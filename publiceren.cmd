@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V14: kleuren per functierol"
+set "OMSCHRIJVING=WorkPortal V15: Verkoop-Inkoop-WVB lichtblauw"
 
 echo.
 echo ============================================

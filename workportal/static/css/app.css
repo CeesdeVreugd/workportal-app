@@ -404,7 +404,7 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .role-administratie { --rc: #7C6CF0; --rb: #EFEDFE; --rt: #4B3FB8; }
 .role-directie      { --rc: #1FA35B; --rb: #E6F6EC; --rt: #16733F; }
 .role-engineering   { --rc: #F2711C; --rb: #FEEFE5; --rt: #B24E0C; }
-.role-verkoop       { --rc: #14B8A6; --rb: #E3F7F4; --rt: #0E7A6E; }
+.role-verkoop       { --rc: #3AA3EC; --rb: #E5F3FD; --rt: #1A6AA6; }
 .role-werkplaats    { --rc: #F2A516; --rb: #FEF4E0; --rt: #9A6508; }
 :where(.rolepill) { --rc: #8A90B0; --rb: #F0F2F8; --rt: var(--ink-2); }
 .rolepill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--rb); color: var(--rt); font-size: 13px; font-weight: 500; white-space: nowrap; line-height: 1.5; }
