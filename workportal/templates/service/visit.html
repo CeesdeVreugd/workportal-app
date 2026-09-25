@@ -2,9 +2,11 @@
 {% from "partials/icons.html" import icon %}
 {% from "partials/macros.html" import photos %}
 {% block title %}Bezoek {{ t.number }}{% endblock %}
+{% from "partials/alert.html" import alert_box %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / bezoek</div>
 <h1>{{ 'Bezoek bewerken' if vid else 'Bezoek vastleggen' }}</h1>
+{{ alert_box(t.customer_alert, t.inst_alert, t.inst_bring, t.installation) }}
 <p class="muted">{{ t.title }}{% if t.customer %} · {{ t.customer }}{% endif %}{% if t.installation %} · {{ t.installation }}{% endif %}</p>
 <form method="post" enctype="multipart/form-data" class="card form" style="max-width:900px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

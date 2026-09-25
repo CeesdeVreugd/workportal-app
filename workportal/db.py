@@ -342,6 +342,13 @@ MIGRATIONS = [
     CREATE UNIQUE INDEX idx_customers_komdex ON customers(komdex_id) WHERE komdex_id IS NOT NULL;
     CREATE INDEX idx_customers_name ON customers(name);
     """,
+    # 3 - meldingen bij machine en relatie ("meenemen", "let op")
+    """
+    ALTER TABLE installations ADD COLUMN alert TEXT;
+    ALTER TABLE installations ADD COLUMN bring TEXT;
+    ALTER TABLE customers ADD COLUMN alert TEXT;
+    ALTER TABLE tickets ADD COLUMN alert_sent_at TEXT;
+    """,
 ]
 
 

@@ -356,3 +356,13 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .search input[type=search], .search input[type=text] { padding-left: 4px; caret-color: var(--basic); }
 .search input:focus::placeholder { color: transparent; }
 .search input::-webkit-search-decoration { -webkit-appearance: none; }
+
+/* meldingen bij machine / relatie */
+.alertbox { background: var(--warn-bg); border: 1px solid #F5C98A; color: #5C3205; border-radius: var(--radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.alertbox-head { display: flex; align-items: center; gap: 10px; color: var(--warn); font-size: 16px; }
+.bringlist { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.bringlist li { background: #fff; border: 1px solid #F5C98A; border-radius: 999px; padding: 4px 12px; font-weight: 500; font-size: 14px; }
+.alertdlg { border: 0; border-radius: 16px; padding: 22px; width: min(460px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(10,10,60,.3); }
+.alertdlg::backdrop { background: rgba(10,10,60,.45); }
+.bringcheck { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 16px; }
+.badge-alert { background: var(--warn-bg); color: var(--warn); }

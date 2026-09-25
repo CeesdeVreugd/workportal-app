@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/macros.html" import ticket_status, prio, photos %}
+{% from "partials/alert.html" import alert_box, alert_dialog %}
 {% block title %}{{ t.number }}{% endblock %}
 {% block content %}
 {% set edit = can('service', 2) %}
@@ -11,10 +12,13 @@
   <div class="actions">
     {% if edit %}
     <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>
+    {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
     <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
     {% endif %}
   </div>
 </div>
+{{ alert_box(t.customer_alert, t.inst_alert, t.inst_bring, t.installation) }}
+{{ alert_dialog('ticket-' ~ t.id, t.customer_alert, t.inst_alert, t.inst_bring, 'Let op: ' ~ (t.installation or t.customer or t.title), url_for('service.depart', tid=t.id) if can('service', 2) else None, t.status in ['nieuw','ingepland','in_uitvoering','wacht']) }}
 <div class="grid g2 stack">
   <section class="card">
     <h2>Gegevens</h2>

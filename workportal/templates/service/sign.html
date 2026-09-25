@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Handtekening{% endblock %}
+{% from "partials/alert.html" import alert_box %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / handtekening</div>
 <h1>Werkbon laten tekenen</h1>
+{{ alert_box(t.customer_alert, t.inst_alert, t.inst_bring, t.installation) }}
 <div class="card" style="max-width:760px">
   <dl class="dl"><dt>Bezoek</dt><dd>{{ v.date|date }} · {{ v.technicians or '' }} · {{ v.hours|num(2) }} uur</dd>
   <dt>Uitgevoerd</dt><dd class="prose" style="font-weight:400">{{ v.work_done or '–' }}</dd></dl>

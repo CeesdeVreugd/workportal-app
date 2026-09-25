@@ -40,6 +40,37 @@ def _check_pressure_tests(conn):
         conn.commit()
 
 
+def _ticket_reminders(conn):
+    """Op de geplande dag (vanaf 07:00) de monteur herinneren aan meldingen en mee te nemen spullen."""
+    local = now_utc().astimezone(TZ)
+    if local.hour < 7:
+        return
+    today = local.strftime("%Y-%m-%d")
+    rows = conn.execute(
+        "SELECT t.id, t.number, t.title, t.assigned_to, c.name AS customer, c.alert AS customer_alert,"
+        " i.name AS installation, i.alert AS inst_alert, i.bring AS inst_bring"
+        " FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN installations i ON i.id = t.installation_id"
+        " WHERE t.status IN ('nieuw','ingepland') AND substr(t.planned_date, 1, 10) = ? AND t.assigned_to IS NOT NULL"
+        " AND t.alert_sent_at IS NULL AND (IFNULL(i.alert,'') <> '' OR IFNULL(i.bring,'') <> '' OR IFNULL(c.alert,'') <> '')",
+        (today,)).fetchall()
+    for t in rows:
+        parts = []
+        where = " – ".join(x for x in (t["customer"], t["installation"]) if x)
+        if where:
+            parts.append(f"Bij {where}.")
+        if t["inst_bring"]:
+            parts.append("Neem mee: " + ", ".join(x for x in t["inst_bring"].splitlines() if x.strip()) + ".")
+        for a in (t["inst_alert"], t["customer_alert"]):
+            if a:
+                parts.append("Let op: " + a.strip())
+        try:
+            notify_user(conn, t["assigned_to"], f"Vandaag: {t['title']}", " ".join(parts), url=f"/service/{t['id']}")
+        except Exception:
+            traceback.print_exc()
+        conn.execute("UPDATE tickets SET alert_sent_at = ? WHERE id = ?", (now_iso(), t["id"]))
+        conn.commit()
+
+
 def _nightly_backup(app, state):
     local = now_utc().astimezone(TZ)
     today = local.strftime("%Y-%m-%d")
@@ -75,6 +106,7 @@ def _loop(app):
     while True:
         try:
             _check_pressure_tests(conn)
+            _ticket_reminders(conn)
             _nightly_backup(app, state)
             conn.execute("DELETE FROM login_codes WHERE created_at < datetime('now', '-2 days')")
             conn.commit()

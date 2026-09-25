@@ -1,11 +1,33 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/macros.html" import ticket_status, photos %}
+{% from "partials/alert.html" import alert_box %}
 {% block title %}{{ i.name }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a> / <a href="{{ url_for('klanten.customer', cid=i.customer_id) }}">{{ i.customer }}</a> / {{ i.name }}</div>
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Relaties</a> / <a href="{{ url_for('klanten.customer', cid=i.customer_id) }}">{{ i.customer }}</a> / {{ i.name }}</div>
 <div class="pagehead"><div><h1>{{ i.name }}</h1><p>{{ i.customer }}{% if i.location %} · {{ i.location }}{% endif %}</p></div>
-  <div class="actions">{% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new', klant=i.customer_id, installatie=i.id) }}">{{ icon('plus') }}Ticket voor deze installatie</a>{% endif %}</div></div>
+  <div class="actions">{% if can('klanten', 2) and not edit %}<a class="btn" href="?bewerken=1">{{ icon('edit') }}Bewerken</a>{% endif %}{% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new', klant=i.customer_id, installatie=i.id) }}">{{ icon('plus') }}Ticket voor deze installatie</a>{% endif %}</div></div>
+{% if edit and can('klanten', 2) %}
+<section class="card"><h2>Installatie bewerken</h2>
+  <form method="post" action="{{ url_for('klanten.add_installation', cid=i.customer_id) }}" enctype="multipart/form-data" class="formgrid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="id" value="{{ i.id }}"><input type="hidden" name="back" value="installatie">
+    <label class="f">Naam<input name="name" value="{{ i.name }}" required></label>
+    <label class="f">Serienummer<input name="serial" value="{{ i.serial or '' }}"></label>
+    <label class="f">Bouwjaar<input name="year" value="{{ i.year or '' }}"></label>
+    <label class="f">Locatie<select name="location_id"><option value="">–</option>{% for l in locations %}<option value="{{ l.id }}" {{ 'selected' if l.id == i.location_id }}>{{ l.name }}</option>{% endfor %}</select></label>
+    <label class="f">Project<select name="project_id"><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if p.id == i.project_id }}>{{ p.number }} {{ p.name }}</option>{% endfor %}</select></label>
+    <label class="f">Onderhoudsinterval (maanden)<input name="service_interval_months" type="number" min="0" value="{{ i.service_interval_months or '' }}"></label>
+    <label class="f">Volgend onderhoud<input name="next_service" type="date" value="{{ i.next_service or '' }}"></label>
+    <label class="f full">Notities<textarea name="notes">{{ i.notes or '' }}</textarea></label>
+    <label class="f full">Meenemen bij onderhoud of storing (één per regel)<textarea name="bring" rows="4" placeholder="Vulhout&#10;Jas&#10;Dommekracht&#10;Dompijzer">{{ i.bring or '' }}</textarea><span class="hint">Wie een ticket op deze machine heeft, krijgt deze lijst als afvinklijst bij vertrek.</span></label>
+    <label class="f full">Let op bij deze machine<textarea name="alert" rows="2" placeholder="bijv. Machine staat bij de eindklant; eerst melden bij de receptie">{{ i.alert or '' }}</textarea></label>
+    <label class="f full">Documenten toevoegen<input type="file" name="files" multiple></label>
+    <div class="full actions"><button class="btn primary">Opslaan</button><a class="btn" href="{{ url_for('klanten.installation', iid=i.id) }}">Annuleren</a></div>
+  </form>
+</section>
+{% else %}
+{{ alert_box(i.customer_alert, i.alert, i.bring, None) }}
+{% endif %}
 <div class="grid g2 stack">
   <section class="card"><h2>Gegevens</h2><dl class="dl">
     <dt>Serienummer</dt><dd>{{ i.serial or '–' }}</dd><dt>Bouwjaar</dt><dd>{{ i.year or '–' }}</dd>

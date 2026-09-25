@@ -20,6 +20,7 @@
     <label class="f">Algemeen e-mailadres<input type="email" name="email" value="{{ c.email or '' }}"></label>
     <label class="f full">Website<input type="text" name="website" value="{{ c.website or '' }}"></label>
     <label class="f full">Notities<textarea name="notes">{{ c.notes or '' }}</textarea></label>
+    <label class="f full">Let op bij deze relatie (melding bij elk ticket)<textarea name="alert" rows="2" placeholder="bijv. Altijd eerst melden bij de portier, veiligheidsschoenen verplicht">{{ c.alert or '' }}</textarea><span class="hint">Verschijnt als melding bij elk ticket en bezoek voor deze relatie. Spullen per machine vul je in bij de installatie.</span></label>
     {% if edit %}<label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if c.active }}> Actief (uitvinken = vervallen)</label>
     <div class="hint" style="align-self:center">{% if komdex_id %}Gekoppeld aan Komdex-ID {{ komdex_id }}. Wijzigingen in Komdex worden bij de volgende import overgenomen.{% else %}Niet gekoppeld aan Komdex.{% endif %}</div>{% endif %}
   </div>

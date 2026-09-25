@@ -1,0 +1,35 @@
+{# Melding bij machine/relatie: meenemen + let op #}
+{% macro has_alert(customer_alert, inst_alert, bring) -%}{{ '1' if (customer_alert or inst_alert or bring) else '' }}{%- endmacro %}
+
+{% macro alert_box(customer_alert, inst_alert, bring, inst_name=None) %}
+{% if customer_alert or inst_alert or bring %}
+<section class="alertbox" role="note">
+  <div class="alertbox-head"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>
+    <b>Let op{% if inst_name %} bij {{ inst_name }}{% endif %}</b></div>
+  {% if bring %}<div><div class="small" style="font-weight:700;margin-bottom:4px">Meenemen</div>
+    <ul class="bringlist">{% for item in bring.split('\n') if item.strip() %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if inst_alert %}<div class="prose">{{ inst_alert }}</div>{% endif %}
+  {% if customer_alert %}<div class="prose"><span class="small" style="font-weight:700">Bij deze relatie:</span> {{ customer_alert }}</div>{% endif %}
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro alert_dialog(key, customer_alert, inst_alert, bring, title, depart_url=None, auto=True) %}
+{% if customer_alert or inst_alert or bring %}
+<dialog class="alertdlg" id="alertdlg" data-key="{{ key }}" data-auto="{{ '1' if auto else '' }}">
+  <form method="post" action="{{ depart_url or '' }}" class="form" id="alertform">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="alertbox-head" style="color:var(--warn)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>
+      <h2 style="margin:0">{{ title }}</h2></div>
+    {% if bring %}<div><div class="small muted" style="margin-bottom:6px">Vink af wat je bij je hebt</div>
+      {% for item in bring.split('\n') if item.strip() %}<label class="check bringcheck"><input type="checkbox" name="item" value="{{ item }}"> {{ item }}</label>{% endfor %}</div>{% endif %}
+    {% if inst_alert %}<div class="prose">{{ inst_alert }}</div>{% endif %}
+    {% if customer_alert %}<div class="prose"><b class="small">Bij deze relatie:</b> {{ customer_alert }}</div>{% endif %}
+    <div class="actions">
+      {% if depart_url %}<button class="btn primary" type="submit" name="go" value="1" data-go>Alles bij me · vertrekken</button>{% endif %}
+      <button class="btn" type="button" data-close>{{ 'Later' if depart_url else 'Begrepen' }}</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endmacro %}

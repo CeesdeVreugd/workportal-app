@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/macros.html" import ticket_status, opt %}
+{% from "partials/alert.html" import alert_box %}
 {% block title %}{{ c.name }}{% endblock %}
 {% block content %}
 {% set edit = can('klanten', 2) %}
@@ -13,6 +14,7 @@
     {% if edit %}<a class="btn" href="{{ url_for('klanten.new_project', klant=c.id) }}">{{ icon('plus') }}Project</a><a class="btn primary" href="{{ url_for('klanten.edit', cid=c.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
   </div>
 </div>
+{{ alert_box(c.alert, None, None) }}
 <div class="grid g2 stack">
   <section class="card">
     <h2>Gegevens</h2>
@@ -46,6 +48,8 @@
       <label class="f">Onderhoudsinterval (maanden)<input type="number" name="service_interval_months" min="0"></label>
       <label class="f">Volgend onderhoud<input type="date" name="next_service"></label>
       <label class="f full">Notities<textarea name="notes" style="min-height:60px"></textarea></label>
+      <label class="f full">Meenemen bij onderhoud of storing (één per regel)<textarea name="bring" rows="3" placeholder="Vulhout&#10;Jas&#10;Dommekracht&#10;Dompijzer"></textarea></label>
+      <label class="f full">Let op bij deze machine<textarea name="alert" rows="2" placeholder="bijv. Machine staat bij hun klant; sleutel ophalen bij receptie"></textarea></label>
       <label class="f full">Documenten (handleiding, tekeningen)<input type="file" name="files" multiple></label>
     </div>
     <div class="actions"><button class="btn primary">Installatie opslaan</button></div>
@@ -53,7 +57,7 @@
   {% endif %}
   <div class="tablewrap"><table class="table">
     <thead><tr><th>Installatie</th><th>Serienr.</th><th class="hide-m">Locatie</th><th class="hide-m">Project</th><th>Volgend onderhoud</th></tr></thead>
-    <tbody>{% for i in installations %}<tr id="inst{{ i.id }}" class="link" data-href="{{ url_for('klanten.installation', iid=i.id) }}"><td><b>{{ i.name }}</b></td><td>{{ i.serial or '' }}</td><td class="hide-m">{{ i.location or '' }}</td><td class="hide-m">{{ i.project_no or '' }}</td><td>{{ i.next_service|date }}</td></tr>
+    <tbody>{% for i in installations %}<tr id="inst{{ i.id }}" class="link" data-href="{{ url_for('klanten.installation', iid=i.id) }}"><td><b>{{ i.name }}</b>{% if i.alert or i.bring %} <span class="badge badge-alert">Let op</span>{% endif %}</td><td>{{ i.serial or '' }}</td><td class="hide-m">{{ i.location or '' }}</td><td class="hide-m">{{ i.project_no or '' }}</td><td>{{ i.next_service|date }}</td></tr>
     {% else %}<tr><td colspan="5" class="empty">Nog geen installaties.</td></tr>{% endfor %}</tbody>
   </table></div>
 </section>

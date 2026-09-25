@@ -178,3 +178,22 @@
     apply(true);
   });
 })();
+
+/* Meldingvenster bij machine/relatie (meenemen / let op) */
+(function () {
+  var dlg = document.getElementById("alertdlg");
+  if (!dlg || typeof dlg.showModal !== "function") return;
+  var key = "wp-alert-" + dlg.getAttribute("data-key");
+  var seen = false;
+  try { seen = sessionStorage.getItem(key) === "1"; } catch (e) {}
+  function open() { dlg.showModal(); }
+  function close() { try { sessionStorage.setItem(key, "1"); } catch (e) {} dlg.close(); }
+  if (dlg.getAttribute("data-auto") === "1" && !seen) open();
+  document.querySelectorAll("[data-open-alert]").forEach(function (b) { b.addEventListener("click", open); });
+  dlg.querySelectorAll("[data-close]").forEach(function (b) { b.addEventListener("click", close); });
+  var go = dlg.querySelector("[data-go]"), boxes = dlg.querySelectorAll("input[name=item]");
+  function check() { if (!go) return; var all = true; boxes.forEach(function (b) { if (!b.checked) all = false; }); go.disabled = !all; }
+  boxes.forEach(function (b) { b.addEventListener("change", check); });
+  check();
+  dlg.querySelector("form").addEventListener("submit", function () { try { sessionStorage.setItem(key, "1"); } catch (e) {} });
+})();

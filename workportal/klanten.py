@@ -15,7 +15,7 @@ def _f(name):
 
 
 CUSTOMER_FIELDS = ["name", "short_name", "debtor_no", "relation_type", "relation_group", "address", "postcode",
-                   "city", "phone", "email", "website", "notes"]
+                   "city", "phone", "email", "website", "notes", "alert"]
 
 
 def customer_options(include_id=None):
@@ -189,19 +189,23 @@ def add_contact(cid):
 @require("klanten", BEWERKEN)
 def add_installation(cid):
     iid = to_int(request.form.get("id"))
+    bring = "\n".join(x.strip() for x in (request.form.get("bring") or "").replace(",", "\n").splitlines() if x.strip()) or None
     vals = (_f("name"), _f("serial"), _f("year"), to_int(request.form.get("location_id")),
             to_int(request.form.get("project_id")), to_int(request.form.get("service_interval_months")),
-            _f("next_service"), _f("notes"))
+            _f("next_service"), _f("notes"), _f("alert"), bring)
     if not vals[0]:
         flash("Vul een naam voor de installatie in.", "error")
     elif iid:
         execute("UPDATE installations SET name=?, serial=?, year=?, location_id=?, project_id=?, service_interval_months=?,"
-                " next_service=?, notes=? WHERE id=? AND customer_id=?", vals + (iid, cid))
+                " next_service=?, notes=?, alert=?, bring=? WHERE id=? AND customer_id=?", vals + (iid, cid))
+        flash("Installatie opgeslagen.", "ok")
     else:
         iid = execute("INSERT INTO installations (name, serial, year, location_id, project_id, service_interval_months,"
-                      " next_service, notes, customer_id) VALUES (?,?,?,?,?,?,?,?,?)", vals + (cid,))
+                      " next_service, notes, alert, bring, customer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", vals + (cid,))
     if iid:
         save_uploads("installation", iid, field="files")
+    if request.form.get("back") == "installatie" and iid:
+        return redirect(url_for("klanten.installation", iid=iid))
     return redirect(url_for("klanten.customer", cid=cid) + f"#inst{iid or ''}")
 
 
@@ -217,14 +221,17 @@ def delete_sub(cid, kind, oid):
 @bp.route("/installatie/<int:iid>")
 @require("klanten", LEZEN)
 def installation(iid):
-    i = query("SELECT i.*, c.name AS customer, l.name AS location, p.number AS project_no, p.name AS project_name"
+    i = query("SELECT i.*, c.name AS customer, c.alert AS customer_alert, l.name AS location, p.number AS project_no, p.name AS project_name"
               " FROM installations i JOIN customers c ON c.id = i.customer_id LEFT JOIN locations l ON l.id = i.location_id"
               " LEFT JOIN projects p ON p.id = i.project_id WHERE i.id = ?", (iid,), one=True) or abort(404)
     tickets = query("SELECT * FROM tickets WHERE installation_id = ? ORDER BY created_at DESC", (iid,))
     visits = query("SELECT v.*, t.number, t.title FROM visits v JOIN tickets t ON t.id = v.ticket_id"
                    " WHERE t.installation_id = ? ORDER BY v.date DESC", (iid,))
-    return render_template("klanten/installation.html", i=i, tickets=tickets, visits=visits,
-                           files=files_for("installation", iid))
+    locations = query("SELECT * FROM locations WHERE customer_id = ? ORDER BY name", (i["customer_id"],))
+    projects = query("SELECT id, number, name FROM projects WHERE customer_id = ? OR id = ? ORDER BY number DESC",
+                     (i["customer_id"], i["project_id"] or 0))
+    return render_template("klanten/installation.html", i=i, tickets=tickets, visits=visits, locations=locations,
+                           projects=projects, files=files_for("installation", iid), edit=request.args.get("bewerken"))
 
 
 # ---------------------------------------------------------------- projecten

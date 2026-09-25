@@ -23,7 +23,7 @@
   {% for t in tickets %}
   <tr class="link" data-href="{{ url_for('service.detail', tid=t.id) }}">
     <td class="nowrap"><b>{{ t.number }}</b><div class="small muted">{{ t.type|capitalize }}</div></td>
-    <td>{{ t.title }} {{ prio(t.priority) }}<div class="small muted">bijgewerkt {{ t.updated_at|dt }}</div></td>
+    <td>{{ t.title }} {{ prio(t.priority) }}{% if t.has_alert %} <span class="badge badge-alert" title="Meldingen / meenemen">Let op</span>{% endif %}<div class="small muted">bijgewerkt {{ t.updated_at|dt }}</div></td>
     <td class="hide-m">{{ t.customer or '–' }}{% if t.installation %}<div class="small muted">{{ t.installation }}</div>{% endif %}</td>
     <td class="hide-m">{{ t.assignee or '–' }}</td>
     <td>{{ ticket_status(t.status) }}</td>

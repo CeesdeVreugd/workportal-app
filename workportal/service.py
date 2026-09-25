@@ -26,7 +26,7 @@ def _f(name):
 def _ticket(tid):
     t = query(
         "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location, i.name AS installation,"
-        " i.serial AS serial, p.number AS project_no, p.name AS project_name, p.sharepoint_path,"
+        " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path,"
         " ct.name AS contact, ct.phone AS contact_phone, ct.email AS contact_email, u.name AS assignee"
         " FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN locations l ON l.id = t.location_id"
         " LEFT JOIN installations i ON i.id = t.installation_id LEFT JOIN projects p ON p.id = t.project_id"
@@ -70,7 +70,8 @@ def index():
     if q:
         where.append("(t.number LIKE ? OR t.title LIKE ? OR IFNULL(c.name,'') LIKE ?)")
         params += [f"%{q}%"] * 3
-    sql = ("SELECT t.*, c.name AS customer, i.name AS installation, u.name AS assignee FROM tickets t"
+    sql = ("SELECT t.*, c.name AS customer, i.name AS installation, u.name AS assignee,"
+           " (IFNULL(i.alert,'') <> '' OR IFNULL(i.bring,'') <> '' OR IFNULL(c.alert,'') <> '') AS has_alert FROM tickets t"
            " LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN installations i ON i.id = t.installation_id"
            " LEFT JOIN users u ON u.id = t.assigned_to")
     if where:
@@ -132,6 +133,9 @@ def edit(tid):
         if not _f("title"):
             flash("Vul een korte omschrijving in.", "error")
         else:
+            if (_f("planned_date") or None) != (t["planned_date"] or None) or \
+                    to_int(request.form.get("assigned_to")) != t["assigned_to"]:
+                execute("UPDATE tickets SET alert_sent_at = NULL WHERE id = ?", (tid,))
             execute("UPDATE tickets SET type=?, priority=?, status=?, title=?, description=?, customer_id=?, location_id=?,"
                     " installation_id=?, project_id=?, contact_id=?, reported_by=?, assigned_to=?, planned_date=?, updated_at=?"
                     " WHERE id=?",
@@ -161,6 +165,18 @@ def set_status(tid):
     execute("UPDATE tickets SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?", (status, closed, now_iso(), tid))
     audit("status", "ticket", tid, dict(STATUSES)[status])
     flash(f"Status gewijzigd naar {dict(STATUSES)[status]}.", "ok")
+    return redirect(url_for("service.detail", tid=tid))
+
+
+@bp.route("/<int:tid>/vertrek", methods=["POST"])
+@require("service", BEWERKEN)
+def depart(tid):
+    t = _ticket(tid)
+    items = request.form.getlist("item")
+    if t["status"] in ("nieuw", "ingepland"):
+        execute("UPDATE tickets SET status = 'in_uitvoering', updated_at = ? WHERE id = ?", (now_iso(), tid))
+    audit("vertrokken", "ticket", tid, ("meegenomen: " + ", ".join(items)) if items else "meldingen gelezen")
+    flash("Goede reis! Vertrek vastgelegd" + (" met alles bij je." if items else "."), "ok")
     return redirect(url_for("service.detail", tid=tid))
 
 
