@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon"}
 
@@ -112,6 +112,15 @@ def create_app(test_config=None, start_scheduler=True):
 
     @app.route("/manifest.webmanifest")
     def manifest():
+        ua = request.headers.get("User-Agent", "")
+        if any(k in ua for k in ("iPhone", "iPad", "iPod")):
+            # iOS: effen vierkant icoon zonder doorzichtige delen (anders legt iOS er een glaseffect overheen)
+            icons = [{"src": url_for("static", filename=f"img/wp-ios-{n}.png"), "sizes": f"{n}x{n}",
+                      "type": "image/png", "purpose": "any"} for n in (180, 192, 512)]
+        else:
+            # Bureaublad/Android: rond icoon
+            icons = [{"src": url_for("static", filename=f"img/wp-round-{n}.png"), "sizes": f"{n}x{n}",
+                      "type": "image/png", "purpose": "any"} for n in (96, 144, 192, 256, 384, 512)]
         return {
             "name": "WorkPortal - DVP",
             "short_name": "WorkPortal - DVP",
@@ -121,11 +130,8 @@ def create_app(test_config=None, start_scheduler=True):
             "theme_color": "#0A0A96",
             "id": "/",
             "scope": "/",
-            "icons": [
-                {"src": url_for("static", filename=f"img/wp-round-{n}.png"), "sizes": f"{n}x{n}", "type": "image/png",
-                 "purpose": "any"} for n in (96, 144, 192, 256, 384, 512)
-            ],
-        }
+            "icons": icons,
+        }, 200, {"Vary": "User-Agent", "Cache-Control": "no-cache"}
 
     @app.route("/apple-touch-icon.png")
     @app.route("/apple-touch-icon-precomposed.png")
