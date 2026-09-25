@@ -4,9 +4,10 @@
 {% block title %}{{ c.name }}{% endblock %}
 {% block content %}
 {% set edit = can('klanten', 2) %}
-<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a> / {{ c.name }}</div>
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Relaties</a> / {{ c.name }}</div>
 <div class="pagehead">
-  <div><h1>{{ c.name }}</h1><p>{{ c.address or '' }} {{ c.postcode or '' }} {{ c.city or '' }}{% if c.debtor_no %} · debiteur {{ c.debtor_no }}{% endif %}</p></div>
+  <div><div class="eyebrow">{{ TYPE_LABELS.get(c.relation_type, 'Relatie') }}{% if c.relation_group %} · {{ c.relation_group }}{% endif %}{% if not c.active %} · vervallen{% endif %}</div>
+    <h1>{{ c.name }}</h1><p>{{ c.address or '' }} {{ c.postcode or '' }} {{ c.city or '' }}</p></div>
   <div class="actions">
     {% if can('service', 2) %}<a class="btn" href="{{ url_for('service.new', klant=c.id) }}">{{ icon('plus') }}Ticket</a>{% endif %}
     {% if edit %}<a class="btn" href="{{ url_for('klanten.new_project', klant=c.id) }}">{{ icon('plus') }}Project</a><a class="btn primary" href="{{ url_for('klanten.edit', cid=c.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
@@ -16,8 +17,12 @@
   <section class="card">
     <h2>Gegevens</h2>
     <dl class="dl">
+      <dt>Klantnr. SnelStart</dt><dd>{% if c.debtor_no %}{{ c.debtor_no }}{% elif can('klanten', 2) %}<a href="{{ url_for('klanten.snelstart', cid=c.id) }}">Invullen</a>{% else %}–{% endif %}</dd>
+      <dt>Komdex-ID</dt><dd>{{ c.komdex_id or 'Niet gekoppeld' }}</dd>
+      {% if c.short_name %}<dt>Verkorte naam</dt><dd>{{ c.short_name }}</dd>{% endif %}
       <dt>Telefoon</dt><dd>{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% else %}–{% endif %}</dd>
       <dt>E-mail</dt><dd>{% if c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}–{% endif %}</dd>
+      <dt>Website</dt><dd>{% if c.website %}<a href="{{ c.website if c.website.startswith('http') else 'https://' ~ c.website }}" target="_blank" rel="noopener">{{ c.website }}</a>{% else %}–{% endif %}</dd>
       <dt>Notities</dt><dd class="prose" style="font-weight:400">{{ c.notes or '–' }}</dd>
     </dl>
   </section>
@@ -95,6 +100,6 @@
 </section>
 {% endif %}
 {% if can('klanten', 3) %}
-<form method="post" action="{{ url_for('klanten.delete', cid=c.id) }}" data-confirm="Klant {{ c.name }} definitief verwijderen, inclusief locaties, contactpersonen en installaties?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Klant verwijderen</button></form>
+<form method="post" action="{{ url_for('klanten.delete', cid=c.id) }}" data-confirm="Relatie {{ c.name }} definitief verwijderen, inclusief locaties, contactpersonen en installaties?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Relatie verwijderen</button></form>
 {% endif %}
 {% endblock %}

@@ -1,19 +1,27 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Klant bewerken' if edit else 'Nieuwe klant' }}{% endblock %}
+{% from "partials/macros.html" import opt %}
+{% block title %}{{ 'Relatie bewerken' if edit else 'Nieuwe relatie' }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a>{% if edit %} / <a href="{{ url_for('klanten.customer', cid=cid) }}">{{ c.name }}</a>{% endif %}</div>
-<h1>{{ 'Klant bewerken' if edit else 'Nieuwe klant' }}</h1>
-<form method="post" class="card form" style="max-width:820px">
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Relaties</a>{% if edit %} / <a href="{{ url_for('klanten.customer', cid=cid) }}">{{ c.name }}</a>{% endif %}</div>
+<h1>{{ 'Relatie bewerken' if edit else 'Nieuwe relatie' }}</h1>
+<form method="post" class="card form" style="max-width:860px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if dup %}<input type="hidden" name="confirm_dup" value="1"><div class="flash info">Bestaande relatie: <a href="{{ url_for('klanten.customer', cid=dup.id) }}" target="_blank">{{ dup.name }}</a>. Opslaan maakt toch een nieuwe relatie aan.</div>{% endif %}
   <div class="fgrid">
-    <label class="f full">Klantnaam *<input type="text" name="name" value="{{ c.name or '' }}" required autofocus></label>
-    <label class="f">Debiteurnummer (ERP)<input type="text" name="debtor_no" value="{{ c.debtor_no or '' }}"></label>
-    <label class="f">Telefoon<input type="tel" name="phone" value="{{ c.phone or '' }}"></label>
-    <label class="f full">Adres<input type="text" name="address" value="{{ c.address or '' }}"></label>
+    <label class="f full">Naam *<input type="text" name="name" value="{{ c.name or '' }}" required autofocus></label>
+    <label class="f">Verkorte naam<input type="text" name="short_name" value="{{ c.short_name or '' }}"></label>
+    <label class="f">Klantnummer SnelStart<input type="text" name="debtor_no" value="{{ c.debtor_no or '' }}" inputmode="numeric"></label>
+    <label class="f">Type<select name="relation_type"><option value="">–</option>{% for k, l in TYPES %}{{ opt(k, l, c.relation_type) }}{% endfor %}</select></label>
+    <label class="f">Groep / branche<input type="text" name="relation_group" value="{{ c.relation_group or '' }}" placeholder="bijv. Food, Machines"></label>
+    <label class="f full">Adres (straat en huisnummer)<input type="text" name="address" value="{{ c.address or '' }}"></label>
     <label class="f">Postcode<input type="text" name="postcode" value="{{ c.postcode or '' }}"></label>
     <label class="f">Plaats<input type="text" name="city" value="{{ c.city or '' }}"></label>
-    <label class="f full">Algemeen e-mailadres<input type="email" name="email" value="{{ c.email or '' }}"></label>
+    <label class="f">Telefoon<input type="tel" name="phone" value="{{ c.phone or '' }}"></label>
+    <label class="f">Algemeen e-mailadres<input type="email" name="email" value="{{ c.email or '' }}"></label>
+    <label class="f full">Website<input type="text" name="website" value="{{ c.website or '' }}"></label>
     <label class="f full">Notities<textarea name="notes">{{ c.notes or '' }}</textarea></label>
+    {% if edit %}<label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if c.active }}> Actief (uitvinken = vervallen)</label>
+    <div class="hint" style="align-self:center">{% if komdex_id %}Gekoppeld aan Komdex-ID {{ komdex_id }}. Wijzigingen in Komdex worden bij de volgende import overgenomen.{% else %}Niet gekoppeld aan Komdex.{% endif %}</div>{% endif %}
   </div>
   <div class="actions"><button class="btn primary">Opslaan</button><a class="btn ghost" href="{{ url_for('klanten.customer', cid=cid) if edit else url_for('klanten.index') }}">Annuleren</a></div>
 </form>

@@ -328,6 +328,20 @@ MIGRATIONS = [
         notes TEXT
     );
     """,
+    # 2 - relaties uit Komdex (klanten en leveranciers), klantnummer SnelStart
+    """
+    ALTER TABLE customers ADD COLUMN komdex_id TEXT;
+    ALTER TABLE customers ADD COLUMN komdex_snapshot TEXT;
+    ALTER TABLE customers ADD COLUMN short_name TEXT;
+    ALTER TABLE customers ADD COLUMN website TEXT;
+    ALTER TABLE customers ADD COLUMN relation_type TEXT;
+    ALTER TABLE customers ADD COLUMN relation_group TEXT;
+    ALTER TABLE customers ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE customers ADD COLUMN snelstart_asked INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE customers ADD COLUMN updated_at TEXT;
+    CREATE UNIQUE INDEX idx_customers_komdex ON customers(komdex_id) WHERE komdex_id IS NOT NULL;
+    CREATE INDEX idx_customers_name ON customers(name);
+    """,
 ]
 
 

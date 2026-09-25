@@ -5,6 +5,7 @@ from .integrations import upload_to_sharepoint, sharepoint_configured
 from .mail import send_mail
 from .pdf import visit_pdf
 from .permissions import require, LEZEN, BEWERKEN, BEHEER
+from .klanten import customer_options, ask_snelstart
 from .util import (now_iso, audit, files_for, save_uploads, save_signature, file_path, to_float, to_int,
                    next_number, get_setting, local, now_utc, delete_file, safe_filename)
 
@@ -38,7 +39,7 @@ def _ticket(tid):
 
 def _lookups(customer_id=None):
     return dict(
-        customers=query("SELECT id, name FROM customers ORDER BY name"),
+        customers=customer_options(customer_id),
         locations=query("SELECT id, customer_id, name FROM locations ORDER BY name"),
         installations=query("SELECT id, customer_id, name, serial FROM installations ORDER BY name"),
         contacts=query("SELECT id, customer_id, name FROM contacts ORDER BY name"),
@@ -87,7 +88,7 @@ def new():
     if request.method == "POST":
         if not _f("title"):
             flash("Vul een korte omschrijving in.", "error")
-            return render_template("service/form.html", t=request.form, **_lookups())
+            return render_template("service/form.html", t=request.form, **_lookups(to_int(request.form.get("customer_id"))))
         now = now_iso()
         number = next_number("tickets", "T")
         status = _f("status") or ("ingepland" if _f("planned_date") else "nieuw")
@@ -103,7 +104,8 @@ def new():
         save_uploads("ticket", tid)
         audit("aangemaakt", "ticket", tid, number)
         flash(f"Ticket {number} aangemaakt.", "ok")
-        return redirect(url_for("service.detail", tid=tid))
+        target = url_for("service.detail", tid=tid)
+        return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
     t = {"customer_id": request.args.get("klant"), "installation_id": request.args.get("installatie"),
          "type": request.args.get("type", "storing"), "priority": "normaal", "assigned_to": g.user["id"]}
     return render_template("service/form.html", t=t, **_lookups(to_int(t["customer_id"])))
@@ -141,7 +143,8 @@ def edit(tid):
             save_uploads("ticket", tid)
             audit("gewijzigd", "ticket", tid)
             flash("Ticket opgeslagen.", "ok")
-            return redirect(url_for("service.detail", tid=tid))
+            target = url_for("service.detail", tid=tid)
+            return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
     return render_template("service/form.html", t=t, edit=True, **_lookups(t["customer_id"]))
 
 

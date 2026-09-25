@@ -53,8 +53,8 @@ def search():
     if q:
         like = f"%{q}%"
         if can("klanten"):
-            res["klanten"] = query("SELECT * FROM customers WHERE name LIKE ? OR debtor_no LIKE ? OR city LIKE ? ORDER BY name LIMIT 20",
-                                   (like, like, like))
+            res["klanten"] = query("SELECT * FROM customers WHERE name LIKE ? OR IFNULL(short_name,'') LIKE ? OR debtor_no LIKE ? OR city LIKE ? ORDER BY name LIMIT 20",
+                                   (like, like, like, like))
             res["projecten"] = query("SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id"
                                      " WHERE p.number LIKE ? OR p.name LIKE ? ORDER BY p.created_at DESC LIMIT 20", (like, like))
             res["installaties"] = query("SELECT i.*, c.name AS customer FROM installations i JOIN customers c ON c.id = i.customer_id"

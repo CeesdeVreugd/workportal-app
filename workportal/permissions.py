@@ -7,7 +7,7 @@ GEEN, LEZEN, BEWERKEN, BEHEER = 0, 1, 2, 3
 LEVEL_NAMES = {0: "Geen", 1: "Lezen", 2: "Bewerken", 3: "Beheer"}
 
 MODULES = [
-    ("klanten", "Klanten & projecten"),
+    ("klanten", "Relaties & projecten"),
     ("service", "Service & onderhoud"),
     ("druktest", "Druktestregistratie"),
     ("calculatie", "Calculatie"),

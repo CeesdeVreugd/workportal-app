@@ -336,3 +336,4 @@ body { min-height: 100vh; }
 body.authbody { background: #fff; }
 body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--basic); z-index: 50; }
 @media (min-width: 901px) { html { background: var(--bg); } }
+.content .search, .content form .search { flex: none; width: 100%; }

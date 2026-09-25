@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Import controleren{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Relaties</a> / <a href="{{ url_for('klanten.import_upload') }}">importeren</a> / controleren</div>
+<h1>Stap 2 · Controleren</h1>
+<p class="muted">{{ data.filename }} · {{ data.records|length }} relaties ingelezen</p>
+<div class="grid g4">
+  <div class="card kpi"><div class="label">Nieuw</div><div class="value">{{ p.new|length }}</div></div>
+  <div class="card kpi"><div class="label">Bijwerken</div><div class="value">{{ p.updates|length }}</div></div>
+  <div class="card kpi"><div class="label">Keuze nodig</div><div class="value" {% if p.conflicts %}style="color:var(--warn)"{% endif %}>{{ p.conflicts|length }}</div></div>
+  <div class="card kpi"><div class="label">Ongewijzigd</div><div class="value">{{ p.unchanged }}</div></div>
+</div>
+{% if data.warnings %}<div class="flash info">{% for w in data.warnings %}{{ w }}<br>{% endfor %}</div>{% endif %}
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if p.conflicts %}
+  <section class="card">
+    <h2>Keuze nodig: bestaat deze relatie al?</h2>
+    <p class="muted small">Deze relaties uit Komdex lijken op relaties die in de app zijn aangemaakt. Kies per relatie wat er moet gebeuren. Deze vraag komt maar één keer.</p>
+    {% for c in p.conflicts %}{% set r = c.rec %}
+    <div style="border-top:1px solid var(--line);padding:14px 0;display:flex;flex-direction:column;gap:10px">
+      <div class="grid g2" style="gap:12px">
+        <div style="background:#F7F8FC;border-radius:10px;padding:12px"><div class="small muted">Uit Komdex (ID {{ r.komdex_id }})</div><b>{{ r.name }}</b>
+          <div class="small">{{ r.address or '' }} {{ r.postcode or '' }} {{ r.city or '' }}<br>{{ r.email or '' }} {{ r.phone or '' }} · {{ TYPE_LABELS.get(r.relation_type, '') }}</div></div>
+        {% for a in c.candidates %}
+        <div style="background:var(--accent-soft);border-radius:10px;padding:12px"><div class="small muted">In WorkPortal</div><b><a href="{{ url_for('klanten.customer', cid=a.id) }}" target="_blank">{{ a.name }}</a></b>
+          <div class="small">{{ a.address or '' }} {{ a.postcode or '' }} {{ a.city or '' }}<br>{{ a.email or '' }} {{ a.phone or '' }}{% if a.debtor_no %} · SnelStart {{ a.debtor_no }}{% endif %}</div></div>
+        {% endfor %}
+      </div>
+      <div class="chips">
+        {% for a in c.candidates %}
+        <label class="chip"><input type="radio" name="dec_{{ r.komdex_id }}" value="app:{{ a.id }}" {{ 'checked' if decisions.get(r.komdex_id) == 'app:' ~ a.id }}><span>Zelfde relatie · gegevens uit app houden{{ (' (' ~ a.name ~ ')') if c.candidates|length > 1 }}</span></label>
+        <label class="chip"><input type="radio" name="dec_{{ r.komdex_id }}" value="excel:{{ a.id }}" {{ 'checked' if decisions.get(r.komdex_id) == 'excel:' ~ a.id }}><span>Zelfde relatie · gegevens uit Komdex gebruiken{{ (' (' ~ a.name ~ ')') if c.candidates|length > 1 }}</span></label>
+        {% endfor %}
+        <label class="chip"><input type="radio" name="dec_{{ r.komdex_id }}" value="apart" {{ 'checked' if decisions.get(r.komdex_id) == 'apart' }}><span>Andere relatie · apart toevoegen</span></label>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if p.updates %}
+  <section class="card">
+    <h2>Wordt bijgewerkt ({{ p.updates|length }})</h2>
+    <div class="tablewrap"><table class="table"><thead><tr><th>Relatie</th><th>Wijziging</th></tr></thead><tbody>
+    {% for u in p.updates[:200] %}<tr><td><b>{{ u.rec.name }}</b><div class="small muted">ID {{ u.rec.komdex_id }}</div></td>
+      <td class="small">{% for f, ch in u.changes.items() %}<div><span class="muted">{{ FIELD_LABELS.get(f, f) }}:</span> {{ ch[0] if ch[0] not in [None, ''] else '–' }} → <b>{{ ch[1] if ch[1] not in [None, ''] else '–' }}</b></div>{% endfor %}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% if p.updates|length > 200 %}<p class="hint">En nog {{ p.updates|length - 200 }} meer.</p>{% endif %}
+  </section>
+  {% endif %}
+  {% if p.new %}
+  <details class="card"><summary style="cursor:pointer"><b>Nieuw toe te voegen ({{ p.new|length }})</b> <span class="muted small">klik om te bekijken</span></summary>
+    <div class="tablewrap" style="margin-top:12px"><table class="table"><thead><tr><th>ID</th><th>Naam</th><th>Plaats</th><th>Type</th></tr></thead><tbody>
+    {% for r in p.new[:1000] %}<tr><td>{{ r.komdex_id }}</td><td>{{ r.name }}</td><td>{{ r.city or '' }}</td><td>{{ TYPE_LABELS.get(r.relation_type, '') }}{% if not r.active %} (vervallen){% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </details>
+  {% endif %}
+  <div class="actions">
+    <button class="btn primary">Import uitvoeren</button>
+    <a class="btn ghost" href="{{ url_for('klanten.import_upload') }}">Annuleren</a>
+  </div>
+</form>
+{% endblock %}

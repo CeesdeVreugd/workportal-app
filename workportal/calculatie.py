@@ -10,6 +10,7 @@ from .db import query, execute, get_db
 from .engine import load_calc, compute_calc
 from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
 from .seed import CATEGORIES, CATEGORY_TITLES, WORKTYPES
+from .klanten import customer_options, ask_snelstart
 from .util import now_iso, audit, to_float, to_int, next_number, safe_filename
 
 bp = Blueprint("calculatie", __name__, url_prefix="/calculatie")
@@ -127,7 +128,7 @@ def index():
 @bp.route("/nieuw", methods=["GET", "POST"])
 @require("calculatie", BEWERKEN)
 def new():
-    customers = query("SELECT id, name FROM customers ORDER BY name")
+    customers = customer_options(to_int(request.form.get("customer_id")))
     projects = query("SELECT id, number, name, customer_id FROM projects ORDER BY number DESC")
     if request.method == "POST":
         worktypes = [w for w in request.form.getlist("worktypes") if w in dict(WORKTYPES)]
@@ -156,7 +157,8 @@ def new():
         save_structure(cid, build_structure(worktypes, names, include))
         audit("aangemaakt", "calc", cid, title)
         flash("Calculatie opgebouwd uit de sjablonen. Vul de aantallen en prijzen in.", "ok")
-        return redirect(url_for("calculatie.edit", cid=cid))
+        target = url_for("calculatie.edit", cid=cid)
+        return ask_snelstart(cust_id, target) or redirect(target)
     return render_template("calculatie/new.html", form={"n_parts": 1, "quantity": 1, "transport": "ja"},
                            customers=customers, projects=projects, WORKTYPES=WORKTYPES)
 
@@ -165,7 +167,7 @@ def new():
 @require("calculatie", LEZEN)
 def edit(cid):
     data = _calc_or_404(cid)
-    customers = query("SELECT id, name FROM customers ORDER BY name")
+    customers = customer_options(data["customer_id"])
     projects = query("SELECT id, number, name, customer_id FROM projects ORDER BY number DESC")
     nacalcs = query("SELECT id, imported_at, order_no FROM nacalcs WHERE calc_id = ? ORDER BY imported_at DESC", (cid,))
     readonly = not can("calculatie", BEWERKEN)

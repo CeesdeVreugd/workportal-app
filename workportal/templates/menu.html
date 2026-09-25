@@ -6,7 +6,7 @@
 <div class="card flush"><div class="nav" style="padding:8px">
   <a href="{{ url_for('main.dashboard') }}">{{ icon('dashboard') }}Dashboard</a>
   {% if can('klanten') %}<div class="navhead">Relaties</div>{% endif %}
-  {% if can('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Klanten &amp; projecten</a>{% endif %}
+  {% if can('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Relaties &amp; projecten</a>{% endif %}
   {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
   {% if can('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
   {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}

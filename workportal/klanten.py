@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
+from . import relaties
 from .db import query, execute
-from .permissions import require, LEZEN, BEWERKEN, BEHEER
+from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
+from .relaties import RELATION_TYPES, TYPE_LABELS
 from .util import now_iso, audit, files_for, save_uploads, to_int
 
 bp = Blueprint("klanten", __name__, url_prefix="/klanten")
@@ -12,41 +14,85 @@ def _f(name):
     return v.strip() if v and v.strip() else None
 
 
+CUSTOMER_FIELDS = ["name", "short_name", "debtor_no", "relation_type", "relation_group", "address", "postcode",
+                   "city", "phone", "email", "website", "notes"]
+
+
+def customer_options(include_id=None):
+    """Relaties voor keuzelijsten: actieve klanten (geen pure leveranciers)."""
+    return query("SELECT id, name, city FROM customers WHERE (active = 1 AND IFNULL(relation_type, '') != 'leverancier')"
+                 " OR id = ? ORDER BY name COLLATE NOCASE", (include_id or 0,))
+
+
+def ask_snelstart(customer_id, next_url):
+    """Eerste keer dat een klant wordt gebruikt zonder klantnummer SnelStart: vraag het één keer."""
+    if not customer_id or not can("klanten", BEWERKEN):
+        return None
+    c = query("SELECT debtor_no, snelstart_asked, relation_type FROM customers WHERE id = ?", (customer_id,), one=True)
+    if not c or c["debtor_no"] or c["snelstart_asked"] or c["relation_type"] == "leverancier":
+        return None
+    return redirect(url_for("klanten.snelstart", cid=customer_id, next=next_url))
+
+
 @bp.route("/")
 @require("klanten", LEZEN)
 def index():
     q = (request.args.get("q") or "").strip()
     tab = request.args.get("tab", "klanten")
     like = f"%{q}%"
-    customers = query(
-        "SELECT c.*, (SELECT COUNT(*) FROM projects p WHERE p.customer_id = c.id) AS n_projects,"
-        " (SELECT COUNT(*) FROM installations i WHERE i.customer_id = c.id) AS n_inst,"
-        " (SELECT COUNT(*) FROM tickets t WHERE t.customer_id = c.id AND t.status NOT IN ('afgerond','gefactureerd')) AS n_open"
-        " FROM customers c WHERE c.name LIKE ? OR IFNULL(c.city,'') LIKE ? OR IFNULL(c.debtor_no,'') LIKE ? ORDER BY c.name",
-        (like, like, like))
+    where = ["(c.name LIKE ? OR IFNULL(c.short_name,'') LIKE ? OR IFNULL(c.city,'') LIKE ? OR IFNULL(c.debtor_no,'') LIKE ?"
+             " OR IFNULL(c.komdex_id,'') = ?)"]
+    params = [like, like, like, like, q]
+    if tab == "klanten":
+        where.append("c.active = 1 AND IFNULL(c.relation_type,'') IN ('klant','beide','instelling','prospect','')")
+    elif tab == "leveranciers":
+        where.append("c.active = 1 AND c.relation_type IN ('leverancier','beide')")
+    elif tab == "vervallen":
+        where.append("c.active = 0")
+    customers = []
+    if tab != "projecten":
+        customers = query(
+            "SELECT c.*, (SELECT COUNT(*) FROM projects p WHERE p.customer_id = c.id) AS n_projects,"
+            " (SELECT COUNT(*) FROM tickets t WHERE t.customer_id = c.id AND t.status NOT IN ('afgerond','gefactureerd')) AS n_open"
+            " FROM customers c WHERE " + " AND ".join(where) + " ORDER BY c.name COLLATE NOCASE", params)
     projects = query(
         "SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id"
         " WHERE p.number LIKE ? OR p.name LIKE ? OR IFNULL(c.name,'') LIKE ?"
         " ORDER BY CASE p.status WHEN 'actief' THEN 0 ELSE 1 END, p.number DESC", (like, like, like))
-    return render_template("klanten/index.html", customers=customers, projects=projects, q=q, tab=tab)
+    counts = query("SELECT COUNT(*) AS alle, SUM(active = 1 AND IFNULL(relation_type,'') IN ('klant','beide','instelling','prospect',''))"
+                   " AS klanten, SUM(active = 1 AND relation_type IN ('leverancier','beide')) AS leveranciers,"
+                   " SUM(active = 0) AS vervallen FROM customers", one=True)
+    return render_template("klanten/index.html", customers=customers, projects=projects, q=q, tab=tab,
+                           counts=counts, TYPE_LABELS=TYPE_LABELS)
+
+
+def _customer_values():
+    vals = {f: _f(f) for f in CUSTOMER_FIELDS}
+    if vals["relation_type"] not in TYPE_LABELS:
+        vals["relation_type"] = None
+    return vals
 
 
 @bp.route("/nieuw", methods=["GET", "POST"])
 @require("klanten", BEWERKEN)
 def new():
     if request.method == "POST":
-        if not _f("name"):
-            flash("Vul een klantnaam in.", "error")
-            return render_template("klanten/customer_form.html", c=request.form)
-        cid = execute(
-            "INSERT INTO customers (name, debtor_no, address, postcode, city, phone, email, notes, created_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?)",
-            (_f("name"), _f("debtor_no"), _f("address"), _f("postcode"), _f("city"), _f("phone"), _f("email"),
-             _f("notes"), now_iso()))
-        audit("aangemaakt", "customer", cid, _f("name"))
-        flash("Klant aangemaakt.", "ok")
+        vals = _customer_values()
+        if not vals["name"]:
+            flash("Vul een naam in.", "error")
+            return render_template("klanten/customer_form.html", c=request.form, TYPES=RELATION_TYPES)
+        dup = query("SELECT id, name FROM customers WHERE lower(name) = lower(?)", (vals["name"],), one=True)
+        if dup and not request.form.get("confirm_dup"):
+            flash(f"Er bestaat al een relatie '{dup['name']}'. Klik nogmaals op Opslaan om toch een nieuwe aan te maken.", "error")
+            return render_template("klanten/customer_form.html", c=request.form, TYPES=RELATION_TYPES, dup=dup)
+        now = now_iso()
+        cid = execute(f"INSERT INTO customers ({', '.join(CUSTOMER_FIELDS)}, created_at, updated_at)"
+                      f" VALUES ({', '.join('?' * len(CUSTOMER_FIELDS))}, ?, ?)",
+                      [vals[f] for f in CUSTOMER_FIELDS] + [now, now])
+        audit("aangemaakt", "customer", cid, vals["name"])
+        flash("Relatie aangemaakt.", "ok")
         return redirect(url_for("klanten.customer", cid=cid))
-    return render_template("klanten/customer_form.html", c={})
+    return render_template("klanten/customer_form.html", c={"relation_type": "klant"}, TYPES=RELATION_TYPES)
 
 
 @bp.route("/<int:cid>")
@@ -63,7 +109,7 @@ def customer(cid):
     tickets = query("SELECT t.*, i.name AS installation FROM tickets t LEFT JOIN installations i ON i.id = t.installation_id"
                     " WHERE t.customer_id = ? ORDER BY t.created_at DESC LIMIT 50", (cid,))
     return render_template("klanten/customer.html", c=c, locations=locations, contacts=contacts,
-                           installations=installations, projects=projects, tickets=tickets)
+                           installations=installations, projects=projects, tickets=tickets, TYPE_LABELS=TYPE_LABELS)
 
 
 @bp.route("/<int:cid>/bewerken", methods=["GET", "POST"])
@@ -71,16 +117,19 @@ def customer(cid):
 def edit(cid):
     c = query("SELECT * FROM customers WHERE id = ?", (cid,), one=True) or abort(404)
     if request.method == "POST":
-        if not _f("name"):
-            flash("Vul een klantnaam in.", "error")
-            return render_template("klanten/customer_form.html", c=request.form, edit=True, cid=cid)
-        execute("UPDATE customers SET name=?, debtor_no=?, address=?, postcode=?, city=?, phone=?, email=?, notes=? WHERE id=?",
-                (_f("name"), _f("debtor_no"), _f("address"), _f("postcode"), _f("city"), _f("phone"), _f("email"),
-                 _f("notes"), cid))
+        vals = _customer_values()
+        if not vals["name"]:
+            flash("Vul een naam in.", "error")
+            return render_template("klanten/customer_form.html", c=request.form, edit=True, cid=cid, TYPES=RELATION_TYPES,
+                                   komdex_id=c["komdex_id"])
+        active = 1 if request.form.get("active") else 0
+        execute(f"UPDATE customers SET {', '.join(f + ' = ?' for f in CUSTOMER_FIELDS)}, active = ?, updated_at = ? WHERE id = ?",
+                [vals[f] for f in CUSTOMER_FIELDS] + [active, now_iso(), cid])
         audit("gewijzigd", "customer", cid)
-        flash("Klant opgeslagen.", "ok")
+        flash("Relatie opgeslagen.", "ok")
         return redirect(url_for("klanten.customer", cid=cid))
-    return render_template("klanten/customer_form.html", c=c, edit=True, cid=cid)
+    return render_template("klanten/customer_form.html", c=c, edit=True, cid=cid, TYPES=RELATION_TYPES,
+                           komdex_id=c["komdex_id"])
 
 
 @bp.route("/<int:cid>/verwijderen", methods=["POST"])
@@ -89,7 +138,7 @@ def delete(cid):
     c = query("SELECT * FROM customers WHERE id = ?", (cid,), one=True) or abort(404)
     execute("DELETE FROM customers WHERE id = ?", (cid,))
     audit("verwijderd", "customer", cid, c["name"])
-    flash(f"Klant {c['name']} verwijderd.", "ok")
+    flash(f"Relatie {c['name']} verwijderd.", "ok")
     return redirect(url_for("klanten.index"))
 
 
@@ -173,7 +222,7 @@ def installation(iid):
 @bp.route("/projecten/nieuw", methods=["GET", "POST"])
 @require("klanten", BEWERKEN)
 def new_project():
-    customers = query("SELECT id, name FROM customers ORDER BY name")
+    customers = customer_options(to_int(request.values.get("customer_id") or request.args.get("klant")))
     if request.method == "POST":
         if not _f("number") or not _f("name"):
             flash("Vul projectnummer en omschrijving in.", "error")
@@ -188,9 +237,8 @@ def new_project():
         audit("aangemaakt", "project", pid, _f("number"))
         flash("Project aangemaakt.", "ok")
         nxt = request.form.get("next")
-        if nxt and nxt.startswith("/"):
-            return redirect(nxt)
-        return redirect(url_for("klanten.project", pid=pid))
+        target = nxt if nxt and nxt.startswith("/") else url_for("klanten.project", pid=pid)
+        return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
     return render_template("klanten/project_form.html", customers=customers,
                            p={"customer_id": request.args.get("klant"), "status": "actief"},
                            next=request.args.get("next", ""))
@@ -214,7 +262,7 @@ def project(pid):
 @require("klanten", BEWERKEN)
 def edit_project(pid):
     p = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) or abort(404)
-    customers = query("SELECT id, name FROM customers ORDER BY name")
+    customers = customer_options(p["customer_id"])
     if request.method == "POST":
         if not _f("number") or not _f("name"):
             flash("Vul projectnummer en omschrijving in.", "error")
@@ -235,3 +283,78 @@ def delete_project(pid):
     audit("verwijderd", "project", pid)
     flash("Project verwijderd.", "ok")
     return redirect(url_for("klanten.index", tab="projecten"))
+
+
+# ---------------------------------------------------------------- klantnummer SnelStart
+
+@bp.route("/<int:cid>/klantnummer", methods=["GET", "POST"])
+@require("klanten", BEWERKEN)
+def snelstart(cid):
+    c = query("SELECT * FROM customers WHERE id = ?", (cid,), one=True) or abort(404)
+    nxt = request.values.get("next") or url_for("klanten.customer", cid=cid)
+    if not nxt.startswith("/"):
+        nxt = url_for("klanten.customer", cid=cid)
+    if request.method == "POST":
+        nr = _f("debtor_no")
+        if request.form.get("later") or not nr:
+            execute("UPDATE customers SET snelstart_asked = 1 WHERE id = ?", (cid,))
+        else:
+            execute("UPDATE customers SET debtor_no = ?, snelstart_asked = 1, updated_at = ? WHERE id = ?", (nr, now_iso(), cid))
+            audit("klantnummer SnelStart", "customer", cid, nr)
+            flash(f"Klantnummer SnelStart {nr} opgeslagen bij {c['name']}.", "ok")
+        return redirect(nxt)
+    return render_template("klanten/snelstart.html", c=c, next=nxt)
+
+
+# ---------------------------------------------------------------- import uit Komdex
+
+@bp.route("/importeren", methods=["GET", "POST"])
+@require("klanten", BEHEER)
+def import_upload():
+    if request.method == "POST":
+        f = request.files.get("file")
+        if not f or not f.filename:
+            flash("Kies de Excel-export uit Komdex.", "error")
+            return redirect(url_for("klanten.import_upload"))
+        try:
+            records, warnings = relaties.parse_relations(f.read())
+        except Exception as exc:
+            flash(f"Inlezen mislukt: {exc}", "error")
+            return redirect(url_for("klanten.import_upload"))
+        token = relaties.store(records, warnings, f.filename)
+        return redirect(url_for("klanten.import_review", token=token))
+    total = query("SELECT COUNT(*) c, SUM(komdex_id IS NOT NULL) k FROM customers", one=True)
+    return render_template("klanten/import.html", total=total)
+
+
+@bp.route("/importeren/<token>", methods=["GET", "POST"])
+@require("klanten", BEHEER)
+def import_review(token):
+    data = relaties.load(token)
+    if not data:
+        flash("Deze import is verlopen. Upload het bestand opnieuw.", "error")
+        return redirect(url_for("klanten.import_upload"))
+    if request.method == "POST":
+        decisions = {k[4:]: v for k, v in request.form.items() if k.startswith("dec_")}
+        p = relaties.plan(data["records"])
+        missing = [c["rec"]["name"] for c in p["conflicts"] if not decisions.get(c["rec"]["komdex_id"])]
+        if missing:
+            flash(f"Maak eerst een keuze bij: {', '.join(missing[:5])}{' …' if len(missing) > 5 else ''}", "error")
+            return render_template("klanten/import_review.html", token=token, data=data, p=p, decisions=decisions,
+                                   TYPE_LABELS=TYPE_LABELS, FIELD_LABELS=relaties.FIELD_LABELS)
+        stats = relaties.apply(data["records"], decisions)
+        relaties.discard(token)
+        audit("relaties geïmporteerd", "customer", None,
+              f"{data['filename']}: {stats['nieuw']} nieuw, {stats['bijgewerkt']} bijgewerkt, {stats['gekoppeld']} gekoppeld")
+        msg = (f"Import klaar: {stats['nieuw']} nieuw, {stats['bijgewerkt']} bijgewerkt, "
+               f"{stats['gekoppeld']} gekoppeld aan een bestaande relatie, {stats['ongewijzigd']} ongewijzigd.")
+        if stats["namen"]:
+            msg += f" {len(stats['namen'])} naam/namen gewijzigd."
+        if stats["dubbel"]:
+            msg += (" Let op: " + ", ".join(stats["dubbel"]) + " kon niet gekoppeld worden omdat die app-relatie al aan"
+                    " een ander Komdex-ID is gekoppeld; toegevoegd als aparte relatie.")
+        flash(msg, "ok")
+        return redirect(url_for("klanten.index"))
+    p = relaties.plan(data["records"])
+    return render_template("klanten/import_review.html", token=token, data=data, p=p, decisions={},
+                           TYPE_LABELS=TYPE_LABELS, FIELD_LABELS=relaties.FIELD_LABELS)

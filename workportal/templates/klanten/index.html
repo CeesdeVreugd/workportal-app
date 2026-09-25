@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
-{% block title %}Klanten & projecten{% endblock %}
+{% block title %}Relaties & projecten{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <div><h1>Klanten &amp; projecten</h1><p>{{ customers|length }} klanten · {{ projects|length }} projecten</p></div>
+  <div><h1>Relaties &amp; projecten</h1><p>{{ counts.alle or 0 }} relaties · {{ projects|length }} projecten</p></div>
   <div class="actions">
+    {% if can('klanten', 3) %}<a class="btn" href="{{ url_for('klanten.import_upload') }}">{{ icon('upload') }}Importeren uit Komdex</a>{% endif %}
     {% if can('klanten', 2) %}
     <a class="btn" href="{{ url_for('klanten.new_project') }}">{{ icon('plus') }}Nieuw project</a>
-    <a class="btn primary" href="{{ url_for('klanten.new') }}">{{ icon('plus') }}Nieuwe klant</a>
+    <a class="btn primary" href="{{ url_for('klanten.new') }}">{{ icon('plus') }}Nieuwe relatie</a>
     {% endif %}
   </div>
 </div>
-<form class="search" style="max-width:none" method="get"><input type="hidden" name="tab" value="{{ tab }}">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op naam, plaats, debiteur- of projectnummer"></form>
+<form class="search" style="max-width:none" method="get"><input type="hidden" name="tab" value="{{ tab }}">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op naam, plaats, klantnummer SnelStart of Komdex-ID"></form>
 <div class="tabs">
-  <a href="?tab=klanten&q={{ q }}" class="{{ 'active' if tab == 'klanten' }}">Klanten</a>
+  <a href="?tab=klanten&q={{ q }}" class="{{ 'active' if tab == 'klanten' }}">Klanten <span class="muted small">{{ counts.klanten or 0 }}</span></a>
+  <a href="?tab=leveranciers&q={{ q }}" class="{{ 'active' if tab == 'leveranciers' }}">Leveranciers <span class="muted small">{{ counts.leveranciers or 0 }}</span></a>
+  <a href="?tab=alle&q={{ q }}" class="{{ 'active' if tab == 'alle' }}">Alle</a>
+  {% if counts.vervallen %}<a href="?tab=vervallen&q={{ q }}" class="{{ 'active' if tab == 'vervallen' }}">Vervallen <span class="muted small">{{ counts.vervallen }}</span></a>{% endif %}
   <a href="?tab=projecten&q={{ q }}" class="{{ 'active' if tab == 'projecten' }}">Projecten</a>
 </div>
 {% if tab == 'projecten' %}
@@ -25,10 +29,17 @@
   </tbody></table></div>
 {% else %}
 <div class="card flush tablewrap"><table class="table">
-  <thead><tr><th>Klant</th><th class="hide-m">Plaats</th><th class="hide-m">Debiteurnr.</th><th class="num">Projecten</th><th class="num">Installaties</th><th class="num">Open tickets</th></tr></thead>
+  <thead><tr><th>Relatie</th><th class="hide-m">Type</th><th class="hide-m">Groep</th><th>Plaats</th><th class="hide-m">Klantnr. SnelStart</th><th class="num hide-m">Projecten</th><th class="num">Open tickets</th></tr></thead>
   <tbody>
-  {% for c in customers %}<tr class="link" data-href="{{ url_for('klanten.customer', cid=c.id) }}"><td><b>{{ c.name }}</b></td><td class="hide-m">{{ c.city or '' }}</td><td class="hide-m">{{ c.debtor_no or '' }}</td><td class="num">{{ c.n_projects }}</td><td class="num">{{ c.n_inst }}</td><td class="num">{% if c.n_open %}<span class="badge b-blue">{{ c.n_open }}</span>{% else %}0{% endif %}</td></tr>
-  {% else %}<tr><td colspan="6" class="empty">Nog geen klanten. {% if can('klanten', 2) %}<a href="{{ url_for('klanten.new') }}">Voeg de eerste klant toe.</a>{% endif %}</td></tr>{% endfor %}
+  {% for c in customers %}<tr class="link" data-href="{{ url_for('klanten.customer', cid=c.id) }}">
+    <td><b>{{ c.name }}</b>{% if c.short_name and c.short_name != c.name %}<div class="small muted">{{ c.short_name }}</div>{% endif %}</td>
+    <td class="hide-m">{% if c.relation_type %}<span class="badge {{ 'b-blue' if c.relation_type in ['klant','beide'] else '' }}">{{ TYPE_LABELS.get(c.relation_type, c.relation_type) }}</span>{% endif %}</td>
+    <td class="hide-m small">{{ c.relation_group or '' }}</td>
+    <td>{{ c.city or '' }}</td>
+    <td class="hide-m">{{ c.debtor_no or '' }}</td>
+    <td class="num hide-m">{{ c.n_projects }}</td>
+    <td class="num">{% if c.n_open %}<span class="badge b-blue">{{ c.n_open }}</span>{% else %}0{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Geen relaties gevonden. {% if can('klanten', 3) %}<a href="{{ url_for('klanten.import_upload') }}">Importeer de relaties uit Komdex</a> of {% endif %}{% if can('klanten', 2) %}<a href="{{ url_for('klanten.new') }}">voeg een relatie toe</a>.{% endif %}</td></tr>{% endfor %}
   </tbody></table></div>
 {% endif %}
 {% endblock %}

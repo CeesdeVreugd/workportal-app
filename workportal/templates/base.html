@@ -33,7 +33,7 @@
     </a>
     <div class="nav">
       {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
-      {% if can('klanten') %}<div class="navhead">Relaties</div>{{ navlink('klanten.index', 'Klanten & projecten', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('klanten') %}<div class="navhead">Relaties</div>{{ navlink('klanten.index', 'Relaties & projecten', 'klanten', 'klanten.') }}{% endif %}
       {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
       {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
       {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Klantnummer SnelStart{% endblock %}
+{% block content %}
+<h1>Klantnummer SnelStart</h1>
+<p class="muted">{{ c.name }}{% if c.city %} · {{ c.city }}{% endif %} heeft nog geen klantnummer uit SnelStart. Vul het nu in, dan kunnen werkbonnen en na-calculaties aan de juiste klant gekoppeld worden.</p>
+<form method="post" class="card form" style="max-width:520px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="f">Klantnummer SnelStart<input type="text" name="debtor_no" inputmode="numeric" autofocus></label>
+  <div class="actions"><button class="btn primary">Opslaan</button><button class="btn ghost" name="later" value="1" formnovalidate>Weet ik nu niet</button></div>
+  <p class="hint">Deze vraag komt één keer. Later invullen kan altijd via de relatie → Bewerken.</p>
+</form>
+{% endblock %}

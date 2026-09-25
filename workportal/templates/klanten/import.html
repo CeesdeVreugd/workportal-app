@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Relaties importeren{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Relaties</a> / importeren</div>
+<h1>Relaties importeren uit Komdex</h1>
+<div class="grid g2 stack">
+  <form method="post" enctype="multipart/form-data" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Stap 1 · Excel kiezen</h2>
+    <label class="f">Relatie-export uit Komdex (.xlsx)<input type="file" name="file" accept=".xlsx" required></label>
+    <div><button class="btn primary">{{ icon('upload') }}Inlezen en controleren</button></div>
+    <p class="hint">Er wordt nog niets opgeslagen. Je krijgt eerst een overzicht van wat er verandert.</p>
+  </form>
+  <section class="card">
+    <h2>Zo werkt de import</h2>
+    <ul style="margin:0;padding-left:18px;line-height:1.6">
+      <li>Relaties worden gekoppeld op het <b>ID uit Komdex</b>. Staat het ID al in WorkPortal, dan worden de gegevens bijgewerkt, ook een gewijzigde naam.</li>
+      <li>Alleen wat in Komdex is veranderd sinds de vorige import wordt overgenomen. Het klantnummer SnelStart, notities, contactpersonen en installaties blijven altijd staan.</li>
+      <li>Lijkt een relatie uit Komdex op een relatie die in de app is aangemaakt (zelfde naam of e-mailadres), dan kies je <b>één keer</b> welke blijft. Daarna is de koppeling vast.</li>
+      <li>Relaties met type "Vervallen" komen onder het tabblad Vervallen.</li>
+    </ul>
+    <p class="small muted" style="margin-top:12px">Nu in WorkPortal: {{ total.c or 0 }} relaties, waarvan {{ total.k or 0 }} gekoppeld aan Komdex.</p>
+  </section>
+</div>
+{% endblock %}
