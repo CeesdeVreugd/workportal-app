@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}SharePoint{% endblock %}
+{% block head %}{% if v.sp_running %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Koppeling met de Projecten-map in SharePoint</p></div></div>
+{% include "beheer/_nav.html" %}
+
+{% if not configured %}
+<section class="card">
+  <h2>Nog niet klaar: app-registratie</h2>
+  <p>De koppeling gebruikt dezelfde app-registratie als de mail. Vul in Portainer <code>GRAPH_TENANT_ID</code>, <code>GRAPH_CLIENT_ID</code> en <code>GRAPH_CLIENT_SECRET</code> in zodra IT de rechten heeft goedgekeurd. Nodig voor SharePoint:</p>
+  <ol class="steps-list">
+    <li>API-machtiging <b>Microsoft Graph › Toepassing › Sites.Selected</b> met beheerderstoestemming.</li>
+    <li>Schrijfrecht voor de app op de site waar de Projecten-map staat (zie README, stap “SharePoint-toegang”).</li>
+  </ol>
+</section>
+{% endif %}
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Status</h2>
+    <dl class="dl">
+      <dt>Verbinding</dt><dd><span class="badge {{ 'b-ok' if connected else 'b-warn' }}">{{ 'Verbonden' if connected else 'Niet verbonden' }}</span></dd>
+      {% if v.sp_root_id %}
+      <dt>Projectenmap</dt><dd>{% if v.sp_root_web %}<a href="{{ v.sp_root_web }}" target="_blank" rel="noopener">{{ v.sp_root_name }}</a>{% else %}{{ v.sp_root_name }}{% endif %}{% if v.sp_site_name %} <span class="muted">· site {{ v.sp_site_name }}</span>{% endif %}</dd>
+      <dt>Klantmappen</dt><dd>{{ counts.folders }}{% if counts.unlinked %} · <a href="#klantmappen">{{ counts.unlinked }} nog niet gekoppeld aan een relatie</a>{% endif %}</dd>
+      <dt>Projectmappen</dt><dd>{{ counts.projects }} gekoppeld{% if counts.nocust %} · {{ counts.nocust }} zonder relatie{% endif %}{% if counts.missing %} · <span class="badge b-warn">{{ counts.missing }} niet meer gevonden</span>{% endif %}</dd>
+      <dt>Laatste controle</dt><dd>{{ v.sp_last_sync|dt if v.sp_last_sync else '–' }} <span class="muted">(elke 3 minuten)</span></dd>
+      <dt>Volledige controle</dt><dd>{{ v.sp_last_full|dt if v.sp_last_full else '–' }} <span class="muted">(elke nacht)</span></dd>
+      {% if v.sp_running %}<dt>Nu bezig</dt><dd><span class="badge b-blue">Synchroniseren… (pagina ververst vanzelf)</span></dd>
+      {% elif v.result %}<dt>Laatste volledige run</dt><dd style="font-weight:400">{{ v.result_at|dt }} · {{ v.result }}</dd>{% endif %}
+      {% if v.sp_last_error %}<dt>Laatste fout</dt><dd><span class="badge b-bad">{{ v.sp_last_error }}</span></dd>{% endif %}
+      {% endif %}
+    </dl>
+    {% if connected %}
+    <div class="actions" style="margin-top:14px">
+      <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="action" value="sync">{{ icon('refresh') }}Nu volledig synchroniseren</button></form>
+      <form method="post" data-confirm="SharePoint ontkoppelen? Projecten en koppelingen blijven bewaard."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="ontkoppelen">Ontkoppelen</button></form>
+    </div>
+    {% endif %}
+  </section>
+
+  <form method="post" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>{{ 'Andere map kiezen' if connected else 'Verbinden' }}</h2>
+    <label class="f full">Link naar de Projecten-map<input type="url" name="url" value="{{ v.sp_url or '' }}" placeholder="https://…sharepoint.com/sites/…/Gedeelde documenten/Projecten" {{ 'disabled' if not configured }} required>
+      <span class="hint">Open de Projecten-map in SharePoint in je browser en kopieer de adresbalk. In deze map staan de klantmappen.</span></label>
+    <label class="f full">Bestaande ordermappen importeren als
+      <select name="existing_status" {{ 'disabled' if not configured }}><option value="actief">Actief project</option><option value="afgerond">Afgerond project</option></select>
+      <span class="hint">Alleen bij de eerste keer verbinden. Ordermappen waarvan het nummer al als project bestaat, worden gekoppeld en niet dubbel aangemaakt.</span></label>
+    <div><button class="btn primary" name="action" value="verbinden" {{ 'disabled' if not configured }}>{{ icon('link') }}Verbinden en synchroniseren</button></div>
+  </form>
+</div>
+
+{% if connected %}
+<form method="post" class="card form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Instellingen</h2>
+  <div class="fgrid">
+    <label class="check full"><input type="checkbox" name="sp_auto_create" value="1" {{ 'checked' if v.sp_auto_create != '0' }}> <span><b>Nieuwe ordermappen automatisch als project aanmaken</b><br><span class="hint">Uit: alleen bestaande projecten met hetzelfde ordernummer worden gekoppeld.</span></span></label>
+    <label class="f">Submap voor werkbonnen<input name="sp_sub_werkbon" value="{{ v.sp_sub_werkbon or '' }}"><span class="hint">In de projectmap, bijv. <code>Service</code>. Leeg = direct in de projectmap.</span></label>
+    <label class="f">Submap voor druktestrapporten<input name="sp_sub_druktest" value="{{ v.sp_sub_druktest or '' }}"><span class="hint">Bijv. <code>Werkvoorbereiding/Druktesten</code>.</span></label>
+  </div>
+  <div><button class="btn primary" name="action" value="instellingen">Opslaan</button></div>
+</form>
+
+<section class="card flush" id="klantmappen">
+  <div class="card-head" style="padding:18px 18px 0"><h2>Klantmappen {{ '(alle)' if show_all else 'zonder relatie' }}</h2>
+    <a class="btn sm ghost" href="{{ url_for('beheer.sharepoint', alle=None if show_all else '1') }}#klantmappen">{{ 'Alleen ongekoppeld' if show_all else 'Alle tonen' }}</a></div>
+  <p class="muted small" style="padding:0 18px">Mappen met dezelfde naam als een relatie zijn automatisch gekoppeld. Koppel de rest hier; projecten in die map krijgen dan ook de relatie.</p>
+  <datalist id="custlist">{% for c in customers %}<option value="{{ c.name }} · #{{ c.id }}">{% endfor %}</datalist>
+  <div class="tablewrap"><table class="table sptable">
+    <thead><tr><th>Klantmap</th><th class="num hide-m">Projecten</th><th>Relatie in WorkPortal</th></tr></thead>
+    <tbody>
+    {% for f in folders %}<tr>
+      <td>{{ icon('folder') }} {% if f.web_url %}<a href="{{ f.web_url }}" target="_blank" rel="noopener">{{ f.name }}</a>{% else %}{{ f.name }}{% endif %}</td>
+      <td class="num hide-m">{{ f.n }}</td>
+      <td><form method="post" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="koppel"><input type="hidden" name="item_id" value="{{ f.item_id }}"><input type="hidden" name="alle" value="{{ '1' if show_all }}">
+        <input list="custlist" name="customer" value="{{ (f.customer ~ ' · #' ~ f.customer_id) if f.customer_id else '' }}" placeholder="Zoek relatie…"><button class="btn sm">Opslaan</button>{% if f.auto %} <span class="badge">automatisch</span>{% endif %}</form></td>
+    </tr>{% else %}<tr><td colspan="3" class="empty">{{ 'Geen klantmappen gevonden.' if show_all else 'Alle klantmappen zijn gekoppeld.' }}</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+{% endif %}
+{% endblock %}

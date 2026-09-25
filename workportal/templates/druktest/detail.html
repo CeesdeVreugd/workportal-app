@@ -7,7 +7,7 @@
 <div class="crumbs"><a href="{{ url_for('druktest.index') }}">Druktesten</a> / {{ t.number }}</div>
 <div class="pagehead">
   <div><div class="eyebrow">Druktest {{ t.number }}</div><h1>{{ t.line_no or 'Leiding' }} · {{ t.part }}</h1>
-    <p>{% if t.project_no %}Project <a href="{{ url_for('klanten.project', pid=t.project_id) }}">{{ t.project_no }}</a> · {% endif %}tekening {{ t.drawing_no }}{% if t.drawing_rev %} rev {{ t.drawing_rev }}{% endif %}</p></div>
+    <p>{% if t.project_no %}Project <a href="{{ url_for('klanten.project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} (<a href="{{ url_for('klanten.project_folder', pid=t.project_id) }}">projectmap</a>){% endif %} · {% endif %}tekening {{ t.drawing_no }}{% if t.drawing_rev %} rev {{ t.drawing_rev }}{% endif %}</p></div>
   <div class="actions">
     <a class="btn" href="{{ url_for('druktest.report', tid=t.id) }}" target="_blank">{{ icon('pdf') }}{{ 'PDF-rapport' if t.status == 'afgerond' else 'Voorbeeld rapport' }}</a>
   </div>

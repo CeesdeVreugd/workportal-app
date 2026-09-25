@@ -2,7 +2,8 @@ from datetime import timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, g, Response
 
-from .db import query, execute
+from .db import query, execute, get_db
+from . import sharepoint as sp
 from .integrations import upload_to_sharepoint, sharepoint_configured
 from .pdf import pressure_test_pdf
 from .permissions import require, LEZEN, BEWERKEN, BEHEER
@@ -39,7 +40,7 @@ def _label(minutes):
 
 
 def _test(tid):
-    t = query("SELECT t.*, p.number AS project_no, p.name AS project_name, p.sharepoint_path, c.name AS customer,"
+    t = query("SELECT t.*, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, c.name AS customer,"
               " u.name AS creator FROM pressure_tests t LEFT JOIN projects p ON p.id = t.project_id"
               " LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN users u ON u.id = t.created_by WHERE t.id = ?",
               (tid,), one=True)
@@ -140,7 +141,11 @@ def detail(tid):
     return render_template("druktest/detail.html", t=t, readings=readings, rfiles=rfiles, drop=drop, within=within,
                            presets=[(m, _label(m)) for m in _presets()], label=_label, history=history,
                            files=files_for("pressure_test", tid), pdf=pdfs[-1] if pdfs else None,
-                           sharepoint=sharepoint_configured())
+                           sharepoint=_sp_available(t))
+
+
+def _sp_available(t):
+    return sharepoint_configured() or bool(t["project_sp"] and not t["project_sp_missing"] and sp.connected(get_db()))
 
 
 def _require_open(t):
@@ -237,7 +242,7 @@ def finish(tid):
         pdf, fname = _make_pdf(tid)
         save_bytes("pressure_test", tid, pdf, fname, kind="pdf", mime="application/pdf")
         msg = f"Druktest afgerond: {result}. PDF-rapport gemaakt."
-        if sharepoint_configured():
+        if _sp_available(t):
             ok, spmsg = _to_sharepoint(tid, pdf, fname)
             msg += " " + spmsg + "."
         flash(msg, "ok")
@@ -264,9 +269,15 @@ def _make_pdf(tid):
 
 def _to_sharepoint(tid, pdf, fname):
     t = _test(tid)
-    root = get_setting("sharepoint_root") or "Projecten"
-    base = t["sharepoint_path"] or (f"{root}/{t['project_no']}" if t["project_no"] else f"{root}/Druktesten zonder project")
-    ok, msg = upload_to_sharepoint(pdf, fname, f"{base}/Druktesten", t["project_no"] or "", "druktest")
+    res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_druktest"), fname, pdf)
+    if res is not None:
+        ok, msg = res
+    elif not sharepoint_configured():
+        ok, msg = False, "Geen gekoppelde projectmap in SharePoint"
+    else:
+        root = get_setting("sharepoint_root") or "Projecten"
+        base = t["sharepoint_path"] or (f"{root}/{t['project_no']}" if t["project_no"] else f"{root}/Druktesten zonder project")
+        ok, msg = upload_to_sharepoint(pdf, fname, f"{base}/Druktesten", t["project_no"] or "", "druktest")
     execute("UPDATE pressure_tests SET sharepoint_status = ? WHERE id = ?", (msg, tid))
     audit("sharepoint", "pressure_test", tid, msg)
     return ok, msg

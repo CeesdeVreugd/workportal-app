@@ -51,7 +51,7 @@ def load_logged_in_user():
     ok = device is not None and device["id"] == did and device["user_id"] == uid and device_verified(device)
     unlocked = parse_iso(session.get("unlocked_at"))
     if ok and unlocked and now_utc() - unlocked < timedelta(hours=_unlock_hours()):
-        user = query("SELECT u.*, r.name AS role_name FROM users u LEFT JOIN roles r ON r.id = u.role_id"
+        user = query("SELECT u.*, (SELECT group_concat(name, ', ') FROM (SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id ORDER BY r.sort)) AS role_name FROM users u"
                      " WHERE u.id = ? AND u.active = 1", (uid,), one=True)
         if user:
             g.user = user

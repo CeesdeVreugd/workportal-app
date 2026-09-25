@@ -4,7 +4,7 @@
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('druktest.detail', tid=t.id) }}">{{ t.number }}</a> / afronden</div>
 <h1>Druktest afronden</h1>
-<p class="muted">Na afronden wordt de test vergrendeld en wordt het PDF-rapport gemaakt{{ ' en in SharePoint geplaatst' if sharepoint_configured() }}.</p>
+<p class="muted">Na afronden wordt de test vergrendeld en wordt het PDF-rapport gemaakt{{ ' en in SharePoint geplaatst' if sharepoint_configured() or (t.project_sp and not t.project_sp_missing) }}.</p>
 <form method="post" enctype="multipart/form-data" class="card form" style="max-width:700px" id="finishform">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="signature" id="sigdata">

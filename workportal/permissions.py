@@ -54,9 +54,10 @@ def load_permissions(user):
         return perms
     if user["is_admin"]:
         return {m: BEHEER for m in MODULE_KEYS}
-    if user["role_id"]:
-        for r in query("SELECT module, level FROM role_permissions WHERE role_id = ?", (user["role_id"],)):
-            perms[r["module"]] = r["level"]
+    # meerdere functierollen: per module geldt het hoogste niveau
+    for r in query("SELECT rp.module, MAX(rp.level) AS level FROM role_permissions rp"
+                   " JOIN user_roles ur ON ur.role_id = rp.role_id WHERE ur.user_id = ? GROUP BY rp.module", (user["id"],)):
+        perms[r["module"]] = r["level"]
     for r in query("SELECT module, level FROM user_permissions WHERE user_id = ?", (user["id"],)):
         perms[r["module"]] = max(perms.get(r["module"], 0), r["level"])
     return perms

@@ -197,3 +197,13 @@
   check();
   dlg.querySelector("form").addEventListener("submit", function () { try { sessionStorage.setItem(key, "1"); } catch (e) {} });
 })();
+
+/* Projectmap (SharePoint) laden op de projectpagina */
+(function () {
+  var box = document.getElementById("spfolder");
+  if (!box) return;
+  fetch(box.getAttribute("data-src"), { credentials: "same-origin" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (html) { box.innerHTML = html; })
+    .catch(function () { box.innerHTML = '<div class="empty">SharePoint is op dit moment niet bereikbaar.</div>'; });
+})();

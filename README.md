@@ -99,6 +99,46 @@ Lukt versturen niet, dan staat de reden in het containerlog
 (`E-mail via Microsoft 365 mislukt ...`). Veelvoorkomend: geen beheerderstoestemming,
 verkeerde secret (Secret ID i.p.v. Waarde) of `MAIL_FROM` bestaat niet.
 
+## SharePoint: projectmappen koppelen
+
+WorkPortal koppelt projecten aan de mappen in `Projecten/<Klantmap>/<ordernummer>-<omschrijving>`:
+
+- Een nieuwe ordermap (8 cijfers, streepje, omschrijving) wordt binnen ~3 minuten een project,
+  bij de relatie die aan de klantmap is gekoppeld. Bestaat het nummer al, dan wordt het gekoppeld.
+- Een project dat in WorkPortal wordt aangemaakt krijgt zo'n map in de klantmap. De bestaande
+  Power Automate-flow herkent die en kopieert het sjabloon en plaatst de Teams-post.
+- Monteurs zien de projectmap alleen-lezen in WorkPortal (project, ticket en druktest) en hebben
+  geen SharePoint-toegang nodig. Werkbonnen en druktestrapporten gaan direct in de projectmap.
+
+**Eenmalig door IT (zelfde app-registratie `WorkPortal`):**
+
+1. App-registratie → **API-machtigingen** → Microsoft Graph → **Toepassingsmachtigingen** →
+   `Sites.Selected` → toevoegen → **Beheerderstoestemming verlenen**.
+   (`Sites.Selected` geeft zelf nog nergens toegang; alleen tot sites uit stap 2.)
+2. Geef de app **schrijfrecht op de site** waar de Projecten-map staat. Met PnP PowerShell:
+   ```powershell
+   Connect-PnPOnline -Url https://<tenant>.sharepoint.com/sites/<site> -Interactive -ClientId <PnP-app-id>
+   Grant-PnPAzureADAppSitePermission -AppId <client-id van WorkPortal> -DisplayName "WorkPortal" `
+     -Site https://<tenant>.sharepoint.com/sites/<site> -Permissions Write
+   ```
+   Of in Graph Explorer (als beheerder, met toestemming `Sites.FullControl.All`):
+   `GET https://graph.microsoft.com/v1.0/sites/<tenant>.sharepoint.com:/sites/<site>` → neem `id`, dan
+   `POST https://graph.microsoft.com/v1.0/sites/<id>/permissions` met body
+   `{"roles":["write"],"grantedToIdentities":[{"application":{"id":"<client-id>","displayName":"WorkPortal"}}]}`.
+
+**Daarna:**
+
+3. Portainer: `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` invullen → Update the stack.
+   Laat `MAIL_FROM` leeg zolang `Mail.Send` nog niet is goedgekeurd: dan blijven de inlogcodes
+   in het containerlog staan en werkt SharePoint al wel.
+4. WorkPortal → Beheer → **SharePoint** → plak de link van de Projecten-map (adresbalk van de
+   browser) → **Verbinden en synchroniseren**. Kies of bestaande ordermappen als *actief* of
+   *afgerond* project binnenkomen.
+5. Controleer onder *Klantmappen zonder relatie* welke mappen niet automatisch op naam zijn
+   herkend en koppel ze aan de juiste relatie.
+
+Foutmelding 403 bij verbinden = stap 2 ontbreekt of is voor een andere site gedaan.
+
 ## Back-ups
 
 - Elke nacht om 02:00 maakt de app een kopie van de database in `/data/backups`
@@ -129,7 +169,8 @@ regie-Excel kan handmatig worden geüpload bij Na-calculatie.
 ## Rechten
 
 Per functierol en module: **Geen · Lezen · Bewerken · Beheer** (Beheer = ook verwijderen).
-Aan te passen in Beheer → Rechten per functierol. Per gebruiker kunnen extra rechten
+Aan te passen in Beheer → Rechten per functierol. Een gebruiker kan meerdere functierollen
+hebben; per module geldt dan het hoogste recht van die rollen. Per gebruiker kunnen extra rechten
 worden gegeven. Een gebruiker met "Beheerder" aangevinkt heeft overal alle rechten.
 
 ## Inloggen

@@ -10,7 +10,9 @@
     <div class="fgrid">
       <label class="f">Naam *<input type="text" name="name" value="{{ u.name or '' }}" required></label>
       <label class="f">E-mailadres *<input type="email" name="email" value="{{ u.email or '' }}" required></label>
-      <label class="f">Functierol<select name="role_id"><option value="">–</option>{% for r in roles %}{{ opt(r.id, r.name, u.role_id) }}{% endfor %}</select><span class="hint">De functierol bepaalt de rechten per module (zie Rechten per functierol).</span></label>
+      <div class="f full"><span>Functierollen</span>
+        <div class="rolepick">{% for r in roles %}<label class="rolechip"><input type="checkbox" name="role_ids" value="{{ r.id }}" {{ 'checked' if r.id in user_roles }}><span>{{ r.name }}</span></label>{% endfor %}</div>
+        <span class="hint">Meerdere rollen mogelijk; per module geldt het hoogste recht van de gekozen rollen.</span></div>
       <div style="display:flex;flex-direction:column;gap:10px;justify-content:flex-end">
         <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if u.active }}> Actief</label>
         {% if g.user.is_admin %}<label class="check"><input type="checkbox" name="is_admin" value="1" {{ 'checked' if u.is_admin }}> Beheerder (alle rechten)</label>{% endif %}
@@ -19,7 +21,7 @@
     </div>
   </section>
   <section class="card form">
-    <h2>Extra rechten (bovenop de functierol)</h2>
+    <h2>Extra rechten (bovenop de functierollen)</h2>
     <p class="hint">Alleen invullen voor uitzonderingen. Het hoogste niveau van rol en extra recht geldt.</p>
     <div class="fgrid">
     {% for m, label in MODULES %}

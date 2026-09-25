@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V12: meldingen/meenemen bij machine en relatie, vertrekknop"
+set "OMSCHRIJVING=WorkPortal V13: SharePoint-koppeling projectmappen, meerdere functierollen"
 
 echo.
 echo ============================================

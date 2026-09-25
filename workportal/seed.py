@@ -127,9 +127,10 @@ def seed(app):
         if admin_email:
             exists = conn.execute("SELECT id FROM users WHERE email = ?", (admin_email,)).fetchone()
             if not exists:
-                conn.execute(
+                cur = conn.execute(
                     "INSERT INTO users (email, name, role_id, is_admin, active, created_at) VALUES (?,?,?,?,1,?)",
                     (admin_email, os.environ.get("ADMIN_NAME", "Beheerder"), roles["directie"], 1, now))
+                conn.execute("INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?,?)", (cur.lastrowid, roles["directie"]))
                 print(f"[WorkPortal] Beheerder aangemaakt: {admin_email}", flush=True)
 
         for key, name in WORKTYPES:

@@ -349,6 +349,36 @@ MIGRATIONS = [
     ALTER TABLE customers ADD COLUMN alert TEXT;
     ALTER TABLE tickets ADD COLUMN alert_sent_at TEXT;
     """,
+    # 4 - SharePoint-koppeling (klantmappen en projectmappen via Microsoft Graph)
+    """
+    CREATE TABLE sp_folders (
+        item_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        web_url TEXT,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        auto INTEGER NOT NULL DEFAULT 0,
+        missing INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_sp_folders_customer ON sp_folders(customer_id);
+    ALTER TABLE projects ADD COLUMN sp_item_id TEXT;
+    ALTER TABLE projects ADD COLUMN sp_parent_id TEXT;
+    ALTER TABLE projects ADD COLUMN sp_name TEXT;
+    ALTER TABLE projects ADD COLUMN sp_web_url TEXT;
+    ALTER TABLE projects ADD COLUMN sp_missing INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE projects ADD COLUMN source TEXT;
+    CREATE UNIQUE INDEX idx_projects_sp ON projects(sp_item_id) WHERE sp_item_id IS NOT NULL;
+    CREATE INDEX idx_projects_number ON projects(number);
+    """,
+    # 5 - meerdere functierollen per gebruiker
+    """
+    CREATE TABLE user_roles (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        PRIMARY KEY (user_id, role_id)
+    );
+    INSERT INTO user_roles (user_id, role_id) SELECT id, role_id FROM users WHERE role_id IS NOT NULL;
+    """,
 ]
 
 

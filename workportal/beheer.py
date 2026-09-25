@@ -4,7 +4,12 @@ import tempfile
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, g, send_file, current_app
 
-from .db import query, execute, backup
+import re
+
+import requests
+
+from . import sharepoint as sp
+from .db import query, execute, backup, get_db
 from .mail import smtp_configured, send_mail, mail_method
 from .integrations import sharepoint_configured, nacalc_configured
 from .permissions import require, MODULES, MODULE_KEYS, MODULE_GROUPS, BEHEER
@@ -22,8 +27,8 @@ def _f(name):
 @bp.route("/")
 @require("beheer", BEHEER)
 def users():
-    rows = query("SELECT u.*, r.name AS role_name, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS n_devices"
-                 " FROM users u LEFT JOIN roles r ON r.id = u.role_id ORDER BY u.active DESC, u.name")
+    rows = query("SELECT u.*, (SELECT group_concat(name, ', ') FROM (SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id ORDER BY r.sort)) AS role_name, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS n_devices"
+                 " FROM users u ORDER BY u.active DESC, u.name")
     return render_template("beheer/users.html", users=rows, roles=query("SELECT * FROM roles ORDER BY sort"))
 
 
@@ -40,11 +45,13 @@ def user(uid=None):
         name = _f("name")
         if not email or "@" not in email or not name:
             flash("Vul naam en een geldig e-mailadres in.", "error")
-            return render_template("beheer/user.html", u=request.form, uid=uid, roles=roles, extra={}, devices=[])
+            return render_template("beheer/user.html", u=request.form, uid=uid, roles=roles, extra={}, devices=[],
+                                   user_roles=_form_roles())
         dup = query("SELECT id FROM users WHERE email = ? AND id != ?", (email, uid or 0), one=True)
         if dup:
             flash("Er bestaat al een gebruiker met dit e-mailadres.", "error")
-            return render_template("beheer/user.html", u=request.form, uid=uid, roles=roles, extra={}, devices=[])
+            return render_template("beheer/user.html", u=request.form, uid=uid, roles=roles, extra={}, devices=[],
+                                   user_roles=_form_roles())
         if g.user["is_admin"]:
             is_admin = 1 if request.form.get("is_admin") else 0
         else:
@@ -52,7 +59,8 @@ def user(uid=None):
         if uid == g.user["id"]:
             is_admin = u["is_admin"]  # jezelf geen beheerrechten afnemen
         active = 1 if request.form.get("active") or uid == g.user["id"] else 0
-        role_id = to_int(request.form.get("role_id"))
+        role_ids = [r["id"] for r in roles if str(r["id"]) in request.form.getlist("role_ids")]
+        role_id = role_ids[0] if role_ids else None
         if uid:
             execute("UPDATE users SET email=?, name=?, role_id=?, is_admin=?, active=? WHERE id=?",
                     (email, name, role_id, is_admin, active, uid))
@@ -67,6 +75,9 @@ def user(uid=None):
                           f"Hallo {name},\n\nEr is een account voor je aangemaakt in WorkPortal van De Vreugd Productietechniek.\n\n"
                           f"Ga naar {app_url or 'WorkPortal'} en log in met dit e-mailadres. Je ontvangt dan een code per mail "
                           f"en stelt daarna een pincode in.\n\nGroet,\n{g.user['name']}")
+        execute("DELETE FROM user_roles WHERE user_id = ?", (uid,))
+        for rid in role_ids:
+            execute("INSERT INTO user_roles (user_id, role_id) VALUES (?,?)", (uid, rid))
         execute("DELETE FROM user_permissions WHERE user_id = ?", (uid,))
         for m in MODULE_KEYS:
             lvl = to_int(request.form.get(f"extra_{m}"), 0)
@@ -77,7 +88,13 @@ def user(uid=None):
         return redirect(url_for("beheer.users"))
     extra = {r["module"]: r["level"] for r in query("SELECT * FROM user_permissions WHERE user_id = ?", (uid or 0,))}
     devices = query("SELECT * FROM devices WHERE user_id = ? ORDER BY last_used DESC", (uid or 0,))
-    return render_template("beheer/user.html", u=u or {"active": 1}, uid=uid, roles=roles, extra=extra, devices=devices)
+    user_roles = {r["role_id"] for r in query("SELECT role_id FROM user_roles WHERE user_id = ?", (uid,))} if uid else set()
+    return render_template("beheer/user.html", u=u or {"active": 1}, uid=uid, roles=roles, extra=extra, devices=devices,
+                           user_roles=user_roles)
+
+
+def _form_roles():
+    return {to_int(x) for x in request.form.getlist("role_ids")}
 
 
 @bp.route("/gebruiker/<int:uid>/apparaten-wissen", methods=["POST"])
@@ -129,6 +146,70 @@ def settings():
         "db_size": os.path.getsize(current_app.config["DB_PATH"]) if os.path.exists(current_app.config["DB_PATH"]) else 0,
     }
     return render_template("beheer/settings.html", v=values, status=status)
+
+
+@bp.route("/sharepoint", methods=["GET", "POST"])
+@require("beheer", BEHEER)
+def sharepoint():
+    conn = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        try:
+            if action == "verbinden":
+                info = sp.connect(conn, request.form.get("url") or "", request.form.get("existing_status") or "actief")
+                audit("sharepoint verbonden", "settings", None, info["web_url"])
+                sp.sync_background(current_app.config["DB_PATH"], full=True, initial=True)
+                flash(f"Verbonden met '{info['name']}'. De klantmappen en ordermappen worden nu ingelezen; dat kan een paar minuten duren.", "ok")
+            elif action == "sync":
+                if sp.setting(conn, "sp_running"):
+                    flash("Er loopt al een synchronisatie.", "info")
+                else:
+                    sp.sync_background(current_app.config["DB_PATH"], full=True)
+                    flash("Volledige synchronisatie gestart.", "ok")
+            elif action == "instellingen":
+                sp.set_setting(conn, "sp_auto_create", "1" if request.form.get("sp_auto_create") else "0")
+                for k in ("sp_sub_werkbon", "sp_sub_druktest"):
+                    sp.set_setting(conn, k, re.sub(r'["*:<>?\\|#%]+', "", request.form.get(k) or "").strip("/ "))
+                flash("Instellingen opgeslagen.", "ok")
+            elif action == "koppel":
+                m = re.search(r"#(\d+)\s*$", request.form.get("customer") or "")
+                cid = int(m.group(1)) if m else None
+                if request.form.get("customer") and not cid:
+                    flash("Kies een relatie uit de lijst.", "error")
+                else:
+                    sp.link_folder(conn, request.form.get("item_id"), cid)
+                    flash("Klantmap gekoppeld." if cid else "Klantmap ontkoppeld.", "ok")
+                return redirect(url_for("beheer.sharepoint", alle=request.form.get("alle")) + "#klantmappen")
+            elif action == "ontkoppelen":
+                sp.disconnect(conn)
+                audit("sharepoint ontkoppeld", "settings")
+                flash("SharePoint ontkoppeld. Projecten en koppelingen blijven bewaard.", "ok")
+        except ValueError as exc:
+            flash(str(exc), "error")
+        except sp.GraphError as exc:
+            hint = " Controleer of IT de app toegang heeft gegeven tot deze site (Sites.Selected)." if exc.status in (401, 403) else ""
+            flash(f"SharePoint gaf een fout ({exc.status}): {exc.message}.{hint}", "error")
+        except (requests.RequestException, RuntimeError) as exc:
+            flash(f"SharePoint niet bereikbaar: {exc}", "error")
+        return redirect(url_for("beheer.sharepoint"))
+    show_all = request.args.get("alle") == "1"
+    folders = query("SELECT f.*, c.name AS customer, (SELECT COUNT(*) FROM projects p WHERE p.sp_parent_id = f.item_id) AS n"
+                    " FROM sp_folders f LEFT JOIN customers c ON c.id = f.customer_id WHERE f.missing = 0"
+                    + ("" if show_all else " AND f.customer_id IS NULL") + " ORDER BY f.name COLLATE NOCASE")
+    counts = query("SELECT (SELECT COUNT(*) FROM sp_folders WHERE missing = 0) AS folders,"
+                   " (SELECT COUNT(*) FROM sp_folders WHERE missing = 0 AND customer_id IS NULL) AS unlinked,"
+                   " (SELECT COUNT(*) FROM projects WHERE sp_item_id IS NOT NULL AND sp_missing = 0) AS projects,"
+                   " (SELECT COUNT(*) FROM projects WHERE sp_missing = 1) AS missing,"
+                   " (SELECT COUNT(*) FROM projects WHERE sp_item_id IS NOT NULL AND customer_id IS NULL) AS nocust", one=True)
+    customers = query("SELECT id, name FROM customers WHERE active = 1 ORDER BY name COLLATE NOCASE")
+    v = {k: sp.setting(conn, k) for k in ("sp_url", "sp_root_name", "sp_root_web", "sp_site_name", "sp_last_sync", "sp_last_full",
+                                           "sp_last_error", "sp_auto_create", "sp_sub_werkbon", "sp_sub_druktest", "sp_root_id",
+                                           "sp_running", "sp_last_result")}
+    if v["sp_last_result"] and "|" in v["sp_last_result"]:
+        v["result_at"], v["result"] = v["sp_last_result"].split("|", 1)
+    return render_template("beheer/sharepoint.html", v=v, configured=sp.configured(), connected=sp.connected(conn),
+                           folders=folders, counts=counts, customers=customers, show_all=show_all,
+                           client_id=os.environ.get("GRAPH_CLIENT_ID", ""))
 
 
 @bp.route("/testmail", methods=["POST"])

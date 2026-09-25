@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, g, Response
 
-from .db import query, execute
+from .db import query, execute, get_db
+from . import sharepoint as sp
 from .integrations import upload_to_sharepoint, sharepoint_configured
 from .mail import send_mail
 from .pdf import visit_pdf
@@ -26,7 +27,7 @@ def _f(name):
 def _ticket(tid):
     t = query(
         "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location, i.name AS installation,"
-        " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path,"
+        " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing,"
         " ct.name AS contact, ct.phone AS contact_phone, ct.email AS contact_email, u.name AS assignee"
         " FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN locations l ON l.id = t.location_id"
         " LEFT JOIN installations i ON i.id = t.installation_id LEFT JOIN projects p ON p.id = t.project_id"
@@ -267,15 +268,23 @@ def sign(tid, vid):
                            f"Met vriendelijke groet,\n{g.user['name']}\nDe Vreugd Productietechniek",
                            attachments=[(fname, pdf, "application/pdf")])
             msgs.append("Werkbon gemaild naar " + to + "." if ok else "Mailen is mislukt.")
-        if request.form.get("sharepoint") and sharepoint_configured():
-            folder = _sp_folder(t, "Service")
-            ok, msg = upload_to_sharepoint(pdf, fname, folder, t["project_no"] or "", "werkbon")
+        if request.form.get("sharepoint") and _sp_available(t):
+            res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_werkbon"), fname, pdf)
+            if res is None:
+                ok, msg = upload_to_sharepoint(pdf, fname, _sp_folder(t, "Service"), t["project_no"] or "", "werkbon")
+            else:
+                ok, msg = res
             execute("UPDATE visits SET sharepoint_status = ? WHERE id = ?", (msg, vid))
             msgs.append(msg + ".")
         flash(" ".join(msgs), "ok")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     return render_template("service/sign.html", t=t, v=v, mail_to=t["contact_email"] or t["customer_email"] or "",
-                           sharepoint=sharepoint_configured())
+                           sharepoint=_sp_available(t))
+
+
+def _sp_available(t):
+    """Werkbon kan naar SharePoint: direct in de gekoppelde projectmap, of via de Power Automate-flow."""
+    return sharepoint_configured() or bool(t["project_sp"] and not t["project_sp_missing"] and sp.connected(get_db()))
 
 
 def _sp_folder(t, sub):

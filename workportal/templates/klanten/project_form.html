@@ -8,11 +8,17 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="next" value="{{ next or '' }}">
   <div class="fgrid">
-    <label class="f">Projectnummer / ordernummer ERP *<input type="text" name="number" value="{{ p.number or '' }}" required autofocus placeholder="bijv. 20260102"></label>
+    <label class="f">Ordernummer (Komdex) *<input type="text" name="number" value="{{ p.number or '' }}" required autofocus placeholder="bijv. 20260102"></label>
     <label class="f">Status<select name="status">{{ opt('actief','Actief',p.status) }}{{ opt('afgerond','Afgerond',p.status) }}{{ opt('gearchiveerd','Gearchiveerd',p.status) }}</select></label>
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ p.name or '' }}" required></label>
     <label class="f full">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
+    {% if sp_on and not p.sp_item_id %}
+    <label class="check full"><input type="checkbox" name="sp_create" value="1" {{ 'checked' if p.sp_create }}> <span><b>Projectmap aanmaken in SharePoint</b><br><span class="hint">Maakt <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aan in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post. Het projectnummer moet dan het ordernummer van 8 cijfers zijn.</span></span></label>
+    {% elif sp_on and p.sp_item_id %}
+    <div class="f full"><span class="hint">{{ 'Projectmap is gekoppeld. Wijzig je nummer of omschrijving, dan wordt de map in SharePoint mee hernoemd.' }}</span></div>
+    {% else %}
     <label class="f full">SharePoint-map<input type="text" name="sharepoint_path" value="{{ p.sharepoint_path or '' }}" placeholder="bijv. Projecten/20260102 Aanpassing leidingdeel"><span class="hint">Map waarin druktestrapporten en werkbonnen worden geplaatst. Leeg = standaardmap met projectnummer.</span></label>
+    {% endif %}
     <label class="f full">Notities<textarea name="notes">{{ p.notes or '' }}</textarea></label>
   </div>
   <div class="actions"><button class="btn primary">Opslaan</button></div>

@@ -132,7 +132,7 @@ form { margin: 0; }
 .fgrid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .fgrid .full { grid-column: 1 / -1; }
 label.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
-input[type=text], input[type=email], input[type=number], input[type=date], input[type=datetime-local], input[type=password], input[type=search], input[type=tel], select, textarea {
+input[type=text], input[type=url], input:not([type]), input[type=email], input[type=number], input[type=date], input[type=datetime-local], input[type=password], input[type=search], input[type=tel], select, textarea {
   font: 15px var(--font); color: var(--ink); background: #fff; border: 1px solid #D5DAE8; border-radius: 10px; padding: 0 12px; height: 44px; width: 100%; outline: none; }
 textarea { padding: 10px 12px; height: auto; min-height: 90px; resize: vertical; line-height: 1.45; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #D6EAFF; }
@@ -366,3 +366,35 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .alertdlg::backdrop { background: rgba(10,10,60,.45); }
 .bringcheck { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 16px; }
 .badge-alert { background: var(--warn-bg); color: var(--warn); }
+
+/* SharePoint projectmap */
+.dl svg, .rowitem .s svg, .card-head h2 svg, .choice svg { width: 16px; height: 16px; vertical-align: -3px; }
+.card-head h2 svg { width: 20px; height: 20px; color: var(--accent); }
+.files .rowitem { gap: 12px; align-items: center; }
+.files a.grow { color: inherit; text-decoration: none; min-width: 0; }
+.files .t { overflow-wrap: anywhere; }
+.ficon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--basic); flex-shrink: 0; }
+.ficon svg { width: 18px; height: 18px; }
+.ficon.dir { background: #FFF4D6; color: #A86B00; }
+.card.flush .files .rowitem { padding-left: 18px; padding-right: 18px; }
+.pathbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 15px; }
+.pathbar a { display: inline-flex; align-items: center; gap: 6px; }
+.pathbar svg { width: 16px; height: 16px; }
+.pathbar span { color: var(--muted); }
+.choice-list { display: grid; gap: 8px; margin: 6px 0 16px; }
+.choice { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: #F0F7FF; }
+.sptable td { vertical-align: middle; }
+.sptable input[list] { min-width: 220px; }
+.check.full { align-items: flex-start; grid-column: 1 / -1; }
+.check.full input { margin-top: 2px; flex-shrink: 0; }
+.inline-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.inline-form input[list] { flex: 1; min-width: 180px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+.steps-list { margin: 8px 0 0 20px; line-height: 1.6; }
+.spdot svg { width: 15px; height: 15px; vertical-align: -2px; color: #A86B00; }
+.rolepick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.rolechip { cursor: pointer; }
+.rolechip input { position: absolute; opacity: 0; pointer-events: none; }
+.rolechip span { display: inline-block; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; background: #fff; }
+.rolechip input:checked + span { background: var(--basic); border-color: var(--basic); color: #fff; }
+.rolechip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }

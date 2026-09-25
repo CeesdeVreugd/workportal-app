@@ -23,6 +23,7 @@
     <dl class="dl">
       <dt>App-adres</dt><dd>{{ status.app_url or 'APP_URL niet ingesteld' }}</dd>
       <dt>E-mail</dt><dd><span class="badge {{ 'b-ok' if status.smtp else 'b-warn' }}">{{ status.mail_method if status.smtp else 'Niet ingesteld – codes in containerlog' }}</span></dd>
+      <dt>SharePoint-projecten</dt><dd><a href="{{ url_for('beheer.sharepoint') }}">Koppeling beheren</a></dd>
       <dt>SharePoint-flow</dt><dd><span class="badge {{ 'b-ok' if status.sharepoint else 'b-warn' }}">{{ 'Ingesteld' if status.sharepoint else 'Niet ingesteld' }}</span></dd>
       <dt>Na-calculatie-flow</dt><dd><span class="badge {{ 'b-ok' if status.nacalc else 'b-warn' }}">{{ 'Ingesteld' if status.nacalc else 'Niet ingesteld (upload werkt wel)' }}</span></dd>
       <dt>Database</dt><dd>{{ (status.db_size / 1024 / 1024)|num(1) }} MB · {{ status.data_dir }}</dd>

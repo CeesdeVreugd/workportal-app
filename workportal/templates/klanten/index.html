@@ -37,7 +37,7 @@
 <div class="card flush tablewrap"><table class="table">
   <thead><tr><th>Projectnr.</th><th>Omschrijving</th><th class="hide-m">Klant</th><th>Status</th></tr></thead>
   <tbody>
-  {% for p in projects %}<tr class="link" data-href="{{ url_for('klanten.project', pid=p.id) }}"><td class="nowrap"><b>{{ p.number }}</b></td><td>{{ p.name }}</td><td class="hide-m">{{ p.customer or '' }}</td><td><span class="badge {{ 'b-blue' if p.status == 'actief' else '' }}">{{ p.status|capitalize }}</span></td></tr>
+  {% for p in projects %}<tr class="link" data-href="{{ url_for('klanten.project', pid=p.id) }}"><td class="nowrap"><b>{{ p.number }}</b></td><td>{{ p.name }}{% if p.sp_item_id and not p.sp_missing %} <span class="spdot" title="Projectmap in SharePoint gekoppeld">{{ icon('folder') }}</span>{% endif %}</td><td class="hide-m">{{ p.customer or '' }}</td><td><span class="badge {{ 'b-blue' if p.status == 'actief' else '' }}">{{ p.status|capitalize }}</span></td></tr>
   {% else %}<tr><td colspan="4" class="empty">Geen projecten gevonden.{% if can('klanten', 2) %} <a href="{{ url_for('klanten.new_project') }}">Nieuw project aanmaken</a>.{% endif %}</td></tr>{% endfor %}
   </tbody></table></div>
 {% else %}
