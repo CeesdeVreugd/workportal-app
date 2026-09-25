@@ -3,7 +3,8 @@
 services:
   workportal-app:
     build: .
-    image: workportal-app:latest
+    # Image wordt op de server zelf gebouwd; niet ophalen van Docker Hub
+    pull_policy: build
     container_name: workportal-app
     restart: unless-stopped
     environment:

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V2: e-mail via Microsoft 365 app-registratie, publiceren.cmd"
+set "OMSCHRIJVING=WorkPortal V3: compose bouwt image lokaal (pull_policy build)"
 
 echo.
 echo ============================================
