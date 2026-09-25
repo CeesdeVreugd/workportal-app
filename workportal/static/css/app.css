@@ -395,6 +395,23 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .rolepick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .rolechip { cursor: pointer; }
 .rolechip input { position: absolute; opacity: 0; pointer-events: none; }
-.rolechip span { display: inline-block; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; background: #fff; }
-.rolechip input:checked + span { background: var(--basic); border-color: var(--basic); color: #fff; }
+.rolechip span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; background: #fff; color: var(--ink-2); }
+.rolechip span i { width: 8px; height: 8px; border-radius: 50%; background: var(--rc); }
+.rolechip input:checked + span { background: var(--rb); border-color: var(--rc); color: var(--rt); font-weight: 500; }
 .rolechip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Kleuren per functierol */
+.role-administratie { --rc: #7C6CF0; --rb: #EFEDFE; --rt: #4B3FB8; }
+.role-directie      { --rc: #1FA35B; --rb: #E6F6EC; --rt: #16733F; }
+.role-engineering   { --rc: #F2711C; --rb: #FEEFE5; --rt: #B24E0C; }
+.role-verkoop       { --rc: #14B8A6; --rb: #E3F7F4; --rt: #0E7A6E; }
+.role-werkplaats    { --rc: #F2A516; --rb: #FEF4E0; --rt: #9A6508; }
+:where(.rolepill) { --rc: #8A90B0; --rb: #F0F2F8; --rt: var(--ink-2); }
+.rolepill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--rb); color: var(--rt); font-size: 13px; font-weight: 500; white-space: nowrap; line-height: 1.5; }
+.rolepill i, .roledot { width: 8px; height: 8px; border-radius: 50%; background: var(--rc); flex-shrink: 0; display: inline-block; }
+.rolepill.lg { font-size: 17px; padding: 5px 14px 5px 11px; }
+.rolepill.lg i { width: 10px; height: 10px; }
+.rolepills { display: flex; flex-wrap: wrap; gap: 6px; }
+.rolename { display: inline-flex; align-items: center; gap: 10px; }
+.rolebtn.active { background: var(--rb); color: var(--rt); box-shadow: inset 3px 0 0 var(--rc); }
+.rolebtn.active .rolecount { color: var(--rt); opacity: .75; }

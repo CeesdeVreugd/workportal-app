@@ -9,8 +9,8 @@
   <nav class="rights-roles" aria-label="Functierollen">
     <div class="navhead" style="padding-top:0">Functierollen</div>
     {% for r in roles %}
-    <button type="button" class="rolebtn {{ 'active' if r.id == active }}" data-role="{{ r.id }}">
-      <span>{{ r.name }}</span>
+    <button type="button" class="rolebtn role-{{ r.key }} {{ 'active' if r.id == active }}" data-role="{{ r.id }}">
+      <span class="rolename"><i class="roledot"></i>{{ r.name }}</span>
       <span class="small rolecount" data-count="{{ r.id }}"></span>
     </button>
     {% endfor %}
@@ -18,7 +18,7 @@
   <div class="rights-panel">
     {% for r in roles %}
     <section class="card rolepanel {{ '' if r.id == active else 'hidden' }}" data-panel="{{ r.id }}">
-      <div class="card-head"><h2>{{ r.name }}</h2><span class="small muted">Lezen · Bewerken · Beheer (ook verwijderen)</span></div>
+      <div class="card-head"><h2><span class="rolepill role-{{ r.key }} lg"><i></i>{{ r.name }}</span></h2><span class="small muted">Lezen · Bewerken · Beheer (ook verwijderen)</span></div>
       {% for gname, mods in groups %}
       <div class="rights-group">
         <div class="navhead">{{ gname }}</div>

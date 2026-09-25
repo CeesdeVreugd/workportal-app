@@ -29,7 +29,10 @@ def _f(name):
 def users():
     rows = query("SELECT u.*, (SELECT group_concat(name, ', ') FROM (SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id ORDER BY r.sort)) AS role_name, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS n_devices"
                  " FROM users u ORDER BY u.active DESC, u.name")
-    return render_template("beheer/users.html", users=rows, roles=query("SELECT * FROM roles ORDER BY sort"))
+    uroles = {}
+    for r in query("SELECT ur.user_id, ro.key, ro.name FROM user_roles ur JOIN roles ro ON ro.id = ur.role_id ORDER BY ro.sort"):
+        uroles.setdefault(r["user_id"], []).append(r)
+    return render_template("beheer/users.html", users=rows, roles=query("SELECT * FROM roles ORDER BY sort"), uroles=uroles)
 
 
 @bp.route("/gebruiker/nieuw", methods=["GET", "POST"])

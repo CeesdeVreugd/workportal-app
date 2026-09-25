@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/roles.html" import role_pill %}
 {% block title %}Beheer{% endblock %}
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>{{ users|length }} gebruiker(s)</p></div>
   <div class="actions"><a class="btn primary" href="{{ url_for('beheer.user') }}">{{ icon('plus') }}Nieuwe gebruiker</a></div></div>
 {% include "beheer/_nav.html" %}
 <div class="card flush tablewrap"><table class="table">
-  <thead><tr><th>Naam</th><th>E-mail</th><th>Functierol</th><th class="hide-m">Laatst ingelogd</th><th class="num hide-m">Apparaten</th><th>Status</th></tr></thead>
+  <thead><tr><th>Naam</th><th>E-mail</th><th>Functierollen</th><th class="hide-m">Laatst ingelogd</th><th class="num hide-m">Apparaten</th><th>Status</th></tr></thead>
   <tbody>{% for u in users %}<tr class="link" data-href="{{ url_for('beheer.user', uid=u.id) }}">
-    <td><b>{{ u.name }}</b>{% if u.is_admin %} <span class="badge b-dark">Beheerder</span>{% endif %}</td><td>{{ u.email }}</td><td>{{ u.role_name or '–' }}</td>
+    <td><b>{{ u.name }}</b>{% if u.is_admin %} <span class="badge b-dark">Beheerder</span>{% endif %}</td><td>{{ u.email }}</td><td><div class="rolepills">{% for r in uroles.get(u.id, []) %}{{ role_pill(r) }}{% else %}<span class="muted">–</span>{% endfor %}</div></td>
     <td class="hide-m">{{ u.last_login|dt or 'Nog nooit' }}</td><td class="num hide-m">{{ u.n_devices }}</td>
     <td><span class="badge {{ 'b-ok' if u.active else 'b-bad' }}">{{ 'Actief' if u.active else 'Uitgeschakeld' }}</span></td></tr>{% endfor %}</tbody>
 </table></div>
