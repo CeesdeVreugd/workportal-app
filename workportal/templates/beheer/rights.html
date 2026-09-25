@@ -1,15 +1,75 @@
 {% extends "base.html" %}
 {% block title %}Rechten{% endblock %}
 {% block content %}
-<div class="pagehead"><div><h1>Beheer</h1><p>Rechten per functierol: Geen · Lezen · Bewerken · Beheer (ook verwijderen)</p></div></div>
+<div class="pagehead"><div><h1>Beheer</h1><p>Rechten per functierol. Vink aan wat een rol mag; een hoger recht omvat de lagere.</p></div></div>
 {% include "beheer/_nav.html" %}
-<form method="post" class="form">
+<form method="post" class="rights" id="rightsform">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="card flush tablewrap"><table class="table">
-    <thead><tr><th>Module</th>{% for r in roles %}<th>{{ r.name }}</th>{% endfor %}</tr></thead>
-    <tbody>{% for m, label in MODULES %}<tr><td><b>{{ label }}</b></td>
-      {% for r in roles %}<td><select name="{{ r.id }}_{{ m }}" style="min-width:120px">{% for lvl in [0,1,2,3] %}<option value="{{ lvl }}" {{ 'selected' if matrix.get((r.id, m), 0) == lvl }}>{{ LEVEL_NAMES[lvl] }}</option>{% endfor %}</select></td>{% endfor %}</tr>{% endfor %}</tbody>
-  </table></div>
-  <div class="actions"><button class="btn primary">Rechten opslaan</button></div>
+  <input type="hidden" name="active_role" id="active_role" value="{{ active }}">
+  <nav class="rights-roles" aria-label="Functierollen">
+    <div class="navhead" style="padding-top:0">Functierollen</div>
+    {% for r in roles %}
+    <button type="button" class="rolebtn {{ 'active' if r.id == active }}" data-role="{{ r.id }}">
+      <span>{{ r.name }}</span>
+      <span class="small rolecount" data-count="{{ r.id }}"></span>
+    </button>
+    {% endfor %}
+  </nav>
+  <div class="rights-panel">
+    {% for r in roles %}
+    <section class="card rolepanel {{ '' if r.id == active else 'hidden' }}" data-panel="{{ r.id }}">
+      <div class="card-head"><h2>{{ r.name }}</h2><span class="small muted">Lezen · Bewerken · Beheer (ook verwijderen)</span></div>
+      {% for gname, mods in groups %}
+      <div class="rights-group">
+        <div class="navhead">{{ gname }}</div>
+        {% for m in mods %}{% set lvl = matrix.get((r.id, m), 0) %}
+        <div class="rights-row" data-row>
+          <div class="rights-mod">{{ labels[m] }}</div>
+          <div class="rights-checks">
+            {% for v, l in [(1,'Lezen'),(2,'Bewerken'),(3,'Beheer')] %}
+            <label class="tick"><input type="checkbox" name="{{ r.id }}_{{ m }}" value="{{ v }}" data-lvl="{{ v }}" {{ 'checked' if lvl >= v }}><span>{{ l }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </section>
+    {% endfor %}
+    <div class="actions"><button class="btn primary">Rechten opslaan</button><span class="hint">Opslaan bewaart de wijzigingen van alle rollen.</span></div>
+  </div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var form = document.getElementById('rightsform');
+  function count(){
+    document.querySelectorAll('[data-count]').forEach(function(el){
+      var p = document.querySelector('[data-panel="'+el.getAttribute('data-count')+'"]');
+      var n = 0; p.querySelectorAll('[data-row]').forEach(function(row){ if (row.querySelector('input:checked')) n++; });
+      el.textContent = n + ' module' + (n === 1 ? '' : 's');
+    });
+  }
+  document.querySelectorAll('.rolebtn').forEach(function(b){
+    b.addEventListener('click', function(){
+      var id = b.getAttribute('data-role');
+      document.querySelectorAll('.rolebtn').forEach(function(x){ x.classList.toggle('active', x === b); });
+      document.querySelectorAll('.rolepanel').forEach(function(p){ p.classList.toggle('hidden', p.getAttribute('data-panel') !== id); });
+      document.getElementById('active_role').value = id;
+    });
+  });
+  form.addEventListener('change', function(e){
+    var cb = e.target; if (!cb.hasAttribute('data-lvl')) return;
+    var lvl = +cb.getAttribute('data-lvl'), row = cb.closest('[data-row]');
+    row.querySelectorAll('input[data-lvl]').forEach(function(o){
+      var l = +o.getAttribute('data-lvl');
+      if (cb.checked && l < lvl) o.checked = true;
+      if (!cb.checked && l > lvl) o.checked = false;
+    });
+    count();
+  });
+  count();
+})();
+</script>
 {% endblock %}

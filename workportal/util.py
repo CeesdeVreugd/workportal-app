@@ -73,6 +73,18 @@ def long_date(dt=None):
     return f"{DAYS[dt.weekday()].capitalize()} {dt.day} {MONTHS[dt.month - 1]} {dt.year}"
 
 
+def greeting(dt=None):
+    """Goedemorgen/-middag/-avond/-nacht volgens de Nederlandse tijd."""
+    h = (local(dt) if dt else now_utc().astimezone(TZ)).hour
+    if 6 <= h < 12:
+        return "Goedemorgen"
+    if 12 <= h < 18:
+        return "Goedemiddag"
+    if 18 <= h < 24:
+        return "Goedenavond"
+    return "Goedenacht"
+
+
 def fmt_num(value, decimals=2):
     if value is None or value == "":
         return ""

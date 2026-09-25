@@ -6,14 +6,14 @@ from flask import Flask, g, session, request, redirect, url_for, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import db as dbmod
-from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, long_date,
+from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, long_date, greeting,
                    get_setting, parse_iso, now_utc, hash_secret)
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
-PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon"}
+PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon"}
 
 
 def _secret_key(data_dir):
@@ -64,7 +64,7 @@ def create_app(test_config=None, start_scheduler=True):
 
     app.jinja_env.filters.update(dt=fmt_dt, date=fmt_date, eur=fmt_eur, num=fmt_num)
     app.jinja_env.globals.update(csrf_token=csrf_token, can=can, MODULES=MODULES, LEVEL_NAMES=LEVEL_NAMES,
-                                 long_date=long_date, VERSION=VERSION,
+                                 long_date=long_date, greeting=greeting, VERSION=VERSION,
                                  sharepoint_configured=sharepoint_configured,
                                  nacalc_configured=nacalc_configured)
 
@@ -120,10 +120,21 @@ def create_app(test_config=None, start_scheduler=True):
             "background_color": "#FFFFFF",
             "theme_color": "#0A0A96",
             "icons": [
-                {"src": url_for("static", filename="img/icon-192.png"), "sizes": "192x192", "type": "image/png"},
-                {"src": url_for("static", filename="img/icon-512.png"), "sizes": "512x512", "type": "image/png"},
+                {"src": url_for("static", filename="img/icon-192.png") + "?v=" + VERSION, "sizes": "192x192",
+                 "type": "image/png", "purpose": "any"},
+                {"src": url_for("static", filename="img/icon-512.png") + "?v=" + VERSION, "sizes": "512x512",
+                 "type": "image/png", "purpose": "any"},
+                {"src": url_for("static", filename="img/icon-maskable-192.png") + "?v=" + VERSION, "sizes": "192x192",
+                 "type": "image/png", "purpose": "maskable"},
+                {"src": url_for("static", filename="img/icon-maskable-512.png") + "?v=" + VERSION, "sizes": "512x512",
+                 "type": "image/png", "purpose": "maskable"},
             ],
         }
+
+    @app.route("/apple-touch-icon.png")
+    @app.route("/apple-touch-icon-precomposed.png")
+    def apple_icon():
+        return send_from_directory(os.path.join(app.root_path, "static", "img"), "apple-touch-icon.png")
 
     @app.route("/favicon.ico")
     def favicon():

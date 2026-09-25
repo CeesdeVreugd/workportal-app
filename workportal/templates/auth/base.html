@@ -6,21 +6,23 @@
 <meta name="theme-color" content="#0A0A96">
 <title>{% block title %}Inloggen{% endblock %} – WorkPortal</title>
 <link rel="manifest" href="{{ url_for('manifest') }}">
-<link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
-<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+<link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}?v={{ VERSION }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v={{ VERSION }}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
 </head>
 <body>
 <main class="auth">
   <div class="auth-card">
-    <img class="logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="De Vreugd Productietechniek">
-    <div class="eyebrow">WORKPORTAL</div>
+    <div class="auth-brand">
+      <img class="logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="De Vreugd Productietechniek">
+      <div class="eyebrow">WORKPORTAL</div>
+    </div>
     {% with msgs = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in msgs %}<div class="flash {{ cat if cat in ['ok','error','info'] else 'info' }}">{{ msg }}</div>{% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
-    <div class="payoff">ALS PERFORMANCE TELT</div>
+    <img class="payoff" src="{{ url_for('static', filename='img/payoff.png') }}" alt="Als performance telt">
   </div>
 </main>
 </body>

@@ -7,8 +7,8 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>{% block title %}WorkPortal{% endblock %} – WorkPortal</title>
 <link rel="manifest" href="{{ url_for('manifest') }}">
-<link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
-<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+<link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}?v={{ VERSION }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v={{ VERSION }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
@@ -27,17 +27,21 @@
     </a>
     <div class="nav">
       {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
+      {% if can('klanten') or can('kennis') %}<div class="navhead">Algemeen</div>{% endif %}
       {% if can('klanten') %}{{ navlink('klanten.index', 'Klanten & projecten', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('kennis') %}{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
+      {% if can('service') or can('druktest') %}<div class="navhead">Werkplaats &amp; service</div>{% endif %}
       {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
       {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}
+      {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Verkoop &amp; engineering</div>{% endif %}
       {% if can('calculatie') %}{{ navlink('calculatie.index', 'Calculatie', 'calculatie', 'calculatie.') }}{% endif %}
       {% if can('nacalculatie') %}{{ navlink('nacalc.index', 'Na-calculatie', 'nacalculatie', 'nacalc.') }}{% endif %}
-      {% if can('kennis') %}{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
-      {% if can('beheer') %}<div class="sep"></div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
+      {% if can('beheer') %}<div class="navhead">Administratie &amp; directie</div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
     </div>
     <div style="margin-top:auto" class="small muted">
-      <a href="{{ url_for('main.account') }}" style="text-decoration:none">Mijn account &amp; meldingen</a><br>
-      <span>WorkPortal v{{ VERSION }}</span>
+      <img class="side-payoff" src="{{ url_for('static', filename='img/payoff.png') }}" alt="Als performance telt">
+      <div style="padding:0 8px"><a href="{{ url_for('main.account') }}" style="text-decoration:none">Mijn account &amp; meldingen</a><br>
+      <span>WorkPortal v{{ VERSION }}</span></div>
     </div>
   </nav>
   <div class="main">

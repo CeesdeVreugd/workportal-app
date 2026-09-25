@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V3: compose bouwt image lokaal (pull_policy build)"
+set "OMSCHRIJVING=WorkPortal V4: ronde app-iconen, officiele slogan, compact inlogscherm, nieuwe rechtenpagina, begroeting op tijd"
 
 echo.
 echo ============================================

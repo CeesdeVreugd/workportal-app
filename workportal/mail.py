@@ -139,6 +139,9 @@ def send_mail(to, subject, text, html=None, attachments=None):
 
 
 def code_mail_html(name, code, minutes):
+    app_url = os.environ.get("APP_URL", "").rstrip("/")
+    payoff = (f'<img src="{app_url}/static/img/payoff.png" alt="Als performance telt" width="180" style="display:block;margin-top:6px">'
+              if app_url else "")
     return f"""<div style="font-family:Arial,sans-serif;max-width:480px;color:#14163A">
 <div style="background:#0A0A96;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0;font-weight:bold;letter-spacing:.1em">WORKPORTAL</div>
 <div style="border:1px solid #E1E5F0;border-top:0;padding:22px;border-radius:0 0 10px 10px">
@@ -146,5 +149,6 @@ def code_mail_html(name, code, minutes):
 <p>Je inlogcode voor WorkPortal is:</p>
 <p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#0A0A96;margin:18px 0">{code}</p>
 <p>De code is {minutes} minuten geldig. Heb je niet geprobeerd in te loggen? Dan kun je deze mail negeren.</p>
-<p style="color:#5A5F80;font-size:12px;margin-top:24px">De Vreugd Productietechniek &middot; ALS PERFORMANCE TELT</p>
+<p style="color:#5A5F80;font-size:12px;margin-top:24px">De Vreugd Productietechniek</p>
+{payoff}
 </div></div>"""

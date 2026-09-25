@@ -64,9 +64,9 @@ def _doc(buf, title, doc_no):
         canvas.setLineWidth(0.8)
         canvas.line(18 * mm, h - 25 * mm, w - 18 * mm, h - 25 * mm)
         canvas.line(18 * mm, 13 * mm, w - 18 * mm, 13 * mm)
-        canvas.setFont("Helvetica-Bold", 7.5)
-        canvas.setFillColor(BASIC)
-        canvas.drawString(18 * mm, 9 * mm, "DE VREUGD PRODUCTIETECHNIEK · ALS PERFORMANCE TELT")
+        payoff = os.path.join(STATIC, "payoff.png")
+        if os.path.exists(payoff):
+            canvas.drawImage(payoff, 18 * mm, 7.6 * mm, width=48 * mm, height=48 * mm * 191 / 3174, mask="auto")
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
         canvas.drawRightString(w - 18 * mm, 9 * mm, f"Pagina {d.page}")

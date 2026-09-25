@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from .db import query, execute, backup
 from .mail import smtp_configured, send_mail, mail_method
 from .integrations import sharepoint_configured, nacalc_configured
-from .permissions import require, MODULES, MODULE_KEYS, BEHEER
+from .permissions import require, MODULES, MODULE_KEYS, MODULE_GROUPS, BEHEER
 from .seed import CATEGORIES, WORKTYPES
 from .util import now_iso, audit, get_setting, set_setting, to_int, to_float, DEFAULT_SETTINGS
 
@@ -96,14 +96,16 @@ def rights():
     if request.method == "POST":
         for r in roles:
             for m in MODULE_KEYS:
-                lvl = max(0, min(3, to_int(request.form.get(f"{r['id']}_{m}"), 0)))
+                vals = [to_int(v, 0) for v in request.form.getlist(f"{r['id']}_{m}")] or [0]
+                lvl = max(0, min(3, max(vals)))
                 execute("INSERT INTO role_permissions (role_id, module, level) VALUES (?,?,?)"
                         " ON CONFLICT(role_id, module) DO UPDATE SET level = excluded.level", (r["id"], m, lvl))
         audit("rechten gewijzigd", "roles")
         flash("Rechten per functierol opgeslagen.", "ok")
-        return redirect(url_for("beheer.rights"))
+        return redirect(url_for("beheer.rights", rol=request.form.get("active_role")))
     matrix = {(r["role_id"], r["module"]): r["level"] for r in query("SELECT * FROM role_permissions")}
-    return render_template("beheer/rights.html", roles=roles, matrix=matrix)
+    return render_template("beheer/rights.html", roles=roles, matrix=matrix, groups=MODULE_GROUPS,
+                           labels=dict(MODULES), active=to_int(request.args.get("rol")) or roles[0]["id"])
 
 
 @bp.route("/instellingen", methods=["GET", "POST"])

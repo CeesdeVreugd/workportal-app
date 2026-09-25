@@ -4,7 +4,7 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <div><h1>Goedendag, {{ g.user.name.split(' ')[0] }}</h1><p>{{ long_date() }}</p></div>
+  <div><h1>{{ greeting() }}, {{ g.user.name.split(' ')[0] }}</h1><p>{{ long_date() }}</p></div>
   <div class="actions">
     {% if can('calculatie', 2) %}<a class="btn" href="{{ url_for('calculatie.new') }}">{{ icon('plus') }}Nieuwe calculatie</a>{% endif %}
     {% if can('druktest', 2) %}<a class="btn" href="{{ url_for('druktest.new') }}">{{ icon('druktest') }}Nieuwe druktest</a>{% endif %}
