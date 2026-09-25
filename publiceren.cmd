@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V5: neutrale menukoppen, nieuwe app-iconen, inlogscherm links boven"
+set "OMSCHRIJVING=WorkPortal V6: ronde iconen overal, appnaam WorkPortal - DVP"
 
 echo.
 echo ============================================

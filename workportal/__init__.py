@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon"}
 
@@ -113,8 +113,8 @@ def create_app(test_config=None, start_scheduler=True):
     @app.route("/manifest.webmanifest")
     def manifest():
         return {
-            "name": "WorkPortal – De Vreugd Productietechniek",
-            "short_name": "WorkPortal",
+            "name": "WorkPortal - DVP",
+            "short_name": "WorkPortal - DVP",
             "start_url": "/",
             "display": "standalone",
             "background_color": "#FFFFFF",
@@ -124,9 +124,6 @@ def create_app(test_config=None, start_scheduler=True):
             "icons": [
                 {"src": url_for("static", filename=f"img/wp-round-{n}.png"), "sizes": f"{n}x{n}", "type": "image/png",
                  "purpose": "any"} for n in (96, 144, 192, 256, 384, 512)
-            ] + [
-                {"src": url_for("static", filename=f"img/wp-square-{n}.png"), "sizes": f"{n}x{n}", "type": "image/png",
-                 "purpose": "maskable"} for n in (96, 144, 192, 256, 384, 512)
             ],
         }
 
@@ -137,7 +134,8 @@ def create_app(test_config=None, start_scheduler=True):
 
     @app.route("/favicon.ico")
     def favicon():
-        return send_from_directory(os.path.join(app.root_path, "static", "img"), "favicon.png")
+        return send_from_directory(os.path.join(app.root_path, "static", "img"), "favicon.ico",
+                                   mimetype="image/x-icon")
 
     @app.route("/health")
     def health():
