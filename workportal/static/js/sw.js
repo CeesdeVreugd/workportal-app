@@ -9,8 +9,8 @@ self.addEventListener("push", function (event) {
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: "WorkPortal", body: event.data ? event.data.text() : "" }; }
   event.waitUntil(self.registration.showNotification(data.title || "WorkPortal", {
     body: data.body || "",
-    icon: "/static/img/icon-192.png",
-    badge: "/static/img/icon-192.png",
+    icon: "/static/img/wp-square-192.png",
+    badge: "/static/img/wp-square-192.png",
     data: { url: data.url || "/" },
     requireInteraction: true,
     vibrate: [300, 150, 300]

@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon"}
 
@@ -119,15 +119,14 @@ def create_app(test_config=None, start_scheduler=True):
             "display": "standalone",
             "background_color": "#FFFFFF",
             "theme_color": "#0A0A96",
+            "id": "/",
+            "scope": "/",
             "icons": [
-                {"src": url_for("static", filename="img/icon-192.png") + "?v=" + VERSION, "sizes": "192x192",
-                 "type": "image/png", "purpose": "any"},
-                {"src": url_for("static", filename="img/icon-512.png") + "?v=" + VERSION, "sizes": "512x512",
-                 "type": "image/png", "purpose": "any"},
-                {"src": url_for("static", filename="img/icon-maskable-192.png") + "?v=" + VERSION, "sizes": "192x192",
-                 "type": "image/png", "purpose": "maskable"},
-                {"src": url_for("static", filename="img/icon-maskable-512.png") + "?v=" + VERSION, "sizes": "512x512",
-                 "type": "image/png", "purpose": "maskable"},
+                {"src": url_for("static", filename=f"img/wp-round-{n}.png"), "sizes": f"{n}x{n}", "type": "image/png",
+                 "purpose": "any"} for n in (96, 144, 192, 256, 384, 512)
+            ] + [
+                {"src": url_for("static", filename=f"img/wp-square-{n}.png"), "sizes": f"{n}x{n}", "type": "image/png",
+                 "purpose": "maskable"} for n in (96, 144, 192, 256, 384, 512)
             ],
         }
 

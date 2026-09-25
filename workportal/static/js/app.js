@@ -104,7 +104,7 @@
           el.dataset.alerted = "1";
           try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (x) {}
           if ("Notification" in window && Notification.permission === "granted") {
-            try { new Notification("Druktest: tijd voor controle", { body: el.getAttribute("data-alert"), icon: "/static/img/icon-192.png" }); } catch (x) {}
+            try { new Notification("Druktest: tijd voor controle", { body: el.getAttribute("data-alert"), icon: "/static/img/wp-square-192.png" }); } catch (x) {}
           }
         }
       } else {

@@ -5,16 +5,16 @@
 <h1>Menu</h1>
 <div class="card flush"><div class="nav" style="padding:8px">
   <a href="{{ url_for('main.dashboard') }}">{{ icon('dashboard') }}Dashboard</a>
-  {% if can('klanten') or can('kennis') %}<div class="navhead">Algemeen</div>{% endif %}
+  {% if can('klanten') %}<div class="navhead">Relaties</div>{% endif %}
   {% if can('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Klanten &amp; projecten</a>{% endif %}
-  {% if can('kennis') %}<a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
-  {% if can('service') or can('druktest') %}<div class="navhead">Werkplaats &amp; service</div>{% endif %}
+  {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
   {% if can('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
   {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}
-  {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Verkoop &amp; engineering</div>{% endif %}
+  {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
   {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
   {% if can('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
-  {% if can('beheer') %}<div class="navhead">Administratie &amp; directie</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
+  {% if can('kennis') %}<div class="navhead">Kennis</div><a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
+  {% if can('beheer') %}<div class="navhead">Systeem</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
   <div class="navhead">Persoonlijk</div>
   <a href="{{ url_for('main.account') }}">{{ icon('bell') }}Mijn account &amp; meldingen</a>
 </div></div>

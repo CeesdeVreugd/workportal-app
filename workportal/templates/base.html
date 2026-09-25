@@ -27,16 +27,15 @@
     </a>
     <div class="nav">
       {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
-      {% if can('klanten') or can('kennis') %}<div class="navhead">Algemeen</div>{% endif %}
-      {% if can('klanten') %}{{ navlink('klanten.index', 'Klanten & projecten', 'klanten', 'klanten.') }}{% endif %}
-      {% if can('kennis') %}{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
-      {% if can('service') or can('druktest') %}<div class="navhead">Werkplaats &amp; service</div>{% endif %}
+      {% if can('klanten') %}<div class="navhead">Relaties</div>{{ navlink('klanten.index', 'Klanten & projecten', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
       {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
       {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}
-      {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Verkoop &amp; engineering</div>{% endif %}
+      {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
       {% if can('calculatie') %}{{ navlink('calculatie.index', 'Calculatie', 'calculatie', 'calculatie.') }}{% endif %}
       {% if can('nacalculatie') %}{{ navlink('nacalc.index', 'Na-calculatie', 'nacalculatie', 'nacalc.') }}{% endif %}
-      {% if can('beheer') %}<div class="navhead">Administratie &amp; directie</div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
+      {% if can('kennis') %}<div class="navhead">Kennis</div>{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
+      {% if can('beheer') %}<div class="navhead">Systeem</div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
     </div>
     <div style="margin-top:auto" class="small muted">
       <img class="side-payoff" src="{{ url_for('static', filename='img/payoff.png') }}" alt="Als performance telt">

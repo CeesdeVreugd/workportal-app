@@ -20,10 +20,11 @@ MODULE_KEYS = [m for m, _ in MODULES]
 
 # Modules gegroepeerd onder koppen (menu en rechtenpagina)
 MODULE_GROUPS = [
-    ("Algemeen", ["klanten", "kennis", "kennis_schrijven"]),
-    ("Werkplaats & service", ["service", "druktest"]),
-    ("Verkoop & engineering", ["calculatie", "nacalculatie"]),
-    ("Administratie & directie", ["beheer"]),
+    ("Relaties", ["klanten"]),
+    ("Uitvoering", ["service", "druktest"]),
+    ("Calculatie & financiën", ["calculatie", "nacalculatie"]),
+    ("Kennis", ["kennis", "kennis_schrijven"]),
+    ("Systeem", ["beheer"]),
 ]
 
 ROLES = [
