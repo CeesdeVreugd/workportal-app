@@ -38,32 +38,42 @@ def ask_snelstart(customer_id, next_url):
 @require("klanten", LEZEN)
 def index():
     q = (request.args.get("q") or "").strip()
-    tab = request.args.get("tab", "klanten")
+    tab = request.args.get("tab")
+    view = request.args.get("view") or ("projecten" if tab == "projecten" else "relaties")
+    flt = request.args.get("filter") or (tab if tab in ("klanten", "leveranciers", "alle", "vervallen") else None)
     like = f"%{q}%"
-    where = ["(c.name LIKE ? OR IFNULL(c.short_name,'') LIKE ? OR IFNULL(c.city,'') LIKE ? OR IFNULL(c.debtor_no,'') LIKE ?"
-             " OR IFNULL(c.komdex_id,'') = ?)"]
-    params = [like, like, like, like, q]
-    if tab == "klanten":
-        where.append("c.active = 1 AND IFNULL(c.relation_type,'') IN ('klant','beide','instelling','prospect','')")
-    elif tab == "leveranciers":
-        where.append("c.active = 1 AND c.relation_type IN ('leverancier','beide')")
-    elif tab == "vervallen":
-        where.append("c.active = 0")
-    customers = []
-    if tab != "projecten":
+    customers, projects = [], []
+    if view == "projecten":
+        flt = flt if flt in ("actief", "afgerond", "gearchiveerd", "alle") else "actief"
+        where, params = ["(p.number LIKE ? OR p.name LIKE ? OR IFNULL(c.name,'') LIKE ?)"], [like, like, like]
+        if flt != "alle":
+            where.append("p.status = ?")
+            params.append(flt)
+        projects = query("SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id"
+                         " WHERE " + " AND ".join(where) + " ORDER BY p.number DESC", params)
+    else:
+        view = "relaties"
+        flt = flt if flt in ("klanten", "leveranciers", "alle", "vervallen") else "klanten"
+        where = ["(c.name LIKE ? OR IFNULL(c.short_name,'') LIKE ? OR IFNULL(c.city,'') LIKE ? OR IFNULL(c.debtor_no,'') LIKE ?"
+                 " OR IFNULL(c.komdex_id,'') = ?)"]
+        params = [like, like, like, like, q]
+        if flt == "klanten":
+            where.append("c.active = 1 AND IFNULL(c.relation_type,'') IN ('klant','beide','instelling','prospect','')")
+        elif flt == "leveranciers":
+            where.append("c.active = 1 AND c.relation_type IN ('leverancier','beide')")
+        elif flt == "vervallen":
+            where.append("c.active = 0")
         customers = query(
             "SELECT c.*, (SELECT COUNT(*) FROM projects p WHERE p.customer_id = c.id) AS n_projects,"
             " (SELECT COUNT(*) FROM tickets t WHERE t.customer_id = c.id AND t.status NOT IN ('afgerond','gefactureerd')) AS n_open"
             " FROM customers c WHERE " + " AND ".join(where) + " ORDER BY c.name COLLATE NOCASE", params)
-    projects = query(
-        "SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id"
-        " WHERE p.number LIKE ? OR p.name LIKE ? OR IFNULL(c.name,'') LIKE ?"
-        " ORDER BY CASE p.status WHEN 'actief' THEN 0 ELSE 1 END, p.number DESC", (like, like, like))
     counts = query("SELECT COUNT(*) AS alle, SUM(active = 1 AND IFNULL(relation_type,'') IN ('klant','beide','instelling','prospect',''))"
                    " AS klanten, SUM(active = 1 AND relation_type IN ('leverancier','beide')) AS leveranciers,"
                    " SUM(active = 0) AS vervallen FROM customers", one=True)
-    return render_template("klanten/index.html", customers=customers, projects=projects, q=q, tab=tab,
-                           counts=counts, TYPE_LABELS=TYPE_LABELS)
+    pcounts = query("SELECT COUNT(*) AS alle, SUM(status = 'actief') AS actief, SUM(status = 'afgerond') AS afgerond,"
+                    " SUM(status = 'gearchiveerd') AS gearchiveerd FROM projects", one=True)
+    return render_template("klanten/index.html", customers=customers, projects=projects, q=q, view=view, flt=flt,
+                           counts=counts, pcounts=pcounts, TYPE_LABELS=TYPE_LABELS)
 
 
 def _customer_values():
@@ -282,7 +292,7 @@ def delete_project(pid):
     execute("DELETE FROM projects WHERE id = ?", (pid,))
     audit("verwijderd", "project", pid)
     flash("Project verwijderd.", "ok")
-    return redirect(url_for("klanten.index", tab="projecten"))
+    return redirect(url_for("klanten.index", view="projecten"))
 
 
 # ---------------------------------------------------------------- klantnummer SnelStart

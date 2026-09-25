@@ -3,7 +3,7 @@
 {% from "partials/macros.html" import ticket_status, calc_status %}
 {% block title %}Project {{ p.number }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for('klanten.index', tab='projecten') }}">Projecten</a> / {{ p.number }}</div>
+<div class="crumbs"><a href="{{ url_for('klanten.index', view='projecten') }}">Projecten</a> / {{ p.number }}</div>
 <div class="pagehead">
   <div><div class="eyebrow">Project {{ p.number }} · {{ p.status }}</div><h1>{{ p.name }}</h1><p>{% if p.customer_id %}<a href="{{ url_for('klanten.customer', cid=p.customer_id) }}">{{ p.customer }}</a>{% else %}Geen klant gekoppeld{% endif %}{% if p.sharepoint_path %} · SharePoint: {{ p.sharepoint_path }}{% endif %}</p></div>
   <div class="actions">

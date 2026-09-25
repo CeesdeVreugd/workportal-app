@@ -2,7 +2,7 @@
 {% from "partials/macros.html" import opt %}
 {% block title %}{{ 'Project bewerken' if edit else 'Nieuw project' }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for('klanten.index', tab='projecten') }}">Projecten</a></div>
+<div class="crumbs"><a href="{{ url_for('klanten.index', view='projecten') }}">Projecten</a></div>
 <h1>{{ 'Project bewerken' if edit else 'Nieuw project' }}</h1>
 <form method="post" class="card form" style="max-width:820px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V9: relaties importeren uit Komdex, klantnummer SnelStart"
+set "OMSCHRIJVING=WorkPortal V10: knoppen Relaties/Projecten met filterknoppen"
 
 echo.
 echo ============================================

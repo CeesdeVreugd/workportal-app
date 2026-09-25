@@ -337,3 +337,17 @@ body.authbody { background: #fff; }
 body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--basic); z-index: 50; }
 @media (min-width: 901px) { html { background: var(--bg); } }
 .content .search, .content form .search { flex: none; width: 100%; }
+
+/* hoofdknoppen Relaties / Projecten en filterknoppen */
+.seg { display: inline-flex; gap: 4px; padding: 4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; align-self: flex-start; }
+.seg a { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 22px; border-radius: 9px; text-decoration: none; color: var(--ink-2); font-weight: 500; font-size: 15px; }
+.seg a svg { width: 18px; height: 18px; }
+.seg a:hover { background: var(--bg); color: var(--basic); }
+.seg a.active { background: var(--basic); color: #fff; }
+.fchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchip { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #D5DAE8; border-radius: 999px; background: #fff; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; }
+.fchip span { font-size: 12px; color: var(--muted); background: var(--line-2); border-radius: 999px; padding: 1px 8px; }
+.fchip:hover { border-color: var(--accent); color: var(--basic); }
+.fchip.active { background: var(--accent-soft); border-color: var(--accent); color: #0059B3; }
+.fchip.active span { background: #fff; color: #0059B3; }
+@media (max-width: 900px) { .seg { align-self: stretch; } .seg a { flex: 1; justify-content: center; padding: 0 10px; } }
