@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Gebruiker{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('beheer.users') }}">Beheer</a> / gebruiker</div>
+<h1>{{ u.name if uid else 'Nieuwe gebruiker' }}</h1>
+<form method="post" class="form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card form">
+    <div class="fgrid">
+      <label class="f">Naam *<input type="text" name="name" value="{{ u.name or '' }}" required></label>
+      <label class="f">E-mailadres *<input type="email" name="email" value="{{ u.email or '' }}" required></label>
+      <label class="f">Functierol<select name="role_id"><option value="">–</option>{% for r in roles %}{{ opt(r.id, r.name, u.role_id) }}{% endfor %}</select><span class="hint">De functierol bepaalt de rechten per module (zie Rechten per functierol).</span></label>
+      <div style="display:flex;flex-direction:column;gap:10px;justify-content:flex-end">
+        <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if u.active }}> Actief</label>
+        {% if g.user.is_admin %}<label class="check"><input type="checkbox" name="is_admin" value="1" {{ 'checked' if u.is_admin }}> Beheerder (alle rechten)</label>{% endif %}
+        {% if not uid %}<label class="check"><input type="checkbox" name="welcome" value="1" checked> Welkomstmail sturen</label>{% endif %}
+      </div>
+    </div>
+  </section>
+  <section class="card form">
+    <h2>Extra rechten (bovenop de functierol)</h2>
+    <p class="hint">Alleen invullen voor uitzonderingen. Het hoogste niveau van rol en extra recht geldt.</p>
+    <div class="fgrid">
+    {% for m, label in MODULES %}
+      <label class="f">{{ label }}<select name="extra_{{ m }}">{% for lvl in [0,1,2,3] %}<option value="{{ lvl }}" {{ 'selected' if extra.get(m, 0) == lvl }}>{{ '– (volgens rol)' if lvl == 0 else LEVEL_NAMES[lvl] }}</option>{% endfor %}</select></label>
+    {% endfor %}
+    </div>
+  </section>
+  <div class="actions"><button class="btn primary">Opslaan</button></div>
+</form>
+{% if uid %}
+<section class="card" style="max-width:900px">
+  <h2>Apparaten ({{ devices|length }})</h2>
+  <div class="rows">{% for d in devices %}<div class="rowitem"><div class="grow"><div class="s">{{ (d.user_agent or '')[:90] }}</div><div class="small">Laatst gebruikt {{ d.last_used|dt }} · pincode {{ 'ingesteld' if d.pin_hash else 'niet ingesteld' }}</div></div></div>{% else %}<div class="empty">Geen apparaten.</div>{% endfor %}</div>
+  <form method="post" action="{{ url_for('beheer.reset_devices', uid=uid) }}" data-confirm="Alle apparaten van deze gebruiker afmelden?" style="margin-top:12px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Alle apparaten afmelden (pincode vergeten / telefoon kwijt)</button></form>
+</section>
+{% endif %}
+{% endblock %}

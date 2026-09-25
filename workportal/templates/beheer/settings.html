@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Instellingen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Instellingen en koppelingen</p></div></div>
+{% include "beheer/_nav.html" %}
+<div class="grid g2 stack">
+  <form method="post" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Instellingen</h2>
+    <div class="fgrid">
+      <label class="f">Opnieuw verifiëren met e-mailcode (dagen)<input type="number" min="1" name="verify_days" value="{{ v.verify_days }}"></label>
+      <label class="f">Automatisch vergrendelen na (uren)<input type="number" min="1" name="unlock_hours" value="{{ v.unlock_hours }}"></label>
+      <label class="f">Minimale lengte pincode<input type="number" min="4" max="8" name="pin_min_length" value="{{ v.pin_min_length }}"></label>
+      <label class="f">Doel extra marge boven minimum (%)<input type="text" inputmode="decimal" name="extra_margin_pct" value="{{ v.extra_margin_pct }}"></label>
+      <label class="f full">Druktest-timers (minuten, komma-gescheiden)<input type="text" name="pressure_presets" value="{{ v.pressure_presets }}"></label>
+      <label class="f full">SharePoint hoofdmap voor projecten<input type="text" name="sharepoint_root" value="{{ v.sharepoint_root }}"><span class="hint">Als een project geen eigen SharePoint-map heeft, wordt &lt;hoofdmap&gt;/&lt;projectnummer&gt; gebruikt.</span></label>
+    </div>
+    <div><button class="btn primary">Opslaan</button></div>
+  </form>
+  <section class="card">
+    <h2>Koppelingen &amp; status</h2>
+    <dl class="dl">
+      <dt>App-adres</dt><dd>{{ status.app_url or 'APP_URL niet ingesteld' }}</dd>
+      <dt>E-mail</dt><dd><span class="badge {{ 'b-ok' if status.smtp else 'b-warn' }}">{{ status.mail_method if status.smtp else 'Niet ingesteld – codes in containerlog' }}</span></dd>
+      <dt>SharePoint-flow</dt><dd><span class="badge {{ 'b-ok' if status.sharepoint else 'b-warn' }}">{{ 'Ingesteld' if status.sharepoint else 'Niet ingesteld' }}</span></dd>
+      <dt>Na-calculatie-flow</dt><dd><span class="badge {{ 'b-ok' if status.nacalc else 'b-warn' }}">{{ 'Ingesteld' if status.nacalc else 'Niet ingesteld (upload werkt wel)' }}</span></dd>
+      <dt>Database</dt><dd>{{ (status.db_size / 1024 / 1024)|num(1) }} MB · {{ status.data_dir }}</dd>
+      <dt>Laatste back-ups</dt><dd style="font-weight:400">{% for b in status.backups %}{{ b }}<br>{% else %}Nog geen (elke nacht om 02:00){% endfor %}</dd>
+    </dl>
+    <div class="actions" style="margin-top:14px">
+      <form method="post" action="{{ url_for('beheer.testmail') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Testmail naar mij</button></form>
+      <a class="btn sm" href="{{ url_for('beheer.download_backup') }}">{{ icon('download') }}Database-back-up downloaden</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

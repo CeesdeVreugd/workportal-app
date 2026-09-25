@@ -1,0 +1,10 @@
+{% extends "base.html" if g.user else "auth/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px">
+  <div class="muted small">Fout {{ code }}</div>
+  <h1 style="margin:6px 0 10px">{{ title }}</h1>
+  <p>{{ message }}</p>
+  <p><a class="btn primary" href="{{ url_for('main.dashboard') }}">Naar het dashboard</a></p>
+</div>
+{% endblock %}

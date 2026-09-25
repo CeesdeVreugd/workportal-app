@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Nieuwe calculatie{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('calculatie.index') }}">Calculatie</a> / nieuw</div>
+<h1>Nieuwe calculatie</h1>
+<p class="muted">Beantwoord de startvragen. WorkPortal bouwt de calculatie op uit de sjablonen per type werk; daarna vul je aantallen en prijzen in.</p>
+<form method="post" class="form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card form">
+    <h2>1 · Klant en omschrijving</h2>
+    <div class="fgrid">
+      <label class="f full">Omschrijving *<input type="text" name="title" value="{{ form.title or '' }}" required placeholder="bijv. Aangepaste leiding voor Foodjet"></label>
+      <label class="f">Klant<select name="customer_id"><option value="">– kies of typ hiernaast –</option>{% for c in customers %}{{ opt(c.id, c.name, form.customer_id) }}{% endfor %}</select></label>
+      <label class="f">Of klantnaam (nog niet in klantenbestand)<input type="text" name="customer_text" value="{{ form.customer_text or '' }}"></label>
+      <label class="f">Project (optioneel)<select name="project_id" data-filter-by="customer_id"><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}" data-c="{{ p.customer_id or '' }}" {{ 'selected' if form.project_id|string == p.id|string }}>{{ p.number }} · {{ p.name }}</option>{% endfor %}</select></label>
+      <label class="f">Verwachte prijsafspraak (€)<input type="text" inputmode="decimal" name="expected" value="{{ form.expected or '' }}"></label>
+    </div>
+  </section>
+  <section class="card form">
+    <h2>2 · Type werk <span class="muted small">(meerdere mogelijk)</span></h2>
+    <div class="chips">{% for k, l in WORKTYPES %}<label class="chip"><input type="checkbox" name="worktypes" value="{{ k }}" {{ 'checked' if k in (form.getlist('worktypes') if form.getlist else []) }}><span>{{ l }}</span></label>{% endfor %}</div>
+  </section>
+  <section class="card form">
+    <h2>3 · Vragen</h2>
+    {% macro yn(name, label, default) %}
+      <div><label class="f">{{ label }}</label><div class="chips">
+        <label class="chip"><input type="radio" name="{{ name }}" value="ja" {{ 'checked' if (form[name] or default) == 'ja' }}><span>Ja</span></label>
+        <label class="chip"><input type="radio" name="{{ name }}" value="nee" {{ 'checked' if (form[name] or default) == 'nee' }}><span>Nee</span></label></div></div>
+    {% endmacro %}
+    <div class="fgrid">
+      {{ yn('montage', 'Montage op locatie bij de klant?', 'nee') }}
+      {{ yn('besturing', 'Besturing / bekabeling / software?', 'nee') }}
+      {{ yn('transport', 'Transporten (toeleveranciers, klant)?', 'ja') }}
+      <label class="f">Materiaal<select name="material"><option value="">–</option><option>RVS 304</option><option>RVS 316</option><option>Staal</option><option>Aluminium</option><option>Kunststof</option></select></label>
+      <label class="f">Aantal stuks (seriebouw)<input type="number" name="quantity" min="1" value="{{ form.quantity or 1 }}"><span class="hint">Bij meer dan 1 toont de calculatie ook de prijs per stuk.</span></label>
+      <label class="f">Aantal onderdelen / tabbladen<input type="number" name="n_parts" id="nparts" min="1" max="10" value="{{ form.n_parts or 1 }}"><span class="hint">Bijv. 2 leidingdelen die apart worden gecalculeerd (Tabblad 01, 02).</span></label>
+    </div>
+    <div id="partnames" class="fgrid"></div>
+    <label class="f">Notities<textarea name="notes" rows="2">{{ form.notes or '' }}</textarea></label>
+  </section>
+  <div class="actions"><button class="btn primary">{{ icon('calculatie') }}Calculatie opbouwen</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var n = document.getElementById('nparts'), box = document.getElementById('partnames');
+  function draw(){ var k = Math.max(1, Math.min(10, parseInt(n.value || '1', 10))); var old = {};
+    box.querySelectorAll('input').forEach(function(i){ old[i.name] = i.value; }); box.innerHTML = '';
+    if (k < 2) return;
+    for (var i = 0; i < k; i++) { var l = document.createElement('label'); l.className = 'f';
+      l.textContent = 'Naam onderdeel ' + (i + 1); var inp = document.createElement('input'); inp.type = 'text'; inp.name = 'part_' + i;
+      inp.value = old['part_' + i] || ('Tabblad ' + (i < 9 ? '0' : '') + (i + 1)); l.appendChild(inp); box.appendChild(l); } }
+  n.addEventListener('input', draw); draw();
+})();
+</script>
+{% endblock %}

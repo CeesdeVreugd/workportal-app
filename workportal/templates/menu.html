@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Menu{% endblock %}
+{% block content %}
+<h1>Menu</h1>
+<div class="card flush"><div class="nav" style="padding:8px">
+  <a href="{{ url_for('main.dashboard') }}">{{ icon('dashboard') }}Dashboard</a>
+  {% if can('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Klanten &amp; projecten</a>{% endif %}
+  {% if can('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
+  {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}
+  {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
+  {% if can('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
+  {% if can('kennis') %}<a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
+  {% if can('beheer') %}<a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
+  <a href="{{ url_for('main.account') }}">{{ icon('bell') }}Mijn account &amp; meldingen</a>
+</div></div>
+<p class="small muted">WorkPortal v{{ VERSION }} · {{ g.user.name }} · {{ g.user.role_name or '' }}</p>
+{% endblock %}

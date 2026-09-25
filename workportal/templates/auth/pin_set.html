@@ -1,0 +1,16 @@
+{% extends "auth/base.html" %}
+{% block title %}Pincode instellen{% endblock %}
+{% block content %}
+<h1>Stel je pincode in</h1>
+<p>Met deze pincode log je op dit apparaat snel in. Kies {{ min_len }} tot 8 cijfers.</p>
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="f">Nieuwe pincode
+    <input class="code-input" type="password" name="pin" required autofocus inputmode="numeric" pattern="[0-9]*" minlength="{{ min_len }}" maxlength="8" autocomplete="new-password">
+  </label>
+  <label class="f">Herhaal pincode
+    <input class="code-input" type="password" name="pin2" required inputmode="numeric" pattern="[0-9]*" minlength="{{ min_len }}" maxlength="8" autocomplete="new-password">
+  </label>
+  <button class="btn primary block" type="submit">Pincode opslaan</button>
+</form>
+{% endblock %}

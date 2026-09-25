@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Afronden {{ t.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('druktest.detail', tid=t.id) }}">{{ t.number }}</a> / afronden</div>
+<h1>Druktest afronden</h1>
+<p class="muted">Na afronden wordt de test vergrendeld en wordt het PDF-rapport gemaakt{{ ' en in SharePoint geplaatst' if sharepoint_configured() }}.</p>
+<form method="post" enctype="multipart/form-data" class="card form" style="max-width:700px" id="finishform">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="signature" id="sigdata">
+  <div><label class="f">Eindfoto manometer *</label>
+    <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" required></label></div>
+    <div class="photos" id="prev" style="margin-top:10px"></div></div>
+  <div class="fgrid">
+    <label class="f">Einddruk (bar) *<input type="text" inputmode="decimal" name="pressure" id="endp" required></label>
+    <label class="f">Temperatuur (°C)<input type="text" inputmode="decimal" name="temperature"></label>
+  </div>
+  <div id="dropinfo" class="result info hidden"></div>
+  <label class="f">Oordeel *</label>
+  <div class="chips"><label class="chip"><input type="radio" name="result" value="goedgekeurd" required><span>Goedgekeurd</span></label><label class="chip"><input type="radio" name="result" value="afgekeurd"><span>Afgekeurd</span></label></div>
+  <label class="f">Opmerking<textarea name="remarks" rows="3">{{ t.remarks or '' }}</textarea></label>
+  <label class="f">Naam uitvoerder *<input type="text" name="signed_name" value="{{ g.user.name }}" required></label>
+  <div><label class="f">Handtekening *</label><canvas class="sigpad" id="sig" data-target="sigdata"></canvas><button type="button" class="btn ghost sm" data-clear="sig">Wissen</button></div>
+  <div class="actions"><button class="btn primary">{{ icon('check') }}Afronden en rapport maken</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var start = {{ start if start is not none else 'null' }}, max = {{ t.max_drop if t.max_drop is not none else 'null' }};
+  var inp = document.getElementById('endp'), box = document.getElementById('dropinfo');
+  inp.addEventListener('input', function(){
+    if (start === null || !inp.value) { box.classList.add('hidden'); return; }
+    var drop = start - WP.num(inp.value);
+    box.classList.remove('hidden','ok','bad','info');
+    var ok = max === null || drop <= max + 1e-9;
+    box.classList.add(max === null ? 'info' : (ok ? 'ok' : 'bad'));
+    box.textContent = 'Drukverlies t.o.v. start: ' + WP.fmt(drop) + ' bar' + (max === null ? '' : (ok ? ' – binnen norm (max ' + WP.fmt(max) + ')' : ' – BUITEN norm (max ' + WP.fmt(max) + ')'));
+    var r = document.querySelector('input[name=result][value=' + (ok ? 'goedgekeurd' : 'afgekeurd') + ']');
+    if (max !== null && r && !document.querySelector('input[name=result]:checked')) r.checked = true;
+  });
+})();
+</script>
+{% endblock %}

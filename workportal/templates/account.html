@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Mijn account{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Mijn account</h1><p>{{ g.user.email }} · {{ g.user.role_name or 'Geen functierol' }}{{ ' · Beheerder' if g.user.is_admin }}</p></div></div>
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Pushmeldingen op dit apparaat</h2>
+    <p class="muted">Nodig voor de druktest-herinnering "terug naar leiding". Op iPhone werkt dit alleen als WorkPortal op het beginscherm staat (Deel → Zet op beginscherm).</p>
+    <p class="small">Actieve apparaten met meldingen: <b>{{ subs }}</b></p>
+    <div class="actions">
+      <button class="btn primary" type="button" onclick="WP.enablePush(document.getElementById('pushstat'))">{{ icon('bell') }}Meldingen aanzetten</button>
+      <button class="btn" type="button" onclick="WP.testPush(document.getElementById('pushstat'))">Testmelding sturen</button>
+    </div>
+    <p id="pushstat" class="small" style="margin-top:12px"></p>
+  </section>
+  <section class="card">
+    <h2>Mijn apparaten</h2>
+    <p class="muted small">Elk apparaat heeft een eigen pincode. Verwijder apparaten die je niet meer gebruikt.</p>
+    <div class="rows">
+    {% for d in devices %}
+      <div class="rowitem"><div class="grow"><div class="t">{{ 'Dit apparaat' if g.device and d.id == g.device.id else 'Apparaat #' ~ d.id }}</div>
+        <div class="s">{{ (d.user_agent or '')[:70] }}<br>Laatst gebruikt {{ d.last_used|dt }} · geverifieerd {{ d.verified_at|dt }}</div></div>
+        {% if not (g.device and d.id == g.device.id) %}
+        <form method="post" action="{{ url_for('main.remove_device', did=d.id) }}" data-confirm="Apparaat verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>
+        {% endif %}
+      </div>
+    {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('auth.forget_device') }}" data-confirm="Dit apparaat vergeten? Je moet daarna opnieuw inloggen met een e-mailcode." style="margin-top:12px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Dit apparaat vergeten</button></form>
+  </section>
+</div>
+{% endblock %}

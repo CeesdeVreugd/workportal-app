@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Rechten{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Rechten per functierol: Geen · Lezen · Bewerken · Beheer (ook verwijderen)</p></div></div>
+{% include "beheer/_nav.html" %}
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card flush tablewrap"><table class="table">
+    <thead><tr><th>Module</th>{% for r in roles %}<th>{{ r.name }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for m, label in MODULES %}<tr><td><b>{{ label }}</b></td>
+      {% for r in roles %}<td><select name="{{ r.id }}_{{ m }}" style="min-width:120px">{% for lvl in [0,1,2,3] %}<option value="{{ lvl }}" {{ 'selected' if matrix.get((r.id, m), 0) == lvl }}>{{ LEVEL_NAMES[lvl] }}</option>{% endfor %}</select></td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="actions"><button class="btn primary">Rechten opslaan</button></div>
+</form>
+{% endblock %}

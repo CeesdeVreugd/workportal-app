@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Verloopstuk inkorten{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a> / verloopstuk inkorten</div>
+<h1>Verloopstuk inkorten</h1>
+<div class="grid g2 stack">
+  <section class="card form">
+    <div><label class="f">Type verloop</label><div class="chips">
+      <label class="chip"><input type="radio" name="type" value="conc" checked><span>Concentrisch</span></label>
+      <label class="chip"><input type="radio" name="type" value="exc"><span>Excentrisch</span></label></div></div>
+    <div><label class="f">Welke kant wil je inkorten?</label><div class="chips">
+      <label class="chip"><input type="radio" name="side" value="klein" checked><span>Kleine kant</span></label>
+      <label class="chip"><input type="radio" name="side" value="groot"><span>Grote kant</span></label></div></div>
+    <div class="fgrid">
+      <label class="f">Grote diameter D (mm)<input type="text" inputmode="decimal" id="D" placeholder="bijv. 53"></label>
+      <label class="f">Kleine diameter d (mm)<input type="text" inputmode="decimal" id="d" placeholder="bijv. 41"></label>
+      <label class="f">Lengte verloop L (mm)<input type="text" inputmode="decimal" id="L" placeholder="bijv. 50"></label>
+      <label class="f"><span id="newlbl">Gewenste nieuwe kleine diameter (mm)</span><input type="text" inputmode="decimal" id="n"></label>
+    </div>
+    <p class="hint">Gebruik overal dezelfde maatsoort (bijv. buitendiameter). Ga uit van het rechte, conische deel; rechte aanlasranden tel je er zelf bij.</p>
+  </section>
+  <section class="card" style="display:flex;flex-direction:column;gap:14px">
+    <div id="res" class="result info big"><div>Inkorten</div><div class="val">–</div><div id="sub"></div></div>
+    <div class="diagram" id="dia"></div>
+    <div class="formula" id="form"></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  function v(id){ return WP.num(document.getElementById(id).value); }
+  function r(n){ var e = document.querySelector('input[name='+n+']:checked'); return e ? e.value : null; }
+  var res = document.getElementById('res');
+  function draw(D, d, L, x, side, type){
+    var W = 320, H = 170, sc = Math.min(220 / (L || 1), 110 / (D || 1)), ox = 50, cy = 85;
+    var hl = L*sc, hD = D*sc/2, hd = d*sc/2, yoff = type === 'exc' ? (hD - hd) : 0;
+    var topBig = cy - hD, botBig = cy + hD, topSmall = cy - hd + yoff, botSmall = cy + hd + yoff;
+    var s = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:360px" font-family="Ubuntu, sans-serif">';
+    s += '<polygon points="'+ox+','+topBig+' '+(ox+hl)+','+topSmall+' '+(ox+hl)+','+botSmall+' '+ox+','+botBig+'" fill="#E6F2FF" stroke="#0A0A96" stroke-width="2"/>';
+    if (x > 0 && x < L) { var cx = side === 'klein' ? ox + hl - x*sc : ox + x*sc;
+      s += '<line x1="'+cx+'" y1="8" x2="'+cx+'" y2="'+(H-8)+'" stroke="#B42318" stroke-width="2" stroke-dasharray="6 4"/>';
+      var rx = side === 'klein' ? cx : ox, rw = x*sc;
+      s += '<rect x="'+rx+'" y="10" width="'+rw+'" height="'+(H-20)+'" fill="#B42318" opacity=".08"/>';
+      s += '<text x="'+cx+'" y="'+(H-2)+'" text-anchor="middle" font-size="12" fill="#B42318">zaaglijn</text>'; }
+    s += '<text x="'+(ox-6)+'" y="'+(cy+4)+'" text-anchor="end" font-size="12" fill="#3A3F66">D</text><text x="'+(ox+hl+6)+'" y="'+(cy+yoff+4)+'" font-size="12" fill="#3A3F66">d</text>';
+    return s + '</svg>';
+  }
+  function calc(){
+    var D = v('D'), d = v('d'), L = v('L'), n = v('n'), side = r('side'), type = r('type');
+    document.getElementById('newlbl').textContent = side === 'klein' ? 'Gewenste nieuwe kleine diameter (mm)' : 'Gewenste nieuwe grote diameter (mm)';
+    var dia = document.getElementById('dia'), f = document.getElementById('form');
+    if (!(D > 0 && d > 0 && L > 0) || D <= d) { res.className = 'result info big'; res.innerHTML = '<div>Inkorten</div><div class="val">–</div><div>Vul D, d en L in (D groter dan d).</div>'; dia.innerHTML = draw(D||53, d||41, L||50, 0, side, type); f.textContent = ''; return; }
+    if (!n) { res.className = 'result info big'; res.innerHTML = '<div>Inkorten</div><div class="val">–</div><div>Vul de gewenste nieuwe diameter in.</div>'; dia.innerHTML = draw(D, d, L, 0, side, type); return; }
+    var x, ok = true, msg = '';
+    if (side === 'klein') { x = L * (n - d) / (D - d); if (n < d || n > D) { ok = false; msg = 'De nieuwe diameter moet tussen d en D liggen.'; }
+      f.textContent = 'inkorten = L × (nieuw − d) ÷ (D − d) = ' + WP.fmt(L,1) + ' × (' + WP.fmt(n,1) + ' − ' + WP.fmt(d,1) + ') ÷ (' + WP.fmt(D,1) + ' − ' + WP.fmt(d,1) + ')'; }
+    else { x = L * (D - n) / (D - d); if (n > D || n < d) { ok = false; msg = 'De nieuwe diameter moet tussen d en D liggen.'; }
+      f.textContent = 'inkorten = L × (D − nieuw) ÷ (D − d) = ' + WP.fmt(L,1) + ' × (' + WP.fmt(D,1) + ' − ' + WP.fmt(n,1) + ') ÷ (' + WP.fmt(D,1) + ' − ' + WP.fmt(d,1) + ')'; }
+    if (!ok) { res.className = 'result bad big'; res.innerHTML = '<div>Inkorten</div><div class="val">Niet mogelijk</div><div>'+msg+'</div>'; dia.innerHTML = draw(D, d, L, 0, side, type); return; }
+    var dd = Math.abs(side === 'klein' ? (n - d) : (D - n));
+    var slant = type === 'exc' ? Math.sqrt(x*x + dd*dd) : Math.sqrt(x*x + (dd/2)*(dd/2));
+    var angle = Math.atan(((D - d) / (type === 'exc' ? 1 : 2)) / L) * 180 / Math.PI;
+    res.className = 'result ok big';
+    res.innerHTML = '<div>Inkorten aan de ' + (side === 'klein' ? 'kleine' : 'grote') + ' kant</div><div class="val">' + WP.fmt(x, 1) + ' mm</div>' +
+      '<div>Nieuwe lengte ' + WP.fmt(L - x, 1) + ' mm · aftekenen langs de ' + (type === 'exc' ? 'schuine zijde' : 'schuine wand') + ' ' + WP.fmt(slant, 1) + ' mm' + (type === 'exc' ? ' (vlakke zijde ' + WP.fmt(x, 1) + ' mm)' : '') + ' · hoek ' + WP.fmt(angle, 1) + '°</div>';
+    dia.innerHTML = draw(D, d, L, x, side, type);
+  }
+  document.querySelectorAll('input').forEach(function(i){ i.addEventListener('input', calc); i.addEventListener('change', calc); });
+  calc();
+})();
+</script>
+{% endblock %}

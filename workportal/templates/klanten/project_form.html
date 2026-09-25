@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import opt %}
+{% block title %}{{ 'Project bewerken' if edit else 'Nieuw project' }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('klanten.index', tab='projecten') }}">Projecten</a></div>
+<h1>{{ 'Project bewerken' if edit else 'Nieuw project' }}</h1>
+<form method="post" class="card form" style="max-width:820px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next or '' }}">
+  <div class="fgrid">
+    <label class="f">Projectnummer / ordernummer ERP *<input type="text" name="number" value="{{ p.number or '' }}" required autofocus placeholder="bijv. 20260102"></label>
+    <label class="f">Status<select name="status">{{ opt('actief','Actief',p.status) }}{{ opt('afgerond','Afgerond',p.status) }}{{ opt('gearchiveerd','Gearchiveerd',p.status) }}</select></label>
+    <label class="f full">Omschrijving *<input type="text" name="name" value="{{ p.name or '' }}" required></label>
+    <label class="f full">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
+    <label class="f full">SharePoint-map<input type="text" name="sharepoint_path" value="{{ p.sharepoint_path or '' }}" placeholder="bijv. Projecten/20260102 Aanpassing leidingdeel"><span class="hint">Map waarin druktestrapporten en werkbonnen worden geplaatst. Leeg = standaardmap met projectnummer.</span></label>
+    <label class="f full">Notities<textarea name="notes">{{ p.notes or '' }}</textarea></label>
+  </div>
+  <div class="actions"><button class="btn primary">Opslaan</button></div>
+</form>
+{% endblock %}

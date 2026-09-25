@@ -1,0 +1,18 @@
+{% extends "auth/base.html" %}
+{% block title %}Pincode{% endblock %}
+{% block content %}
+<h1>Welkom terug, {{ user.name.split(' ')[0] }}</h1>
+<p>Voer je pincode in om WorkPortal te openen.</p>
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="f">Pincode
+    <input class="code-input" type="password" name="pin" required autofocus inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password">
+  </label>
+  <button class="btn primary block" type="submit">Openen</button>
+</form>
+<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+  <a href="{{ url_for('auth.login', ander=1) }}" style="padding:8px 0">Pincode vergeten?</a>
+  <form method="post" action="{{ url_for('auth.forget_device') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn ghost sm" type="submit">Ander account</button></form>
+</div>
+{% endblock %}

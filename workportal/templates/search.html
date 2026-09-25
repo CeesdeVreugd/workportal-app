@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import ticket_status, calc_status %}
+{% block title %}Zoeken{% endblock %}
+{% block content %}
+<form class="search" style="max-width:none;height:48px" method="get"><input type="search" name="q" value="{{ q }}" placeholder="Zoek klant, project, ticket of tekeningnummer" autofocus><button class="btn primary sm">Zoeken</button></form>
+{% if q %}<p class="muted">{{ total }} resultaat/resultaten voor "{{ q }}"</p>{% endif %}
+{% macro block(title, items) %}{% if items %}<section class="card"><h2>{{ title }}</h2><div class="rows">{{ caller() }}</div></section>{% endif %}{% endmacro %}
+{% call block('Klanten', res.klanten) %}{% for c in res.klanten %}<a class="rowitem" href="{{ url_for('klanten.customer', cid=c.id) }}"><div class="grow"><div class="t">{{ c.name }}</div><div class="s">{{ c.city or '' }} {{ ('· deb. ' ~ c.debtor_no) if c.debtor_no }}</div></div></a>{% endfor %}{% endcall %}
+{% call block('Projecten', res.projecten) %}{% for p in res.projecten %}<a class="rowitem" href="{{ url_for('klanten.project', pid=p.id) }}"><div class="grow"><div class="t">{{ p.number }} · {{ p.name }}</div><div class="s">{{ p.customer or '' }}</div></div></a>{% endfor %}{% endcall %}
+{% call block('Installaties', res.installaties) %}{% for i in res.installaties %}<a class="rowitem" href="{{ url_for('klanten.customer', cid=i.customer_id) }}#inst{{ i.id }}"><div class="grow"><div class="t">{{ i.name }}</div><div class="s">{{ i.customer }} {{ ('· SN ' ~ i.serial) if i.serial }}</div></div></a>{% endfor %}{% endcall %}
+{% call block('Tickets', res.tickets) %}{% for t in res.tickets %}<a class="rowitem" href="{{ url_for('service.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.title }}</div><div class="s">{{ t.number }} · {{ t.customer or '' }}</div></div>{{ ticket_status(t.status) }}</a>{% endfor %}{% endcall %}
+{% call block('Druktesten', res.druktesten) %}{% for t in res.druktesten %}<a class="rowitem" href="{{ url_for('druktest.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.number }} · tekening {{ t.drawing_no }}</div><div class="s">{{ t.line_no or '' }} {{ t.part }} · {{ t.status }}</div></div></a>{% endfor %}{% endcall %}
+{% call block('Calculaties', res.calculaties) %}{% for c in res.calculaties %}<a class="rowitem" href="{{ url_for('calculatie.edit', cid=c.id) }}"><div class="grow"><div class="t">{{ c.number }} · {{ c.title }}</div><div class="s">{{ c.customer or c.customer_text or '' }}</div></div>{{ calc_status(c.status) }}</a>{% endfor %}{% endcall %}
+{% call block('Kennisartikelen', res.artikelen) %}{% for a in res.artikelen %}<a class="rowitem" href="{{ url_for('kennis.article', aid=a.id) }}"><div class="grow"><div class="t">{{ a.title }}</div><div class="s">{{ a.category or '' }}</div></div></a>{% endfor %}{% endcall %}
+{% if q and not total %}<div class="card empty">Niets gevonden.</div>{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Kenniscentrum{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Kenniscentrum</h1><p>Rekenhulpen, beslisbomen en kennisartikelen voor werkplaats en engineering</p></div>
+  <div class="actions">{% if can('kennis_schrijven', 2) %}<a class="btn primary" href="{{ url_for('kennis.edit') }}">{{ icon('plus') }}Nieuw artikel</a>{% endif %}</div>
+</div>
+<form method="get"><div class="search" style="max-width:520px">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek in rekenhulpen en artikelen, bijv. 'lassen' of 'motor'"></div></form>
+{% if tools %}
+<div class="grid g3">
+{% for t in tools %}
+  <a class="card" href="{{ url_for(t.endpoint) }}" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px">
+    <div style="width:46px;height:46px;border-radius:12px;background:var(--basic);color:#fff;display:flex;align-items:center;justify-content:center"><span style="width:24px;height:24px;display:block">{{ icon(t.icon) }}</span></div>
+    <div style="font-weight:700;color:var(--basic);font-size:17px">{{ t.title }}</div>
+    <div class="muted">{{ t.text }}</div>
+  </a>
+{% endfor %}
+</div>
+{% endif %}
+<section class="card">
+  <div class="card-head"><h2>Kennisartikelen</h2>
+    {% if cats %}<div class="chips">{% for c in [''] + cats %}<a class="badge {{ 'b-dark' if cat == c }}" href="?cat={{ c }}&q={{ q }}" style="text-decoration:none;padding:6px 12px">{{ c or 'Alles' }}</a>{% endfor %}</div>{% endif %}</div>
+  <div class="rows">
+  {% for a in articles %}<a class="rowitem" href="{{ url_for('kennis.article', aid=a.id) }}"><span style="width:22px;height:22px;color:var(--accent)">{{ icon('book') }}</span><div class="grow"><div class="t">{{ a.title }}</div><div class="s">{{ a.category or 'Algemeen' }}{% if a.tags %} · {{ a.tags }}{% endif %} · bijgewerkt {{ a.updated_at|date }}</div></div></a>
+  {% else %}<div class="empty">Geen artikelen gevonden.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

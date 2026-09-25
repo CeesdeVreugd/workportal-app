@@ -1,0 +1,81 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}WorkPortal{% endblock %} – WorkPortal</title>
+<link rel="manifest" href="{{ url_for('manifest') }}">
+<link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% set ep = request.endpoint or '' %}
+{% macro navlink(endpoint, label, ico, prefix) -%}
+<a href="{{ url_for(endpoint) }}" class="{{ 'active' if ep.startswith(prefix) }}">{{ icon(ico) }}<span>{{ label }}</span></a>
+{%- endmacro %}
+<div class="app">
+  <nav class="sidebar" aria-label="Hoofdmenu">
+    <a class="brand" href="{{ url_for('main.dashboard') }}">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="De Vreugd Productietechniek">
+      <span>WORKPORTAL</span>
+    </a>
+    <div class="nav">
+      {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
+      {% if can('klanten') %}{{ navlink('klanten.index', 'Klanten & projecten', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
+      {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}
+      {% if can('calculatie') %}{{ navlink('calculatie.index', 'Calculatie', 'calculatie', 'calculatie.') }}{% endif %}
+      {% if can('nacalculatie') %}{{ navlink('nacalc.index', 'Na-calculatie', 'nacalculatie', 'nacalc.') }}{% endif %}
+      {% if can('kennis') %}{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
+      {% if can('beheer') %}<div class="sep"></div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
+    </div>
+    <div style="margin-top:auto" class="small muted">
+      <a href="{{ url_for('main.account') }}" style="text-decoration:none">Mijn account &amp; meldingen</a><br>
+      <span>WorkPortal v{{ VERSION }}</span>
+    </div>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <form class="search" action="{{ url_for('main.search') }}" method="get" role="search">
+        {{ icon('search') }}<input type="search" name="q" value="{{ request.args.get('q','') if ep == 'main.search' }}" placeholder="Zoek klant, project, ticket of tekeningnummer" aria-label="Zoeken">
+      </form>
+      <div class="userbox">
+        <div class="who"><b>{{ g.user.name }}</b><span>{{ 'Beheerder · ' if g.user.is_admin }}{{ g.user.role_name or '' }}</span></div>
+        <a class="avatar" href="{{ url_for('main.account') }}" style="text-decoration:none;color:#fff" aria-label="Mijn account">{{ g.user.name[:1]|upper }}{{ (g.user.name.split(' ')[-1][:1]|upper) if ' ' in g.user.name }}</a>
+        <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Vergrendelen" aria-label="Vergrendelen">{{ icon('lock') }}</button></form>
+      </div>
+    </header>
+    <header class="mobile-top">
+      <a href="{{ url_for('main.dashboard') }}"><img src="{{ url_for('static', filename='img/logo-wit.png') }}" alt="De Vreugd Productietechniek"></a>
+      <div class="actions" style="gap:8px">
+        <a class="iconbtn" href="{{ url_for('main.search') }}" aria-label="Zoeken">{{ icon('search') }}</a>
+        <a class="iconbtn" href="{{ url_for('main.account') }}" aria-label="Mijn account">{{ icon('bell') }}</a>
+        <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Vergrendelen">{{ icon('lock') }}</button></form>
+      </div>
+    </header>
+    <main class="content">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in msgs %}<div class="flash {{ cat if cat in ['ok','error','info'] else 'info' }}">{{ msg }}</div>{% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<nav class="bottomnav" aria-label="Snelmenu">
+  <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if ep.startswith('main.') }}">{{ icon('home') }}Start</a>
+  {% if can('service') %}<a href="{{ url_for('service.index') }}" class="{{ 'active' if ep.startswith('service.') }}">{{ icon('service') }}Service</a>{% endif %}
+  {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}" class="{{ 'active' if ep.startswith('druktest.') }}">{{ icon('druktest') }}Druktest</a>{% endif %}
+  {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}" class="{{ 'active' if ep.startswith('calculatie.') or ep.startswith('nacalc.') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
+  {% if can('kennis') %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
+  <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
+</nav>
+<script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

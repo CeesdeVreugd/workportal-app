@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import ticket_status, prio %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Goedendag, {{ g.user.name.split(' ')[0] }}</h1><p>{{ long_date() }}</p></div>
+  <div class="actions">
+    {% if can('calculatie', 2) %}<a class="btn" href="{{ url_for('calculatie.new') }}">{{ icon('plus') }}Nieuwe calculatie</a>{% endif %}
+    {% if can('druktest', 2) %}<a class="btn" href="{{ url_for('druktest.new') }}">{{ icon('druktest') }}Nieuwe druktest</a>{% endif %}
+    {% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new') }}">{{ icon('plus') }}Nieuw ticket</a>{% endif %}
+  </div>
+</div>
+
+<div class="grid g4">
+  {% if can('service') %}
+  <a class="card kpi" href="{{ url_for('service.index') }}" style="text-decoration:none;color:inherit"><div class="label">Open tickets</div><div class="value">{{ d.open_tickets }}</div>
+    <div class="sub" {% if d.urgent %}style="color:var(--bad)"{% endif %}>{{ d.urgent }} met prioriteit hoog · {{ d.my_tickets }} van mij</div></a>
+  {% endif %}
+  {% if can('druktest') %}
+  <a class="card kpi" href="{{ url_for('druktest.index') }}" style="text-decoration:none;color:inherit"><div class="label">Lopende druktesten</div><div class="value">{{ d.tests|length }}</div>
+    <div class="sub">{% if d.tests and d.tests[0].next_check_at %}Eerstvolgende controle {{ d.tests[0].next_check_at|dt('%H:%M') }}{% else %}Geen timer actief{% endif %}</div></a>
+  {% endif %}
+  {% if can('calculatie') %}
+  <a class="card kpi" href="{{ url_for('calculatie.index') }}" style="text-decoration:none;color:inherit"><div class="label">Calculaties in behandeling</div><div class="value">{{ d.calcs_open }}</div>
+    <div class="sub">{{ d.calcs_sent }} verstuurd, wacht op akkoord</div></a>
+  {% endif %}
+  {% if can('nacalculatie') %}
+  <a class="card kpi" href="{{ url_for('nacalc.index') }}" style="text-decoration:none;color:inherit"><div class="label">Projecten onder minimale marge</div><div class="value" {% if d.below_margin %}style="color:var(--warn)"{% endif %}>{{ d.below_margin|length }}</div>
+    <div class="sub">van {{ d.nacalc_count }} na-gecalculeerde projecten</div></a>
+  {% endif %}
+</div>
+
+<div class="grid g2 stack">
+  {% if can('service') %}
+  <section class="card">
+    <div class="card-head"><h2>Recente tickets</h2><a href="{{ url_for('service.index') }}" class="small">Alle tickets</a></div>
+    <div class="rows">
+      {% for t in d.tickets %}
+      <a class="rowitem" href="{{ url_for('service.detail', tid=t.id) }}">
+        <div class="grow"><div class="t">{{ t.title }}</div><div class="s">{{ t.number }} · {{ t.customer or 'Geen klant' }}</div></div>
+        {{ prio(t.priority) }} {{ ticket_status(t.status) }}
+      </a>
+      {% else %}<div class="empty">Nog geen tickets.</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if can('druktest') %}
+  <section class="card">
+    <div class="card-head"><h2>Lopende druktesten</h2><a href="{{ url_for('druktest.index') }}" class="small">Alle druktesten</a></div>
+    <div class="rows">
+      {% for t in d.tests %}
+      <a class="rowitem" href="{{ url_for('druktest.detail', tid=t.id) }}">
+        <div class="grow"><div class="t">{{ t.number }} · {{ t.line_no or 'Leiding' }} {{ t.part }}</div>
+          <div class="s">{% if t.project_no %}Project {{ t.project_no }} · {% endif %}tekening {{ t.drawing_no }}{% if t.drawing_rev %} rev {{ t.drawing_rev }}{% endif %} · {{ t.test_pressure|num(1) }} bar</div></div>
+        {% if t.next_check_at %}<div class="right"><b data-countdown="{{ t.next_check_at }}" data-due-text="Controleren!">…</b><div class="s muted">tot controle</div></div>
+        {% else %}<span class="badge">Geen timer</span>{% endif %}
+      </a>
+      {% else %}<div class="empty">Geen lopende druktesten.</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if can('nacalculatie') and d.below_margin %}
+  <section class="card">
+    <div class="card-head"><h2>Let op: marge</h2><a href="{{ url_for('nacalc.index') }}" class="small">Na-calculatie</a></div>
+    <div class="rows">
+      {% for r in d.below_margin %}
+      <a class="rowitem" href="{{ url_for('nacalc.detail', nid=r.id) }}">
+        <div class="grow"><div class="t">{{ r.order_no }} · {{ r.order_desc }}</div><div class="s">Resultaat {{ r.result|eur }} ({{ r.margin_pct|num(1) }}%)</div></div>
+        <span class="badge {{ 'b-bad' if r.status == 'bad' else 'b-warn' }}">{{ r.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

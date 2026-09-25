@@ -1,0 +1,43 @@
+# WorkPortal – De Vreugd Productietechniek
+# Portainer: Stacks > Add stack > Repository. Vul de environment variables in de Portainer-UI in.
+services:
+  workportal-app:
+    build: .
+    image: workportal-app:latest
+    container_name: workportal-app
+    restart: unless-stopped
+    environment:
+      APP_URL: ${APP_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_NAME: ${ADMIN_NAME:-Beheerder}
+      SECRET_KEY: ${SECRET_KEY}
+      # E-mail via app-registratie in Microsoft Entra ID (Microsoft Graph, Mail.Send)
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-}
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID:-}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET:-}
+      # Alternatief: SMTP (alleen gebruikt als GRAPH_* leeg is)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      MAIL_FROM: ${MAIL_FROM:-}
+      PA_SHAREPOINT_URL: ${PA_SHAREPOINT_URL:-}
+      PA_NACALC_URL: ${PA_NACALC_URL:-}
+      PA_SECRET: ${PA_SECRET:-}
+      TZ: Europe/Amsterdam
+    volumes:
+      - workportal-data:/data
+    networks:
+      - intern
+      - npm_default
+
+volumes:
+  workportal-data:
+    name: workportal-data
+
+networks:
+  intern:
+    driver: bridge
+  npm_default:
+    external: true

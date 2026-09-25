@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Ster of driehoek{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a> / motor aansluiten</div>
+<h1>Draaistroommotor: ster of driehoek?</h1>
+<div class="grid g2 stack">
+  <section class="card form">
+    <div><label class="f">1 · Spanning op het typeplaatje</label>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="plate" value="230/400"><span>230/400 V (Δ/Y)</span></label>
+        <label class="chip"><input type="radio" name="plate" value="400/690"><span>400/690 V (Δ/Y)</span></label>
+        <label class="chip"><input type="radio" name="plate" value="anders"><span>Anders / één spanning</span></label>
+      </div></div>
+    <div><label class="f">2 · Hoe wordt de motor gevoed?</label>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="feed" value="direct"><span>Direct op net 3×400 V</span></label>
+        <label class="chip"><input type="radio" name="feed" value="yd"><span>Ster-driehoekschakelaar</span></label>
+        <label class="chip"><input type="radio" name="feed" value="fr"><span>Frequentieregelaar</span></label>
+        <label class="chip"><input type="radio" name="feed" value="soft"><span>Softstarter</span></label>
+      </div></div>
+    <div id="q3" class="hidden"><label class="f">3 · Voedingsspanning van de frequentieregelaar</label>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="frin" value="230"><span>1×230 V (uitgang 3×230 V)</span></label>
+        <label class="chip"><input type="radio" name="frin" value="400"><span>3×400 V (uitgang 3×400 V)</span></label>
+      </div></div>
+  </section>
+  <section class="card" style="display:flex;flex-direction:column;gap:14px">
+    <div id="answer" class="result info big"><div>Uitkomst</div><div class="val">Beantwoord de vragen</div><div id="why"></div></div>
+    <div class="diagram" id="diagram"></div>
+    <p class="small muted">Klemmenbord gezien van voren: boven U1 V1 W1, onder W2 U2 V2. Draairichting verkeerd? Wissel twee fasen (bijv. L1 en L2).</p>
+  </section>
+</div>
+<div class="flash info">Het typeplaatje en de handleiding van de motor en regelaar zijn altijd leidend. Werk alleen spanningsloos en laat aansluiten door bevoegd personeel.</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  function val(n){ var e = document.querySelector('input[name='+n+']:checked'); return e ? e.value : null; }
+  var ans = document.getElementById('answer'), dia = document.getElementById('diagram');
+  function svg(mode){
+    var top = [['U1',60],['V1',150],['W1',240]], bot = [['W2',60],['U2',150],['V2',240]];
+    var s = '<svg viewBox="0 0 300 210" width="300" height="210" font-family="Ubuntu, sans-serif">';
+    s += '<rect x="20" y="20" width="260" height="170" rx="14" fill="#F3F5FA" stroke="#C9CFE0"/>';
+    ['L1','L2','L3'].forEach(function(l,i){ var x = 60 + i*90; s += '<line x1="'+x+'" y1="0" x2="'+x+'" y2="50" stroke="'+(mode==='yd6'?'#0080FF':'#14163A')+'" stroke-width="3"/><text x="'+(x+8)+'" y="14" font-size="12" fill="#3A3F66">'+l+'</text>'; });
+    if (mode === 'star') s += '<rect x="50" y="138" width="200" height="14" rx="7" fill="#0A0A96"/>';
+    if (mode === 'delta') [60,150,240].forEach(function(x){ s += '<rect x="'+(x-7)+'" y="62" width="14" height="86" rx="7" fill="#0A0A96"/>'; });
+    if (mode === 'yd6') bot.forEach(function(b){ s += '<line x1="'+b[1]+'" y1="145" x2="'+b[1]+'" y2="205" stroke="#0080FF" stroke-width="3"/>'; });
+    top.forEach(function(t){ s += '<circle cx="'+t[1]+'" cy="62" r="15" fill="#fff" stroke="#14163A" stroke-width="2"/><text x="'+t[1]+'" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="#14163A">'+t[0]+'</text>'; });
+    bot.forEach(function(b){ s += '<circle cx="'+b[1]+'" cy="145" r="15" fill="#fff" stroke="#14163A" stroke-width="2"/><text x="'+b[1]+'" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#14163A">'+b[0]+'</text>'; });
+    return s + '</svg>';
+  }
+  function show(cls, title, why, mode){
+    ans.className = 'result big ' + cls; ans.innerHTML = '<div>Uitkomst</div><div class="val">'+title+'</div><div>'+why+'</div>';
+    dia.innerHTML = mode ? svg(mode) : '<p class="muted" style="padding:30px 10px;text-align:center">Geen aansluitschema</p>';
+  }
+  function update(){
+    var p = val('plate'), f = val('feed'), fr = val('frin');
+    document.getElementById('q3').classList.toggle('hidden', f !== 'fr');
+    if (!p || !f || (f === 'fr' && !fr)) { ans.className='result info big'; ans.innerHTML='<div>Uitkomst</div><div class="val">Beantwoord de vragen</div>'; dia.innerHTML = svg(''); return; }
+    if (p === 'anders') return show('warn','Controleer het typeplaatje','Bij een motor met één spanning of afwijkende spanningen: volg het schema in het klemmenkastdeksel of de handleiding.', '');
+    var net = (f === 'fr') ? (fr === '230' ? 230 : 400) : 400;
+    if (f === 'yd') {
+      if (p === '400/690') return show('ok','Bruggen eraf – 6 draden','De ster-driehoekschakelaar maakt zelf ster en driehoek. Sluit U1 V1 W1 en W2 U2 V2 apart aan op de schakelaar. Motor draait in bedrijf in driehoek op 400 V.', 'yd6');
+      return show('bad','Niet geschikt','Een 230/400 V-motor mag in driehoek maar 230 V hebben. Op een 400 V-net kan hij niet via ster-driehoek aanlopen: gebruik direct in ster, een softstarter of een frequentieregelaar.', '');
+    }
+    if (p === '230/400') {
+      if (net === 230) return show('ok','Driehoek (Δ)','De regelaar geeft 3×230 V. De lage spanning op het plaatje (230 V) hoort bij driehoek.', 'delta');
+      return show('ok','Ster (Y)','Het net/de regelaar geeft 3×400 V. De hoge spanning op het plaatje (400 V) hoort bij ster.', 'star');
+    }
+    if (p === '400/690') {
+      if (net === 230) return show('bad','Niet geschikt','Een 400/690 V-motor krijgt op 3×230 V te weinig spanning (te weinig koppel). Gebruik een regelaar met 3×400 V voeding.', '');
+      return show('ok','Driehoek (Δ)','De voeding is 3×400 V. De lage spanning op het plaatje (400 V) hoort bij driehoek.', 'delta');
+    }
+  }
+  document.querySelectorAll('input[type=radio]').forEach(function(r){ r.addEventListener('change', update); });
+  update();
+})();
+</script>
+{% endblock %}

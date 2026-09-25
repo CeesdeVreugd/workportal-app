@@ -1,0 +1,22 @@
+{% macro ticket_status(s) -%}
+{%- set m = {'nieuw':('Nieuw','b-blue'),'ingepland':('Ingepland',''),'in_uitvoering':('In uitvoering','b-blue'),'wacht':('Wacht op onderdelen','b-warn'),'afgerond':('Afgerond','b-ok'),'gefactureerd':('Gefactureerd','b-dark')} -%}
+{%- set v = m.get(s, (s, '')) -%}<span class="badge {{ v[1] }}">{{ v[0] }}</span>
+{%- endmacro %}
+{% macro prio(p) -%}
+{%- if p == 'hoog' %}<span class="badge b-bad">Hoog</span>{% elif p == 'laag' %}<span class="badge">Laag</span>{% endif -%}
+{%- endmacro %}
+{% macro calc_status(s) -%}
+{%- set m = {'concept':('Concept',''),'verstuurd':('Verstuurd','b-blue'),'akkoord':('Akkoord','b-ok'),'verloren':('Niet doorgegaan','b-bad')} -%}
+{%- set v = m.get(s, (s, '')) -%}<span class="badge {{ v[1] }}">{{ v[0] }}</span>
+{%- endmacro %}
+{% macro photos(files, can_delete=False, back='') -%}
+<div class="photos">
+{%- for f in files if f.kind == 'photo' -%}
+<div class="photo"><a href="{{ url_for('main.file', fid=f.id) }}" target="_blank"><img src="{{ url_for('main.file', fid=f.id) }}" alt="{{ f.caption or 'Foto' }}" loading="lazy"></a>{% if f.caption %}<div class="cap">{{ f.caption }}</div>{% endif %}</div>
+{%- endfor -%}
+{{ caller() if caller }}
+</div>
+{%- set others = files|selectattr('kind','equalto','attachment')|list -%}
+{%- if others %}<div class="filelist" style="margin-top:10px">{% for f in others %}<a href="{{ url_for('main.file', fid=f.id, download=1) }}">Bijlage: {{ f.filename }}</a>{% endfor %}</div>{% endif -%}
+{%- endmacro %}
+{% macro opt(value, label, current) -%}<option value="{{ value }}" {{ 'selected' if (current|string) == (value|string) }}>{{ label }}</option>{%- endmacro %}

@@ -1,0 +1,15 @@
+{% extends "auth/base.html" %}
+{% block title %}Code invoeren{% endblock %}
+{% block content %}
+<h1>Voer je inlogcode in</h1>
+<p>Als {{ masked }} bekend is, is er een code van 6 cijfers naartoe gestuurd. De code is 10 minuten geldig.</p>
+{% if dev_mode %}<div class="flash info">Testmodus: e-mail is nog niet ingesteld. De code staat in het containerlog (Portainer → container → Logs).</div>{% endif %}
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="f">Inlogcode
+    <input class="code-input" type="text" name="code" required autofocus inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" placeholder="••••••">
+  </label>
+  <button class="btn primary block" type="submit">Verifiëren</button>
+</form>
+<a href="{{ url_for('auth.login', ander=1) }}" style="align-self:center;padding:8px">Ander e-mailadres of nieuwe code</a>
+{% endblock %}

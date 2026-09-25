@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Artikel{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a></div>
+<h1>{{ 'Artikel bewerken' if aid else 'Nieuw artikel' }}</h1>
+<form method="post" enctype="multipart/form-data" class="card form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fgrid">
+    <label class="f full">Titel *<input type="text" name="title" value="{{ a.title or '' }}" required></label>
+    <label class="f">Categorie<input type="text" name="category" value="{{ a.category or '' }}" list="cats" placeholder="bijv. Lassen, Elektra, CIP"><datalist id="cats">{% for c in cats or [] %}<option value="{{ c }}">{% endfor %}</datalist></label>
+    <label class="f">Trefwoorden<input type="text" name="tags" value="{{ a.tags or '' }}" placeholder="gescheiden door komma's"></label>
+    <label class="f full">Tekst<textarea name="body" rows="16">{{ a.body or '' }}</textarea><span class="hint">Gewone tekst; witregels blijven behouden.</span></label>
+    <label class="f full">Foto's en bijlagen toevoegen<input type="file" name="photos" multiple></label>
+  </div>
+  {% if files %}<div><label class="f">Huidige bestanden (vink aan om te verwijderen)</label>{% for f in files %}<label class="check"><input type="checkbox" name="remove_file" value="{{ f.id }}"> {{ f.filename }}</label>{% endfor %}</div>{% endif %}
+  <div class="actions"><button class="btn primary">Opslaan</button></div>
+</form>
+{% endblock %}

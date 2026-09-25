@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import opt %}
+{% block title %}{{ 'Ticket bewerken' if edit else 'Nieuw ticket' }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a>{% if edit %} / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a>{% endif %}</div>
+<h1>{{ 'Ticket bewerken' if edit else 'Nieuw ticket' }}</h1>
+<form method="post" enctype="multipart/form-data" class="card form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="f">Type</label>
+  <div class="chips">{% for k, l in TYPES %}<label class="chip"><input type="radio" name="type" value="{{ k }}" {{ 'checked' if (t.type or 'storing') == k }}><span>{{ l }}</span></label>{% endfor %}</div>
+  <div class="fgrid">
+    <label class="f full">Korte omschrijving *<input type="text" name="title" value="{{ t.title or '' }}" required placeholder="bijv. Pasteurisator schakelt uit op temperatuur"></label>
+    <label class="f">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, t.customer_id) }}{% endfor %}</select></label>
+    <label class="f">Locatie<select name="location_id" data-filter-by="customer_id"><option value="">–</option>{% for l in locations %}<option value="{{ l.id }}" data-c="{{ l.customer_id }}" {{ 'selected' if t.location_id|string == l.id|string }}>{{ l.name }}</option>{% endfor %}</select></label>
+    <label class="f">Installatie / machine<select name="installation_id" data-filter-by="customer_id"><option value="">–</option>{% for i in installations %}<option value="{{ i.id }}" data-c="{{ i.customer_id }}" {{ 'selected' if t.installation_id|string == i.id|string }}>{{ i.name }}{{ (' · SN ' ~ i.serial) if i.serial }}</option>{% endfor %}</select></label>
+    <label class="f">Contactpersoon<select name="contact_id" data-filter-by="customer_id"><option value="">–</option>{% for c in contacts %}<option value="{{ c.id }}" data-c="{{ c.customer_id }}" {{ 'selected' if t.contact_id|string == c.id|string }}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label class="f">Project<select name="project_id" data-filter-by="customer_id"><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}" data-c="{{ p.customer_id or '' }}" {{ 'selected' if t.project_id|string == p.id|string }}>{{ p.number }} {{ p.name }}</option>{% endfor %}</select></label>
+    <label class="f">Gemeld door<input type="text" name="reported_by" value="{{ t.reported_by or '' }}"></label>
+    <label class="f">Prioriteit<select name="priority">{% for k, l in PRIOS %}{{ opt(k, l, t.priority or 'normaal') }}{% endfor %}</select></label>
+    <label class="f">Toegewezen aan<select name="assigned_to"><option value="">–</option>{% for u in users %}{{ opt(u.id, u.name, t.assigned_to) }}{% endfor %}</select></label>
+    <label class="f">Geplande datum<input type="date" name="planned_date" value="{{ t.planned_date or '' }}"></label>
+    {% if edit %}<label class="f">Status<select name="status">{% for k, l in STATUSES %}{{ opt(k, l, t.status) }}{% endfor %}</select></label>{% endif %}
+    <label class="f full">Melding / toelichting<textarea name="description" rows="4">{{ t.description or '' }}</textarea></label>
+    <label class="f full">Foto's of bijlagen<input type="file" name="photos" multiple accept="image/*,.pdf" data-preview="prev"></label>
+  </div>
+  <div class="photos" id="prev"></div>
+  <div class="actions"><button class="btn primary">Opslaan</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) if edit else url_for('service.index') }}">Annuleren</a></div>
+</form>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import ticket_status, opt %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+{% set edit = can('klanten', 2) %}
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a> / {{ c.name }}</div>
+<div class="pagehead">
+  <div><h1>{{ c.name }}</h1><p>{{ c.address or '' }} {{ c.postcode or '' }} {{ c.city or '' }}{% if c.debtor_no %} · debiteur {{ c.debtor_no }}{% endif %}</p></div>
+  <div class="actions">
+    {% if can('service', 2) %}<a class="btn" href="{{ url_for('service.new', klant=c.id) }}">{{ icon('plus') }}Ticket</a>{% endif %}
+    {% if edit %}<a class="btn" href="{{ url_for('klanten.new_project', klant=c.id) }}">{{ icon('plus') }}Project</a><a class="btn primary" href="{{ url_for('klanten.edit', cid=c.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
+  </div>
+</div>
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Gegevens</h2>
+    <dl class="dl">
+      <dt>Telefoon</dt><dd>{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% else %}–{% endif %}</dd>
+      <dt>E-mail</dt><dd>{% if c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}–{% endif %}</dd>
+      <dt>Notities</dt><dd class="prose" style="font-weight:400">{{ c.notes or '–' }}</dd>
+    </dl>
+  </section>
+  <section class="card" id="projecten">
+    <div class="card-head"><h2>Projecten</h2></div>
+    <div class="rows">{% for p in projects %}<a class="rowitem" href="{{ url_for('klanten.project', pid=p.id) }}"><div class="grow"><div class="t">{{ p.number }} · {{ p.name }}</div></div><span class="badge">{{ p.status }}</span></a>{% else %}<div class="empty">Geen projecten.</div>{% endfor %}</div>
+  </section>
+</div>
+
+<section class="card" id="installaties">
+  <div class="card-head"><h2>Installaties &amp; machines</h2>{% if edit %}<button class="btn sm" type="button" onclick="document.getElementById('instform').classList.toggle('hidden')">{{ icon('plus') }}Toevoegen</button>{% endif %}</div>
+  {% if edit %}
+  <form id="instform" method="post" action="{{ url_for('klanten.add_installation', cid=c.id) }}" enctype="multipart/form-data" class="form hidden" style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fgrid three">
+      <label class="f">Omschrijving *<input type="text" name="name" required placeholder="bijv. Pasteurisator P-02"></label>
+      <label class="f">Serienummer<input type="text" name="serial"></label>
+      <label class="f">Bouwjaar<input type="text" name="year" inputmode="numeric"></label>
+      <label class="f">Locatie<select name="location_id"><option value="">–</option>{% for l in locations %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></label>
+      <label class="f">Project<select name="project_id"><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.number }} {{ p.name }}</option>{% endfor %}</select></label>
+      <label class="f">Onderhoudsinterval (maanden)<input type="number" name="service_interval_months" min="0"></label>
+      <label class="f">Volgend onderhoud<input type="date" name="next_service"></label>
+      <label class="f full">Notities<textarea name="notes" style="min-height:60px"></textarea></label>
+      <label class="f full">Documenten (handleiding, tekeningen)<input type="file" name="files" multiple></label>
+    </div>
+    <div class="actions"><button class="btn primary">Installatie opslaan</button></div>
+  </form>
+  {% endif %}
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th>Installatie</th><th>Serienr.</th><th class="hide-m">Locatie</th><th class="hide-m">Project</th><th>Volgend onderhoud</th></tr></thead>
+    <tbody>{% for i in installations %}<tr id="inst{{ i.id }}" class="link" data-href="{{ url_for('klanten.installation', iid=i.id) }}"><td><b>{{ i.name }}</b></td><td>{{ i.serial or '' }}</td><td class="hide-m">{{ i.location or '' }}</td><td class="hide-m">{{ i.project_no or '' }}</td><td>{{ i.next_service|date }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">Nog geen installaties.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<div class="grid g2 stack">
+  <section class="card" id="locaties">
+    <div class="card-head"><h2>Locaties</h2></div>
+    <div class="rows">
+      {% for l in locations %}<div class="rowitem"><div class="grow"><div class="t">{{ l.name }}</div><div class="s">{{ l.address or '' }} {{ l.postcode or '' }} {{ l.city or '' }}</div></div>
+      {% if edit %}<form method="post" action="{{ url_for('klanten.delete_sub', cid=c.id, kind='locatie', oid=l.id) }}" data-confirm="Locatie verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
+      {% else %}<div class="empty">Geen extra locaties.</div>{% endfor %}
+    </div>
+    {% if edit %}
+    <form method="post" action="{{ url_for('klanten.add_location', cid=c.id) }}" class="form" style="margin-top:14px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required placeholder="bijv. Vestiging Noord"></label><label class="f">Adres<input type="text" name="address"></label><label class="f">Postcode<input type="text" name="postcode"></label><label class="f">Plaats<input type="text" name="city"></label></div>
+      <div><button class="btn sm">{{ icon('plus') }}Locatie toevoegen</button></div>
+    </form>
+    {% endif %}
+  </section>
+  <section class="card" id="contacten">
+    <div class="card-head"><h2>Contactpersonen</h2></div>
+    <div class="rows">
+      {% for p in contacts %}<div class="rowitem"><div class="grow"><div class="t">{{ p.name }}{% if p.function %} <span class="muted small">· {{ p.function }}</span>{% endif %}</div>
+        <div class="s">{% if p.phone %}<a href="tel:{{ p.phone }}">{{ p.phone }}</a>{% endif %} {% if p.email %}· <a href="mailto:{{ p.email }}">{{ p.email }}</a>{% endif %} {% if p.location %}· {{ p.location }}{% endif %}</div></div>
+      {% if edit %}<form method="post" action="{{ url_for('klanten.delete_sub', cid=c.id, kind='contact', oid=p.id) }}" data-confirm="Contactpersoon verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
+      {% else %}<div class="empty">Nog geen contactpersonen.</div>{% endfor %}
+    </div>
+    {% if edit %}
+    <form method="post" action="{{ url_for('klanten.add_contact', cid=c.id) }}" class="form" style="margin-top:14px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required></label><label class="f">Functie<input type="text" name="function"></label><label class="f">Telefoon<input type="tel" name="phone"></label><label class="f">E-mail<input type="email" name="email"></label>
+      <label class="f full">Locatie<select name="location_id"><option value="">Algemeen</option>{% for l in locations %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></label></div>
+      <div><button class="btn sm">{{ icon('plus') }}Contactpersoon toevoegen</button></div>
+    </form>
+    {% endif %}
+  </section>
+</div>
+
+{% if can('service') %}
+<section class="card">
+  <div class="card-head"><h2>Tickets</h2></div>
+  <div class="rows">{% for t in tickets %}<a class="rowitem" href="{{ url_for('service.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.title }}</div><div class="s">{{ t.number }} · {{ t.created_at|date }}{% if t.installation %} · {{ t.installation }}{% endif %}</div></div>{{ ticket_status(t.status) }}</a>{% else %}<div class="empty">Geen tickets.</div>{% endfor %}</div>
+</section>
+{% endif %}
+{% if can('klanten', 3) %}
+<form method="post" action="{{ url_for('klanten.delete', cid=c.id) }}" data-confirm="Klant {{ c.name }} definitief verwijderen, inclusief locaties, contactpersonen en installaties?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Klant verwijderen</button></form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Logboek{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Laatste 500 acties</p></div></div>
+{% include "beheer/_nav.html" %}
+<div class="card flush tablewrap"><table class="table">
+  <thead><tr><th>Wanneer</th><th>Wie</th><th>Actie</th><th>Onderdeel</th><th>Details</th></tr></thead>
+  <tbody>{% for r in rows %}<tr><td class="nowrap">{{ r.created_at|dt }}</td><td>{{ r.who or 'Systeem' }}</td><td>{{ r.action }}</td><td>{{ r.entity or '' }} {{ ('#' ~ r.entity_id) if r.entity_id }}</td><td class="small">{{ r.details or '' }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

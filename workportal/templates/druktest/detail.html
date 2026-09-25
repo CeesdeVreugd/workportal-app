@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import photos %}
+{% block title %}{{ t.number }}{% endblock %}
+{% block content %}
+{% set edit = can('druktest', 2) and t.status == 'lopend' %}
+<div class="crumbs"><a href="{{ url_for('druktest.index') }}">Druktesten</a> / {{ t.number }}</div>
+<div class="pagehead">
+  <div><div class="eyebrow">Druktest {{ t.number }}</div><h1>{{ t.line_no or 'Leiding' }} · {{ t.part }}</h1>
+    <p>{% if t.project_no %}Project <a href="{{ url_for('klanten.project', pid=t.project_id) }}">{{ t.project_no }}</a> · {% endif %}tekening {{ t.drawing_no }}{% if t.drawing_rev %} rev {{ t.drawing_rev }}{% endif %}</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('druktest.report', tid=t.id) }}" target="_blank">{{ icon('pdf') }}{{ 'PDF-rapport' if t.status == 'afgerond' else 'Voorbeeld rapport' }}</a>
+  </div>
+</div>
+
+{% if t.status == 'lopend' %}
+<div class="grid g2 stack">
+  <section class="timer">
+    {% if t.next_check_at %}
+      <div class="lbl">Volgende controle over</div>
+      <div class="clock" data-countdown="{{ t.next_check_at }}" data-start="{{ t.timer_started_at }}" data-due-text="Nu controleren!" data-alert="Terug naar leiding {{ t.line_no or t.drawing_no }}">…</div>
+      <div class="bar"><div></div></div>
+      <div class="lbl" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Timer {{ label(t.timer_minutes) }} · gestart {{ t.timer_started_at|dt('%H:%M') }}</span><span>Melding om {{ t.next_check_at|dt('%d-%m %H:%M') }}</span></div>
+    {% else %}
+      <div class="lbl">Geen timer actief</div><div class="clock">–:–</div>
+    {% endif %}
+    {% if edit %}
+    <form method="post" action="{{ url_for('druktest.timer', tid=t.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" data-no-disable>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% for m, l in presets %}<button class="btn sm" name="minutes" value="{{ m }}" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)">{{ l }}</button>{% endfor %}
+    </form>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Stand</h2>
+    <div class="grid g2" style="gap:12px">
+      <div class="kpi"><div class="label">Startdruk</div><div class="value" style="font-size:26px">{{ readings[0].pressure|num(2) if readings else '–' }} <span class="small muted">bar</span></div></div>
+      <div class="kpi"><div class="label">Laatste meting</div><div class="value" style="font-size:26px">{{ readings[-1].pressure|num(2) if readings else '–' }} <span class="small muted">bar</span></div></div>
+    </div>
+    <p style="margin:14px 0 0">Drukverlies: <b>{{ drop|num(2) if drop is not none else '–' }} bar</b>
+      {% if t.max_drop is not none and drop is not none %}<span class="badge {{ 'b-ok' if within else 'b-bad' }}">{{ 'Binnen norm' if within else 'Buiten norm' }} (max {{ t.max_drop|num(2) }})</span>{% endif %}</p>
+    <p class="small muted">Tip: zet op <a href="{{ url_for('main.account') }}">Mijn account</a> pushmeldingen aan, dan krijg je een melding op je telefoon.</p>
+  </section>
+</div>
+{% if edit %}
+<div class="actions">
+  <a class="btn primary" href="{{ url_for('druktest.reading', tid=t.id) }}">{{ icon('camera') }}Controle vastleggen</a>
+  <a class="btn" href="{{ url_for('druktest.finish', tid=t.id) }}">{{ icon('check') }}Druktest afronden</a>
+</div>
+{% endif %}
+{% else %}
+<section class="result big {{ 'ok' if t.result == 'goedgekeurd' else 'bad' }}">
+  <div>Resultaat</div><div class="val">{{ t.result|capitalize }}</div>
+  <div>Afgerond {{ t.finished_at|dt }} door {{ t.signed_name }} · drukverlies {{ drop|num(2) if drop is not none else '–' }} bar{% if t.sharepoint_status %} · {{ t.sharepoint_status }}{% endif %}</div>
+</section>
+{% if can('druktest', 2) and sharepoint and pdf %}<form method="post" action="{{ url_for('druktest.resend', tid=t.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">{{ icon('upload') }}Opnieuw naar SharePoint sturen</button></form>{% endif %}
+{% endif %}
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Gegevens</h2>
+    <dl class="dl">
+      <dt>Testdruk</dt><dd>{{ t.test_pressure|num(2) }} bar · {{ t.medium }}</dd>
+      <dt>Max. drukverlies</dt><dd>{{ (t.max_drop|num(2) ~ ' bar') if t.max_drop is not none else '–' }}</dd>
+      <dt>Manometer</dt><dd>{{ t.gauge_id or '–' }}{% if t.gauge_cal_date %} · kal. {{ t.gauge_cal_date|date }}{% endif %}</dd>
+      <dt>Uitvoerder(s)</dt><dd>{{ t.executor or '–' }}</dd>
+      <dt>Getuige klant</dt><dd>{{ t.witness or '–' }}</dd>
+      <dt>Klant</dt><dd>{{ t.customer or '–' }}</dd>
+      <dt>Gestart</dt><dd>{{ t.created_at|dt }} door {{ t.creator or '' }}</dd>
+      {% if t.remarks %}<dt>Opmerkingen</dt><dd class="prose" style="font-weight:400">{{ t.remarks }}</dd>{% endif %}
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Tijdlijn</h2>
+    <div class="timeline">
+    {% for r in readings %}
+      {% set drop_r = readings[0].pressure - r.pressure %}
+      <div class="tl">
+        <div class="thumbs">{% for f in rfiles[r.id] if f.kind == 'photo' %}<a href="{{ url_for('main.file', fid=f.id) }}" target="_blank"><img src="{{ url_for('main.file', fid=f.id) }}" alt="Foto {{ r.kind }}" loading="lazy"></a>{% endfor %}</div>
+        <div class="grow"><div style="font-weight:500">{{ {'start':'Start','controle':'Controle','eind':'Eindmeting'}[r.kind] }} · {{ r.pressure|num(2) }} bar</div>
+          <div class="small muted">{{ r.created_at|dt }} · {{ r.who or '' }}{% if r.temperature is not none %} · {{ r.temperature|num(1) }} °C{% endif %}{% if r.note %} · {{ r.note }}{% endif %}</div></div>
+        {% if not loop.first %}<span class="badge {{ 'b-ok' if t.max_drop is none or drop_r <= t.max_drop + 0.000001 else 'b-bad' }}">−{{ drop_r|num(2) }}</span>{% endif %}
+      </div>
+    {% endfor %}
+    </div>
+  </section>
+</div>
+<section class="card">
+  <h2>Overige foto's</h2>
+  {% call photos(files|rejectattr('kind','in',['signature','pdf'])|list) %}
+    {% if edit %}<form method="post" action="{{ url_for('druktest.add_photos', tid=t.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" capture="environment" multiple data-autosubmit></label></form>{% endif %}
+  {% endcall %}
+</section>
+<section class="card"><h2>Logboek</h2><div class="rows">{% for h in history %}<div class="rowitem"><div class="grow"><div class="s">{{ h.created_at|dt }} · {{ h.who or 'Systeem' }}</div><div>{{ h.action|capitalize }}{% if h.details %}: {{ h.details }}{% endif %}</div></div></div>{% endfor %}</div></section>
+{% if can('druktest', 3) %}
+<div class="actions">
+  {% if t.status == 'afgerond' %}
+  <form method="post" action="{{ url_for('druktest.reopen', tid=t.id) }}" class="actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="reason" placeholder="Reden voor heropenen (verplicht)" style="width:280px" required><button class="btn sm">Heropenen</button></form>
+  {% endif %}
+  <form method="post" action="{{ url_for('druktest.delete', tid=t.id) }}" data-confirm="Druktest {{ t.number }} met alle foto's definitief verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Verwijderen</button></form>
+</div>
+{% endif %}
+{% endblock %}

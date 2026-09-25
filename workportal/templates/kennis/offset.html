@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Verzet met bochten{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a> / verzet</div>
+<h1>Verzet met twee bochten</h1>
+<div class="grid g2 stack">
+  <section class="card form">
+    <div class="fgrid">
+      <label class="f">Verzet hart-op-hart H (mm)<input type="text" inputmode="decimal" id="H" value="200"></label>
+      <label class="f">Bochthoek<select id="ang"><option value="45" selected>45°</option><option value="30">30°</option><option value="60">60°</option><option value="22.5">22,5°</option></select></label>
+      <label class="f full">Bocht uit bibliotheek<select id="bend"><option value="">– handmatig invullen –</option>{% for b in bends %}<option value="{{ b.id }}" data-r="{{ b.radius }}" data-t="{{ b.tangent }}">{{ b.name }} · R{{ b.radius|num(1) }}{% if b.tangent %} + {{ b.tangent|num(1) }} recht{% endif %}</option>{% endfor %}</select></label>
+      <label class="f">Buigradius R hartlijn (mm)<input type="text" inputmode="decimal" id="R" placeholder="bijv. 70"></label>
+      <label class="f">Recht eind per bocht (mm)<input type="text" inputmode="decimal" id="T" value="0"></label>
+      <label class="f">Of: hart-tot-eind A (mm)<input type="text" inputmode="decimal" id="A" placeholder="overschrijft R"></label>
+      <label class="f">Lasspleet per las (mm)<input type="text" inputmode="decimal" id="s" value="0"></label>
+    </div>
+    <p class="hint">A = hart-tot-eindmaat van één bocht (van het snijpunt van de hartlijnen tot het einde van de bocht). Bij een bocht zonder recht eind is A = R × tan(hoek ÷ 2).</p>
+  </section>
+  <section class="card" style="display:flex;flex-direction:column;gap:14px">
+    <div id="res" class="result info big"><div>Zaaglengte buis tussen de bochten</div><div class="val">–</div><div id="sub"></div></div>
+    <div class="diagram" id="dia"></div>
+    <div class="formula" id="form"></div>
+  </section>
+</div>
+<section class="card">
+  <h2>Bochtenbibliotheek</h2>
+  <div class="tablewrap"><table class="table"><thead><tr><th>Naam</th><th class="num">Buis Ø</th><th class="num">R</th><th class="num">Recht eind</th><th>Notitie</th><th></th></tr></thead><tbody>
+  {% for b in bends %}<tr><td>{{ b.name }}</td><td class="num">{{ b.diameter|num(1) if b.diameter else '' }}</td><td class="num">{{ b.radius|num(1) }}</td><td class="num">{{ b.tangent|num(1) }}</td><td>{{ b.notes or '' }}</td>
+    <td>{% if can('kennis_schrijven', 2) %}<form method="post" action="{{ url_for('kennis.bends') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" name="delete" value="{{ b.id }}" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6" class="empty">Nog geen bochten. Voeg de bochten toe die jullie gebruiken, dan hoeft niemand R op te zoeken.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if can('kennis_schrijven', 2) %}
+  <form method="post" action="{{ url_for('kennis.bends') }}" class="fgrid three" style="margin-top:14px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f">Naam<input type="text" name="name" required placeholder="bijv. Walsbocht 53×1,5 R70"></label>
+    <label class="f">Buis Ø (mm)<input type="text" inputmode="decimal" name="diameter"></label>
+    <label class="f">Radius R (mm)<input type="text" inputmode="decimal" name="radius" required></label>
+    <label class="f">Recht eind (mm)<input type="text" inputmode="decimal" name="tangent" value="0"></label>
+    <label class="f">Notitie<input type="text" name="notes"></label>
+    <div style="align-self:end"><button class="btn">{{ icon('plus') }}Toevoegen</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  function v(id){ return WP.num(document.getElementById(id).value); }
+  var bend = document.getElementById('bend');
+  bend.addEventListener('change', function(){ var o = bend.selectedOptions[0]; if (o && o.value) { document.getElementById('R').value = WP.fmt(o.getAttribute('data-r'),1); document.getElementById('T').value = WP.fmt(o.getAttribute('data-t'),1); document.getElementById('A').value = ''; } calc(); });
+  function draw(H, ang){
+    var t = ang*Math.PI/180, run = H / Math.tan(t), sc = Math.min(1, 150 / H, 170 / (run || 1));
+    var x0 = 30, y0 = 150, x1 = 110, x2 = x1 + run*sc, y2 = y0 - H*sc;
+    var s = '<svg viewBox="0 0 340 175" width="100%" style="max-width:380px" font-family="Ubuntu, sans-serif">';
+    s += '<path d="M'+x0+' '+y0+' H'+x1+' L'+x2+' '+y2+' H'+(x2+80)+'" fill="none" stroke="#0A0A96" stroke-width="12" stroke-linejoin="round"/>';
+    s += '<path d="M'+x0+' '+y0+' H'+x1+' L'+x2+' '+y2+' H'+(x2+80)+'" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>';
+    s += '<line x1="'+(x1+10)+'" y1="'+(y0-10*Math.tan(t))+'" x2="'+(x2-10)+'" y2="'+(y2+10*Math.tan(t))+'" stroke="#0080FF" stroke-width="3"/>';
+    s += '<line x1="14" y1="'+y0+'" x2="14" y2="'+y2+'" stroke="#5A5F80"/><line x1="8" y1="'+y0+'" x2="20" y2="'+y0+'" stroke="#5A5F80"/><line x1="8" y1="'+y2+'" x2="20" y2="'+y2+'" stroke="#5A5F80"/>';
+    s += '<text x="22" y="'+((y0+y2)/2+4)+'" font-size="12" fill="#3A3F66">H</text>';
+    s += '<text x="'+((x1+x2)/2+10)+'" y="'+((y0+y2)/2+14)+'" font-size="12" fill="#0059B3">buis</text>';
+    return s + '</svg>';
+  }
+  function calc(){
+    var H = v('H'), ang = parseFloat(document.getElementById('ang').value), R = v('R'), T = v('T'), Ain = v('A'), s = v('s');
+    var t = ang*Math.PI/180, res = document.getElementById('res'), f = document.getElementById('form');
+    document.getElementById('dia').innerHTML = draw(H || 200, ang);
+    if (!(H > 0)) { res.className='result info big'; res.innerHTML='<div>Zaaglengte</div><div class="val">–</div><div>Vul het verzet H in.</div>'; f.textContent=''; return; }
+    var travel = H / Math.sin(t), run = H / Math.tan(t);
+    var A = Ain > 0 ? Ain : (R > 0 ? R * Math.tan(t/2) + T : null);
+    if (A === null) { res.className='result info big'; res.innerHTML='<div>Hartlijnlengte tussen de bochten</div><div class="val">'+WP.fmt(travel,1)+' mm</div><div>Vul R of A in om de zaaglengte te berekenen. Verzet vraagt '+WP.fmt(run,1)+' mm lengte in de looprichting.</div>'; f.textContent = 'hartlijn = H ÷ sin('+WP.fmt(ang,1)+'°) = '+WP.fmt(travel,1)+' mm'; return; }
+    var L = travel - 2*A - 2*s;
+    res.className = L > 0 ? 'result ok big' : 'result bad big';
+    res.innerHTML = '<div>Zaaglengte buis tussen de bochten</div><div class="val">' + (L > 0 ? WP.fmt(L,1) + ' mm' : 'Te kort') + '</div><div>Hartlijn '+WP.fmt(travel,1)+' mm − 2 × A ('+WP.fmt(A,1)+') − 2 × lasspleet ('+WP.fmt(s,1)+') · ruimte in looprichting '+WP.fmt(run,1)+' mm</div>';
+    f.textContent = 'buis = H ÷ sin(' + WP.fmt(ang,1) + '°) − 2A − 2s' + (Ain > 0 ? '' : ',  A = R × tan(' + WP.fmt(ang/2,2) + '°) + recht eind');
+  }
+  document.querySelectorAll('input,select').forEach(function(i){ i.addEventListener('input', calc); i.addEventListener('change', calc); });
+  calc();
+})();
+</script>
+{% endblock %}

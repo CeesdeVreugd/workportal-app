@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Handtekening{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / handtekening</div>
+<h1>Werkbon laten tekenen</h1>
+<div class="card" style="max-width:760px">
+  <dl class="dl"><dt>Bezoek</dt><dd>{{ v.date|date }} · {{ v.technicians or '' }} · {{ v.hours|num(2) }} uur</dd>
+  <dt>Uitgevoerd</dt><dd class="prose" style="font-weight:400">{{ v.work_done or '–' }}</dd></dl>
+  <p><a href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" target="_blank">Voorbeeld werkbon bekijken</a></p>
+</div>
+<form method="post" class="card form" style="max-width:760px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="signature" id="sigdata">
+  <label class="f">Naam klant *<input type="text" name="signed_name" required value="{{ t.contact or '' }}"></label>
+  <div><label class="f">Handtekening klant *</label><canvas class="sigpad" id="sig" data-target="sigdata"></canvas>
+    <button type="button" class="btn ghost sm" data-clear="sig">Wissen</button></div>
+  <label class="check"><input type="checkbox" name="mail" value="1" {{ 'checked' if mail_to }}> Werkbon mailen naar</label>
+  <input type="email" name="mail_to" value="{{ mail_to }}" placeholder="e-mailadres klant">
+  {% if sharepoint %}<label class="check"><input type="checkbox" name="sharepoint" value="1" checked> Werkbon in SharePoint (projectmap) plaatsen</label>{% endif %}
+  <label class="check"><input type="checkbox" name="close" value="1"> Ticket afronden</label>
+  <div class="actions"><button class="btn primary">Ondertekenen &amp; afronden</button></div>
+</form>
+{% endblock %}

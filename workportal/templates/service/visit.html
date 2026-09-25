@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import photos %}
+{% block title %}Bezoek {{ t.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / bezoek</div>
+<h1>{{ 'Bezoek bewerken' if vid else 'Bezoek vastleggen' }}</h1>
+<p class="muted">{{ t.title }}{% if t.customer %} · {{ t.customer }}{% endif %}{% if t.installation %} · {{ t.installation }}{% endif %}</p>
+<form method="post" enctype="multipart/form-data" class="card form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fgrid three">
+    <label class="f">Datum<input type="date" name="date" value="{{ v.date }}" required></label>
+    <label class="f" style="grid-column:span 2">Monteur(s)<input type="text" name="technicians" value="{{ v.technicians or '' }}"></label>
+    <label class="f">Gewerkte uren<input type="text" inputmode="decimal" name="hours" value="{{ v.hours|num(2) if v.hours else '' }}" placeholder="0,00"></label>
+    <label class="f">Reistijd (uur)<input type="text" inputmode="decimal" name="travel_hours" value="{{ v.travel_hours|num(2) if v.travel_hours else '' }}" placeholder="0,00"></label>
+    <label class="f">Kilometers<input type="text" inputmode="numeric" name="km" value="{{ v.km|num(0) if v.km else '' }}"></label>
+  </div>
+  <label class="f">Bevindingen<textarea name="findings" rows="3">{{ v.findings or '' }}</textarea></label>
+  <label class="f">Uitgevoerde werkzaamheden<textarea name="work_done" rows="3">{{ v.work_done or '' }}</textarea></label>
+  <label class="f">Gebruikte materialen<textarea name="materials" rows="2" placeholder="bijv. 1× temperatuurvoeler PT100">{{ v.materials or '' }}</textarea></label>
+  <div><label class="f">Foto's</label>
+    {% call photos(files) %}<label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev"></label>{% endcall %}
+    <div class="photos" id="prev" style="margin-top:10px"></div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" name="next" value="">Opslaan</button>
+    <button class="btn" name="next" value="tekenen">Opslaan &amp; laten tekenen</button>
+  </div>
+</form>
+{% endblock %}

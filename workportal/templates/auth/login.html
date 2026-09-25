@@ -1,0 +1,13 @@
+{% extends "auth/base.html" %}
+{% block content %}
+<h1>Inloggen</h1>
+<p>Vul je e-mailadres in. Je ontvangt een code van 6 cijfers per e-mail.</p>
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next or '' }}">
+  <label class="f">E-mailadres
+    <input type="email" name="email" value="{{ email or '' }}" required autofocus autocomplete="email" inputmode="email" placeholder="naam@devreugd-pt.nl">
+  </label>
+  <button class="btn primary block" type="submit">Stuur inlogcode</button>
+</form>
+{% endblock %}

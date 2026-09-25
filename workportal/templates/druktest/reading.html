@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Controle {{ t.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('druktest.detail', tid=t.id) }}">{{ t.number }}</a> / controle</div>
+<h1>Controle vastleggen</h1>
+<p class="muted">{{ t.line_no or 'Leiding' }} · tekening {{ t.drawing_no }} · startdruk {{ readings[0].pressure|num(2) }} bar</p>
+<form method="post" enctype="multipart/form-data" class="card form" style="max-width:640px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div><label class="f">Foto manometer *</label>
+    <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" required></label></div>
+    <div class="photos" id="prev" style="margin-top:10px"></div></div>
+  <div class="fgrid">
+    <label class="f">Afgelezen druk (bar) *<input type="text" inputmode="decimal" name="pressure" required autofocus></label>
+    <label class="f">Temperatuur (°C)<input type="text" inputmode="decimal" name="temperature"></label>
+    <label class="f full">Opmerking<input type="text" name="note"></label>
+  </div>
+  <label class="f">Nieuwe timer (volgende controle)</label>
+  <div class="chips"><label class="chip"><input type="radio" name="timer" value=""><span>Geen</span></label>{% for m, l in presets %}<label class="chip"><input type="radio" name="timer" value="{{ m }}" {{ 'checked' if m == t.timer_minutes }}><span>{{ l }}</span></label>{% endfor %}</div>
+  <div class="actions"><button class="btn primary">Controle opslaan</button><a class="btn ghost" href="{{ url_for('druktest.detail', tid=t.id) }}">Annuleren</a></div>
+</form>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Druktesten{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Druktesten</h1><p>Registratie van druktesten van dubbelwandig leidingwerk</p></div>
+  <div class="actions">{% if can('druktest', 2) %}<a class="btn primary" href="{{ url_for('druktest.new') }}">{{ icon('plus') }}Nieuwe druktest</a>{% endif %}</div>
+</div>
+<div class="tabs">{% for k, l in [('lopend','Lopend'),('afgerond','Afgerond'),('alle','Alle')] %}<a href="?view={{ k }}" class="{{ 'active' if view == k }}">{{ l }}</a>{% endfor %}</div>
+<form method="get"><input type="hidden" name="view" value="{{ view }}"><div class="search" style="max-width:420px">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op nummer, tekening, leiding of project"></div></form>
+<div class="grid" style="gap:12px">
+{% for t in tests %}
+  <a class="card" href="{{ url_for('druktest.detail', tid=t.id) }}" style="text-decoration:none;color:inherit;display:flex;gap:16px;align-items:center;padding:16px">
+    <div style="width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;{{ 'background:var(--accent);color:#fff' if t.status == 'lopend' else 'background:var(--line-2);color:var(--basic)' }}"><span style="width:24px;height:24px;display:block">{{ icon('timer') }}</span></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:500">{{ t.number }} · {{ t.line_no or 'Leiding' }} · {{ t.part }}</div>
+      <div class="small muted">{% if t.project_no %}Project {{ t.project_no }} · {% endif %}tekening {{ t.drawing_no }}{% if t.drawing_rev %} rev {{ t.drawing_rev }}{% endif %} · {{ t.test_pressure|num(1) }} bar · {{ t.medium }}</div>
+    </div>
+    <div class="right">
+      {% if t.status == 'lopend' %}
+        {% if t.next_check_at %}<div style="font-size:20px;font-weight:700;color:var(--basic)" data-countdown="{{ t.next_check_at }}" data-due-text="Controleren!">…</div><div class="small muted">tot controle</div>
+        {% else %}<span class="badge b-blue">Lopend</span><div class="small muted" style="margin-top:4px">{{ t.last_pressure|num(2) }} bar</div>{% endif %}
+      {% else %}
+        <span class="badge {{ 'b-ok' if t.result == 'goedgekeurd' else 'b-bad' }}">{{ t.result|capitalize }}</span><div class="small muted" style="margin-top:4px">{{ t.finished_at|date }}</div>
+      {% endif %}
+    </div>
+  </a>
+{% else %}<div class="card empty">Geen druktesten in deze weergave.</div>{% endfor %}
+</div>
+{% endblock %}

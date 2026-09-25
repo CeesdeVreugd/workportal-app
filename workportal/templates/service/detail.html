@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import ticket_status, prio, photos %}
+{% block title %}{{ t.number }}{% endblock %}
+{% block content %}
+{% set edit = can('service', 2) %}
+<div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / {{ t.number }}</div>
+<div class="pagehead">
+  <div><div class="eyebrow">{{ t.number }} · {{ TYPES.get(t.type, t.type) }}</div><h1>{{ t.title }}</h1>
+    <p>{{ ticket_status(t.status) }} {{ prio(t.priority) }} · aangemaakt {{ t.created_at|dt }}</p></div>
+  <div class="actions">
+    {% if edit %}
+    <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>
+    <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
+    {% endif %}
+  </div>
+</div>
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Gegevens</h2>
+    <dl class="dl">
+      <dt>Klant</dt><dd>{% if t.customer_id %}<a href="{{ url_for('klanten.customer', cid=t.customer_id) }}">{{ t.customer }}</a>{% else %}–{% endif %}{% if t.location %}<div class="small muted">{{ t.location }}</div>{% endif %}</dd>
+      <dt>Installatie</dt><dd>{% if t.installation_id %}<a href="{{ url_for('klanten.installation', iid=t.installation_id) }}">{{ t.installation }}</a>{{ (' · SN ' ~ t.serial) if t.serial }}{% else %}–{% endif %}</dd>
+      <dt>Contact</dt><dd>{{ t.contact or '–' }}{% if t.contact_phone %} · <a href="tel:{{ t.contact_phone }}">Bellen</a>{% endif %}</dd>
+      <dt>Project</dt><dd>{% if t.project_id %}<a href="{{ url_for('klanten.project', pid=t.project_id) }}">{{ t.project_no }}</a>{% else %}–{% endif %}</dd>
+      <dt>Gemeld door</dt><dd>{{ t.reported_by or '–' }}</dd>
+      <dt>Toegewezen</dt><dd>{{ t.assignee or '–' }}</dd>
+      <dt>Gepland</dt><dd>{{ t.planned_date|date or '–' }}</dd>
+    </dl>
+    {% if t.description %}<h3 style="margin-top:16px">Melding</h3><div class="prose">{{ t.description }}</div>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Status</h2>
+    {% if edit %}
+    <form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" class="chips" data-no-disable>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% for k, l in STATUSES %}<button class="btn sm {{ 'primary' if t.status == k }}" name="status" value="{{ k }}">{{ l }}</button>{% endfor %}
+    </form>
+    {% else %}<p>{{ ticket_status(t.status) }}</p>{% endif %}
+    <h3 style="margin-top:20px">Foto's &amp; bijlagen</h3>
+    {% call photos(files) %}
+      {% if edit %}<form method="post" action="{{ url_for('service.add_photos', tid=t.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" multiple data-autosubmit></label></form>{% endif %}
+    {% endcall %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>Bezoeken ({{ visits|length }})</h2>{% if edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a>{% endif %}</div>
+  <div class="rows">
+  {% for v in visits %}
+    <div class="rowitem" id="bezoek{{ v.id }}" style="align-items:flex-start;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;width:100%;gap:10px;flex-wrap:wrap">
+        <div><div class="t">Bezoek {{ v.date|date }} · {{ v.technicians or '' }}</div><div class="s">{{ v.hours|num(2) }} uur · reistijd {{ v.travel_hours|num(2) }} uur · {{ v.km|num(0) }} km</div></div>
+        <div class="actions">
+          {% if v.signed_at %}<span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% if v.sharepoint_status %}<span class="badge">{{ v.sharepoint_status }}</span>{% endif %}
+          {% elif edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}">{{ icon('edit') }}Bewerken</a><a class="btn sm primary" href="{{ url_for('service.sign', tid=t.id, vid=v.id) }}">Handtekening &amp; afronden</a>{% endif %}
+          <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
+        </div>
+      </div>
+      {% if v.findings %}<div><b class="small muted">Bevindingen</b><div class="prose">{{ v.findings }}</div></div>{% endif %}
+      {% if v.work_done %}<div><b class="small muted">Uitgevoerd</b><div class="prose">{{ v.work_done }}</div></div>{% endif %}
+      {% if v.materials %}<div><b class="small muted">Materialen</b><div class="prose">{{ v.materials }}</div></div>{% endif %}
+      {% set vf = vfiles[v.id]|rejectattr('kind','equalto','signature')|list %}{% if vf %}<div style="width:100%">{{ photos(vf) }}</div>{% endif %}
+    </div>
+  {% else %}<div class="empty">Nog geen bezoeken vastgelegd.</div>{% endfor %}
+  </div>
+</section>
+
+<section class="card"><h2>Historie</h2><div class="rows">
+{% for h in history %}<div class="rowitem"><div class="grow"><div class="s">{{ h.created_at|dt }} · {{ h.who or 'Systeem' }}</div><div>{{ h.action|capitalize }}{% if h.details %}: {{ h.details }}{% endif %}</div></div></div>{% endfor %}
+</div></section>
+{% if can('service', 3) %}<form method="post" action="{{ url_for('service.delete', tid=t.id) }}" data-confirm="Ticket {{ t.number }} met alle bezoeken en foto's verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Ticket verwijderen</button></form>{% endif %}
+{% endblock %}

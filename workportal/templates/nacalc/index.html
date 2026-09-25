@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Na-calculatie{% endblock %}
+{% block content %}
+{% set badge = {'bad':'b-bad','warn':'b-warn','ok':'b-ok','okplus':'b-okplus','info':'b-blue'} %}
+<div class="pagehead"><div><h1>Na-calculatie</h1><p>Werkelijke kosten uit de ERP-regie-export vergeleken met orderbedrag en calculatie</p></div></div>
+{% if can('nacalculatie', 2) %}
+<div class="grid g2 stack">
+  {% if pa %}
+  <form method="post" action="{{ url_for('nacalc.fetch') }}" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Ophalen uit ERP (Power Automate)</h2>
+    <p class="muted small">Draai eerst in het ERP de regie-export voor de order. Daarna haalt WorkPortal het bestand op uit de ERP-map.</p>
+    <div class="fgrid">
+      <label class="f">Ordernummer *<input type="text" name="order_no" required placeholder="bijv. 20260102"></label>
+      <label class="f">Calculatie (optioneel)<select name="calc_id"><option value="">Automatisch / geen</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, pre_calc) }}{% endfor %}</select></label>
+    </div>
+    <div><button class="btn primary">{{ icon('refresh') }}Na-calculatie ophalen</button></div>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('nacalc.upload') }}" enctype="multipart/form-data" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Excel-export uploaden</h2>
+    <p class="muted small">Upload de regie-Excel uit het ERP. Project wordt herkend op ordernummer (en aangemaakt als het nog niet bestaat).</p>
+    <div class="fgrid">
+      <label class="f full">Bestand (.xlsx) *<input type="file" name="file" accept=".xlsx" required></label>
+      <label class="f">Project<select name="project_id"><option value="">Automatisch op ordernummer</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name, pre_project) }}{% endfor %}</select></label>
+      <label class="f">Calculatie<select name="calc_id"><option value="">Automatisch / geen</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, pre_calc) }}{% endfor %}</select></label>
+    </div>
+    <div><button class="btn {{ '' if pa else 'primary' }}">{{ icon('upload') }}Importeren</button></div>
+  </form>
+</div>
+{% endif %}
+<section class="card flush tablewrap">
+  <table class="table">
+    <thead><tr><th>Order</th><th>Omschrijving</th><th class="hide-m">Calculatie</th><th class="num">Orderbedrag</th><th class="num hide-m">Kostprijs</th><th class="num">Resultaat</th><th>Beoordeling</th></tr></thead>
+    <tbody>
+    {% for r in results %}<tr class="link" data-href="{{ url_for('nacalc.detail', nid=r.id) }}">
+      <td class="nowrap"><b>{{ r.order_no }}</b><div class="small muted">{{ r.imported_at|date }}</div></td>
+      <td>{{ r.order_desc or '' }}</td><td class="hide-m">{{ r.calc_no or '–' }}</td>
+      <td class="num">{{ r.order_total|eur }}</td><td class="num hide-m">{{ r.cost|eur }}</td>
+      <td class="num"><b>{{ r.result|eur }}</b><div class="small muted">{{ r.margin_pct|num(1) }}%</div></td>
+      <td><span class="badge {{ badge[r.status] }}">{{ r.label }}</span></td></tr>
+    {% else %}<tr><td colspan="7" class="empty">Nog geen na-calculaties. Importeer een regie-export uit het ERP.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

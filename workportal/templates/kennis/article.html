@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import photos %}
+{% block title %}{{ a.title }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a> / {{ a.category or 'Algemeen' }}</div>
+<div class="pagehead"><div><div class="eyebrow">{{ a.category or 'Algemeen' }}</div><h1>{{ a.title }}</h1><p>{% if a.author %}{{ a.author }} · {% endif %}bijgewerkt {{ a.updated_at|date }}{% if a.tags %} · {{ a.tags }}{% endif %}</p></div>
+  <div class="actions">{% if can('kennis_schrijven', 2) %}<a class="btn primary" href="{{ url_for('kennis.edit', aid=a.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}</div></div>
+<article class="card prose" style="max-width:860px">{{ a.body }}</article>
+{% if files %}<section class="card" style="max-width:860px"><h2>Foto's &amp; bijlagen</h2>{{ photos(files) }}</section>{% endif %}
+{% if can('kennis_schrijven', 3) %}<form method="post" action="{{ url_for('kennis.delete', aid=a.id) }}" data-confirm="Artikel verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Artikel verwijderen</button></form>{% endif %}
+{% endblock %}

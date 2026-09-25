@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import ticket_status, photos %}
+{% block title %}{{ i.name }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a> / <a href="{{ url_for('klanten.customer', cid=i.customer_id) }}">{{ i.customer }}</a> / {{ i.name }}</div>
+<div class="pagehead"><div><h1>{{ i.name }}</h1><p>{{ i.customer }}{% if i.location %} · {{ i.location }}{% endif %}</p></div>
+  <div class="actions">{% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new', klant=i.customer_id, installatie=i.id) }}">{{ icon('plus') }}Ticket voor deze installatie</a>{% endif %}</div></div>
+<div class="grid g2 stack">
+  <section class="card"><h2>Gegevens</h2><dl class="dl">
+    <dt>Serienummer</dt><dd>{{ i.serial or '–' }}</dd><dt>Bouwjaar</dt><dd>{{ i.year or '–' }}</dd>
+    <dt>Project</dt><dd>{% if i.project_id %}<a href="{{ url_for('klanten.project', pid=i.project_id) }}">{{ i.project_no }} {{ i.project_name }}</a>{% else %}–{% endif %}</dd>
+    <dt>Onderhoudsinterval</dt><dd>{{ (i.service_interval_months ~ ' maanden') if i.service_interval_months else '–' }}</dd>
+    <dt>Volgend onderhoud</dt><dd>{{ i.next_service|date or '–' }}</dd>
+    <dt>Notities</dt><dd class="prose" style="font-weight:400">{{ i.notes or '–' }}</dd></dl></section>
+  <section class="card"><h2>Documenten &amp; foto's</h2>{% if files %}{{ photos(files) }}{% else %}<div class="empty">Geen documenten.</div>{% endif %}</section>
+</div>
+<section class="card"><h2>Onderhoudshistorie</h2>
+  <div class="tablewrap"><table class="table"><thead><tr><th>Datum</th><th>Ticket</th><th>Monteur(s)</th><th>Uitgevoerd</th></tr></thead><tbody>
+  {% for v in visits %}<tr class="link" data-href="{{ url_for('service.detail', tid=v.ticket_id) }}"><td class="nowrap">{{ v.date|date }}</td><td>{{ v.number }} · {{ v.title }}</td><td>{{ v.technicians or '' }}</td><td>{{ (v.work_done or '')[:120] }}</td></tr>
+  {% else %}<tr><td colspan="4" class="empty">Nog geen bezoeken.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+<section class="card"><h2>Tickets</h2><div class="rows">{% for t in tickets %}<a class="rowitem" href="{{ url_for('service.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.title }}</div><div class="s">{{ t.number }} · {{ t.created_at|date }}</div></div>{{ ticket_status(t.status) }}</a>{% else %}<div class="empty">Geen tickets.</div>{% endfor %}</div></section>
+{% endblock %}

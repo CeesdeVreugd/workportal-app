@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import calc_status %}
+{% block title %}Calculatie{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Calculatie</h1><p>Calculaties opbouwen via startvragen en sjablonen per type werk</p></div>
+  <div class="actions">{% if can('calculatie', 2) %}<a class="btn primary" href="{{ url_for('calculatie.new') }}">{{ icon('plus') }}Nieuwe calculatie</a>{% endif %}</div>
+</div>
+<div class="tabs">{% for k, l in [('open','In behandeling'),('akkoord','Akkoord'),('verloren','Niet doorgegaan'),('alle','Alle')] %}<a href="?view={{ k }}" class="{{ 'active' if view == k }}">{{ l }}</a>{% endfor %}</div>
+<form method="get"><input type="hidden" name="view" value="{{ view }}"><div class="search" style="max-width:420px">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op nummer, omschrijving of klant"></div></form>
+<div class="card flush tablewrap"><table class="table">
+  <thead><tr><th>Nummer</th><th>Omschrijving</th><th class="hide-m">Klant</th><th class="hide-m">Type</th><th class="num">Totaal</th><th class="num hide-m">Prijsafspraak</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for c in calcs %}<tr class="link" data-href="{{ url_for('calculatie.edit', cid=c.id) }}">
+    <td class="nowrap"><b>{{ c.number }}</b><div class="small muted">{{ c.updated_at|date }}</div></td>
+    <td>{{ c.title }}{% if c.project_no %}<div class="small muted">Project {{ c.project_no }}</div>{% endif %}</td>
+    <td class="hide-m">{{ c.customer or c.customer_text or '–' }}</td>
+    <td class="hide-m small">{{ (c.worktypes or '').replace(',', ', ') }}</td>
+    <td class="num"><b>{{ c.total|eur }}</b></td>
+    <td class="num hide-m">{{ c.agreed_price|eur if c.agreed_price else '–' }}</td>
+    <td>{{ calc_status(c.status) }}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Geen calculaties in deze weergave.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

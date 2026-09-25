@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Na-calculatie {{ n.order_no }}{% endblock %}
+{% block content %}
+{% set badge = {'bad':'b-bad','warn':'b-warn','ok':'b-ok','okplus':'b-okplus','info':'b-blue','':''} %}
+<div class="crumbs"><a href="{{ url_for('nacalc.index') }}">Na-calculatie</a> / {{ n.order_no }}</div>
+<div class="pagehead">
+  <div><div class="eyebrow">Order {{ n.order_no }}{% if n.project_id %} · <a href="{{ url_for('klanten.project', pid=n.project_id) }}">project {{ n.project_no }}</a>{% endif %}</div>
+    <h1>{{ n.order_desc or 'Na-calculatie' }}</h1>
+    <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('nacalc.report', nid=n.id) }}" target="_blank">{{ icon('pdf') }}PDF-rapport</a>
+    {% if pa and can('nacalculatie', 2) %}
+    <form method="post" action="{{ url_for('nacalc.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="order_no" value="{{ n.order_no }}"><input type="hidden" name="project_id" value="{{ n.project_id or '' }}"><input type="hidden" name="calc_id" value="{{ n.calc_id or '' }}"><button class="btn primary">{{ icon('refresh') }}Opnieuw ophalen</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid g4">
+  <div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
+  <div class="card kpi"><div class="label">Werkelijke kostprijs</div><div class="value">{{ s.cost|eur }}</div><div class="sub">{{ s.hours|num(1) }} uur</div></div>
+  <div class="card kpi"><div class="label">Verkoopwaarde incl. marges</div><div class="value">{{ s.sale|eur }}</div><div class="sub">= minimaal gewenst orderbedrag</div></div>
+  <div class="card kpi dark"><div class="label">Resultaat</div><div class="value">{{ s.result|eur }} · {{ s.margin_pct|num(1) }}%</div>
+    <div style="margin-top:8px"><span class="badge {{ badge[s.status] }}" style="background:#fff">{{ s.label }}</span></div></div>
+</div>
+
+<div class="result {{ s.status }}">
+  {% if s.status == 'bad' %}<b>Verlies:</b> het orderbedrag dekt de werkelijke kostprijs niet ({{ (s.order_total - s.cost)|eur }}).
+  {% elif s.status == 'warn' %}<b>Onder minimale marge:</b> {{ (s.sale - s.order_total)|eur }} te weinig om de normale marges te halen. Wel {{ s.result|eur }} boven kostprijs.
+  {% elif s.status == 'ok' %}<b>Minimale marge gehaald</b> ({{ s.above_min|eur }} boven de verkoopwaarde). Doel voor extra: {{ s.extra_pct|num(0) }}% erboven.
+  {% elif s.status == 'okplus' %}<b>Extra bovenop de marge:</b> {{ s.above_min|eur }} boven de verkoopwaarde.
+  {% else %}Er is geen orderbedrag bekend. Vul in de calculatie een prijsafspraak in of controleer de ERP-export.{% endif %}
+  {% if calc %}<div class="small" style="margin-top:4px">Gecalculeerd (incl. marge): {{ s.calc_total|eur }} · {{ s.calc_hours|num(1) }} uur gecalculeerd tegen {{ s.hours|num(1) }} uur werkelijk.</div>{% endif %}
+</div>
+
+<section class="card flush">
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th>Pos.</th><th>Item</th>{% if calc %}<th class="num">Uren calc.</th>{% endif %}<th class="num">Uren werk.</th>{% if calc %}<th class="num">Gecalculeerd</th>{% endif %}<th class="num">Kostprijs</th><th class="num">Verkoopwaarde</th>{% if calc %}<th class="num">Verschil</th>{% endif %}<th>Beoordeling</th></tr></thead>
+    {% for it in items %}
+    <tbody>
+      <tr class="link" onclick="var d=document.getElementById('it{{ loop.index }}');d.classList.toggle('hidden');this.querySelector('.chev').style.transform=d.classList.contains('hidden')?'':'rotate(90deg)'">
+        <td class="nowrap"><span class="chev">›</span> {{ it.pos or '' }}</td>
+        <td><b>{{ it.desc }}</b>{% if it.divided %} <span class="badge">÷ {{ s.divide_by|num(0) }}</span>{% endif %}<div class="small muted">{{ it.lines|length }} regel(s)</div></td>
+        {% if calc %}<td class="num">{{ it.calc_hours|num(1) if it.calc_hours is not none else '–' }}</td>{% endif %}
+        <td class="num">{{ it.hours|num(1) }}</td>
+        {% if calc %}<td class="num">{{ it.calc|eur if it.calc is not none else '–' }}</td>{% endif %}
+        <td class="num">{{ it.cost|eur }}</td>
+        <td class="num">{{ it.sale|eur }}</td>
+        {% if calc %}<td class="num" style="color:{{ 'var(--ok)' if (it.diff or 0) >= 0 else 'var(--bad)' }}">{{ it.diff|eur if it.diff is not none else '–' }}</td>{% endif %}
+        <td>{% if it.label %}<span class="badge {{ badge[it.status] }}">{{ it.label }}</span>{% else %}<span class="small muted">marge {{ it.margin|eur }}</span>{% endif %}</td>
+      </tr>
+      <tr id="it{{ loop.index }}" class="hidden"><td colspan="9" style="background:#FAFBFE;padding:0 0 0 30px">
+        <table class="table subtable"><thead><tr><th>Pos</th><th>Omschrijving</th><th class="num">Aantal</th><th>Eenh.</th><th class="num">Kostprijs</th><th class="num">Marge</th><th class="num">Verkoop</th></tr></thead><tbody>
+        {% for l in it.lines %}<tr><td>{{ l.pos }}</td><td style="white-space:pre-line">{{ l.description or '' }}{% if l.article %} <span class="muted">({{ l.article }})</span>{% endif %}</td><td class="num">{{ l.qty|num(2) }}</td><td>{{ l.unit or '' }}</td><td class="num">{{ l.cost_subtotal|eur(2) }}</td><td class="num">{{ l.margin|num(2) }}</td><td class="num">{{ l.sale_subtotal|eur(2) }}</td></tr>
+        {% else %}<tr><td colspan="7" class="muted">Geen regels.</td></tr>{% endfor %}
+        </tbody></table></td></tr>
+    </tbody>
+    {% endfor %}
+    <tfoot><tr><td></td><td>Totaal</td>{% if calc %}<td class="num">{{ s.calc_hours|num(1) }}</td>{% endif %}<td class="num">{{ s.hours|num(1) }}</td>{% if calc %}<td class="num">{{ s.calc_total|eur }}</td>{% endif %}<td class="num">{{ s.cost|eur }}</td><td class="num">{{ s.sale|eur }}</td>{% if calc %}<td class="num">{{ s.diff|eur }}</td>{% endif %}<td></td></tr></tfoot>
+  </table></div>
+</section>
+
+<div class="grid g2 stack">
+  {% if can('nacalculatie', 2) %}
+  <form method="post" action="{{ url_for('nacalc.settings', nid=n.id) }}" class="card form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Instellingen</h2>
+    <div class="fgrid">
+      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>
+      <label class="f">Delen door (seriebouw)<input type="number" name="divide_by" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Bijv. 5 als deze order 5 machines bevat of kosten over 5 machines verdeeld worden.</span></label>
+    </div>
+    <label class="check"><input type="checkbox" name="divide_order" value="1" {{ 'checked' if s.divide_order }}> Orderbedrag ook delen (per-stuk-weergave)</label>
+    <div><label class="f">Welke items delen?</label>
+      <div class="chips">{% for it in items if it.pos %}<input type="hidden" name="all_pos" value="{{ it.pos }}"><label class="chip"><input type="checkbox" name="divide_item" value="{{ it.pos }}" {{ 'checked' if it.pos not in s.no_divide }}><span>{{ it.pos }} {{ it.desc[:28] }}</span></label>{% endfor %}</div></div>
+    <div><button class="btn primary">Opslaan &amp; herberekenen</button></div>
+  </form>
+  {% endif %}
+  <section class="card">
+    <h2>Verloop (alle imports van deze order)</h2>
+    <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">Kostprijs {{ h.cost|eur }} · resultaat {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%)</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
+    <p class="hint">Elke import wordt bewaard, zodat je ziet hoe het resultaat zich tijdens het project ontwikkelt.</p>
+  </section>
+</div>
+{% if can('nacalculatie', 3) %}<form method="post" action="{{ url_for('nacalc.delete', nid=n.id) }}" data-confirm="Deze import verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Import verwijderen</button></form>{% endif %}
+{% endblock %}

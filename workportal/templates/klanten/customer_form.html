@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Klant bewerken' if edit else 'Nieuwe klant' }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('klanten.index') }}">Klanten</a>{% if edit %} / <a href="{{ url_for('klanten.customer', cid=cid) }}">{{ c.name }}</a>{% endif %}</div>
+<h1>{{ 'Klant bewerken' if edit else 'Nieuwe klant' }}</h1>
+<form method="post" class="card form" style="max-width:820px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fgrid">
+    <label class="f full">Klantnaam *<input type="text" name="name" value="{{ c.name or '' }}" required autofocus></label>
+    <label class="f">Debiteurnummer (ERP)<input type="text" name="debtor_no" value="{{ c.debtor_no or '' }}"></label>
+    <label class="f">Telefoon<input type="tel" name="phone" value="{{ c.phone or '' }}"></label>
+    <label class="f full">Adres<input type="text" name="address" value="{{ c.address or '' }}"></label>
+    <label class="f">Postcode<input type="text" name="postcode" value="{{ c.postcode or '' }}"></label>
+    <label class="f">Plaats<input type="text" name="city" value="{{ c.city or '' }}"></label>
+    <label class="f full">Algemeen e-mailadres<input type="email" name="email" value="{{ c.email or '' }}"></label>
+    <label class="f full">Notities<textarea name="notes">{{ c.notes or '' }}</textarea></label>
+  </div>
+  <div class="actions"><button class="btn primary">Opslaan</button><a class="btn ghost" href="{{ url_for('klanten.customer', cid=cid) if edit else url_for('klanten.index') }}">Annuleren</a></div>
+</form>
+{% endblock %}

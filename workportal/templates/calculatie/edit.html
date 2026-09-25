@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt, calc_status %}
+{% block title %}{{ c.number }} {{ c.title }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('calculatie.index') }}">Calculatie</a> / {{ c.number }}</div>
+<div class="pagehead">
+  <div><div class="eyebrow">{{ c.number }} · {% for w in c.worktypes %}{{ WORKTYPES.get(w, w) }}{{ ' · ' if not loop.last }}{% endfor %}</div>
+    <h1 id="hdrTitle">{{ c.title }}</h1><p>Aangemaakt {{ c.created_at|date }} · laatst gewijzigd {{ c.updated_at|dt }}</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('calculatie.excel', cid=c.id) }}">{{ icon('download') }}Excel</a>
+    {% if can('nacalculatie') %}<a class="btn" href="{{ url_for('nacalc.index', calc=c.id, project=c.project_id or '') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
+    {% if not readonly %}<form method="post" action="{{ url_for('calculatie.duplicate', cid=c.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn">Kopie maken</button></form>{% endif %}
+  </div>
+</div>
+
+<section class="card form">
+  <div class="fgrid three">
+    <label class="f" style="grid-column:span 2">Omschrijving<input type="text" id="f_title" value="{{ c.title }}"></label>
+    <label class="f">Status<select id="f_status">{% for k, l in STATUSES %}{{ opt(k, l, c.status) }}{% endfor %}</select></label>
+    <label class="f">Klant<select id="f_customer"><option value="">–</option>{% for cu in customers %}{{ opt(cu.id, cu.name, c.customer_id) }}{% endfor %}</select></label>
+    <label class="f">Of klantnaam<input type="text" id="f_customer_text" value="{{ c.customer_text or '' }}"></label>
+    <label class="f">Project<select id="f_project"><option value="">–</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name, c.project_id) }}{% endfor %}</select></label>
+    <label class="f">Aantal stuks<input type="number" min="1" id="f_quantity" value="{{ c.quantity or 1 }}"></label>
+    <label class="f">Prijsafspraak (€)<input type="text" inputmode="decimal" id="f_agreed" value="{{ c.agreed_price|num(2) if c.agreed_price else '' }}"></label>
+    <label class="f">Notities<input type="text" id="f_notes" value="{{ c.notes or '' }}"></label>
+  </div>
+  {% if nacalcs %}<p class="small">Na-calculaties gekoppeld: {% for n in nacalcs %}<a href="{{ url_for('nacalc.detail', nid=n.id) }}">{{ n.order_no }} ({{ n.imported_at|date }})</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+</section>
+
+<div class="tabs" id="tabs"></div>
+<div id="editor"></div>
+
+<div class="stickybar">
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+    <div><div class="small muted">Totaal incl. marge</div><div class="tot" id="sumTotal">€ 0</div></div>
+    <div id="perPiece" class="hidden"><div class="small muted">Per stuk</div><div style="font-weight:700" id="sumPiece"></div></div>
+    <div id="agreedBox" class="hidden"><div class="small muted">T.o.v. prijsafspraak</div><div style="font-weight:700" id="sumAgreed"></div></div>
+    <div class="hide-m"><div class="small muted">Uren</div><div style="font-weight:700" id="sumHours">0</div></div>
+  </div>
+  <div class="actions">
+    <span class="small muted" id="saveState"></span>
+    {% if not readonly %}<button class="btn primary" type="button" id="saveBtn">Opslaan</button>{% endif %}
+  </div>
+</div>
+{% if can('calculatie', 3) %}
+<form method="post" action="{{ url_for('calculatie.delete', cid=c.id) }}" data-confirm="Calculatie {{ c.number }} verwijderen?" style="margin-top:8px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Calculatie verwijderen</button></form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script id="calcdata" type="application/json">{{ c|tojson }}</script>
+<script>
+window.CALC_CFG = {
+  saveUrl: "{{ url_for('calculatie.save', cid=c.id) }}",
+  readonly: {{ 'true' if readonly else 'false' }},
+  units: {{ UNITS|tojson }},
+  categories: {{ CATEGORIES|tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/calc-editor.js') }}?v={{ VERSION }}"></script>
+{% endblock %}

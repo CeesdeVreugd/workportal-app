@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Nieuwe druktest{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('druktest.index') }}">Druktesten</a> / nieuw</div>
+<h1>Nieuwe druktest</h1>
+<form method="post" enctype="multipart/form-data" class="form" style="max-width:900px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card form">
+    <h2>Leiding</h2>
+    <div class="fgrid">
+      <label class="f full">Project<select name="project_id"><option value="">– geen project –</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name ~ ((' · ' ~ p.customer) if p.customer else ''), t.project_id) }}{% endfor %}</select>
+        {% if can('klanten', 2) %}<span class="hint">Project staat er niet bij? <a href="{{ url_for('klanten.new_project', next=url_for('druktest.new')) }}">Maak een project aan</a>.</span>{% endif %}</label>
+      <label class="f">Tekeningnummer *<input type="text" name="drawing_no" value="{{ t.drawing_no or '' }}" required placeholder="bijv. 26014-P-102"></label>
+      <label class="f">Revisie<input type="text" name="drawing_rev" value="{{ t.drawing_rev or '' }}" placeholder="bijv. B"></label>
+      <label class="f full">Leiding- / lijnnummer<input type="text" name="line_no" value="{{ t.line_no or '' }}" placeholder="bijv. L-07"></label>
+    </div>
+    <label class="f">Getest deel</label>
+    <div class="chips">{% for p in PARTS %}<label class="chip"><input type="radio" name="part" value="{{ p }}" {{ 'checked' if t.part == p }}><span>{{ p|capitalize }}</span></label>{% endfor %}</div>
+    <label class="f">Medium</label>
+    <div class="chips">{% for m in MEDIA %}<label class="chip"><input type="radio" name="medium" value="{{ m }}" {{ 'checked' if t.medium == m }}><span>{{ m|capitalize }}</span></label>{% endfor %}</div>
+  </section>
+  <section class="card form">
+    <h2>Test</h2>
+    <div class="fgrid">
+      <label class="f">Testdruk (bar) *<input type="text" inputmode="decimal" name="test_pressure" value="{{ t.test_pressure or '' }}" required placeholder="bijv. 6,0"></label>
+      <label class="f">Toegestaan drukverlies (bar)<input type="text" inputmode="decimal" name="max_drop" value="{{ t.max_drop or '' }}" placeholder="bijv. 0,10"></label>
+      <label class="f">Manometer-ID<input type="text" name="gauge_id" value="{{ t.gauge_id or '' }}"></label>
+      <label class="f">Kalibratiedatum manometer<input type="date" name="gauge_cal_date" value="{{ t.gauge_cal_date or '' }}"></label>
+      <label class="f">Uitvoerder(s)<input type="text" name="executor" value="{{ t.executor or '' }}"></label>
+      <label class="f">Getuige klant<input type="text" name="witness" value="{{ t.witness or '' }}"></label>
+    </div>
+  </section>
+  <section class="card form">
+    <h2>Startmeting</h2>
+    <div class="fgrid">
+      <label class="f">Afgelezen startdruk (bar)<input type="text" inputmode="decimal" name="start_pressure" value="{{ t.start_pressure or '' }}" placeholder="leeg = testdruk"></label>
+      <label class="f">Omgevingstemperatuur (°C)<input type="text" inputmode="decimal" name="temperature" value="{{ t.temperature or '' }}"></label>
+      <label class="f full">Opmerking<input type="text" name="start_note" value="{{ t.start_note or '' }}"></label>
+    </div>
+    <div><label class="f">Startfoto manometer * (en eventueel overzicht leiding)</label>
+      <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" required></label></div>
+      <div class="photos" id="prev" style="margin-top:10px"></div></div>
+    <label class="f">Timer starten (terug naar de leiding na)</label>
+    <div class="chips"><label class="chip"><input type="radio" name="timer" value="" checked><span>Nog niet</span></label>{% for m, l in presets %}<label class="chip"><input type="radio" name="timer" value="{{ m }}"><span>{{ l }}</span></label>{% endfor %}</div>
+  </section>
+  <div class="actions"><button class="btn primary">{{ icon('timer') }}Druktest starten</button></div>
+</form>
+{% endblock %}

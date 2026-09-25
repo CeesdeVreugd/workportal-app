@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import ticket_status, prio %}
+{% block title %}Service & onderhoud{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Service &amp; onderhoud</h1><p>{{ tickets|length }} ticket(s) in deze weergave</p></div>
+  <div class="actions">{% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new') }}">{{ icon('plus') }}Nieuw ticket</a>{% endif %}</div>
+</div>
+<div class="tabs">
+  {% for key, label in [('open','Open'),('mijn','Mijn tickets'),('factureren','Nog te factureren'),('alle','Alle')] %}
+  <a href="?view={{ key }}&type={{ typ }}" class="{{ 'active' if view == key }}">{{ label }}</a>
+  {% endfor %}
+</div>
+<form method="get" class="actions">
+  <input type="hidden" name="view" value="{{ view }}">
+  <div class="search" style="max-width:360px">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek ticket of klant"></div>
+  <select name="type" style="width:auto" onchange="this.form.submit()"><option value="">Alle typen</option>{% for k, l in TYPES %}<option value="{{ k }}" {{ 'selected' if typ == k }}>{{ l }}</option>{% endfor %}</select>
+</form>
+<div class="card flush tablewrap"><table class="table">
+  <thead><tr><th>Ticket</th><th>Omschrijving</th><th class="hide-m">Klant / installatie</th><th class="hide-m">Toegewezen</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for t in tickets %}
+  <tr class="link" data-href="{{ url_for('service.detail', tid=t.id) }}">
+    <td class="nowrap"><b>{{ t.number }}</b><div class="small muted">{{ t.type|capitalize }}</div></td>
+    <td>{{ t.title }} {{ prio(t.priority) }}<div class="small muted">bijgewerkt {{ t.updated_at|dt }}</div></td>
+    <td class="hide-m">{{ t.customer or '–' }}{% if t.installation %}<div class="small muted">{{ t.installation }}</div>{% endif %}</td>
+    <td class="hide-m">{{ t.assignee or '–' }}</td>
+    <td>{{ ticket_status(t.status) }}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">Geen tickets in deze weergave.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% if due %}
+<section class="card"><h2>Onderhoud binnen 30 dagen</h2><div class="rows">
+{% for i in due %}<div class="rowitem"><div class="grow"><div class="t"><a href="{{ url_for('klanten.installation', iid=i.id) }}">{{ i.name }}</a></div><div class="s">{{ i.customer }} · gepland {{ i.next_service|date }}</div></div>
+{% if can('service', 2) %}<a class="btn sm" href="{{ url_for('service.new', klant=i.customer_id, installatie=i.id, type='onderhoud') }}">Ticket maken</a>{% endif %}</div>{% endfor %}
+</div></section>
+{% endif %}
+{% endblock %}

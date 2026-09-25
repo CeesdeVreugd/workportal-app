@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Calculatiesjablonen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Calculatiesjablonen per type werk. Per regel: <b>omschrijving | eenheid | prijs | marge-factor</b></p></div></div>
+{% include "beheer/_nav.html" %}
+<div class="chips">{% for k, l in WORKTYPES %}<a class="btn sm {{ 'primary' if k == wt }}" href="?type={{ k }}">{{ l }}</a>{% endfor %}</div>
+<form method="post" class="form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid g2 stack">
+  {% for cat, title, pos in CATEGORIES %}
+    <label class="card f"><span style="font-size:15px;color:var(--basic);font-weight:700">{{ title }} <span class="muted small">(pos. {{ pos }})</span></span>
+      <textarea name="{{ cat }}" rows="10" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px">{{ text[cat] }}</textarea></label>
+  {% endfor %}
+  </div>
+  <p class="hint">Voorbeeld: <code>Lassen frame | uur | 70 | 1</code> of <code>Inkoop plaatwerk dun | post | 0 | 1,25</code>. De regel 'Koopdelen' bij Alle inkopen wordt automatisch toegevoegd. Lege sectie = sectie wordt bij dit type niet aangemaakt.</p>
+  <div class="actions"><button class="btn primary">Sjabloon {{ row.name }} opslaan</button></div>
+</form>
+{% endblock %}
