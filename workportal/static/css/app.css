@@ -243,7 +243,7 @@ details.item[open] > summary .chev { transform: rotate(90deg); }
 /* ---------- mobile ---------- */
 @media (max-width: 900px) {
   .sidebar, .topbar { display: none; }
-  .mobile-top { display: flex; position: sticky; top: 0; z-index: 20; height: 58px; background: var(--basic); color: #fff; align-items: center; justify-content: space-between; padding: 0 12px 0 16px; gap: 10px; }
+  .mobile-top { display: flex; position: sticky; top: 0; z-index: 20; height: calc(58px + env(safe-area-inset-top)); background: var(--basic); color: #fff; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 12px 0 16px; gap: 10px; }
   .mobile-top img { height: 30px; }
   .mobile-top a, .mobile-top button { color: #fff; }
   .mobile-top .iconbtn { background: transparent; border-color: rgba(255,255,255,.3); color: #fff; width: 40px; height: 40px; }
@@ -283,7 +283,7 @@ span > svg { width: 100%; height: 100%; }
 
 /* inlogscherm mobiel: compact, past zonder scrollen */
 @media (max-width: 600px) {
-  .auth { min-height: 100vh; min-height: 100dvh; height: 100dvh; padding: max(20px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom)); align-items: stretch; overflow: hidden; background: #fff; }
+  .auth { min-height: 100vh; min-height: 100dvh; height: 100dvh; padding: calc(env(safe-area-inset-top) + 20px) 20px max(16px, env(safe-area-inset-bottom)); align-items: stretch; overflow: hidden; background: #fff; }
   .auth-card { max-width: none; justify-content: flex-start; gap: 14px; height: 100%; }
   .auth-brand { position: static; align-items: flex-start; gap: 6px; margin: 4px 0 18px; }
   .auth-card .logo { width: 190px; }
@@ -329,3 +329,10 @@ span > svg { width: 100%; height: 100%; }
   .rolebtn { width: auto; white-space: nowrap; }
   .rolecount { display: none; }
 }
+
+/* geïnstalleerde app (iPhone): blauwe balk achter klok/batterij */
+html { background: var(--basic); }
+body { min-height: 100vh; }
+body.authbody { background: #fff; }
+body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--basic); z-index: 50; }
+@media (min-width: 901px) { html { background: var(--bg); } }

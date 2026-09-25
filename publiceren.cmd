@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V7: effen iPhone-icoon zonder glaseffect"
+set "OMSCHRIJVING=WorkPortal V8: blauw iPhone-icoon, blauwe statusbalk in de app"
 
 echo.
 echo ============================================
