@@ -103,7 +103,7 @@ def login():
                     (user["id"], hash_secret(code), iso(now_utc() + timedelta(minutes=CODE_MINUTES)), now_iso()))
             send_mail(user["email"], f"Je inlogcode voor WorkPortal: {code}",
                       f"Hallo {user['name']},\n\nJe inlogcode voor WorkPortal is: {code}\n\n"
-                      f"De code is {CODE_MINUTES} minuten geldig.\n\nDe Vreugd Productietechniek",
+                      f"De code is {CODE_MINUTES} minuten geldig.",
                       code_mail_html(user["name"], code, CODE_MINUTES))
         # Altijd dezelfde melding, zodat niet te zien is welke adressen bestaan
         return redirect(url_for("auth.code"))

@@ -1,4 +1,5 @@
 import base64
+import html as html_lib
 import os
 import smtplib
 import ssl
@@ -82,6 +83,8 @@ def _send_graph(to, subject, text, html=None, attachments=None):
 def send_mail(to, subject, text, html=None, attachments=None):
     """Verstuurt een e-mail via de app-registratie (Microsoft Graph) of SMTP.
     Zonder instellingen wordt het bericht in het containerlog gezet (testmodus)."""
+    if html is None and text:
+        html = text_to_html(text)
     if graph_configured():
         try:
             _send_graph(to, subject, text, html, attachments)
@@ -138,17 +141,24 @@ def send_mail(to, subject, text, html=None, attachments=None):
         return False
 
 
+# Zelfde lettertype als de standaard e-mailhandtekening (Exclaimer): Calibri
+FONT = "Calibri, Carlito, 'Segoe UI', Arial, sans-serif"
+
+
 def code_mail_html(name, code, minutes):
-    app_url = os.environ.get("APP_URL", "").rstrip("/")
-    payoff = (f'<img src="{app_url}/static/img/payoff.png" alt="Als performance telt" width="180" style="display:block;margin-top:6px">'
-              if app_url else "")
-    return f"""<div style="font-family:Arial,sans-serif;max-width:480px;color:#14163A">
-<div style="background:#0A0A96;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0;font-weight:bold;letter-spacing:.1em">WORKPORTAL</div>
-<div style="border:1px solid #E1E5F0;border-top:0;padding:22px;border-radius:0 0 10px 10px">
-<p>Hallo {name},</p>
-<p>Je inlogcode voor WorkPortal is:</p>
-<p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#0A0A96;margin:18px 0">{code}</p>
-<p>De code is {minutes} minuten geldig. Heb je niet geprobeerd in te loggen? Dan kun je deze mail negeren.</p>
-<p style="color:#5A5F80;font-size:12px;margin-top:24px">De Vreugd Productietechniek</p>
-{payoff}
+    name = html_lib.escape(name or "")
+    return f"""<div style="font-family:{FONT};font-size:11pt;max-width:480px;color:#14163A">
+<div style="background:#0A0A96;color:#fff;padding:16px 22px;border-radius:10px 10px 0 0;font-weight:bold;letter-spacing:.1em;font-size:12pt">WORKPORTAL</div>
+<div style="border:1px solid #E1E5F0;border-top:0;padding:20px 22px;border-radius:0 0 10px 10px">
+<p style="margin:0 0 12px">Hallo {name},</p>
+<p style="margin:0 0 12px">Je inlogcode voor WorkPortal is:</p>
+<p style="font-size:26pt;font-weight:bold;letter-spacing:8px;color:#0A0A96;margin:14px 0">{code}</p>
+<p style="margin:0">De code is {minutes} minuten geldig. Heb je niet geprobeerd in te loggen? Dan kun je deze mail negeren.</p>
 </div></div>"""
+
+
+def text_to_html(text):
+    """Platte tekst als nette HTML in het huisstijl-lettertype, zodat alle mails er hetzelfde uitzien."""
+    body = html_lib.escape(text or "").replace("\r\n", "\n")
+    paras = "".join(f'<p style="margin:0 0 11pt">{p.replace(chr(10), "<br>")}</p>' for p in body.split("\n\n") if p.strip())
+    return f'<div style="font-family:{FONT};font-size:11pt;color:#14163A">{paras}</div>'

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V17: klantnummers SnelStart uit klantmappen"
+set "OMSCHRIJVING=WorkPortal V18: mails in Calibri, zonder bedrijfsnaam en payoff"
 
 echo.
 echo ============================================

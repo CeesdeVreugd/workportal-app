@@ -265,7 +265,7 @@ def sign(tid, vid):
         if request.form.get("mail") and to:
             ok = send_mail(to, f"Werkbon {t['number']} – De Vreugd Productietechniek",
                            f"Beste {name},\n\nIn de bijlage vindt u de werkbon van ons bezoek.\n\n"
-                           f"Met vriendelijke groet,\n{g.user['name']}\nDe Vreugd Productietechniek",
+                           f"Met vriendelijke groet,\n{g.user['name']}",
                            attachments=[(fname, pdf, "application/pdf")])
             msgs.append("Werkbon gemaild naar " + to + "." if ok else "Mailen is mislukt.")
         if request.form.get("sharepoint") and _sp_available(t):
