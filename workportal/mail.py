@@ -80,11 +80,74 @@ def _send_graph(to, subject, text, html=None, attachments=None):
         raise RuntimeError(f"sendMail gaf {r.status_code}: {r.text[:300]}")
 
 
-def send_mail(to, subject, text, html=None, attachments=None):
-    """Verstuurt een e-mail via de app-registratie (Microsoft Graph) of SMTP.
+SIGNERS = {
+    "systeem": "Systeembeheer | De Vreugd Productietechniek",
+    "werkvoorbereiding": "Werkvoorbereiding | De Vreugd Productietechniek",
+}
+GREETING = "Met vriendelijke groeten / Kind regards / Mit Freundlichen Grüßen,"
+
+
+LINKEDIN_URL = os.environ.get("SIGNATURE_LINKEDIN", "")
+YOUTUBE_URL = os.environ.get("SIGNATURE_YOUTUBE", "")
+
+DISCLAIMER = [
+    ["Deze e-mail is uitsluitend bestemd voor de geadresseerde(n). Het bericht kan vertrouwelijke informatie bevatten welke niet voor derden is bedoeld.",
+     "Kopiëren of verstrekking aan en gebruik door anderen van de informatie in dit bericht is niet toegestaan.",
+     "Meld het ons als dit bericht niet bij de juiste persoon terecht is gekomen en verwijder deze e-mail.",
+     "De Vreugd Productietechniek is op geen enkele wijze aansprakelijk voor enige fout of gebrek in de inhoud van dit e-mailbericht."],
+    ["Op al onze offertes, op alle opdrachten aan ons en op alle met ons gesloten overeenkomsten zijn toepasselijk de METAALUNIE voorwaarden, "
+     "gedeponeerd ter Griffie van de Rechtbank te Rotterdam, zoals deze luiden volgens de laatstelijk neergelegde tekst.",
+     "Alle prijzen zijn excl. B.T.W.. De leveringsvoorwaarden worden U op verzoek toegezonden",
+     "Uw algemene voorwaarden worden voor nu en als voor dan uitdrukkelijk van de hand gewezen."],
+    ["To all quotations, all orders placed with us and all contracts concluded with us are subject to the METAALUNIE CONDITIONS,",
+     "filed at the District Court of Rotterdam, as stipulated in the latest text lodged. You can download these conditions below.",
+     "Your general terms and conditions are expressly rejected for now and any time."],
+]
+
+
+def signature_html(signer="systeem"):
+    """Handtekening zoals de bedrijfshandtekening: groet, afzender, logo, contactgegevens, social, banner en disclaimer."""
+    base = os.environ.get("APP_URL", "").rstrip("/")
+    img = lambda f, w, h, alt: (f'<img src="{base}/static/img/{f}" alt="{alt}" width="{w}" height="{h}" '
+                                f'style="display:inline-block;border:0;vertical-align:middle">') if base else ""
+    who = html_lib.escape(SIGNERS.get(signer, SIGNERS["systeem"]))
+    link = "color:#0563C1;text-decoration:underline"
+    li = img("mail-linkedin.png", 30, 30, "LinkedIn")
+    yt = img("mail-youtube.png", 43, 30, "YouTube")
+    if LINKEDIN_URL and li:
+        li = f'<a href="{LINKEDIN_URL}">{li}</a>'
+    if YOUTUBE_URL and yt:
+        yt = f'<a href="{YOUTUBE_URL}">{yt}</a>'
+    social = f'<p style="margin:14px 0 0">{li}&nbsp;&nbsp;{yt}</p>' if base else ""
+    logo = f'<p style="margin:12px 0 0">{img("logo.png", 220, 51, "De Vreugd Productietechniek")}</p>' if base else ""
+    banner = (f'<p style="margin:18px 0 0">{img("mail-banner.png", 560, 40, "De Vreugd Productietechniek – Als performance telt")}</p>'
+              if base else "")
+    disc = "".join('<p style="margin:0 0 9pt">' + "<br>".join(html_lib.escape(l) for l in block) + "</p>" for block in DISCLAIMER)
+    return (f'<div style="font-family:{FONT};font-size:10pt;line-height:1.35;color:#000;margin-top:22px">'
+            f'<p style="margin:0">{html_lib.escape(GREETING)}</p><p style="margin:0">&nbsp;</p>'
+            f'<p style="margin:0">{who}</p>{logo}'
+            f'<p style="margin:12px 0 0">Edisonring 11, 6669 NA Dodewaard<br>+31 (0)488 41 28 28<br>'
+            f'<a href="mailto:werkplaats@devreugd-pt.nl" style="{link}">werkplaats@devreugd-pt.nl</a> | '
+            f'<a href="https://www.devreugd-pt.nl" style="{link}">www.devreugd-pt.nl</a></p>'
+            f'{social}{banner}'
+            f'<div style="font-size:7.5pt;line-height:1.3;margin-top:14px">{disc}</div></div>')
+
+
+def signature_text(signer="systeem"):
+    disc = "\n\n".join("\n".join(b) for b in DISCLAIMER)
+    return (f"\n\n{GREETING}\n\n{SIGNERS.get(signer, SIGNERS['systeem'])}\n\n"
+            f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\nwerkplaats@devreugd-pt.nl | www.devreugd-pt.nl\n\n{disc}")
+
+
+def send_mail(to, subject, text, html=None, attachments=None, signer="systeem"):
+    """Verstuurt een e-mail via de app-registratie (Microsoft Graph) of SMTP, met handtekening.
+    signer: 'systeem' (Systeembeheer) of 'werkvoorbereiding' (werkbonnen e.d.).
     Zonder instellingen wordt het bericht in het containerlog gezet (testmodus)."""
     if html is None and text:
         html = text_to_html(text)
+    html = card_html(html or "", signer)
+    if signer:
+        text = (text or "").rstrip() + signature_text(signer)
     if graph_configured():
         try:
             _send_graph(to, subject, text, html, attachments)
@@ -146,19 +209,26 @@ FONT = "Calibri, Carlito, 'Segoe UI', Arial, sans-serif"
 
 
 def code_mail_html(name, code, minutes):
+    """Inhoud van de inlogmail (het kader en de handtekening komen er in send_mail omheen)."""
     name = html_lib.escape(name or "")
-    return f"""<div style="font-family:{FONT};font-size:11pt;max-width:480px;color:#14163A">
-<div style="background:#0A0A96;color:#fff;padding:16px 22px;border-radius:10px 10px 0 0;font-weight:bold;letter-spacing:.1em;font-size:12pt">WORKPORTAL</div>
-<div style="border:1px solid #E1E5F0;border-top:0;padding:20px 22px;border-radius:0 0 10px 10px">
-<p style="margin:0 0 12px">Hallo {name},</p>
-<p style="margin:0 0 12px">Je inlogcode voor WorkPortal is:</p>
-<p style="font-size:26pt;font-weight:bold;letter-spacing:8px;color:#0A0A96;margin:14px 0">{code}</p>
-<p style="margin:0">De code is {minutes} minuten geldig. Heb je niet geprobeerd in te loggen? Dan kun je deze mail negeren.</p>
-</div></div>"""
+    return (f'<p style="margin:0 0 12px">Hallo {name},</p>'
+            f'<p style="margin:0 0 12px">Je inlogcode voor WorkPortal is:</p>'
+            f'<p style="font-size:26pt;font-weight:bold;letter-spacing:8px;color:#0A0A96;margin:14px 0">{code}</p>'
+            f'<p style="margin:0">De code is {minutes} minuten geldig. Heb je niet geprobeerd in te loggen? Dan kun je deze mail negeren.</p>')
+
+
+def card_html(inner, signer="systeem"):
+    """Alle mails in hetzelfde kader: blauwe kop WORKPORTAL, inhoud en handtekening."""
+    sig = signature_html(signer) if signer else ""
+    return (f'<div style="font-family:{FONT};font-size:11pt;max-width:640px;color:#14163A">'
+            f'<div style="background:#0A0A96;color:#fff;padding:16px 22px;border-radius:10px 10px 0 0;font-weight:bold;'
+            f'letter-spacing:.1em;font-size:12pt">WORKPORTAL</div>'
+            f'<div style="border:1px solid #E1E5F0;border-top:0;padding:20px 22px;border-radius:0 0 10px 10px">'
+            f'{inner}{sig}</div></div>')
 
 
 def text_to_html(text):
     """Platte tekst als nette HTML in het huisstijl-lettertype, zodat alle mails er hetzelfde uitzien."""
     body = html_lib.escape(text or "").replace("\r\n", "\n")
     paras = "".join(f'<p style="margin:0 0 11pt">{p.replace(chr(10), "<br>")}</p>' for p in body.split("\n\n") if p.strip())
-    return f'<div style="font-family:{FONT};font-size:11pt;color:#14163A">{paras}</div>'
+    return paras

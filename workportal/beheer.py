@@ -77,7 +77,7 @@ def user(uid=None):
                 send_mail(email, "Je account voor WorkPortal",
                           f"Hallo {name},\n\nEr is een account voor je aangemaakt in WorkPortal van De Vreugd Productietechniek.\n\n"
                           f"Ga naar {app_url or 'WorkPortal'} en log in met dit e-mailadres. Je ontvangt dan een code per mail "
-                          f"en stelt daarna een pincode in.\n\nGroet,\n{g.user['name']}")
+                          f"en stelt daarna een pincode in.")
         execute("DELETE FROM user_roles WHERE user_id = ?", (uid,))
         for rid in role_ids:
             execute("INSERT INTO user_roles (user_id, role_id) VALUES (?,?)", (uid, rid))

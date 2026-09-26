@@ -264,9 +264,8 @@ def sign(tid, vid):
         to = _f("mail_to")
         if request.form.get("mail") and to:
             ok = send_mail(to, f"Werkbon {t['number']} – De Vreugd Productietechniek",
-                           f"Beste {name},\n\nIn de bijlage vindt u de werkbon van ons bezoek.\n\n"
-                           f"Met vriendelijke groet,\n{g.user['name']}",
-                           attachments=[(fname, pdf, "application/pdf")])
+                           f"Beste {name},\n\nIn de bijlage vindt u de werkbon van ons bezoek.",
+                           attachments=[(fname, pdf, "application/pdf")], signer="werkvoorbereiding")
             msgs.append("Werkbon gemaild naar " + to + "." if ok else "Mailen is mislukt.")
         if request.form.get("sharepoint") and _sp_available(t):
             res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_werkbon"), fname, pdf)

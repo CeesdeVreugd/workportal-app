@@ -23,6 +23,9 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Links onder de iconen in de mailhandtekening (optioneel)
+      SIGNATURE_LINKEDIN: ${SIGNATURE_LINKEDIN:-}
+      SIGNATURE_YOUTUBE: ${SIGNATURE_YOUTUBE:-}
       PA_SHAREPOINT_URL: ${PA_SHAREPOINT_URL:-}
       PA_NACALC_URL: ${PA_NACALC_URL:-}
       PA_SECRET: ${PA_SECRET:-}

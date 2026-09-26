@@ -42,4 +42,4 @@ def notify_user(conn, user_id, title, body, url="/", email=True):
     if email:
         app_url = os.environ.get("APP_URL", "").rstrip("/")
         link = f"{app_url}{url}" if app_url else url
-        send_mail(user["email"], title, f"Hallo {user['name']},\n\n{body}\n\nOpenen: {link}\n\nWorkPortal")
+        send_mail(user["email"], title, f"Hallo {user['name']},\n\n{body}\n\nOpenen: {link}")
