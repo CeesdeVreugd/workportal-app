@@ -482,6 +482,7 @@ def klantmap(cid):
         return redirect(nxt)
     current = sp.customer_folder(conn, cid)
     return render_template("klanten/klantmap.html", c=c, pid=pid, next=nxt, current=current,
+                           new_name=sp.customer_folder_name(conn, c["name"], c["debtor_no"]),
                            suggestions=sp.suggestions(conn, cid),
                            folders=query("SELECT * FROM sp_folders WHERE missing = 0 AND customer_id IS NULL ORDER BY name COLLATE NOCASE"),
                            project=query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) if pid else None)

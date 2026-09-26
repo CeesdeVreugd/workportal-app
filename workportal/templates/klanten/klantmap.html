@@ -20,7 +20,7 @@
   </label>
   <div class="actions">
     <button class="btn primary" name="action" value="koppelen">Koppelen{{ ' en projectmap aanmaken' if project }}</button>
-    <button class="btn" name="action" value="nieuw" formnovalidate>{{ icon('plus') }}Nieuwe klantmap '{{ c.name }}'</button>
+    <button class="btn" name="action" value="nieuw" formnovalidate>{{ icon('plus') }}Nieuwe klantmap '{{ new_name }}'</button>
     {% if project %}<button class="btn ghost" name="action" value="overslaan" formnovalidate>Overslaan</button>{% endif %}
   </div>
 </form>

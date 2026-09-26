@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Klantnummers SnelStart{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Klantnummers SnelStart uit de klantmappen</p></div></div>
+{% include "beheer/_nav.html" %}
+{% set labels = {'nieuw': ('Wordt ingevuld', 'b-ok'), 'gelijk': ('Klopt al', ''), 'afwijkend': ('Wijkt af, niets gedaan', 'b-warn'), 'meerdere': ('Meerdere nummers, niets gedaan', 'b-warn'), 'bezet': ('Nummer al bij andere relatie', 'b-bad')} %}
+<section class="card">
+  <p style="margin-top:0">Het nummer wordt gehaald uit de naam van de klantmap die aan de relatie is gekoppeld, bijvoorbeeld <code>10023 - Foodjet</code> of <code>Foodjet (10023)</code>.
+  Alleen relaties <b>zonder</b> klantnummer worden ingevuld. Hebben de klantmappen van één relatie verschillende nummers, of wijkt het af van wat al is ingevuld, dan gebeurt er niets.</p>
+  <div class="fchips" style="margin:12px 0">
+    <span class="fchip active">Wordt ingevuld <span>{{ counts.get('nieuw', 0) }}</span></span>
+    <span class="fchip">Klopt al <span>{{ counts.get('gelijk', 0) }}</span></span>
+    <span class="fchip">Niets gedaan <span>{{ counts.get('afwijkend', 0) + counts.get('meerdere', 0) + counts.get('bezet', 0) }}</span></span>
+  </div>
+  {% if extra %}<p class="muted small">Ook worden {{ extra }} nog ongekoppelde klantmap(pen) automatisch aan een relatie gekoppeld (op klantnummer of naam zonder nummer).</p>{% endif %}
+  <form method="post" class="actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn primary" {{ 'disabled' if not counts.get('nieuw') and not extra }}>{{ icon('check') }}{{ counts.get('nieuw', 0) }} klantnummer(s) invullen</button>
+    <a class="btn ghost" href="{{ url_for('beheer.sharepoint') }}">Terug</a></form>
+</section>
+<section class="card flush"><div class="tablewrap"><table class="table">
+  <thead><tr><th>Relatie</th><th>Klantmap</th><th class="hide-m">Nu in WorkPortal</th><th>Uit klantmap</th><th>Resultaat</th></tr></thead>
+  <tbody>{% for p in plan %}{% set l = labels[p.status] %}
+  <tr class="link" data-href="{{ url_for('klanten.customer', cid=p.customer_id) }}"><td><b>{{ p.customer }}</b></td><td class="small">{{ p.folders|join('<br>'|safe) }}</td><td class="hide-m">{{ p.current or '–' }}</td><td><b>{{ p.found }}</b></td><td><span class="badge {{ l[1] }}">{{ l[0] }}</span></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">Geen klantmappen met een klantnummer in de naam gevonden bij gekoppelde relaties.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endblock %}

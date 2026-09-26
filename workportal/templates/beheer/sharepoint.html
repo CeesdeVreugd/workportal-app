@@ -36,6 +36,7 @@
     {% if connected %}
     <div class="actions" style="margin-top:14px">
       <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="action" value="sync">{{ icon('refresh') }}Nu volledig synchroniseren</button></form>
+      <a class="btn sm" href="{{ url_for('beheer.sharepoint_snelstart') }}">{{ icon('download') }}Klantnummers SnelStart ophalen</a>
       <form method="post" data-confirm="SharePoint ontkoppelen? Projecten en koppelingen blijven bewaard."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="ontkoppelen">Ontkoppelen</button></form>
     </div>
     {% endif %}

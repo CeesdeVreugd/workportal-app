@@ -3,7 +3,7 @@
   <a href="{{ url_for('beheer.users') }}" class="{{ 'active' if ep in ['beheer.users','beheer.user'] }}">Gebruikers</a>
   <a href="{{ url_for('beheer.rights') }}" class="{{ 'active' if ep == 'beheer.rights' }}">Rechten per functierol</a>
   <a href="{{ url_for('beheer.templates') }}" class="{{ 'active' if ep == 'beheer.templates' }}">Calculatiesjablonen</a>
-  <a href="{{ url_for('beheer.sharepoint') }}" class="{{ 'active' if ep == 'beheer.sharepoint' }}">SharePoint</a>
+  <a href="{{ url_for('beheer.sharepoint') }}" class="{{ 'active' if ep in ['beheer.sharepoint','beheer.sharepoint_snelstart'] }}">SharePoint</a>
   <a href="{{ url_for('beheer.settings') }}" class="{{ 'active' if ep == 'beheer.settings' }}">Instellingen</a>
   <a href="{{ url_for('beheer.log') }}" class="{{ 'active' if ep == 'beheer.log' }}">Logboek</a>
 </div>

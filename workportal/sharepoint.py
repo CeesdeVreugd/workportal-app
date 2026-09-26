@@ -352,8 +352,30 @@ def disconnect(conn):
 
 # ------------------------------------------------------------------ synchroniseren
 
+# Klantmappen kunnen het klantnummer van SnelStart in de naam hebben, bijv. "10023 - Foodjet" of "Foodjet (10023)"
+KM_PREFIX = re.compile(r"^\s*(\d{3,8})\s*(?:[-\u2013_.:]+\s*|\s+)(\S.*)$")
+KM_SUFFIX = re.compile(r"^(.*?\S)\s*(?:[-\u2013_]+\s*|\(\s*|\[\s*|\s+)(\d{3,8})\s*[)\]]?\s*$")
+
+
+def split_klantmap(name):
+    """Geeft (klantnummer of None, naam zonder nummer)."""
+    name = (name or "").strip()
+    m = KM_PREFIX.match(name)
+    if m:
+        return m.group(1), m.group(2).strip()
+    m = KM_SUFFIX.match(name)
+    if m:
+        return m.group(2), m.group(1).strip()
+    return None, name
+
+
 def _match_customer(conn, name):
-    key = norm(name)
+    num, rest = split_klantmap(name)
+    if num:
+        hits = [r["id"] for r in conn.execute("SELECT id FROM customers WHERE TRIM(IFNULL(debtor_no,'')) = ?", (num,))]
+        if len(hits) == 1:
+            return hits[0]
+    key = norm(rest)
     if not key:
         return None
     hits = set()
@@ -557,7 +579,7 @@ def suggestions(conn, customer_id, limit=6):
     rows = conn.execute("SELECT * FROM sp_folders WHERE missing = 0 AND customer_id IS NULL").fetchall()
     scored = []
     for r in rows:
-        n = norm(r["name"])
+        n = norm(split_klantmap(r["name"])[1])
         score = max((difflib.SequenceMatcher(None, n, k).ratio() for k in keys), default=0)
         if any(k and (k in n or n in k) for k in keys):
             score = max(score, 0.8)
@@ -576,11 +598,97 @@ def link_folder(conn, item_id, customer_id):
     conn.commit()
 
 
+def customer_folder_name(conn, name, debtor_no=None):
+    """Nieuwe klantmap in dezelfde stijl als de bestaande: met SnelStart-nummer ervoor of erachter als dat gebruikelijk is."""
+    name = re.sub(r'["*:<>?/\\|#%]+', " ", name or "").strip().rstrip(".")
+    nr = (debtor_no or "").strip()
+    if not nr or not re.fullmatch(r"\d{3,8}", nr):
+        return name
+    pre = suf = 0
+    seps = {}
+    for r in conn.execute("SELECT name FROM sp_folders WHERE missing = 0"):
+        m = KM_PREFIX.match(r["name"])
+        if m:
+            pre += 1
+            sep = r["name"].strip()[len(m.group(1)):].split(m.group(2))[0] or " "
+            seps[sep] = seps.get(sep, 0) + 1
+        elif KM_SUFFIX.match(r["name"]):
+            suf += 1
+    if pre and pre >= suf:
+        sep = max(seps, key=seps.get) if seps else " - "
+        return f"{nr}{sep}{name}"
+    if suf:
+        return f"{name} ({nr})"
+    return name
+
+
+def snelstart_plan(conn):
+    """Voorstel: klantnummer SnelStart per relatie uit de naam van de gekoppelde klantmap(pen)."""
+    per = {}
+    for f in conn.execute("SELECT * FROM sp_folders WHERE missing = 0 AND customer_id IS NOT NULL ORDER BY name"):
+        num, _ = split_klantmap(f["name"])
+        d = per.setdefault(f["customer_id"], {"nums": set(), "folders": []})
+        d["folders"].append(f["name"])
+        if num:
+            d["nums"].add(num)
+    used = {}
+    for r in conn.execute("SELECT id, TRIM(debtor_no) AS nr FROM customers WHERE IFNULL(TRIM(debtor_no),'') <> ''"):
+        used.setdefault(r["nr"], set()).add(r["id"])
+    plan = []
+    for cid, d in per.items():
+        if not d["nums"]:
+            continue
+        c = conn.execute("SELECT id, name, debtor_no FROM customers WHERE id = ?", (cid,)).fetchone()
+        if not c:
+            continue
+        cur = (c["debtor_no"] or "").strip()
+        nums = sorted(d["nums"])
+        if len(nums) > 1:
+            status = "meerdere"
+        elif cur == nums[0]:
+            status = "gelijk"
+        elif cur:
+            status = "afwijkend"
+        elif used.get(nums[0], set()) - {cid}:
+            status = "bezet"
+        else:
+            status = "nieuw"
+        plan.append({"customer_id": cid, "customer": c["name"], "current": cur, "found": ", ".join(nums),
+                     "folders": d["folders"], "status": status})
+    order = {"nieuw": 0, "afwijkend": 1, "meerdere": 2, "bezet": 3, "gelijk": 4}
+    plan.sort(key=lambda x: (order[x["status"]], x["customer"].lower()))
+    return plan
+
+
+def snelstart_apply(conn):
+    n = 0
+    for p in snelstart_plan(conn):
+        if p["status"] == "nieuw":
+            conn.execute("UPDATE customers SET debtor_no = ?, snelstart_asked = 1, updated_at = ? WHERE id = ?"
+                         " AND IFNULL(TRIM(debtor_no),'') = ''", (p["found"], now_iso(), p["customer_id"]))
+            n += 1
+    conn.commit()
+    return n
+
+
+def rematch_folders(conn):
+    """Probeert ongekoppelde klantmappen opnieuw automatisch aan een relatie te koppelen."""
+    n = 0
+    for f in conn.execute("SELECT item_id, name FROM sp_folders WHERE missing = 0 AND customer_id IS NULL").fetchall():
+        cid = _match_customer(conn, f["name"])
+        if cid:
+            conn.execute("UPDATE sp_folders SET customer_id = ?, auto = 1, updated_at = ? WHERE item_id = ?", (cid, now_iso(), f["item_id"]))
+            conn.execute("UPDATE projects SET customer_id = ? WHERE sp_parent_id = ? AND customer_id IS NULL", (cid, f["item_id"]))
+            n += 1
+    conn.commit()
+    return n
+
+
 def create_customer_folder(conn, customer_id, g=None):
     g = g or client()
     drive, root = _ctx(conn)
-    c = conn.execute("SELECT name FROM customers WHERE id = ?", (customer_id,)).fetchone()
-    name = re.sub(r'["*:<>?/\\|#%]+', " ", c["name"]).strip().rstrip(".")
+    c = conn.execute("SELECT name, debtor_no FROM customers WHERE id = ?", (customer_id,)).fetchone()
+    name = customer_folder_name(conn, c["name"], c["debtor_no"])
     try:
         item = g.create_folder(drive, root, name)
     except GraphError as exc:

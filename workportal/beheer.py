@@ -215,6 +215,33 @@ def sharepoint():
                            client_id=os.environ.get("GRAPH_CLIENT_ID", ""))
 
 
+@bp.route("/sharepoint/snelstart", methods=["GET", "POST"])
+@require("beheer", BEHEER)
+def sharepoint_snelstart():
+    conn = get_db()
+    if not sp.connected(conn):
+        flash("SharePoint is niet gekoppeld.", "error")
+        return redirect(url_for("beheer.sharepoint"))
+    if request.method == "POST":
+        linked = sp.rematch_folders(conn)
+        n = sp.snelstart_apply(conn)
+        audit("klantnummers SnelStart uit klantmappen", "customer", None, f"{n} ingevuld")
+        msg = f"{n} klantnummer(s) SnelStart ingevuld."
+        if linked:
+            msg += f" Daarnaast {linked} klantmap(pen) automatisch aan een relatie gekoppeld."
+        flash(msg, "ok")
+        return redirect(url_for("beheer.sharepoint_snelstart"))
+    extra = 0
+    for f in query("SELECT name FROM sp_folders WHERE missing = 0 AND customer_id IS NULL"):
+        if sp._match_customer(conn, f["name"]):
+            extra += 1
+    plan = sp.snelstart_plan(conn)
+    counts = {}
+    for p in plan:
+        counts[p["status"]] = counts.get(p["status"], 0) + 1
+    return render_template("beheer/sharepoint_snelstart.html", plan=plan, counts=counts, extra=extra)
+
+
 @bp.route("/testmail", methods=["POST"])
 @require("beheer", BEHEER)
 def testmail():
