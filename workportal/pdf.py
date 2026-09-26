@@ -291,8 +291,8 @@ def nacalc_pdf(n, summary, items, calc):
                        + (f" · gedeeld door {fmt_num(n['divide_by'], 0)}" if (n.get('divide_by') or 1) != 1 else ""), S["small"]),
              Spacer(1, 8)]
     pairs = [("Orderbedrag", fmt_eur(summary["order_total"], 2)), ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
-             ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Resultaat", fmt_eur(summary["result"], 2)),
-             ("Marge op orderbedrag", f"{fmt_num(summary['margin_pct'], 1)}%"), ("Beoordeling", summary["label"])]
+             ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
+             ("Winst in % van orderbedrag", f"{fmt_num(summary['margin_pct'], 1)}%"), ("Beoordeling", summary["label"])]
     if calc:
         pairs.append(("Gecalculeerd (incl. marge)", fmt_eur(summary.get("calc_total"), 2)))
     story.append(_kv_table(pairs, W))

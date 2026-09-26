@@ -21,8 +21,9 @@
   <div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
   <div class="card kpi"><div class="label">Werkelijke kostprijs</div><div class="value">{{ s.cost|eur }}</div><div class="sub">{{ s.hours|num(1) }} uur</div></div>
   <div class="card kpi"><div class="label">Verkoopwaarde incl. marges</div><div class="value">{{ s.sale|eur }}</div><div class="sub">= minimaal gewenst orderbedrag</div></div>
-  <div class="card kpi dark"><div class="label">Resultaat</div><div class="value">{{ s.result|eur }} · {{ s.margin_pct|num(1) }}%</div>
-    <div style="margin-top:8px"><span class="badge {{ badge[s.status] }}" style="background:#fff">{{ s.label }}</span></div></div>
+  <div class="card kpi dark"><div class="label">Totale winst op order</div><div class="value">{{ s.result|eur }}</div>
+    <div class="sub" style="color:#C9D4FF">{{ s.margin_pct|num(1) }}% van het orderbedrag (orderbedrag − kostprijs)</div>
+    <div style="margin-top:8px"><span class="small" style="color:#C9D4FF">Beoordeling:</span> <span class="badge {{ badge[s.status] }}" style="background:#fff">{{ s.label }}</span></div></div>
 </div>
 
 <div class="result {{ s.status }}">
@@ -78,7 +79,7 @@
   {% endif %}
   <section class="card">
     <h2>Verloop (alle imports van deze order)</h2>
-    <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">Kostprijs {{ h.cost|eur }} · resultaat {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%)</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
+    <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">Kostprijs {{ h.cost|eur }} · winst op order {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%)</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
     <p class="hint">Elke import wordt bewaard, zodat je ziet hoe het resultaat zich tijdens het project ontwikkelt.</p>
   </section>
 </div>
