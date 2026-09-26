@@ -46,32 +46,59 @@ NOTIFY_AFTER = timedelta(minutes=10)   # eerst de orderbon een kans geven (volge
 BON_WINDOW = timedelta(days=30)        # zo lang na het verschijnen van de map vragen we om de orderbon
 
 
-def _types(conn, key, default):
-    return [t.strip().lower() for t in (sp.setting(conn, key) or default).split(",") if t.strip()]
+# Ordertypes uit Komdex. kind: 'project' (direct map + Power Automate), 'order' (map pas op verzoek)
+# of 'vragen' (altijd in het actievenster). Aan te passen onder Orders -> Nieuwe orders.
+DEFAULT_TYPES = [
+    (0, "Leeg", "Leeg", "vragen"), (10, "Offerte", "Off", "vragen"), (20, "Particulier", "P", "order"),
+    (30, "Handel", "H", "order"), (40, "Service / onderhoud", "SO", "order"), (50, "Engineering", "E", "project"),
+    (60, "Speciaal Machinebouw", "SM", "project"), (70, "Constructie/Plaatwerk", "CP", "vragen"),
+    (80, "Leidingwerk", "L", "vragen"), (90, "WBSO", "WBSO", "vragen"), (100, "Garantie", "G", "order"),
+    (110, "Intern", "I", "order"), (120, "Standaard Machine - PalletRotator", "STM", "project"),
+]
+KINDS = ("project", "order", "vragen")
+
+
+def order_types(conn):
+    try:
+        data = json.loads(sp.setting(conn, "komdex_types") or "null")
+    except ValueError:
+        data = None
+    if not data:
+        data = [{"id": i, "name": n, "abbr": a, "kind": k} for i, n, a, k in DEFAULT_TYPES]
+    return data
+
+
+def save_order_types(conn, data):
+    sp.set_setting(conn, "komdex_types", json.dumps(data, ensure_ascii=False))
+
+
+def _norm_type(t):
+    return re.sub(r"\s+", " ", (t or "").strip().lower())
 
 
 def type_kind(conn, order_type):
-    """'project' / 'order' voor een ordertype uit de orderbon, of None als het (nog) onbekend is."""
-    t = (order_type or "").strip().lower()
+    """'project' / 'order' voor een ordertype uit de orderbon, of None als het (nog) niet automatisch mag."""
+    t = _norm_type(order_type)
     if not t:
         return None
-    if t in _types(conn, "komdex_project_types", "project"):
-        return "project"
-    if t in _types(conn, "komdex_order_types", "order"):
-        return "order"
+    for ot in order_types(conn):
+        if t in (_norm_type(ot["name"]), _norm_type(ot.get("abbr"))):
+            return ot["kind"] if ot["kind"] in ("project", "order") else None
     return None
 
 
 def remember_type(conn, order_type, kind):
     t = (order_type or "").strip()
-    if not t or kind not in ("project", "order"):
+    if not t or kind not in KINDS:
         return
-    keys = {"project": ("komdex_project_types", "project"), "order": ("komdex_order_types", "order")}
-    for k, (key, default) in keys.items():
-        lst = [x for x in (sp.setting(conn, key) or default).split(",") if x.strip() and x.strip().lower() != t.lower()]
-        if k == kind:
-            lst.append(t)
-        sp.set_setting(conn, key, ",".join(x.strip() for x in lst))
+    data = order_types(conn)
+    for ot in data:
+        if _norm_type(t) in (_norm_type(ot["name"]), _norm_type(ot.get("abbr"))):
+            ot["kind"] = kind
+            break
+    else:
+        data.append({"id": None, "name": t, "abbr": "", "kind": kind})
+    save_order_types(conn, data)
 
 
 def bon_of(row):
@@ -131,8 +158,8 @@ def auto_process(conn, iid):
         note = f"Ordertype '{bon.get('order_type') or '–'}' is nog niet bekend als project of order."
     elif not it["customer_id"]:
         note = f"Klant '{bon.get('customer') or it['parent'] or '–'}' niet herkend in de relaties."
-    elif sp.connected(conn) and not sp.customer_folder(conn, it["customer_id"]):
-        note = "Klant heeft nog geen klantmap in SharePoint."
+    elif kind == "project" and sp.connected(conn) and not sp.customer_folder(conn, it["customer_id"]):
+        note = "Klant heeft nog geen klantmap in SharePoint (nodig voor de projectmap)."
     if note:
         conn.execute("UPDATE order_inbox SET note = ? WHERE id = ?", (note, iid))
         conn.commit()
@@ -148,7 +175,8 @@ def auto_process(conn, iid):
     name = bon.get("description") or it["description"] or f"Order {number}"
     pid = create_from_inbox(conn, it, kind, number, name, it["customer_id"], None, status="automatisch")
     msg = f"automatisch aangemaakt als {kind}"
-    if sp.connected(conn):
+    # alleen een project krijgt direct een map; een order pas als iemand op 'Ordermap aanmaken' klikt
+    if kind == "project" and sp.connected(conn):
         try:
             ok, spmsg = sp.create_project_folder(conn, pid)
         except Exception as exc:  # pragma: no cover - netwerk

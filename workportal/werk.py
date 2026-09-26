@@ -127,16 +127,17 @@ def new():
     customers = _customers(to_int(request.values.get("customer_id") or request.args.get("klant")))
     on = sp_on()
     if request.method == "POST":
-        make = on and request.form.get("sp_create")
+        # project: direct een projectmap; order: pas een map als iemand op 'Ordermap aanmaken' klikt
+        make = on and k["kind"] == "project"
         err = None
         if not _f("number") or not _f("name"):
             err = "Vul ordernummer en omschrijving in."
         elif query("SELECT 1 FROM projects WHERE number = ?", (_f("number"),), one=True):
             err = "Dit ordernummer bestaat al (als project of order)."
         elif make and not sp.NUMBER_RE.match(_f("number")):
-            err = "Voor een map in SharePoint moet het ordernummer uit 8 cijfers bestaan (bijv. 20260138)."
+            err = "Het ordernummer moet uit 8 cijfers bestaan (bijv. 20260138), zodat de projectmap goed wordt aangemaakt."
         elif make and not to_int(request.form.get("customer_id")):
-            err = "Kies een klant: de map komt in de klantmap van die klant."
+            err = "Kies een klant: de projectmap komt in de klantmap van die klant."
         if err:
             flash(err, "error")
             return render_template("werk/form.html", K=k, B=request.blueprint, p=request.form, customers=customers,
@@ -156,7 +157,7 @@ def new():
         from .klanten import ask_snelstart
         return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
     return render_template("werk/form.html", K=k, B=request.blueprint, customers=customers, sp_on=on,
-                           p={"customer_id": request.args.get("klant"), "status": "actief", "sp_create": "1"},
+                           p={"customer_id": request.args.get("klant"), "status": "actief"},
                            next=request.args.get("next", ""))
 
 
@@ -174,8 +175,12 @@ def detail(pid):
     nacalcs = query("SELECT * FROM nacalcs WHERE project_id = ? ORDER BY imported_at DESC", (pid,))
     on = sp_on()
     folder = sp.customer_folder(get_db(), p["customer_id"]) if on else None
+    notes = query("SELECT n.*, u.name AS who FROM project_notes n LEFT JOIN users u ON u.id = n.created_by"
+                  " WHERE n.project_id = ? ORDER BY n.date DESC, n.id DESC", (pid,))
+    contacts = query("SELECT name FROM contacts WHERE customer_id = ? ORDER BY name", (p["customer_id"] or 0,))
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
-                           nacalcs=nacalcs, sp_on=on, folder=folder,
+                           nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
+                           NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]))
 
 
@@ -203,7 +208,8 @@ def edit(pid):
             target = url_for(f"{request.blueprint}.detail", pid=pid)
             if on and p["sp_item_id"] and not p["sp_missing"] and (_f("number"), _f("name")) != (p["number"], p["name"]):
                 _rename(pid)
-            elif on and not p["sp_item_id"] and request.form.get("sp_create"):
+            elif on and not p["sp_item_id"] and p["kind"] == "project" and sp.NUMBER_RE.match(_f("number") or "") \
+                    and to_int(request.form.get("customer_id")):
                 r = make_folder(pid, target)
                 if r:
                     return r
@@ -220,6 +226,63 @@ def _rename(pid):
         flash(msg, "error" if "niet" in msg else "ok")
 
 
+NOTE_KINDS = [("telefoon", "Telefoon"), ("bezoek", "Bezoek"), ("mail", "E-mail"), ("overleg", "Overleg intern"),
+              ("teams", "Teams / online"), ("anders", "Anders")]
+
+
+def _can_note(p):
+    return can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEWERKEN)
+
+
+@bp.route("/<int:pid>/notitie", methods=["POST"])
+@bp.route("/<int:pid>/notitie/<int:nid>", methods=["POST"])
+def note_save(pid, nid=None):
+    p = _row(pid)
+    if not _can_note(p):
+        abort(403)
+    target = werk_url("detail", p, pid=pid) + "#notities"
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        flash("Schrijf eerst wat er besproken is.", "error")
+        return redirect(target)
+    kind = request.form.get("kind") if request.form.get("kind") in dict(NOTE_KINDS) else "anders"
+    date = _f("date") or now_iso()[:10]
+    vals = (date, kind, _f("contact"), body, _f("follow_up"))
+    if nid:
+        n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
+        if n["created_by"] != g.user["id"] and not can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER):
+            abort(403)
+        execute("UPDATE project_notes SET date = ?, kind = ?, contact = ?, body = ?, follow_up = ?, updated_at = ? WHERE id = ?",
+                vals + (now_iso(), nid))
+        flash("Gespreksnotitie bijgewerkt.", "ok")
+    else:
+        execute("INSERT INTO project_notes (date, kind, contact, body, follow_up, project_id, created_by, created_at)"
+                " VALUES (?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
+        audit("gespreksnotitie", "project", pid, (kind + ": " + body)[:120])
+        flash("Gespreksnotitie opgeslagen.", "ok")
+    return redirect(target)
+
+
+@bp.route("/<int:pid>/notitie/<int:nid>/actie", methods=["POST"])
+def note_done(pid, nid):
+    p = _row(pid)
+    if not _can_note(p):
+        abort(403)
+    execute("UPDATE project_notes SET follow_done = 1 - follow_done WHERE id = ? AND project_id = ?", (nid, pid))
+    return redirect(werk_url("detail", p, pid=pid) + "#notities")
+
+
+@bp.route("/<int:pid>/notitie/<int:nid>/verwijderen", methods=["POST"])
+def note_delete(pid, nid):
+    p = _row(pid)
+    n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
+    if not (_can_note(p) and (n["created_by"] == g.user["id"] or can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER))):
+        abort(403)
+    execute("DELETE FROM project_notes WHERE id = ?", (nid,))
+    flash("Gespreksnotitie verwijderd.", "ok")
+    return redirect(werk_url("detail", p, pid=pid) + "#notities")
+
+
 @bp.route("/<int:pid>/omzetten", methods=["POST"])
 def convert(pid):
     """Project <-> order. De map in SharePoint krijgt de bijbehorende naam."""
@@ -230,9 +293,59 @@ def convert(pid):
     execute("UPDATE projects SET kind = ? WHERE id = ?", (new_kind, pid))
     audit("omgezet", "project", pid, f"naar {new_kind}")
     flash(f"{p['number']} is nu een {new_kind}.", "ok")
+    target = werk_url("detail", new_kind, pid=pid)
     if p["sp_item_id"] and not p["sp_missing"] and sp_on():
         _rename(pid)
-    return redirect(werk_url("detail", new_kind, pid=pid))
+    elif new_kind == "project" and sp_on() and p["customer_id"] and sp.NUMBER_RE.match(p["number"] or ""):
+        r = make_folder(pid, target)
+        if r:
+            return r
+    return redirect(target)
+
+
+@bp.route("/omzetten", methods=["POST"])
+def bulk_convert():
+    """Meerdere projecten in één keer omzetten naar order (of orders naar project)."""
+    k = K()
+    new_kind = "order" if k["kind"] == "project" else "project"
+    _need(BEWERKEN, "projecten")
+    _need(BEWERKEN, "orders")
+    ids = [to_int(x) for x in request.form.getlist("ids") if to_int(x)]
+    back = url_for(f"{request.blueprint}.index", filter=request.form.get("filter"), q=request.form.get("q") or None)
+    if not ids:
+        flash("Vink eerst aan wat je wilt omzetten.", "error")
+        return redirect(back)
+    rows = query(f"SELECT * FROM projects WHERE kind = ? AND id IN ({','.join('?' * len(ids))})", [k["kind"]] + ids)
+    conn, on = get_db(), sp_on()
+    renamed = made = failed = 0
+    for p in rows:
+        execute("UPDATE projects SET kind = ? WHERE id = ?", (new_kind, p["id"]))
+        audit("omgezet", "project", p["id"], f"naar {new_kind} (bulk)")
+        if not on:
+            continue
+        try:
+            if p["sp_item_id"] and not p["sp_missing"]:
+                msg = sp.rename_project_folder(conn, p["id"])
+                if msg and "niet" in msg:
+                    failed += 1
+                elif msg:
+                    renamed += 1
+            elif new_kind == "project" and p["customer_id"] and sp.NUMBER_RE.match(p["number"] or "") \
+                    and sp.customer_folder(conn, p["customer_id"]):
+                ok, _ = sp.create_project_folder(conn, p["id"])
+                made += 1 if ok else 0
+                failed += 0 if ok else 1
+        except (sp.GraphError, requests.RequestException, RuntimeError):
+            failed += 1
+    msg = f"{len(rows)} omgezet naar {new_kind}."
+    if renamed:
+        msg += f" {renamed} map(pen) in SharePoint hernoemd."
+    if made:
+        msg += f" {made} projectmap(pen) aangemaakt."
+    if failed:
+        msg += f" Bij {failed} lukte de actie in SharePoint niet; open die om het opnieuw te proberen."
+    flash(msg, "ok" if not failed else "error")
+    return redirect(back)
 
 
 @bp.route("/<int:pid>/map-aanmaken", methods=["POST"])
@@ -343,10 +456,8 @@ def inbox():
                  " ORDER BY COALESCE(i.handled_at, i.first_seen) DESC LIMIT 15")
     from . import komdex
     conn = get_db()
-    types = {"project": sp.setting(conn, "komdex_project_types") or "project",
-             "order": sp.setting(conn, "komdex_order_types") or "order"}
     return render_template("werk/inbox.html", K=KINDS["orders"], B="orders", items=items, done=done,
-                           customers=_customers(), sp_on=sp_on(), status=komdex.status(), types=types)
+                           customers=_customers(), sp_on=sp_on(), status=komdex.status(), types=komdex.order_types(conn))
 
 
 @bp.route("/inbox/ordertypes", methods=["POST"])
@@ -354,10 +465,17 @@ def inbox_types():
     if request.blueprint != "orders":
         abort(404)
     _need(BEHEER, "orders")
+    from .komdex import order_types, save_order_types, KINDS as TK
     conn = get_db()
-    clean = lambda v: ",".join(t.strip() for t in (v or "").split(",") if t.strip())
-    sp.set_setting(conn, "komdex_project_types", clean(request.form.get("project_types")))
-    sp.set_setting(conn, "komdex_order_types", clean(request.form.get("order_types")))
+    data = order_types(conn)
+    for i, ot in enumerate(data):
+        v = request.form.get(f"kind_{i}")
+        if v in TK:
+            ot["kind"] = v
+    nn = _f("new_name")
+    if nn and request.form.get("new_kind") in TK:
+        data.append({"id": None, "name": nn, "abbr": _f("new_abbr") or "", "kind": request.form.get("new_kind")})
+    save_order_types(conn, data)
     flash("Ordertypes opgeslagen.", "ok")
     return redirect(url_for("orders.inbox") + "#ordertypes")
 
@@ -398,7 +516,7 @@ def inbox_handle(iid):
         remember_type(get_db(), bon["order_type"], kind)
         msg += f" Ordertype '{bon['order_type']}' wordt voortaan automatisch een {kind}."
     flash(msg, "ok")
-    if request.form.get("sp_create") and sp_on() and cid:
+    if kind == "project" and sp_on() and cid:
         r = make_folder(pid, back)
         if r:
             return r

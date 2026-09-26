@@ -428,6 +428,24 @@ MIGRATIONS = [
     """
     UPDATE order_inbox SET bon_received_at = NULL WHERE status = 'bestaand' AND bon_json IS NULL;
     """,
+    # 9 - gespreksnotities bij projecten en orders
+    """
+    CREATE TABLE project_notes (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'telefoon',
+        contact TEXT,
+        body TEXT NOT NULL,
+        follow_up TEXT,
+        follow_done INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_notes_project ON project_notes(project_id, date);
+    CREATE INDEX idx_notes_follow ON project_notes(follow_up) WHERE follow_up IS NOT NULL AND follow_done = 0;
+    """,
 ]
 
 

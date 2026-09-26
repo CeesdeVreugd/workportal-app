@@ -32,14 +32,14 @@
   </div>
   {% elif not it.note %}<p class="small muted" style="margin:0 0 10px">Nog geen orderbon in de map gevonden.</p>{% endif %}
   <div class="kindpick">
-    <label class="kindopt"><input type="radio" name="kind" value="order" {{ 'checked' if it.suggest == 'order' }}><span><b>Order</b><br><small>Map zonder sjabloon</small></span></label>
-    <label class="kindopt"><input type="radio" name="kind" value="project" {{ 'checked' if it.suggest == 'project' }}><span><b>Project</b><br><small>Power Automate zet het sjabloon + Teams-post</small></span></label>
+    <label class="kindopt"><input type="radio" name="kind" value="order" {{ 'checked' if it.suggest == 'order' }}><span><b>Order</b><br><small>Map pas als je erom vraagt</small></span></label>
+    <label class="kindopt"><input type="radio" name="kind" value="project" {{ 'checked' if it.suggest == 'project' }}><span><b>Project</b><br><small>Direct projectmap + sjabloon + Teams-post</small></span></label>
   </div>
   <div class="fgrid">
     <label class="f">Ordernummer *<input type="text" name="number" value="{{ it.number or '' }}" required></label>
     <label class="f">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name ~ (' – ' ~ c.city if c.city else ''), it.customer_id) }}{% endfor %}</select></label>
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ it.description or '' }}" required></label>
-    {% if sp_on %}<label class="check full"><input type="checkbox" name="sp_create" value="1" checked> <span>Map aanmaken in de klantmap in SharePoint</span></label>{% endif %}
+    {% if sp_on %}<div class="f full"><span class="hint">Project: de projectmap wordt direct aangemaakt. Order: alleen vastleggen; een ordermap maak je later met de knop op de orderpagina.</span></div>{% endif %}
     {% if it.bon and it.bon.order_type and can('orders', 3) %}<label class="check full"><input type="checkbox" name="remember" value="1" checked> <span>Ordertype <b>{{ it.bon.order_type }}</b> voortaan automatisch zo verwerken</span></label>{% endif %}
   </div>
   <div class="actions">
@@ -54,13 +54,16 @@
 {% if can('orders', 3) %}
 <form method="post" action="{{ url_for('orders.inbox_types') }}" class="card form" id="ordertypes">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <h2>Automatisch verwerken op ordertype</h2>
-  <p class="small muted" style="margin-top:0">Staat er een orderbon in de map met een van deze ordertypes, en is de klant bekend, dan maakt WorkPortal het project of de order zelf aan, met map. Anders komt hij hier te staan. Meerdere types scheiden met een komma.</p>
-  <div class="fgrid">
-    <label class="f">Ordertypes die een project zijn<input type="text" name="project_types" value="{{ types.project }}"></label>
-    <label class="f">Ordertypes die een order zijn<input type="text" name="order_types" value="{{ types.order }}"></label>
-  </div>
-  <div><button class="btn">Opslaan</button></div>
+  <h2>Ordertypes uit Komdex</h2>
+  <p class="small muted" style="margin-top:0">Staat er een orderbon in een nieuwe ordermap, dan bepaalt het ordertype wat WorkPortal doet. <b>Project</b>: direct aanmaken met projectmap (klant moet een klantmap hebben). <b>Order</b>: direct aanmaken, zonder map. <b>Vragen</b>: altijd hier in het actievenster.</p>
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th class="num">ID</th><th>Ordertype</th><th>Afkorting</th><th>WorkPortal</th></tr></thead>
+    <tbody>{% for t in types %}<tr><td class="num">{{ t.id if t.id is not none else '' }}</td><td>{{ t.name }}</td><td>{{ t.abbr }}</td>
+      <td><select name="kind_{{ loop.index0 }}">{% for k, l in [('project','Project'),('order','Order'),('vragen','Vragen')] %}<option value="{{ k }}" {{ 'selected' if t.kind == k }}>{{ l }}</option>{% endfor %}</select></td></tr>{% endfor %}
+    <tr><td></td><td><input type="text" name="new_name" placeholder="Nieuw ordertype"></td><td><input type="text" name="new_abbr" placeholder="Afk." style="max-width:90px"></td>
+      <td><select name="new_kind"><option value="vragen">Vragen</option><option value="project">Project</option><option value="order">Order</option></select></td></tr>
+    </tbody></table></div>
+  <div><button class="btn primary">Opslaan</button></div>
 </form>
 {% endif %}
 

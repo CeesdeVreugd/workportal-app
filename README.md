@@ -162,8 +162,17 @@ Nieuwe mappen verschijnen onder **Orders → Nieuwe orders** (en op het dashboar
 Verkoop-Inkoop-WVB of Directie krijgen een push-/mailmelding. Daar kies je **order** of **project**, de klant
 en de omschrijving; WorkPortal maakt dan de map in de klantmap in SharePoint:
 
-- Project: `<ordernummer>-<omschrijving>` → Power Automate zet het sjabloon erin en plaatst de Teams-post.
-- Order: `<ordernummer> <omschrijving>` (spatie, geen streepje) → Power Automate doet niets.
+- Project: direct een map `<ordernummer>-<omschrijving>` → Power Automate zet het sjabloon erin en plaatst de Teams-post.
+- Order: géén map, tot iemand op de orderpagina op **Ordermap aanmaken** klikt; dan
+  `<ordernummer> <omschrijving>` (spatie, geen streepje) → Power Automate doet niets.
+
+Ordertypes (Leeg, Offerte, Particulier, Handel, Service / onderhoud, Engineering, Speciaal Machinebouw,
+Constructie/Plaatwerk, Leidingwerk, WBSO, Garantie, Intern, Standaard Machine - PalletRotator) staan
+onderaan **Orders → Nieuwe orders** met per type: Project, Order of Vragen. Controleer die instelling eenmalig.
+
+Bij projecten en orders kun je **gespreksnotities** vastleggen (datum, soort, met wie, notitie en eventueel
+een actiedatum; open acties staan op je dashboard). In de lijsten kun je met vinkjes meerdere projecten
+in één keer omzetten naar order, of andersom.
 
 Controleer eenmalig dat de Power Automate-flow een map als `20260138 Omschrijving` níet oppakt.
 

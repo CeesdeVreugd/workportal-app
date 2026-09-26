@@ -38,6 +38,11 @@ def dashboard():
         res = latest_results()
         data["below_margin"] = [r for r in res if r["status"] in ("bad", "warn")]
         data["nacalc_count"] = len(res)
+    if can("projecten") or can("orders"):
+        data["actions"] = query(
+            "SELECT n.*, p.number, p.name AS pname, p.kind FROM project_notes n JOIN projects p ON p.id = n.project_id"
+            " WHERE n.created_by = ? AND n.follow_up IS NOT NULL AND n.follow_done = 0 AND n.follow_up <= date('now', '+7 days')"
+            " ORDER BY n.follow_up LIMIT 10", (g.user["id"],))
     return render_template("dashboard.html", d=data)
 
 

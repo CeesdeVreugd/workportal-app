@@ -13,7 +13,7 @@
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ p.name or '' }}" required></label>
     <label class="f full">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
     {% if sp_on and not p.sp_item_id %}
-    <label class="check full"><input type="checkbox" name="sp_create" value="1" {{ 'checked' if p.sp_create }}> <span><b>{{ K.label }}map aanmaken in SharePoint</b><br><span class="hint">{% if K.kind == 'project' %}Maakt <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aan in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post.{% else %}Maakt <code>&lt;ordernummer&gt; &lt;omschrijving&gt;</code> (zonder streepje) aan in de klantmap, zodat Power Automate hem niet als project oppakt.{% endif %} Het ordernummer moet uit 8 cijfers bestaan.</span></span></label>
+    <div class="f full"><span class="hint">{% if K.kind == 'project' %}Bij opslaan wordt direct de projectmap <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aangemaakt in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post.{% else %}Een order krijgt pas een map in SharePoint als je op de orderpagina op <b>Ordermap aanmaken</b> klikt.{% endif %}</span></div>
     {% elif sp_on and p.sp_item_id %}
     <div class="f full"><span class="hint">{{ K.label }}map is gekoppeld. Wijzig je nummer of omschrijving, dan wordt de map in SharePoint mee hernoemd.</span></div>
     {% else %}

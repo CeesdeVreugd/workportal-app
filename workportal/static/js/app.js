@@ -40,7 +40,7 @@
   // Klikbare tabelregels
   document.addEventListener("click", function (e) {
     var tr = e.target.closest("tr[data-href]");
-    if (tr && !e.target.closest("a,button,input,select,label")) { window.location = tr.getAttribute("data-href"); }
+    if (tr && !e.target.closest("a,button,input,select,label,td.chk")) { window.location = tr.getAttribute("data-href"); }
   });
 
   // Bevestigen
@@ -206,4 +206,29 @@
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(function (html) { box.innerHTML = html; })
     .catch(function () { box.innerHTML = '<div class="empty">SharePoint is op dit moment niet bereikbaar.</div>'; });
+})();
+
+/* Bulk omzetten projecten <-> orders */
+(function () {
+  var form = document.getElementById("bulkform"), bar = document.getElementById("bulkbar");
+  if (!form || !bar) return;
+  var boxes = function () { return form.querySelectorAll('input[name="ids"]'); };
+  function update() {
+    var n = form.querySelectorAll('input[name="ids"]:checked').length;
+    document.getElementById("bulkn").textContent = n;
+    bar.classList.toggle("hidden", n === 0);
+  }
+  form.addEventListener("change", function (e) {
+    if (e.target.hasAttribute("data-bulk-all")) boxes().forEach(function (b) { b.checked = e.target.checked; });
+    update();
+  });
+  form.addEventListener("click", function (e) {
+    var td = e.target.closest("td.chk");
+    if (td && e.target.tagName !== "INPUT") { var b = td.querySelector("input"); b.checked = !b.checked; update(); }
+    if (e.target.closest("[data-bulk-clear]")) {
+      boxes().forEach(function (b) { b.checked = false; });
+      var all = form.querySelector("[data-bulk-all]"); if (all) all.checked = false;
+      update();
+    }
+  });
 })();

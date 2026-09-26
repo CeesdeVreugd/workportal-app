@@ -15,6 +15,12 @@
 <a class="actionbar" href="{{ url_for('orders.inbox') }}">{{ icon('bell') }}<span><b>Actie nodig: {{ inbox_count() }} nieuwe ordermap{{ 'pen' if inbox_count() != 1 }} uit Komdex</b> om goed te zetten als project of order.</span><span class="go">Goedzetten →</span></a>
 {% endif %}
 
+{% if d.actions %}
+<section class="card"><div class="card-head"><h2>Mijn acties uit gespreksnotities</h2></div>
+  <div class="rows">{% for n in d.actions %}<a class="rowitem" href="{{ werk_url('detail', n.kind, pid=n.project_id) }}#n{{ n.id }}"><div class="grow"><div class="t">{{ n.number }} · {{ n.pname }}</div><div class="s">{{ n.body[:110] }}{{ '…' if n.body|length > 110 }}</div></div><span class="badge b-warn">{{ n.follow_up|date }}</span></a>{% endfor %}</div>
+</section>
+{% endif %}
+
 <div class="grid g4">
   {% if can('service') %}
   <a class="card kpi" href="{{ url_for('service.index') }}" style="text-decoration:none;color:inherit"><div class="label">Open tickets</div><div class="value">{{ d.open_tickets }}</div>

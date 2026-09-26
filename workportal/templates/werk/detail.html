@@ -44,6 +44,51 @@
   {% endif %}
 </section>
 {% endif %}
+<section class="card" id="notities">
+  <div class="card-head"><h2>Gespreksnotities</h2>{% if can_note %}<button class="btn sm" type="button" onclick="var f=document.getElementById('noteform');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Notitie</button>{% endif %}</div>
+  {% if can_note %}
+  <form id="noteform" method="post" action="{{ url_for(B ~ '.note_save', pid=p.id) }}" class="form noteform {{ '' if not notes else 'hidden' }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fgrid three">
+      <label class="f">Datum<input type="date" name="date" value="{{ today }}"></label>
+      <label class="f">Soort<select name="kind">{% for k, l in NOTE_KINDS %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+      <label class="f">Met wie<input type="text" name="contact" list="notecontacts" placeholder="{{ p.contact_name or 'Naam contactpersoon' }}" value="{{ p.contact_name or '' }}"></label>
+      <label class="f full">Wat is er besproken? *<textarea name="body" rows="4" required placeholder="Afspraken, wensen van de klant, aanpassingen, prijsafspraken…"></textarea></label>
+      <label class="f">Actie / terugkomen op<input type="date" name="follow_up"></label>
+    </div>
+    <datalist id="notecontacts">{% for c in contacts %}<option value="{{ c.name }}">{% endfor %}</datalist>
+    <div class="actions"><button class="btn primary">Opslaan</button></div>
+  </form>
+  {% endif %}
+  <div class="notes">
+  {% for n in notes %}
+    <article class="note" id="n{{ n.id }}">
+      <div class="notehead"><span class="badge nk-{{ n.kind }}">{{ dict(NOTE_KINDS).get(n.kind, n.kind) }}</span>
+        <b>{{ n.date|date }}</b>{% if n.contact %} · met {{ n.contact }}{% endif %}
+        <span class="muted small">· {{ n.who or 'onbekend' }}{% if n.updated_at %} · bewerkt{% endif %}</span>
+        {% if n.follow_up %}<form method="post" action="{{ url_for(B ~ '.note_done', pid=p.id, nid=n.id) }}" class="followup {{ 'done' if n.follow_done }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button {{ 'disabled' if not can_note }} title="Actie afvinken">{{ icon('check') }} Actie {{ n.follow_up|date }}</button></form>{% endif %}
+      </div>
+      <div class="notebody">{{ n.body }}</div>
+      {% if can_note and (n.created_by == g.user.id or can(K.module, 3)) %}
+      <details class="noteedit"><summary>Bewerken</summary>
+        <form method="post" action="{{ url_for(B ~ '.note_save', pid=p.id, nid=n.id) }}" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="fgrid three">
+            <label class="f">Datum<input type="date" name="date" value="{{ n.date }}"></label>
+            <label class="f">Soort<select name="kind">{% for k, l in NOTE_KINDS %}<option value="{{ k }}" {{ 'selected' if n.kind == k }}>{{ l }}</option>{% endfor %}</select></label>
+            <label class="f">Met wie<input type="text" name="contact" list="notecontacts" value="{{ n.contact or '' }}"></label>
+            <label class="f full">Notitie<textarea name="body" rows="4" required>{{ n.body }}</textarea></label>
+            <label class="f">Actie / terugkomen op<input type="date" name="follow_up" value="{{ n.follow_up or '' }}"></label>
+          </div>
+          <div class="actions"><button class="btn primary sm">Opslaan</button>
+            <button class="btn danger sm" formaction="{{ url_for(B ~ '.note_delete', pid=p.id, nid=n.id) }}" formnovalidate onclick="return confirm('Notitie verwijderen?')">Verwijderen</button></div>
+        </form></details>
+      {% endif %}
+    </article>
+  {% else %}<div class="empty">Nog geen gespreksnotities.</div>{% endfor %}
+  </div>
+</section>
+
 <div class="grid g2 stack">
   {% if can('druktest') %}<section class="card"><h2>Druktesten</h2><div class="rows">{% for t in tests %}<a class="rowitem" href="{{ url_for('druktest.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.number }} · tekening {{ t.drawing_no }}</div><div class="s">{{ t.line_no or '' }} {{ t.part }} · {{ t.created_at|date }}</div></div><span class="badge {{ 'b-ok' if t.result == 'goedgekeurd' else 'b-bad' if t.result == 'afgekeurd' else 'b-blue' }}">{{ t.result or 'Lopend' }}</span></a>{% else %}<div class="empty">Geen druktesten.</div>{% endfor %}</div></section>{% endif %}
   {% if can('service') %}<section class="card"><h2>Tickets</h2><div class="rows">{% for t in tickets %}<a class="rowitem" href="{{ url_for('service.detail', tid=t.id) }}"><div class="grow"><div class="t">{{ t.title }}</div><div class="s">{{ t.number }}</div></div>{{ ticket_status(t.status) }}</a>{% else %}<div class="empty">Geen tickets.</div>{% endfor %}</div></section>{% endif %}

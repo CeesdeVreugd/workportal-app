@@ -437,3 +437,26 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .dl.compact dt, .dl.compact dd { padding-top: 3px; padding-bottom: 3px; }
 .worklist p { margin: 0 0 4px; }
 .workdetails summary { cursor: pointer; }
+
+/* Gespreksnotities */
+.noteform { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.notes { display: grid; gap: 10px; }
+.note { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.notehead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.notebody { white-space: pre-wrap; line-height: 1.5; }
+.noteedit { margin-top: 8px; }
+.noteedit summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.noteedit form { margin-top: 10px; }
+.followup { margin-left: auto; }
+.followup button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #F5D9A8; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 3px 10px; font: 500 13px var(--font); cursor: pointer; }
+.followup button svg { width: 14px; height: 14px; }
+.followup.done button { background: var(--ok-bg); color: var(--ok); border-color: #BfE3CE; text-decoration: line-through; }
+.nk-telefoon { background: #E5F3FD; color: #1A6AA6; } .nk-bezoek { background: #E6F6EC; color: #16733F; }
+.nk-mail { background: #EFEDFE; color: #4B3FB8; } .nk-overleg { background: #FEF4E0; color: #9A6508; }
+.nk-teams { background: #EAF0FF; color: #0A0A96; } .nk-anders { background: #F0F2F8; color: var(--ink-2); }
+.table th.chk, .table td.chk { width: 44px; text-align: center; padding-left: 14px; padding-right: 4px; cursor: default; }
+.table td.chk input, .table th.chk input { width: 18px; height: 18px; accent-color: var(--basic); cursor: pointer; }
+.bulkbar { position: sticky; top: 76px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin: 0 0 12px; background: var(--basic); color: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(10,10,150,.18); }
+.bulkbar .btn.primary { background: #fff; color: var(--basic); border-color: #fff; }
+.bulkbar .btn.ghost { color: #fff; }
+@media (max-width: 760px) { .bulkbar { top: 64px; } }

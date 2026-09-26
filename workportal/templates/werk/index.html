@@ -20,10 +20,17 @@
 <div class="fchips">
   {{ fbtn('actief', 'Actief', counts.actief) }}{{ fbtn('afgerond', 'Afgerond', counts.afgerond) }}{% if counts.gearchiveerd %}{{ fbtn('gearchiveerd', 'Gearchiveerd', counts.gearchiveerd) }}{% endif %}{{ fbtn('alle', 'Alle', counts.alle) }}
 </div>
+{% set bulk = can('projecten', 2) and can('orders', 2) %}
+<form method="post" action="{{ url_for(B ~ '.bulk_convert') }}" id="bulkform">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="filter" value="{{ flt }}"><input type="hidden" name="q" value="{{ q }}">
+{% if bulk %}<div class="bulkbar hidden" id="bulkbar"><span><b id="bulkn">0</b> geselecteerd</span>
+  <button class="btn sm primary" onclick="return confirm('Geselecteerde ' + document.getElementById('bulkn').textContent + ' omzetten naar {{ 'order' if K.kind == 'project' else 'project' }}?')">{{ icon('refresh') }}Omzetten naar {{ 'order' if K.kind == 'project' else 'project' }}</button>
+  <button class="btn sm ghost" type="button" data-bulk-clear>Selectie wissen</button></div>{% endif %}
 <div class="card flush tablewrap"><table class="table">
-  <thead><tr><th>Ordernr.</th><th>Omschrijving</th><th class="hide-m">Klant</th><th>Status</th></tr></thead>
+  <thead><tr>{% if bulk %}<th class="chk"><input type="checkbox" data-bulk-all aria-label="Alles selecteren"></th>{% endif %}<th>Ordernr.</th><th>Omschrijving</th><th class="hide-m">Klant</th><th>Status</th></tr></thead>
   <tbody>
-  {% for p in rows %}<tr class="link" data-href="{{ url_for(B ~ '.detail', pid=p.id) }}"><td class="nowrap"><b>{{ p.number }}</b></td><td>{{ p.name }}{% if p.sp_item_id and not p.sp_missing %} <span class="spdot" title="Map in SharePoint gekoppeld">{{ icon('folder') }}</span>{% endif %}</td><td class="hide-m">{{ p.customer or '' }}</td><td><span class="badge {{ 'b-blue' if p.status == 'actief' else '' }}">{{ p.status|capitalize }}</span></td></tr>
-  {% else %}<tr><td colspan="4" class="empty">Geen {{ 'projecten' if K.kind == 'project' else 'orders' }} gevonden.</td></tr>{% endfor %}
+  {% for p in rows %}<tr class="link" data-href="{{ url_for(B ~ '.detail', pid=p.id) }}">{% if bulk %}<td class="chk"><input type="checkbox" name="ids" value="{{ p.id }}" aria-label="Selecteer {{ p.number }}"></td>{% endif %}<td class="nowrap"><b>{{ p.number }}</b></td><td>{{ p.name }}{% if p.sp_item_id and not p.sp_missing %} <span class="spdot" title="Map in SharePoint gekoppeld">{{ icon('folder') }}</span>{% endif %}</td><td class="hide-m">{{ p.customer or '' }}</td><td><span class="badge {{ 'b-blue' if p.status == 'actief' else '' }}">{{ p.status|capitalize }}</span></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">Geen {{ 'projecten' if K.kind == 'project' else 'orders' }} gevonden.</td></tr>{% endfor %}
   </tbody></table></div>
+</form>
 {% endblock %}
