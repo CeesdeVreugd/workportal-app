@@ -18,10 +18,10 @@
 #>
 
 # ---- instellingen -------------------------------------------------------
-$OrderMap   = "\\SERVER\Komdex\Orders"                         # map waarin Komdex de ordermappen aanmaakt
+$OrderMap   = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\orders"   # Komdex-ordermap (met jaarmappen 2025, 2026, ...)
 $WorkPortal = "https://workportal.devreugd-pt.nl"               # adres van WorkPortal
 $Sleutel    = "VUL-HIER-KOMDEX_KEY-IN"                         # zelfde waarde als KOMDEX_KEY in Portainer
-$Diepte     = 1                                                 # 0 = alleen ordermappen, 1 = ook één niveau dieper (bijv. per klant)
+$Jaren      = 2                                                 # aantal recente jaarmappen dat wordt bekeken (2 = dit jaar en vorig jaar)
 $Logbestand = "$PSScriptRoot\komdex-orders.log"
 # -------------------------------------------------------------------------
 
@@ -38,16 +38,23 @@ function Log($tekst) {
 try {
     if (-not (Test-Path -LiteralPath $OrderMap)) { throw "Map niet gevonden: $OrderMap" }
     $root = (Get-Item -LiteralPath $OrderMap).FullName.TrimEnd('\')
-    $mappen = Get-ChildItem -LiteralPath $root -Directory -Depth $Diepte -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            $ouder = $_.Parent.FullName.TrimEnd('\')
-            [pscustomobject]@{
-                path   = $_.FullName
-                name   = $_.Name
-                parent = $(if ($ouder -ieq $root) { "" } else { Split-Path $ouder -Leaf })
+    $vanafJaar = (Get-Date).Year - $Jaren + 1
+    $mappen = New-Object System.Collections.Generic.List[object]
+    foreach ($d in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue) {
+        if ($d.Name -match '^\d{8}') {
+            # ordermap direct in de hoofdmap
+            $mappen.Add([pscustomobject]@{ path = $d.FullName; name = $d.Name; parent = "" })
+        }
+        elseif ($d.Name -match '^\d{4}$' -and [int]$d.Name -ge $vanafJaar) {
+            # jaarmap: de ordermappen staan daarin
+            foreach ($o in Get-ChildItem -LiteralPath $d.FullName -Directory -ErrorAction SilentlyContinue) {
+                if ($o.Name -match '^\d{8}') {
+                    $mappen.Add([pscustomobject]@{ path = $o.FullName; name = $o.Name; parent = "" })
+                }
             }
         }
-    $json  = @{ folders = @($mappen) } | ConvertTo-Json -Depth 4 -Compress
+    }
+    $json  = @{ folders = @($mappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
     $bytes = [Text.Encoding]::UTF8.GetBytes($json)
     $res = Invoke-RestMethod -Uri "$WorkPortal/api/komdex/orders" -Method Post -Body $bytes `
         -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 60

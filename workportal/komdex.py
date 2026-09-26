@@ -103,6 +103,8 @@ def create_from_inbox(conn, it, kind, number, name, cid, user_id=None, status="v
 def _enrich(conn, pid, it):
     """Bestaand project/order aanvullen met de orderbon (alleen lege velden)."""
     bon = bon_of(it) or {}
+    if it["customer_id"]:
+        conn.execute("UPDATE projects SET customer_id = COALESCE(customer_id, ?) WHERE id = ?", (it["customer_id"], pid))
     fields = {"order_type": "order_type", "executor": "executor", "order_date": "order_date", "delivery_date": "delivery_date",
               "delivery_week": "delivery_week", "reference": "reference", "contact_name": "contact", "work_description": "work"}
     for col, key in fields.items():
@@ -221,20 +223,29 @@ def receive(conn, folders):
         if st == "nieuw":
             new_items.append({"number": number, "folder": name})
         elif st == "bestaand":
-            conn.execute("UPDATE order_inbox SET notified_at = ?, bon_received_at = ? WHERE path = ?", (now, now, path))
+            # bestaande map: geen melding, niets aanmaken (alleen koppelen en later aanvullen met de orderbon)
+            conn.execute("UPDATE order_inbox SET notified_at = ? WHERE path = ?", (now, path))
     # mappen die in Komdex zijn verdwenen verdwijnen ook uit het actievenster
     for path, r in known.items():
         if path not in seen and r["status"] == "nieuw":
             conn.execute("UPDATE order_inbox SET missing = 1 WHERE path = ? AND status = 'nieuw'", (path,))
+    # bestaande mappen koppelen aan projecten/orders met hetzelfde nummer (ook als die later in WorkPortal komen)
+    conn.execute("UPDATE order_inbox SET project_id = (SELECT p.id FROM projects p WHERE p.number = order_inbox.number"
+                 " ORDER BY p.id LIMIT 1) WHERE project_id IS NULL AND status IN ('bestaand', 'gekoppeld', 'nieuw')"
+                 " AND EXISTS (SELECT 1 FROM projects p WHERE p.number = order_inbox.number)")
+    conn.execute("UPDATE order_inbox SET status = 'gekoppeld', handled_at = COALESCE(handled_at, ?) WHERE status = 'nieuw'"
+                 " AND project_id IS NOT NULL", (now,))
     conn.commit()
     sp.set_setting(conn, "komdex_baseline", "1")
     sp.set_setting(conn, "komdex_last_push", now)
     sp.set_setting(conn, "komdex_last_count", str(len(seen)))
     # welke mappen mogen hun orderbon nog sturen?
     since = iso(now_utc() - BON_WINDOW)
+    # nieuwe mappen (30 dagen) en bestaande mappen die aan een project/order hangen (alleen aanvullen, nooit aanmaken)
     want = [r["path"] for r in conn.execute(
-        "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status NOT IN ('bestaand','genegeerd')"
-        " AND first_seen >= ?", (since,))]
+        "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status <> 'genegeerd'"
+        " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR project_id IS NOT NULL)"
+        " ORDER BY number DESC LIMIT 400", (since,))]
     return {"ontvangen": len(folders), "ordermappen": len(seen), "nieuw": len(new_items), "eerste_keer": first,
             "want": want}
 

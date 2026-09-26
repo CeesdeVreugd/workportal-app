@@ -149,8 +149,8 @@ naar WorkPortal (alleen lezen, er wordt niets gewijzigd).
 1. Bedenk een lange willekeurige sleutel (bijv. 40 tekens) en zet die in Portainer als `KOMDEX_KEY`
    → Update the stack.
 2. Kopieer `scripts/komdex-orders.ps1` naar de server (bijv. `C:\Scripts\`) en vul bovenin in:
-   `$OrderMap` (de Komdex-ordermap), `$Sleutel` (= `KOMDEX_KEY`) en eventueel `$Diepte`
-   (1 als de ordermappen per klant in een submap staan).
+   `$OrderMap` (de Komdex-ordermap), `$Sleutel` (= `KOMDEX_KEY`) en eventueel `$Jaren`
+   (aantal recente jaarmappen dat wordt bekeken, standaard 2).
 3. Test: `powershell -ExecutionPolicy Bypass -File C:\Scripts\komdex-orders.ps1`. In
    `komdex-orders.log` staat `OK: … ordermappen`. De eerste keer worden alle bestaande mappen alleen
    onthouden; pas mappen die daarna verschijnen komen in het actievenster.

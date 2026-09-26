@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V25: Relaties, Projecten en Orders; Komdex-ordermappen en orderbon automatisch verwerken"
+set "OMSCHRIJVING=WorkPortal V26: bestaande Komdex-orders alleen koppelen en aanvullen, script voor jaarmappen"
 
 echo.
 echo ============================================

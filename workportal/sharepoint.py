@@ -583,7 +583,9 @@ def scheduled_sync(conn, state):
 def customer_folder(conn, customer_id):
     if not customer_id:
         return None
-    return conn.execute("SELECT * FROM sp_folders WHERE customer_id = ? AND missing = 0 ORDER BY auto, updated_at DESC LIMIT 1",
+    # bij meerdere klantmappen: de handmatig gekoppelde, dan die met de meeste projecten/orders
+    return conn.execute("SELECT f.* FROM sp_folders f WHERE f.customer_id = ? AND f.missing = 0 ORDER BY f.auto,"
+                        " (SELECT COUNT(*) FROM projects p WHERE p.sp_parent_id = f.item_id) DESC, f.updated_at DESC LIMIT 1",
                         (customer_id,)).fetchone()
 
 

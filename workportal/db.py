@@ -424,6 +424,10 @@ MIGRATIONS = [
     ALTER TABLE order_inbox ADD COLUMN notified_at TEXT;
     ALTER TABLE order_inbox ADD COLUMN note TEXT;
     """,
+    # 8 - bestaande Komdex-mappen mogen hun orderbon nog sturen (alleen aanvullen, nooit aanmaken)
+    """
+    UPDATE order_inbox SET bon_received_at = NULL WHERE status = 'bestaand' AND bon_json IS NULL;
+    """,
 ]
 
 
