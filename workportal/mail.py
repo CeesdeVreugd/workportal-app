@@ -127,7 +127,7 @@ def signature_html(signer="systeem"):
             f'<p style="margin:0">{html_lib.escape(GREETING)}</p><p style="margin:0">&nbsp;</p>'
             f'<p style="margin:0">{who}</p>{logo}'
             f'<p style="margin:12px 0 0">Edisonring 11, 6669 NA Dodewaard<br>+31 (0)488 41 28 28<br>'
-            f'<a href="mailto:werkplaats@devreugd-pt.nl" style="{link}">werkplaats@devreugd-pt.nl</a> | '
+            f'<a href="mailto:werkvoorbereiding@devreugd-pt.nl" style="{link}">werkvoorbereiding@devreugd-pt.nl</a> | '
             f'<a href="https://www.devreugd-pt.nl" style="{link}">www.devreugd-pt.nl</a></p>'
             f'{social}{banner}'
             f'<div style="font-size:7.5pt;line-height:1.3;margin-top:14px">{disc}</div></div>')
@@ -136,7 +136,7 @@ def signature_html(signer="systeem"):
 def signature_text(signer="systeem"):
     disc = "\n\n".join("\n".join(b) for b in DISCLAIMER)
     return (f"\n\n{GREETING}\n\n{SIGNERS.get(signer, SIGNERS['systeem'])}\n\n"
-            f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\nwerkplaats@devreugd-pt.nl | www.devreugd-pt.nl\n\n{disc}")
+            f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\nwerkvoorbereiding@devreugd-pt.nl | www.devreugd-pt.nl\n\n{disc}")
 
 
 def send_mail(to, subject, text, html=None, attachments=None, signer="systeem"):
@@ -220,7 +220,7 @@ def code_mail_html(name, code, minutes):
 def card_html(inner, signer="systeem"):
     """Alle mails in hetzelfde kader: blauwe kop WORKPORTAL, inhoud en handtekening."""
     sig = signature_html(signer) if signer else ""
-    return (f'<div style="font-family:{FONT};font-size:11pt;max-width:640px;color:#14163A">'
+    return (f'<div style="font-family:{FONT};font-size:11pt;max-width:640px;color:#000000">'
             f'<div style="background:#0A0A96;color:#fff;padding:16px 22px;border-radius:10px 10px 0 0;font-weight:bold;'
             f'letter-spacing:.1em;font-size:12pt">WORKPORTAL</div>'
             f'<div style="border:1px solid #E1E5F0;border-top:0;padding:20px 22px;border-radius:0 0 10px 10px">'
