@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V15: Verkoop-Inkoop-WVB lichtblauw"
+set "OMSCHRIJVING=WorkPortal V16: duidelijkere SharePoint-foutmeldingen"
 
 echo.
 echo ============================================

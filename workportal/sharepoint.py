@@ -249,7 +249,20 @@ def resolve_url(url, g=None):
         site_path, rest = "/".join(segs[:2]), segs[2:]
     else:
         site_path, rest = "", segs
-    site = g.get_site(u.netloc, site_path)
+    site_label = site_path.split("/")[-1] if site_path else u.netloc
+    try:
+        site = g.get_site(u.netloc, site_path)
+    except GraphError as exc:
+        if exc.status in (401, 403):
+            raise ValueError(
+                f"De app-registratie heeft (nog) geen toegang tot site '{site_label}'. Het recht Sites.Selected is goedgekeurd, "
+                f"maar de app moet daarnaast per site schrijfrecht krijgen (README, SharePoint stap 2). "
+                f"Microsoft meldt: {exc.message}")
+        if exc.status == 404:
+            raise ValueError(f"Site '{site_label}' niet gevonden. Controleer de link.")
+        raise
+    except RuntimeError as exc:
+        raise ValueError(_token_hint(str(exc)))
     best, best_len = None, -1
     full = [s.lower() for s in (site_path.split("/") if site_path else []) + rest]
     for d in g.drives(site["id"]):
@@ -261,12 +274,31 @@ def resolve_url(url, g=None):
         raise ValueError("Documentbibliotheek niet gevonden in deze link.")
     site_n = len(site_path.split("/")) if site_path else 0
     inner = rest[best_len - site_n:]
-    item = g.item_by_path(best["id"], "/".join(inner))
+    try:
+        item = g.item_by_path(best["id"], "/".join(inner))
+    except GraphError as exc:
+        if exc.status == 404:
+            raise ValueError(f"Map '{'/'.join(inner)}' niet gevonden in de documentbibliotheek.")
+        if exc.status in (401, 403):
+            raise ValueError(f"Geen toegang tot de map: de app heeft leesrecht maar mogelijk geen schrijfrecht op de site. {exc.message}")
+        raise
     if "folder" not in item:
         raise ValueError("De link verwijst niet naar een map.")
     return {"site_id": site["id"], "drive_id": best["id"], "root_id": item["id"],
             "name": item.get("name") or best.get("name"), "web_url": item.get("webUrl") or url,
             "site_name": site.get("displayName") or site.get("name")}
+
+
+def _token_hint(msg):
+    if "AADSTS7000215" in msg:
+        return "Aanmelden bij Microsoft mislukt: het clientgeheim klopt niet. Gebruik de Waarde van het geheim, niet het Geheim-id."
+    if "AADSTS7000222" in msg:
+        return "Aanmelden bij Microsoft mislukt: het clientgeheim is verlopen. Maak een nieuw geheim aan en zet het in Portainer."
+    if "AADSTS700016" in msg:
+        return "Aanmelden bij Microsoft mislukt: GRAPH_CLIENT_ID (toepassings-id) klopt niet."
+    if "AADSTS90002" in msg or "AADSTS900023" in msg:
+        return "Aanmelden bij Microsoft mislukt: GRAPH_TENANT_ID (map-id) klopt niet."
+    return f"Aanmelden bij Microsoft mislukt: {msg}"
 
 
 def connect(conn, url, existing_status="actief", g=None):
