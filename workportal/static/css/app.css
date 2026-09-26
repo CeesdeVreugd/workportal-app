@@ -458,5 +458,6 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .table td.chk input, .table th.chk input { width: 18px; height: 18px; accent-color: var(--basic); cursor: pointer; }
 .bulkbar { position: sticky; top: 76px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin: 0 0 12px; background: var(--basic); color: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(10,10,150,.18); }
 .bulkbar .btn.primary { background: #fff; color: var(--basic); border-color: #fff; }
-.bulkbar .btn.ghost { color: #fff; }
+.bulkbar .btn.ghost { color: #fff; background: transparent; border-color: rgba(255,255,255,.55); }
+.bulkbar .btn.ghost:hover { background: rgba(255,255,255,.12); }
 @media (max-width: 760px) { .bulkbar { top: 64px; } }

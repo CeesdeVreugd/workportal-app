@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V27: ordermap op verzoek, gespreksnotities, bulk omzetten, Komdex-ordertypes"
+set "OMSCHRIJVING=WorkPortal V28: knop Selectie wissen zichtbaar"
 
 echo.
 echo ============================================
