@@ -44,18 +44,11 @@ def index():
     q = (request.args.get("q") or "").strip()
     tab = request.args.get("tab")
     view = request.args.get("view") or ("projecten" if tab == "projecten" else "relaties")
+    if view == "projecten":
+        return redirect(url_for("projecten.index", q=q or None))
     flt = request.args.get("filter") or (tab if tab in ("klanten", "leveranciers", "alle", "vervallen") else None)
     like = f"%{q}%"
-    customers, projects = [], []
-    if view == "projecten":
-        flt = flt if flt in ("actief", "afgerond", "gearchiveerd", "alle") else "actief"
-        where, params = ["(p.number LIKE ? OR p.name LIKE ? OR IFNULL(c.name,'') LIKE ?)"], [like, like, like]
-        if flt != "alle":
-            where.append("p.status = ?")
-            params.append(flt)
-        projects = query("SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id"
-                         " WHERE " + " AND ".join(where) + " ORDER BY p.number DESC", params)
-    else:
+    if True:
         view = "relaties"
         flt = flt if flt in ("klanten", "leveranciers", "alle", "vervallen") else "klanten"
         where = ["(c.name LIKE ? OR IFNULL(c.short_name,'') LIKE ? OR IFNULL(c.city,'') LIKE ? OR IFNULL(c.debtor_no,'') LIKE ?"
@@ -74,10 +67,8 @@ def index():
     counts = query("SELECT COUNT(*) AS alle, SUM(active = 1 AND IFNULL(relation_type,'') IN ('klant','beide','instelling','prospect',''))"
                    " AS klanten, SUM(active = 1 AND relation_type IN ('leverancier','beide')) AS leveranciers,"
                    " SUM(active = 0) AS vervallen FROM customers", one=True)
-    pcounts = query("SELECT COUNT(*) AS alle, SUM(status = 'actief') AS actief, SUM(status = 'afgerond') AS afgerond,"
-                    " SUM(status = 'gearchiveerd') AS gearchiveerd FROM projects", one=True)
-    return render_template("klanten/index.html", customers=customers, projects=projects, q=q, view=view, flt=flt,
-                           counts=counts, pcounts=pcounts, TYPE_LABELS=TYPE_LABELS)
+    return render_template("klanten/index.html", customers=customers, q=q, view=view, flt=flt,
+                           counts=counts, TYPE_LABELS=TYPE_LABELS)
 
 
 def _customer_values():
@@ -240,211 +231,40 @@ def installation(iid):
                            projects=projects, files=files_for("installation", iid), edit=request.args.get("bewerken"))
 
 
-# ---------------------------------------------------------------- projecten
+# ---------------------------------------------------------------- oude projectlinks -> nieuwe modules
 
 def _sp_on():
     return sp.connected(get_db())
 
 
-def _sp_try(fn, *args):
-    """Voert een SharePoint-actie uit en vertaalt fouten naar een nette melding."""
-    try:
-        return fn(get_db(), *args)
-    except sp.GraphError as exc:
-        return False, f"SharePoint gaf een fout ({exc.status}): {exc.message}"
-    except (requests.RequestException, RuntimeError) as exc:
-        return False, f"SharePoint niet bereikbaar: {exc}"
-
-
-def _make_folder(pid, next_url):
-    """Maakt de projectmap aan; stuurt door naar 'klantmap kiezen' als de klant nog geen map heeft."""
-    p = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True)
-    if not p["customer_id"]:
-        flash("Geen klant gekozen, dus geen projectmap in SharePoint aangemaakt.", "error")
-        return None
-    ok, msg = _sp_try(sp.create_project_folder, pid)
-    if msg == "nofolder":
-        return redirect(url_for("klanten.klantmap", cid=p["customer_id"], project=pid, next=next_url))
-    flash(msg, "ok" if ok else "error")
-    if ok:
-        audit("projectmap", "project", pid, msg)
-    return None
-
-
-@bp.route("/projecten/nieuw", methods=["GET", "POST"])
-@require("klanten", BEWERKEN)
-def new_project():
-    customers = customer_options(to_int(request.values.get("customer_id") or request.args.get("klant")))
-    sp_on = _sp_on()
-    if request.method == "POST":
-        make = sp_on and request.form.get("sp_create")
-        err = None
-        if not _f("number") or not _f("name"):
-            err = "Vul projectnummer en omschrijving in."
-        elif query("SELECT 1 FROM projects WHERE number = ?", (_f("number"),), one=True):
-            err = "Dit projectnummer bestaat al."
-        elif make and not sp.NUMBER_RE.match(_f("number")):
-            err = "Voor een projectmap in SharePoint moet het projectnummer het ordernummer van 8 cijfers zijn (bijv. 20260138)."
-        elif make and not to_int(request.form.get("customer_id")):
-            err = "Kies een klant: de projectmap komt in de map van die klant."
-        if err:
-            flash(err, "error")
-            return render_template("klanten/project_form.html", p=request.form, customers=customers, sp_on=sp_on,
-                                   next=request.form.get("next", ""))
-        pid = execute("INSERT INTO projects (number, name, customer_id, status, sharepoint_path, notes, created_at, source)"
-                      " VALUES (?,?,?,?,?,?,?,?)",
-                      (_f("number"), _f("name"), to_int(request.form.get("customer_id")), _f("status") or "actief",
-                       None if make else _f("sharepoint_path"), _f("notes"), now_iso(), "workportal"))
-        audit("aangemaakt", "project", pid, _f("number"))
-        flash("Project aangemaakt.", "ok")
-        nxt = request.form.get("next")
-        target = nxt if nxt and nxt.startswith("/") else url_for("klanten.project", pid=pid)
-        if make:
-            r = _make_folder(pid, target)
-            if r:
-                return r
-        return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
-    return render_template("klanten/project_form.html", customers=customers, sp_on=sp_on,
-                           p={"customer_id": request.args.get("klant"), "status": "actief", "sp_create": "1"},
-                           next=request.args.get("next", ""))
+@bp.route("/projecten/nieuw")
+def old_new_project():
+    return redirect(url_for("projecten.new", **request.args.to_dict()))
 
 
 @bp.route("/projecten/<int:pid>")
-@require("klanten", LEZEN)
-def project(pid):
-    p = query("SELECT p.*, c.name AS customer FROM projects p LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?",
-              (pid,), one=True) or abort(404)
-    tickets = query("SELECT * FROM tickets WHERE project_id = ? ORDER BY created_at DESC", (pid,))
-    tests = query("SELECT * FROM pressure_tests WHERE project_id = ? ORDER BY created_at DESC", (pid,))
-    calcs = query("SELECT * FROM calculations WHERE project_id = ? ORDER BY created_at DESC", (pid,))
-    nacalcs = query("SELECT * FROM nacalcs WHERE project_id = ? ORDER BY imported_at DESC", (pid,))
-    installations = query("SELECT * FROM installations WHERE project_id = ?", (pid,))
-    sp_on = _sp_on()
-    folder = sp.customer_folder(get_db(), p["customer_id"]) if sp_on else None
-    return render_template("klanten/project.html", p=p, tickets=tickets, tests=tests, calcs=calcs, nacalcs=nacalcs,
-                           installations=installations, sp_on=sp_on, folder=folder,
-                           folder_name=sp.folder_name(p["number"], p["name"]))
-
-
-@bp.route("/projecten/<int:pid>/bewerken", methods=["GET", "POST"])
-@require("klanten", BEWERKEN)
-def edit_project(pid):
-    p = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) or abort(404)
-    customers = customer_options(p["customer_id"])
-    sp_on = _sp_on()
-    if request.method == "POST":
-        if not _f("number") or not _f("name"):
-            flash("Vul projectnummer en omschrijving in.", "error")
-        elif query("SELECT 1 FROM projects WHERE number = ? AND id <> ?", (_f("number"), pid), one=True):
-            flash("Dit projectnummer bestaat al.", "error")
-        else:
-            execute("UPDATE projects SET number=?, name=?, customer_id=?, status=?, sharepoint_path=?, notes=? WHERE id=?",
-                    (_f("number"), _f("name"), to_int(request.form.get("customer_id")), _f("status") or "actief",
-                     _f("sharepoint_path") if not p["sp_item_id"] else p["sharepoint_path"], _f("notes"), pid))
-            audit("gewijzigd", "project", pid)
-            flash("Project opgeslagen.", "ok")
-            target = url_for("klanten.project", pid=pid)
-            if sp_on and p["sp_item_id"] and not p["sp_missing"] and (_f("number"), _f("name")) != (p["number"], p["name"]):
-                try:
-                    msg = sp.rename_project_folder(get_db(), pid)
-                except (requests.RequestException, RuntimeError) as exc:
-                    msg = f"Map in SharePoint niet hernoemd: {exc}"
-                if msg:
-                    flash(msg, "error" if "niet" in msg else "ok")
-            elif sp_on and not p["sp_item_id"] and request.form.get("sp_create"):
-                r = _make_folder(pid, target)
-                if r:
-                    return r
-            return redirect(target)
-    return render_template("klanten/project_form.html", p=p, customers=customers, edit=True, sp_on=sp_on)
-
-
-@bp.route("/projecten/<int:pid>/map-aanmaken", methods=["POST"])
-@require("klanten", BEWERKEN)
-def make_project_folder(pid):
-    query("SELECT id FROM projects WHERE id = ?", (pid,), one=True) or abort(404)
-    target = url_for("klanten.project", pid=pid)
-    if not _sp_on():
-        flash("SharePoint is niet gekoppeld.", "error")
-        return redirect(target)
-    return _make_folder(pid, target) or redirect(target)
-
-
-def _can_see_folder():
-    if not (can("klanten") or can("service") or can("druktest")):
-        abort(403)
-
-
-def _project_sp(pid):
-    p = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) or abort(404)
-    if not p["sp_item_id"] or not _sp_on():
-        abort(404)
-    return p
-
-
-@bp.route("/projecten/<int:pid>/map")
-def project_folder(pid):
-    _can_see_folder()
-    p = _project_sp(pid)
-    try:
-        rel = sp.safe_rel(request.args.get("pad", ""))
-    except ValueError:
-        abort(400)
-    error, items = None, []
-    try:
-        items = sp.list_folder(get_db(), pid, rel)
-    except sp.GraphError as exc:
-        error = "Deze map bestaat niet (meer) in SharePoint." if exc.status == 404 else f"SharePoint gaf een fout ({exc.status})."
-    except (requests.RequestException, RuntimeError):
-        error = "SharePoint is op dit moment niet bereikbaar."
-    parts = rel.split("/") if rel else []
-    crumbs = [("/".join(parts[:i + 1]), parts[i]) for i in range(len(parts))]
-    tpl = "klanten/_folder_list.html" if request.args.get("partial") else "klanten/project_folder.html"
-    return render_template(tpl, p=p, items=items, rel=rel, crumbs=crumbs, error=error,
-                           folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"]))
-
-
-@bp.route("/projecten/<int:pid>/bestand")
-def project_file(pid):
-    _can_see_folder()
-    _project_sp(pid)
-    rel = request.args.get("pad", "")
-    try:
-        meta, r = sp.open_file(get_db(), pid, rel)
-    except ValueError:
-        abort(400)
-    except sp.GraphError as exc:
-        abort(404 if exc.status == 404 else 502)
-    name = meta.get("name") or "bestand"
-    mime = (meta.get("file") or {}).get("mimeType") or "application/octet-stream"
-    inline = request.args.get("download") != "1" and (mime.startswith("image/") or mime in ("application/pdf", "text/plain"))
-    disp = "inline" if inline else "attachment"
-    headers = {"Content-Disposition": f"{disp}; filename*=UTF-8''{quote(name)}", "Cache-Control": "private, max-age=300"}
-    if meta.get("size"):
-        headers["Content-Length"] = str(meta["size"])
-    return Response(stream_with_context(r.iter_content(64 * 1024)), mimetype=mime, headers=headers)
-
-
-@bp.route("/projecten/<int:pid>/verwijderen", methods=["POST"])
-@require("klanten", BEHEER)
-def delete_project(pid):
-    execute("DELETE FROM projects WHERE id = ?", (pid,))
-    audit("verwijderd", "project", pid)
-    flash("Project verwijderd. De map in SharePoint is niet aangeraakt.", "ok")
-    return redirect(url_for("klanten.index", view="projecten"))
+@bp.route("/projecten/<int:pid>/<path:rest>")
+def old_project(pid, rest=None):
+    from .werk import werk_url
+    p = query("SELECT kind FROM projects WHERE id = ?", (pid,), one=True) or abort(404)
+    ep = {"map": "project_folder", "bestand": "project_file", "bewerken": "edit"}.get(rest or "", "detail")
+    return redirect(werk_url(ep, p, pid=pid, **request.args.to_dict()))
 
 
 # ---------------------------------------------------------------- klantmap in SharePoint
 
 @bp.route("/<int:cid>/klantmap", methods=["GET", "POST"])
-@require("klanten", BEWERKEN)
 def klantmap(cid):
+    if not (can("klanten", BEWERKEN) or can("projecten", BEWERKEN) or can("orders", BEWERKEN)):
+        abort(403)
+    from .werk import make_folder as _make_folder, werk_url
     c = query("SELECT * FROM customers WHERE id = ?", (cid,), one=True) or abort(404)
     if not _sp_on():
         flash("SharePoint is niet gekoppeld.", "error")
         return redirect(url_for("klanten.customer", cid=cid))
     pid = to_int(request.values.get("project"))
-    nxt = request.values.get("next") or (url_for("klanten.project", pid=pid) if pid else url_for("klanten.customer", cid=cid))
+    prow = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) if pid else None
+    nxt = request.values.get("next") or (werk_url("detail", prow, pid=pid) if prow else url_for("klanten.customer", cid=cid))
     if not nxt.startswith("/"):
         nxt = url_for("klanten.customer", cid=cid)
     conn = get_db()
@@ -452,7 +272,7 @@ def klantmap(cid):
         action = request.form.get("action")
         if action == "overslaan":
             if pid:
-                flash("Projectmap niet aangemaakt. Dat kan later alsnog via de projectpagina.", "info")
+                flash("Map niet aangemaakt. Dat kan later alsnog via de project- of orderpagina.", "info")
             return ask_snelstart(cid, nxt) or redirect(nxt)
         try:
             if action == "nieuw":
@@ -485,7 +305,7 @@ def klantmap(cid):
                            new_name=sp.customer_folder_name(conn, c["name"], c["debtor_no"]),
                            suggestions=sp.suggestions(conn, cid),
                            folders=query("SELECT * FROM sp_folders WHERE missing = 0 AND customer_id IS NULL ORDER BY name COLLATE NOCASE"),
-                           project=query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) if pid else None)
+                           project=prow)
 
 
 @bp.route("/<int:cid>/klantmap/ontkoppelen", methods=["POST"])

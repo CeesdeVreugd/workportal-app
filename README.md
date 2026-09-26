@@ -139,6 +139,43 @@ WorkPortal koppelt projecten aan de mappen in `Projecten/<Klantmap>/<ordernummer
 
 Foutmelding 403 bij verbinden = stap 2 ontbreekt of is voor een andere site gedaan.
 
+## Orders uit Komdex (actievenster "Nieuwe orders")
+
+Komdex maakt bij een nieuwe order een map aan op de server. De Docker-VM zit in een ander VLAN, dus
+WorkPortal leest die map niet zelf uit. Het script `scripts/komdex-orders.ps1` draait als geplande taak
+op een server die wél bij de Komdex-map kan en stuurt elke 5 minuten de lijst met ordermappen via HTTPS
+naar WorkPortal (alleen lezen, er wordt niets gewijzigd).
+
+1. Bedenk een lange willekeurige sleutel (bijv. 40 tekens) en zet die in Portainer als `KOMDEX_KEY`
+   → Update the stack.
+2. Kopieer `scripts/komdex-orders.ps1` naar de server (bijv. `C:\Scripts\`) en vul bovenin in:
+   `$OrderMap` (de Komdex-ordermap), `$Sleutel` (= `KOMDEX_KEY`) en eventueel `$Diepte`
+   (1 als de ordermappen per klant in een submap staan).
+3. Test: `powershell -ExecutionPolicy Bypass -File C:\Scripts\komdex-orders.ps1`. In
+   `komdex-orders.log` staat `OK: … ordermappen`. De eerste keer worden alle bestaande mappen alleen
+   onthouden; pas mappen die daarna verschijnen komen in het actievenster.
+4. Taakplanner: elke 5 minuten, "uitvoeren ongeacht of gebruiker is aangemeld", account met leesrecht.
+5. De server moet `https://workportal.devreugd-pt.nl` kunnen bereiken. Staat er in Nginx Proxy Manager een
+   IP-toegangslijst op de host, voeg dan het IP van deze server toe.
+
+Nieuwe mappen verschijnen onder **Orders → Nieuwe orders** (en op het dashboard). Gebruikers met de rol
+Verkoop-Inkoop-WVB of Directie krijgen een push-/mailmelding. Daar kies je **order** of **project**, de klant
+en de omschrijving; WorkPortal maakt dan de map in de klantmap in SharePoint:
+
+- Project: `<ordernummer>-<omschrijving>` → Power Automate zet het sjabloon erin en plaatst de Teams-post.
+- Order: `<ordernummer> <omschrijving>` (spatie, geen streepje) → Power Automate doet niets.
+
+Controleer eenmalig dat de Power Automate-flow een map als `20260138 Omschrijving` níet oppakt.
+
+**Orderbon: automatisch verwerken.** Staat er in de ordermap een PDF met "orderbon" in de naam (de
+orderbon uit Komdex), dan stuurt het script die mee. WorkPortal leest ordernummer, ordertype, omschrijving,
+klant, uitvoerder, order- en leverdatum en de werkomschrijving uit. Is het ordertype bekend als project of
+order (in te stellen onderaan **Orders → Nieuwe orders**, of met het vinkje "voortaan automatisch" bij het
+goedzetten) en is de klant bekend met een klantmap, dan maakt WorkPortal het project of de order zelf aan,
+met map. Anders komt hij in het actievenster, met de gegevens van de bon al ingevuld. Een melding gaat pas
+de deur uit als er na 10 minuten nog steeds actie nodig is. De werkomschrijving en de orderbon zijn te zien
+bij het project/de order en bij gekoppelde servicetickets.
+
 ## Back-ups
 
 - Elke nacht om 02:00 maakt de app een kopie van de database in `/data/backups`
@@ -169,6 +206,7 @@ regie-Excel kan handmatig worden geüpload bij Na-calculatie.
 ## Rechten
 
 Per functierol en module: **Geen · Lezen · Bewerken · Beheer** (Beheer = ook verwijderen).
+Relaties, Projecten en Orders zijn aparte modules met eigen rechten.
 Aan te passen in Beheer → Rechten per functierol. Een gebruiker kan meerdere functierollen
 hebben; per module geldt dan het hoogste recht van die rollen. Per gebruiker kunnen extra rechten
 worden gegeven. Een gebruiker met "Beheerder" aangevinkt heeft overal alle rechten.

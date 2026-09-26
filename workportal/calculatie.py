@@ -129,7 +129,7 @@ def index():
 @require("calculatie", BEWERKEN)
 def new():
     customers = customer_options(to_int(request.form.get("customer_id")))
-    projects = query("SELECT id, number, name, customer_id FROM projects ORDER BY number DESC")
+    projects = query("SELECT id, number, name, customer_id FROM projects WHERE kind = 'project' ORDER BY number DESC")
     if request.method == "POST":
         worktypes = [w for w in request.form.getlist("worktypes") if w in dict(WORKTYPES)]
         title = _f("title")
@@ -168,7 +168,7 @@ def new():
 def edit(cid):
     data = _calc_or_404(cid)
     customers = customer_options(data["customer_id"])
-    projects = query("SELECT id, number, name, customer_id FROM projects ORDER BY number DESC")
+    projects = query("SELECT id, number, name, customer_id FROM projects WHERE kind = 'project' ORDER BY number DESC")
     nacalcs = query("SELECT id, imported_at, order_no FROM nacalcs WHERE calc_id = ? ORDER BY imported_at DESC", (cid,))
     readonly = not can("calculatie", BEWERKEN)
     return render_template("calculatie/edit.html", c=data, customers=customers, projects=projects, nacalcs=nacalcs,

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import opt %}
-{% block title %}{{ 'Project bewerken' if edit else 'Nieuw project' }}{% endblock %}
+{% block title %}{{ K.label ~ ' bewerken' if edit else ('Nieuw project' if K.kind == 'project' else 'Nieuwe order') }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for('klanten.index', view='projecten') }}">Projecten</a></div>
-<h1>{{ 'Project bewerken' if edit else 'Nieuw project' }}</h1>
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a></div>
+<h1>{{ K.label ~ ' bewerken' if edit else ('Nieuw project' if K.kind == 'project' else 'Nieuwe order') }}</h1>
 <form method="post" class="card form" style="max-width:820px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="next" value="{{ next or '' }}">
@@ -13,9 +13,9 @@
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ p.name or '' }}" required></label>
     <label class="f full">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
     {% if sp_on and not p.sp_item_id %}
-    <label class="check full"><input type="checkbox" name="sp_create" value="1" {{ 'checked' if p.sp_create }}> <span><b>Projectmap aanmaken in SharePoint</b><br><span class="hint">Maakt <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aan in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post. Het projectnummer moet dan het ordernummer van 8 cijfers zijn.</span></span></label>
+    <label class="check full"><input type="checkbox" name="sp_create" value="1" {{ 'checked' if p.sp_create }}> <span><b>{{ K.label }}map aanmaken in SharePoint</b><br><span class="hint">{% if K.kind == 'project' %}Maakt <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aan in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post.{% else %}Maakt <code>&lt;ordernummer&gt; &lt;omschrijving&gt;</code> (zonder streepje) aan in de klantmap, zodat Power Automate hem niet als project oppakt.{% endif %} Het ordernummer moet uit 8 cijfers bestaan.</span></span></label>
     {% elif sp_on and p.sp_item_id %}
-    <div class="f full"><span class="hint">{{ 'Projectmap is gekoppeld. Wijzig je nummer of omschrijving, dan wordt de map in SharePoint mee hernoemd.' }}</span></div>
+    <div class="f full"><span class="hint">{{ K.label }}map is gekoppeld. Wijzig je nummer of omschrijving, dan wordt de map in SharePoint mee hernoemd.</span></div>
     {% else %}
     <label class="f full">SharePoint-map<input type="text" name="sharepoint_path" value="{{ p.sharepoint_path or '' }}" placeholder="bijv. Projecten/20260102 Aanpassing leidingdeel"><span class="hint">Map waarin druktestrapporten en werkbonnen worden geplaatst. Leeg = standaardmap met projectnummer.</span></label>
     {% endif %}

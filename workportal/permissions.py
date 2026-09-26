@@ -7,7 +7,9 @@ GEEN, LEZEN, BEWERKEN, BEHEER = 0, 1, 2, 3
 LEVEL_NAMES = {0: "Geen", 1: "Lezen", 2: "Bewerken", 3: "Beheer"}
 
 MODULES = [
-    ("klanten", "Relaties & projecten"),
+    ("klanten", "Relaties"),
+    ("projecten", "Projecten"),
+    ("orders", "Orders"),
     ("service", "Service & onderhoud"),
     ("druktest", "Druktestregistratie"),
     ("calculatie", "Calculatie"),
@@ -20,7 +22,7 @@ MODULE_KEYS = [m for m, _ in MODULES]
 
 # Modules gegroepeerd onder koppen (menu en rechtenpagina)
 MODULE_GROUPS = [
-    ("Relaties", ["klanten"]),
+    ("Relaties & werk", ["klanten", "projecten", "orders"]),
     ("Uitvoering", ["service", "druktest"]),
     ("Calculatie & financiën", ["calculatie", "nacalculatie"]),
     ("Kennis", ["kennis", "kennis_schrijven"]),
@@ -38,6 +40,8 @@ ROLES = [
 # Standaardinstelling uit de opzet (aanpasbaar in Beheer)
 DEFAULT_MATRIX = {
     "klanten":          {"administratie": 3, "directie": 3, "verkoop": 2, "engineering": 1, "werkplaats": 1},
+    "projecten":        {"administratie": 3, "directie": 3, "verkoop": 2, "engineering": 2, "werkplaats": 1},
+    "orders":           {"administratie": 3, "directie": 3, "verkoop": 2, "engineering": 1, "werkplaats": 1},
     "service":          {"administratie": 1, "directie": 1, "verkoop": 1, "engineering": 2, "werkplaats": 2},
     "druktest":         {"administratie": 1, "directie": 1, "verkoop": 1, "engineering": 2, "werkplaats": 2},
     "calculatie":       {"administratie": 1, "directie": 3, "verkoop": 2, "engineering": 2, "werkplaats": 0},

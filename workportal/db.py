@@ -379,6 +379,51 @@ MIGRATIONS = [
     );
     INSERT INTO user_roles (user_id, role_id) SELECT id, role_id FROM users WHERE role_id IS NOT NULL;
     """,
+    # 6 - Projecten en Orders als losse modules, actievenster voor nieuwe ordermappen uit Komdex
+    """
+    ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'project';
+    CREATE INDEX idx_projects_kind ON projects(kind);
+    INSERT OR IGNORE INTO role_permissions (role_id, module, level) SELECT role_id, 'projecten', level FROM role_permissions WHERE module = 'klanten';
+    INSERT OR IGNORE INTO role_permissions (role_id, module, level) SELECT role_id, 'orders', level FROM role_permissions WHERE module = 'klanten';
+    INSERT OR IGNORE INTO user_permissions (user_id, module, level) SELECT user_id, 'projecten', level FROM user_permissions WHERE module = 'klanten';
+    INSERT OR IGNORE INTO user_permissions (user_id, module, level) SELECT user_id, 'orders', level FROM user_permissions WHERE module = 'klanten';
+    CREATE TABLE order_inbox (
+        id INTEGER PRIMARY KEY,
+        source TEXT NOT NULL DEFAULT 'komdex',
+        path TEXT NOT NULL UNIQUE,
+        folder TEXT,
+        parent TEXT,
+        number TEXT,
+        description TEXT,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'nieuw',
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        first_seen TEXT NOT NULL,
+        last_seen TEXT,
+        missing INTEGER NOT NULL DEFAULT 0,
+        handled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        handled_at TEXT
+    );
+    CREATE INDEX idx_inbox_status ON order_inbox(status);
+    CREATE INDEX idx_inbox_number ON order_inbox(number);
+    """,
+    # 7 - orderbon uit Komdex: gegevens bij project/order en automatisch verwerken op ordertype
+    """
+    ALTER TABLE projects ADD COLUMN order_type TEXT;
+    ALTER TABLE projects ADD COLUMN executor TEXT;
+    ALTER TABLE projects ADD COLUMN order_date TEXT;
+    ALTER TABLE projects ADD COLUMN delivery_date TEXT;
+    ALTER TABLE projects ADD COLUMN delivery_week TEXT;
+    ALTER TABLE projects ADD COLUMN reference TEXT;
+    ALTER TABLE projects ADD COLUMN contact_name TEXT;
+    ALTER TABLE projects ADD COLUMN work_description TEXT;
+    ALTER TABLE projects ADD COLUMN bon_file_id INTEGER;
+    ALTER TABLE order_inbox ADD COLUMN bon_json TEXT;
+    ALTER TABLE order_inbox ADD COLUMN bon_file_id INTEGER;
+    ALTER TABLE order_inbox ADD COLUMN bon_received_at TEXT;
+    ALTER TABLE order_inbox ADD COLUMN notified_at TEXT;
+    ALTER TABLE order_inbox ADD COLUMN note TEXT;
+    """,
 ]
 
 

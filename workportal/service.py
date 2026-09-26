@@ -27,7 +27,7 @@ def _f(name):
 def _ticket(tid):
     t = query(
         "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location, i.name AS installation,"
-        " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing,"
+        " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, p.kind AS project_kind, p.work_description AS project_work, p.bon_file_id AS project_bon,"
         " ct.name AS contact, ct.phone AS contact_phone, ct.email AS contact_email, u.name AS assignee"
         " FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN locations l ON l.id = t.location_id"
         " LEFT JOIN installations i ON i.id = t.installation_id LEFT JOIN projects p ON p.id = t.project_id"
@@ -44,7 +44,7 @@ def _lookups(customer_id=None):
         locations=query("SELECT id, customer_id, name FROM locations ORDER BY name"),
         installations=query("SELECT id, customer_id, name, serial FROM installations ORDER BY name"),
         contacts=query("SELECT id, customer_id, name FROM contacts ORDER BY name"),
-        projects=query("SELECT id, customer_id, number, name FROM projects WHERE status = 'actief' OR customer_id = ? ORDER BY number DESC",
+        projects=query("SELECT id, customer_id, number, name, kind FROM projects WHERE status = 'actief' OR customer_id = ? ORDER BY number DESC",
                        (customer_id or 0,)),
         users=query("SELECT id, name FROM users WHERE active = 1 ORDER BY name"),
         TYPES=TYPES, STATUSES=STATUSES, PRIOS=PRIOS,

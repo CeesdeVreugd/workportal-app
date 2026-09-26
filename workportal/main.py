@@ -95,9 +95,13 @@ def file(fid, name=None):
     row = query("SELECT * FROM files WHERE id = ?", (fid,), one=True)
     if not row:
         abort(404)
-    module = ENTITY_MODULE.get(row["entity"])
-    if module and not can(module):
-        abort(403)
+    if row["entity"] in ("project", "order_inbox"):
+        if not (can("projecten") or can("orders") or can("service") or can("druktest")):
+            abort(403)
+    else:
+        module = ENTITY_MODULE.get(row["entity"])
+        if module and not can(module):
+            abort(403)
     download = request.args.get("download") == "1"
     return send_file(file_path(row), mimetype=row["mime"] or None, download_name=row["filename"],
                      as_attachment=download, max_age=3600)

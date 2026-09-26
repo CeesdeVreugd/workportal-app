@@ -33,7 +33,10 @@
     </a>
     <div class="nav">
       {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
-      {% if can('klanten') %}<div class="navhead">Relaties</div>{{ navlink('klanten.index', 'Relaties & projecten', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('klanten') or can('projecten') or can('orders') %}<div class="navhead">Relaties &amp; werk</div>{% endif %}
+      {% if can('klanten') %}{{ navlink('klanten.index', 'Relaties', 'klanten', 'klanten.') }}{% endif %}
+      {% if can('projecten') %}{{ navlink('projecten.index', 'Projecten', 'project', 'projecten.') }}{% endif %}
+      {% if can('orders') %}<a href="{{ url_for('orders.index') }}" class="{{ 'active' if ep.startswith('orders.') }}">{{ icon('order') }}<span>Orders</span>{% if inbox_count() %}<span class="navbadge" title="Nieuwe orders uit Komdex">{{ inbox_count() }}</span>{% endif %}</a>{% endif %}
       {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
       {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
       {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}
@@ -82,7 +85,7 @@
   {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}" class="{{ 'active' if ep.startswith('druktest.') }}">{{ icon('druktest') }}Druktest</a>{% endif %}
   {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}" class="{{ 'active' if ep.startswith('calculatie.') or ep.startswith('nacalc.') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
   {% if can('kennis') %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
-  <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
+  <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('projecten.') or ep.startswith('orders.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
 </nav>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>
 {% block scripts %}{% endblock %}

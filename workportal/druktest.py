@@ -40,7 +40,7 @@ def _label(minutes):
 
 
 def _test(tid):
-    t = query("SELECT t.*, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, c.name AS customer,"
+    t = query("SELECT t.*, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, p.kind AS project_kind, c.name AS customer,"
               " u.name AS creator FROM pressure_tests t LEFT JOIN projects p ON p.id = t.project_id"
               " LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN users u ON u.id = t.created_by WHERE t.id = ?",
               (tid,), one=True)
@@ -84,7 +84,7 @@ def index():
 @bp.route("/nieuw", methods=["GET", "POST"])
 @require("druktest", BEWERKEN)
 def new():
-    projects = query("SELECT p.id, p.number, p.name, c.name AS customer FROM projects p LEFT JOIN customers c"
+    projects = query("SELECT p.id, p.number, p.name, p.kind, c.name AS customer FROM projects p LEFT JOIN customers c"
                      " ON c.id = p.customer_id WHERE p.status = 'actief' ORDER BY p.number DESC")
     last = query("SELECT gauge_id, gauge_cal_date FROM pressure_tests WHERE created_by = ? ORDER BY id DESC LIMIT 1",
                  (g.user["id"],), one=True)

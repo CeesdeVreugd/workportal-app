@@ -6,7 +6,7 @@
 {% set badge = {'bad':'b-bad','warn':'b-warn','ok':'b-ok','okplus':'b-okplus','info':'b-blue','':''} %}
 <div class="crumbs"><a href="{{ url_for('nacalc.index') }}">Na-calculatie</a> / {{ n.order_no }}</div>
 <div class="pagehead">
-  <div><div class="eyebrow">Order {{ n.order_no }}{% if n.project_id %} · <a href="{{ url_for('klanten.project', pid=n.project_id) }}">project {{ n.project_no }}</a>{% endif %}</div>
+  <div><div class="eyebrow">Order {{ n.order_no }}{% if n.project_id %} · <a href="{{ url_for('projecten.detail', pid=n.project_id) }}">{{ n.project_no }}</a>{% endif %}</div>
     <h1>{{ n.order_desc or 'Na-calculatie' }}</h1>
     <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
   <div class="actions">

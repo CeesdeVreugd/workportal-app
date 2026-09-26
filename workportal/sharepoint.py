@@ -30,6 +30,19 @@ from .util import now_iso
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 PROJECT_RE = re.compile(r"^\s*(\d{8})\s*-\s*(.+?)\s*$")
+# Ordermap: nummer, spatie, omschrijving, zonder streepje, zodat Power Automate hem niet als project oppakt
+ORDER_RE = re.compile(r"^\s*(\d{8})\s+([^\s\-\u2013].*?)\s*$")
+
+
+def parse_werk(name):
+    """Geeft (nummer, omschrijving, 'project'|'order') voor een map in een klantmap, of None."""
+    m = PROJECT_RE.match(name or "")
+    if m:
+        return m.group(1), m.group(2), "project"
+    m = ORDER_RE.match(name or "")
+    if m:
+        return m.group(1), m.group(2), "order"
+    return None
 NUMBER_RE = re.compile(r"^\d{8}$")
 SMALL_UPLOAD = 4 * 1024 * 1024
 CHUNK = 320 * 1024 * 10  # veelvoud van 320 KiB, zoals Graph vereist
@@ -207,11 +220,13 @@ def norm(s):
     return "".join(words)
 
 
-def folder_name(number, name):
-    """Mapnaam zoals Power Automate hem herkent: <ordernummer>-<omschrijving>."""
+def folder_name(number, name, kind="project"):
+    """Project: <ordernummer>-<omschrijving> (Power Automate zet het sjabloon erin).
+    Order: <ordernummer> <omschrijving> (zonder streepje, Power Automate doet niets)."""
     desc = re.sub(r'["*:<>?/\\|#%]+', " ", name or "")
-    desc = re.sub(r"\s+", " ", desc).strip().rstrip(".").strip()
-    return f"{number}-{desc}"[:200].rstrip(". ")
+    desc = re.sub(r"\s+", " ", desc).strip().rstrip(".").strip().lstrip("-\u2013 ")
+    sep = " " if kind == "order" else "-"
+    return f"{number}{sep}{desc}"[:200].rstrip(". ")
 
 
 def safe_rel(relpath):
@@ -399,10 +414,10 @@ def _upsert_folder(conn, item, stats):
 
 
 def _upsert_project(conn, item, parent_id, stats, status):
-    m = PROJECT_RE.match(item.get("name") or "")
-    if not m:
+    parsed = parse_werk(item.get("name"))
+    if not parsed:
         return
-    number, desc = m.group(1), m.group(2)
+    number, desc, kind = parsed
     f = conn.execute("SELECT customer_id FROM sp_folders WHERE item_id = ?", (parent_id,)).fetchone()
     cust = f["customer_id"] if f else None
     row = conn.execute("SELECT * FROM projects WHERE sp_item_id = ?", (item["id"],)).fetchone()
@@ -412,10 +427,11 @@ def _upsert_project(conn, item, parent_id, stats, status):
                 "SELECT 1 FROM projects WHERE number = ? AND id <> ?", (number, row["id"])).fetchone():
             new_number = number
         new_name = desc if (row["sp_name"] is None or row["name"] == row["sp_name"]) else row["name"]
-        changed = (new_number, new_name, parent_id) != (row["number"], row["name"], row["sp_parent_id"]) or row["sp_missing"]
+        changed = (new_number, new_name, parent_id, kind) != (row["number"], row["name"], row["sp_parent_id"], row["kind"]) \
+            or row["sp_missing"]
         conn.execute("UPDATE projects SET number = ?, name = ?, sp_name = ?, sp_parent_id = ?, sp_web_url = ?, sp_missing = 0,"
-                     " customer_id = COALESCE(?, customer_id) WHERE id = ?",
-                     (new_number, new_name, desc, parent_id, item.get("webUrl"), cust, row["id"]))
+                     " kind = ?, customer_id = COALESCE(?, customer_id) WHERE id = ?",
+                     (new_number, new_name, desc, parent_id, item.get("webUrl"), kind, cust, row["id"]))
         if changed:
             stats["bijgewerkt"] += 1
         return
@@ -429,8 +445,8 @@ def _upsert_project(conn, item, parent_id, stats, status):
     if setting(conn, "sp_auto_create") == "0":
         return
     conn.execute("INSERT INTO projects (number, name, customer_id, status, created_at, source, sp_item_id, sp_parent_id,"
-                 " sp_name, sp_web_url) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                 (number, desc, cust, status, now_iso(), "sharepoint", item["id"], parent_id, desc, item.get("webUrl")))
+                 " sp_name, sp_web_url, kind) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 (number, desc, cust, status, now_iso(), "sharepoint", item["id"], parent_id, desc, item.get("webUrl"), kind))
     stats["nieuw"] += 1
 
 
@@ -458,7 +474,7 @@ def _full_scan(conn, g, status):
             seen_p.update(r["sp_item_id"] for r in conn.execute("SELECT sp_item_id FROM projects WHERE sp_parent_id = ?", (f["id"],)))
             continue
         for k in kids:
-            if _is_folder(k) and PROJECT_RE.match(k.get("name") or ""):
+            if _is_folder(k) and parse_werk(k.get("name")):
                 seen_p.add(k["id"])
                 _upsert_project(conn, k, f["id"], stats, status)
     for r in conn.execute("SELECT id, sp_item_id FROM projects WHERE sp_item_id IS NOT NULL AND sp_missing = 0").fetchall():
@@ -508,7 +524,7 @@ def _delta(conn, g):
         if not _is_folder(it):
             continue
         parent = _parent(it)
-        if parent in folder_ids and PROJECT_RE.match(it.get("name") or ""):
+        if parent in folder_ids and parse_werk(it.get("name")):
             _upsert_project(conn, it, parent, stats, "actief")
         elif proj:
             conn.execute("UPDATE projects SET sp_missing = 1 WHERE id = ?", (proj["id"],))
@@ -708,22 +724,25 @@ def create_project_folder(conn, pid, g=None):
     g = g or client()
     drive, _ = _ctx(conn)
     p = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+    label = "Ordermap" if p["kind"] == "order" else "Projectmap"
     if p["sp_item_id"] and not p["sp_missing"]:
-        return True, "Projectmap was al gekoppeld."
+        return True, f"{label} was al gekoppeld."
     if not NUMBER_RE.match(p["number"] or ""):
-        return False, "Geen map aangemaakt: het projectnummer moet het ordernummer van 8 cijfers zijn (bijv. 20260138)."
+        return False, "Geen map aangemaakt: het ordernummer moet uit 8 cijfers bestaan (bijv. 20260138)."
     folder = customer_folder(conn, p["customer_id"])
     if not folder:
         return False, "nofolder"
-    name = folder_name(p["number"], p["name"])
+    name = folder_name(p["number"], p["name"], p["kind"])
     try:
         item = g.create_folder(drive, folder["item_id"], name)
-        msg = f"Projectmap '{name}' aangemaakt in {folder['name']}. Power Automate zet de sjabloonmappen erin."
+        msg = f"{label} '{name}' aangemaakt in {folder['name']}."
+        if p["kind"] != "order":
+            msg += " Power Automate zet de sjabloonmappen erin."
     except GraphError as exc:
         if exc.status != 409:
-            return False, f"Projectmap aanmaken mislukt: {exc.message}"
+            return False, f"{label} aanmaken mislukt: {exc.message}"
         item = g.item_by_path(drive, name, folder["item_id"])
-        msg = f"Bestaande projectmap '{name}' gekoppeld."
+        msg = f"Bestaande {label.lower()} '{name}' gekoppeld."
     conn.execute("UPDATE projects SET sp_item_id = ?, sp_parent_id = ?, sp_name = ?, sp_web_url = ?, sp_missing = 0 WHERE id = ?",
                  (item["id"], folder["item_id"], p["name"], item.get("webUrl"), pid))
     conn.commit()
@@ -736,7 +755,7 @@ def rename_project_folder(conn, pid, g=None):
         return None
     g = g or client()
     drive, _ = _ctx(conn)
-    name = folder_name(p["number"], p["name"])
+    name = folder_name(p["number"], p["name"], p["kind"])
     try:
         item = g.rename(drive, p["sp_item_id"], name)
     except GraphError as exc:
@@ -791,6 +810,6 @@ def upload_document(conn, project_id, sub, filename, data, g=None):
                     raise
                 parent = g.item_by_path(drive, sub, p["sp_item_id"])["id"]
         g.upload(drive, parent, filename, data)
-        return True, f"Opgeslagen in SharePoint ({folder_name(p['number'], p['sp_name'] or p['name'])}/{sub})"
+        return True, f"Opgeslagen in SharePoint ({folder_name(p['number'], p['sp_name'] or p['name'], p['kind'])}/{sub})"
     except GraphError as exc:
         return False, f"Opslaan in SharePoint mislukt: {exc.message}"

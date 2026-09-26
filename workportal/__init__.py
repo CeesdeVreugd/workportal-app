@@ -11,9 +11,9 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.8.6"
+VERSION = "1.10.0"
 
-PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon"}
+PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon"}
 
 
 def _secret_key(data_dir):
@@ -77,8 +77,14 @@ def create_app(test_config=None, start_scheduler=True):
     from .nacalc import bp as nacalc_bp
     from .kennis import bp as kennis_bp
     from .beheer import bp as beheer_bp
-    for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp):
+    from .komdex import bp as komdex_bp
+    from . import werk
+    for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp, komdex_bp):
         app.register_blueprint(bp)
+    # Projecten en Orders: dezelfde code, twee modules
+    app.register_blueprint(werk.bp, url_prefix="/projecten", name="projecten")
+    app.register_blueprint(werk.bp, url_prefix="/orders", name="orders")
+    app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count)
 
     @app.before_request
     def _before():

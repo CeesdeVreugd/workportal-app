@@ -31,7 +31,7 @@
 <div class="grid g2 stack">
   <section class="card"><h2>Gegevens</h2><dl class="dl">
     <dt>Serienummer</dt><dd>{{ i.serial or '–' }}</dd><dt>Bouwjaar</dt><dd>{{ i.year or '–' }}</dd>
-    <dt>Project</dt><dd>{% if i.project_id %}<a href="{{ url_for('klanten.project', pid=i.project_id) }}">{{ i.project_no }} {{ i.project_name }}</a>{% else %}–{% endif %}</dd>
+    <dt>Project</dt><dd>{% if i.project_id %}<a href="{{ url_for('projecten.detail', pid=i.project_id) }}">{{ i.project_no }} {{ i.project_name }}</a>{% else %}–{% endif %}</dd>
     <dt>Onderhoudsinterval</dt><dd>{{ (i.service_interval_months ~ ' maanden') if i.service_interval_months else '–' }}</dd>
     <dt>Volgend onderhoud</dt><dd>{{ i.next_service|date or '–' }}</dd>
     <dt>Notities</dt><dd class="prose" style="font-weight:400">{{ i.notes or '–' }}</dd></dl></section>

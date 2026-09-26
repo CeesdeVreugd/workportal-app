@@ -10,8 +10,8 @@
   <section class="card form">
     <h2>Leiding</h2>
     <div class="fgrid">
-      <label class="f full">Project<select name="project_id"><option value="">– geen project –</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name ~ ((' · ' ~ p.customer) if p.customer else ''), t.project_id) }}{% endfor %}</select>
-        {% if can('klanten', 2) %}<span class="hint">Project staat er niet bij? <a href="{{ url_for('klanten.new_project', next=url_for('druktest.new')) }}">Maak een project aan</a>.</span>{% endif %}</label>
+      <label class="f full">Project / order<select name="project_id"><option value="">– geen –</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name ~ ((' · ' ~ p.customer) if p.customer else '') ~ (' (order)' if p.kind == 'order' else ''), t.project_id) }}{% endfor %}</select>
+        {% if can('projecten', 2) or can('orders', 2) %}<span class="hint">Staat het er niet bij? {% if can('projecten', 2) %}<a href="{{ url_for('projecten.new', next=url_for('druktest.new')) }}">Nieuw project</a>{% endif %}{% if can('projecten', 2) and can('orders', 2) %} of {% endif %}{% if can('orders', 2) %}<a href="{{ url_for('orders.new', next=url_for('druktest.new')) }}">nieuwe order</a>{% endif %}.</span>{% endif %}</label>
       <label class="f">Tekeningnummer *<input type="text" name="drawing_no" value="{{ t.drawing_no or '' }}" required placeholder="bijv. 26014-P-102"></label>
       <label class="f">Revisie<input type="text" name="drawing_rev" value="{{ t.drawing_rev or '' }}" placeholder="bijv. B"></label>
       <label class="f full">Leiding- / lijnnummer<input type="text" name="line_no" value="{{ t.line_no or '' }}" placeholder="bijv. L-07"></label>

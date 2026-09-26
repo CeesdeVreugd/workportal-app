@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V23: wit app-icoon op iPhone"
+set "OMSCHRIJVING=WorkPortal V25: Relaties, Projecten en Orders; Komdex-ordermappen en orderbon automatisch verwerken"
 
 echo.
 echo ============================================

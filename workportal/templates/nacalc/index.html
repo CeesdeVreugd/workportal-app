@@ -25,7 +25,7 @@
     <p class="muted small">Upload de regie-Excel uit het ERP. Project wordt herkend op ordernummer (en aangemaakt als het nog niet bestaat).</p>
     <div class="fgrid">
       <label class="f full">Bestand (.xlsx) *<input type="file" name="file" accept=".xlsx" required></label>
-      <label class="f">Project<select name="project_id"><option value="">Automatisch op ordernummer</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name, pre_project) }}{% endfor %}</select></label>
+      <label class="f">Project / order<select name="project_id"><option value="">Automatisch op ordernummer</option>{% for p in projects %}{{ opt(p.id, p.number ~ ' · ' ~ p.name ~ (' (order)' if p.kind == 'order' else ''), pre_project) }}{% endfor %}</select></label>
       <label class="f">Calculatie<select name="calc_id"><option value="">Automatisch / geen</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, pre_calc) }}{% endfor %}</select></label>
     </div>
     <div><button class="btn {{ '' if pa else 'primary' }}">{{ icon('upload') }}Importeren</button></div>

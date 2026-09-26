@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Nieuwe orders{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('orders.index') }}">Orders</a> / Nieuwe orders</div>
+<div class="pagehead"><div><h1>Nieuwe orders</h1>
+  <p>Ordermappen die Komdex heeft aangemaakt. Zet ze goed: project of order, klant en omschrijving. WorkPortal maakt dan de map aan in de klantmap.</p></div></div>
+{% if not status.configured %}
+<div class="alertbox"><b>Komdex-koppeling nog niet ingesteld.</b> Zet <code>KOMDEX_KEY</code> in Portainer en plan het script <code>scripts/komdex-orders.ps1</code> in op de server met de Komdex-map (zie README).</div>
+{% elif status.last_push %}
+<p class="small muted">Laatste melding van de server: {{ status.last_push|dt }}{% if status.stale %} · <span class="badge b-warn">langer dan een uur geleden, controleer de geplande taak</span>{% endif %}</p>
+{% else %}
+<div class="alertbox">Koppeling ingesteld, maar het script heeft nog niets gestuurd. Controleer de geplande taak op de server.</div>
+{% endif %}
+
+{% for it in items %}
+<form method="post" action="{{ url_for('orders.inbox_handle', iid=it.id) }}" class="card form inboxitem" id="i{{ it.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card-head"><h2>{{ icon('folder') }} {{ it.folder }}</h2><span class="small muted">{{ it.parent ~ ' · ' if it.parent }}gezien {{ it.first_seen|dt }}</span></div>
+  {% if it.note %}<div class="alertbox" style="margin:0 0 12px">{{ it.note }}</div>{% endif %}
+  {% if it.bon %}{% set b = it.bon %}
+  <div class="bonbox">
+    <div class="bonhead">{{ icon('pdf') }} <b>Orderbon</b>{% if it.bon_file_id %} · <a href="{{ url_for('main.file', fid=it.bon_file_id) }}" target="_blank" rel="noopener">openen</a>{% endif %}</div>
+    <dl class="dl compact">
+      <dt>Ordertype</dt><dd><b>{{ b.order_type or '–' }}</b></dd>
+      <dt>Klant (bon)</dt><dd>{{ b.customer or '–' }}{% if b.city %} · {{ b.city }}{% endif %}</dd>
+      {% if b.contact %}<dt>T.a.v.</dt><dd>{{ b.contact }}</dd>{% endif %}
+      {% if b.executor %}<dt>Uitvoerder</dt><dd>{{ b.executor }}</dd>{% endif %}
+      {% if b.delivery_date %}<dt>Leverdatum</dt><dd>{{ b.delivery_date|date }}{% if b.delivery_week %} (week {{ b.delivery_week }}){% endif %}</dd>{% endif %}
+    </dl>
+  </div>
+  {% elif not it.note %}<p class="small muted" style="margin:0 0 10px">Nog geen orderbon in de map gevonden.</p>{% endif %}
+  <div class="kindpick">
+    <label class="kindopt"><input type="radio" name="kind" value="order" {{ 'checked' if it.suggest == 'order' }}><span><b>Order</b><br><small>Map zonder sjabloon</small></span></label>
+    <label class="kindopt"><input type="radio" name="kind" value="project" {{ 'checked' if it.suggest == 'project' }}><span><b>Project</b><br><small>Power Automate zet het sjabloon + Teams-post</small></span></label>
+  </div>
+  <div class="fgrid">
+    <label class="f">Ordernummer *<input type="text" name="number" value="{{ it.number or '' }}" required></label>
+    <label class="f">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name ~ (' – ' ~ c.city if c.city else ''), it.customer_id) }}{% endfor %}</select></label>
+    <label class="f full">Omschrijving *<input type="text" name="name" value="{{ it.description or '' }}" required></label>
+    {% if sp_on %}<label class="check full"><input type="checkbox" name="sp_create" value="1" checked> <span>Map aanmaken in de klantmap in SharePoint</span></label>{% endif %}
+    {% if it.bon and it.bon.order_type and can('orders', 3) %}<label class="check full"><input type="checkbox" name="remember" value="1" checked> <span>Ordertype <b>{{ it.bon.order_type }}</b> voortaan automatisch zo verwerken</span></label>{% endif %}
+  </div>
+  <div class="actions">
+    <button class="btn primary" name="action" value="verwerken">{{ icon('check') }}Goedzetten</button>
+    <button class="btn ghost" name="action" value="negeren" formnovalidate>Negeren</button>
+  </div>
+</form>
+{% else %}
+<div class="card"><div class="empty">Geen nieuwe ordermappen. Alles is goedgezet.</div></div>
+{% endfor %}
+
+{% if can('orders', 3) %}
+<form method="post" action="{{ url_for('orders.inbox_types') }}" class="card form" id="ordertypes">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Automatisch verwerken op ordertype</h2>
+  <p class="small muted" style="margin-top:0">Staat er een orderbon in de map met een van deze ordertypes, en is de klant bekend, dan maakt WorkPortal het project of de order zelf aan, met map. Anders komt hij hier te staan. Meerdere types scheiden met een komma.</p>
+  <div class="fgrid">
+    <label class="f">Ordertypes die een project zijn<input type="text" name="project_types" value="{{ types.project }}"></label>
+    <label class="f">Ordertypes die een order zijn<input type="text" name="order_types" value="{{ types.order }}"></label>
+  </div>
+  <div><button class="btn">Opslaan</button></div>
+</form>
+{% endif %}
+
+{% if done %}
+<section class="card"><h2>Laatst verwerkt</h2>
+  <div class="rows">{% for d in done %}<div class="rowitem"><div class="grow"><div class="t">{{ d.folder }}</div>
+    <div class="s">{% if d.status == 'automatisch' %}Automatisch · {% endif %}{% if d.status == 'genegeerd' %}Genegeerd{% else %}{{ (d.kind or '')|capitalize }}{% if d.project_id %} · <a href="{{ url_for('projecten.detail', pid=d.project_id) }}">{{ d.number }} {{ d.pname or '' }}</a>{% endif %}{% endif %}{{ ' · ' ~ d.who if d.who }}{{ ' · ' ~ (d.handled_at|dt) if d.handled_at }}</div></div>
+    <span class="badge {{ 'b-ok' if d.status in ['verwerkt','gekoppeld','automatisch'] else '' }}">{{ d.status|capitalize }}</span></div>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

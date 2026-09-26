@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}{{ K.plural }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>{{ K.plural }}</h1><p>{{ counts.alle or 0 }} {{ 'projecten' if K.kind == 'project' else 'orders' }}</p></div>
+  <div class="actions">
+    {% if K.kind == 'order' and can('orders', 2) %}<a class="btn" href="{{ url_for('orders.inbox') }}">{{ icon('bell') }}Nieuwe orders{% if inbox %} <span class="navbadge">{{ inbox }}</span>{% endif %}</a>{% endif %}
+    {% if can(K.module, 2) %}<a class="btn primary" href="{{ url_for(B ~ '.new') }}">{{ icon('plus') }}{{ 'Nieuw project' if K.kind == 'project' else 'Nieuwe order' }}</a>{% endif %}
+  </div>
+</div>
+{% if K.kind == 'order' and inbox %}
+<a class="actionbar" href="{{ url_for('orders.inbox') }}">{{ icon('bell') }}<span><b>{{ inbox }} nieuwe ordermap{{ 'pen' if inbox != 1 }} uit Komdex</b> wacht{{ 'en' if inbox != 1 }} op goedzetten: project of order, klant en omschrijving.</span><span class="go">Bekijken →</span></a>
+{% endif %}
+<form class="search" style="max-width:none" method="get">
+  <input type="hidden" name="filter" value="{{ flt }}">
+  {{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op ordernummer, omschrijving of klant">
+</form>
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for(B ~ '.index', filter=key, q=q) }}">{{ label }}{% if n is not none %} <span>{{ n or 0 }}</span>{% endif %}</a>{% endmacro %}
+<div class="fchips">
+  {{ fbtn('actief', 'Actief', counts.actief) }}{{ fbtn('afgerond', 'Afgerond', counts.afgerond) }}{% if counts.gearchiveerd %}{{ fbtn('gearchiveerd', 'Gearchiveerd', counts.gearchiveerd) }}{% endif %}{{ fbtn('alle', 'Alle', counts.alle) }}
+</div>
+<div class="card flush tablewrap"><table class="table">
+  <thead><tr><th>Ordernr.</th><th>Omschrijving</th><th class="hide-m">Klant</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for p in rows %}<tr class="link" data-href="{{ url_for(B ~ '.detail', pid=p.id) }}"><td class="nowrap"><b>{{ p.number }}</b></td><td>{{ p.name }}{% if p.sp_item_id and not p.sp_missing %} <span class="spdot" title="Map in SharePoint gekoppeld">{{ icon('folder') }}</span>{% endif %}</td><td class="hide-m">{{ p.customer or '' }}</td><td><span class="badge {{ 'b-blue' if p.status == 'actief' else '' }}">{{ p.status|capitalize }}</span></td></tr>
+  {% else %}<tr><td colspan="4" class="empty">Geen {{ 'projecten' if K.kind == 'project' else 'orders' }} gevonden.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

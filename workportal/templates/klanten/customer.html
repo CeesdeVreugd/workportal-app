@@ -11,7 +11,7 @@
     <h1>{{ c.name }}</h1><p>{{ c.address or '' }} {{ c.postcode or '' }} {{ c.city or '' }}</p></div>
   <div class="actions">
     {% if can('service', 2) %}<a class="btn" href="{{ url_for('service.new', klant=c.id) }}">{{ icon('plus') }}Ticket</a>{% endif %}
-    {% if edit %}<a class="btn" href="{{ url_for('klanten.new_project', klant=c.id) }}">{{ icon('plus') }}Project</a><a class="btn primary" href="{{ url_for('klanten.edit', cid=c.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
+    {% if edit %}<a class="btn primary" href="{{ url_for('klanten.edit', cid=c.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
   </div>
 </div>
 {{ alert_box(c.alert, None, None) }}
@@ -30,8 +30,8 @@
     </dl>
   </section>
   <section class="card" id="projecten">
-    <div class="card-head"><h2>Projecten</h2>{% if can('klanten', 2) %}<a class="btn sm" href="{{ url_for('klanten.new_project', klant=c.id) }}">{{ icon('plus') }}Project</a>{% endif %}</div>
-    <div class="rows">{% for p in projects %}<a class="rowitem" href="{{ url_for('klanten.project', pid=p.id) }}"><div class="grow"><div class="t">{{ p.number }} · {{ p.name }}</div>{% if p.sp_item_id and not p.sp_missing %}<div class="s">{{ icon('folder') }} Projectmap gekoppeld</div>{% endif %}</div><span class="badge">{{ p.status }}</span></a>{% else %}<div class="empty">Geen projecten.</div>{% endfor %}</div>
+    <div class="card-head"><h2>Projecten &amp; orders</h2><div class="actions">{% if can('projecten', 2) %}<a class="btn sm" href="{{ url_for('projecten.new', klant=c.id) }}">{{ icon('plus') }}Project</a>{% endif %}{% if can('orders', 2) %}<a class="btn sm" href="{{ url_for('orders.new', klant=c.id) }}">{{ icon('plus') }}Order</a>{% endif %}</div></div>
+    <div class="rows">{% for p in projects %}<a class="rowitem" href="{{ werk_url('detail', p, pid=p.id) }}"><div class="grow"><div class="t">{{ p.number }} · {{ p.name }}</div><div class="s">{{ 'Order' if p.kind == 'order' else 'Project' }}{% if p.sp_item_id and not p.sp_missing %} · {{ icon('folder') }} map gekoppeld{% endif %}</div></div><span class="badge">{{ p.status }}</span></a>{% else %}<div class="empty">Geen projecten of orders.</div>{% endfor %}</div>
   </section>
 </div>
 

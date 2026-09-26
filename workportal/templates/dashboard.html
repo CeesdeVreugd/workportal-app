@@ -11,6 +11,9 @@
     {% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new') }}">{{ icon('plus') }}Nieuw ticket</a>{% endif %}
   </div>
 </div>
+{% if inbox_count() %}
+<a class="actionbar" href="{{ url_for('orders.inbox') }}">{{ icon('bell') }}<span><b>Actie nodig: {{ inbox_count() }} nieuwe ordermap{{ 'pen' if inbox_count() != 1 }} uit Komdex</b> om goed te zetten als project of order.</span><span class="go">Goedzetten →</span></a>
+{% endif %}
 
 <div class="grid g4">
   {% if can('service') %}

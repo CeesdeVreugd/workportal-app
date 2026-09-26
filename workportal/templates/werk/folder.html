@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}{{ K.label }}map {{ p.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / {{ K.label }}map</div>
+<div class="pagehead"><div><div class="eyebrow">{{ K.label }}map · alleen lezen</div><h1>{{ p.name }}</h1><p>{{ folder_name }}</p></div>
+  <div class="actions">{% if can(K.module, 2) and p.sp_web_url %}<a class="btn" href="{{ p.sp_web_url }}" target="_blank" rel="noopener">{{ icon('external') }}Openen in SharePoint</a>{% endif %}</div></div>
+<div class="pathbar">
+  <a href="{{ url_for(B ~ '.project_folder', pid=p.id) }}">{{ icon('folder') }}{{ p.number }}</a>
+  {% for path, name in crumbs %}<span>/</span>{% if loop.last %}<b>{{ name }}</b>{% else %}<a href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=path) }}">{{ name }}</a>{% endif %}{% endfor %}
+</div>
+<section class="card flush">{% include "werk/_folder_list.html" %}</section>
+{% endblock %}

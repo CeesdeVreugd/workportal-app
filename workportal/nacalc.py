@@ -55,7 +55,7 @@ def import_file(data, filename, project_id=None, calc_id=None, source="upload"):
         if p:
             project_id = p["id"]
         else:
-            project_id = execute("INSERT INTO projects (number, name, status, created_at) VALUES (?,?, 'actief', ?)",
+            project_id = execute("INSERT INTO projects (number, name, status, created_at, kind, source) VALUES (?,?, 'actief', ?, 'order', 'nacalculatie')",
                                  (order_no, header.get("order_desc") or f"Order {order_no}", now_iso()))
     prev = None
     if order_no:
@@ -88,7 +88,7 @@ def import_file(data, filename, project_id=None, calc_id=None, source="upload"):
 @require("nacalculatie", LEZEN)
 def index():
     results = latest_results()
-    projects = query("SELECT id, number, name FROM projects ORDER BY number DESC")
+    projects = query("SELECT id, number, name, kind FROM projects ORDER BY number DESC")
     calcs = query("SELECT id, number, title FROM calculations ORDER BY updated_at DESC")
     return render_template("nacalc/index.html", results=results, projects=projects, calcs=calcs,
                            pre_project=to_int(request.args.get("project")), pre_calc=to_int(request.args.get("calc")),

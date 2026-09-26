@@ -10,7 +10,7 @@
   <div><div class="eyebrow">{{ t.number }} · {{ TYPES.get(t.type, t.type) }}</div><h1>{{ t.title }}</h1>
     <p>{{ ticket_status(t.status) }} {{ prio(t.priority) }} · aangemaakt {{ t.created_at|dt }}</p></div>
   <div class="actions">
-    {% if t.project_sp and not t.project_sp_missing %}<a class="btn" href="{{ url_for('klanten.project_folder', pid=t.project_id) }}">{{ icon('folder') }}Projectmap</a>{% endif %}
+    {% if t.project_sp and not t.project_sp_missing %}<a class="btn" href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }}{{ 'Ordermap' if t.project_kind == 'order' else 'Projectmap' }}</a>{% endif %}
     {% if edit %}
     <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>
     {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
@@ -19,6 +19,8 @@
   </div>
 </div>
 {{ alert_box(t.customer_alert, t.inst_alert, t.inst_bring, t.installation) }}
+{% if t.project_work %}<details class="card workdetails"><summary><b>Werkomschrijving {{ 'order' if t.project_kind == 'order' else 'project' }} {{ t.project_no }}</b>{% if t.project_bon %} · <a href="{{ url_for('main.file', fid=t.project_bon) }}" target="_blank" rel="noopener">orderbon</a>{% endif %}</summary>
+  <div class="prose worklist" style="margin-top:10px">{% for line in t.project_work.split('\n') %}<p>{{ line }}</p>{% endfor %}</div></details>{% endif %}
 {{ alert_dialog('ticket-' ~ t.id, t.customer_alert, t.inst_alert, t.inst_bring, 'Let op: ' ~ (t.installation or t.customer or t.title), url_for('service.depart', tid=t.id) if can('service', 2) else None, t.status in ['nieuw','ingepland','in_uitvoering','wacht']) }}
 <div class="grid g2 stack">
   <section class="card">
@@ -27,7 +29,7 @@
       <dt>Klant</dt><dd>{% if t.customer_id %}<a href="{{ url_for('klanten.customer', cid=t.customer_id) }}">{{ t.customer }}</a>{% else %}–{% endif %}{% if t.location %}<div class="small muted">{{ t.location }}</div>{% endif %}</dd>
       <dt>Installatie</dt><dd>{% if t.installation_id %}<a href="{{ url_for('klanten.installation', iid=t.installation_id) }}">{{ t.installation }}</a>{{ (' · SN ' ~ t.serial) if t.serial }}{% else %}–{% endif %}</dd>
       <dt>Contact</dt><dd>{{ t.contact or '–' }}{% if t.contact_phone %} · <a href="tel:{{ t.contact_phone }}">Bellen</a>{% endif %}</dd>
-      <dt>Project</dt><dd>{% if t.project_id %}<a href="{{ url_for('klanten.project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} · <a href="{{ url_for('klanten.project_folder', pid=t.project_id) }}">{{ icon('folder') }} Projectmap</a>{% endif %}{% else %}–{% endif %}</dd>
+      <dt>{{ 'Order' if t.project_kind == 'order' else 'Project' }}</dt><dd>{% if t.project_id %}<a href="{{ werk_url('detail', t.project_kind or 'project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} · <a href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }} Map</a>{% endif %}{% else %}–{% endif %}</dd>
       <dt>Gemeld door</dt><dd>{{ t.reported_by or '–' }}</dd>
       <dt>Toegewezen</dt><dd>{{ t.assignee or '–' }}</dd>
       <dt>Gepland</dt><dd>{{ t.planned_date|date or '–' }}</dd>

@@ -415,3 +415,25 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .rolename { display: inline-flex; align-items: center; gap: 10px; }
 .rolebtn.active { background: var(--rb); color: var(--rt); box-shadow: inset 3px 0 0 var(--rc); }
 .rolebtn.active .rolecount { color: var(--rt); opacity: .75; }
+
+/* Orders: actievenster */
+.navbadge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 700; margin-left: 6px; line-height: 1; }
+.nav a .navbadge { margin-left: auto; }
+.actionbar { display: flex; align-items: center; gap: 12px; padding: 14px 18px; margin: 0 0 16px; border-radius: var(--radius); background: var(--warn-bg); color: var(--warn); text-decoration: none; border: 1px solid #F5D9A8; }
+.actionbar svg { width: 20px; height: 20px; flex-shrink: 0; }
+.actionbar .go { margin-left: auto; font-weight: 600; white-space: nowrap; }
+.kindpick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 14px; }
+.kindopt { cursor: pointer; }
+.kindopt input { position: absolute; opacity: 0; pointer-events: none; }
+.kindopt span { display: block; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; line-height: 1.35; }
+.kindopt small { color: var(--muted); }
+.kindopt input:checked + span { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.kindopt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-head h2 svg { vertical-align: -3px; }
+.dash-action { display: flex; align-items: center; gap: 14px; }
+.bonbox { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; background: var(--bg); }
+.bonhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.bonhead svg { width: 18px; height: 18px; color: var(--basic); }
+.dl.compact dt, .dl.compact dd { padding-top: 3px; padding-bottom: 3px; }
+.worklist p { margin: 0 0 4px; }
+.workdetails summary { cursor: pointer; }
