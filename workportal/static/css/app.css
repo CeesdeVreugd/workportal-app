@@ -464,3 +464,8 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .iconlink { display: inline-flex; align-items: center; gap: 5px; } .iconlink svg { width: 16px; height: 16px; }
 .ficon.cube { background: #EFEDFE; color: #4B3FB8; }
 .m3dform { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+
+/* Nederlandse bestandskiezer */
+.filepick { position: relative; display: flex; align-items: center; gap: 10px; margin-top: 4px; cursor: pointer; flex-wrap: wrap; }
+.filepick .fp-native { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.filepick .fp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

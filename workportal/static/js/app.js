@@ -257,4 +257,21 @@
       var btn = f.querySelector("button"); btn.disabled = true; btn.textContent = "Bezig met uploaden…";
     });
   });
+
+  // Bestandskiezer altijd in het Nederlands (de standaardknop volgt de taal van de browser)
+  document.querySelectorAll('input[type="file"]').forEach(function (inp) {
+    if (inp.hidden || inp.closest(".addphoto")) return;
+    var wrapEl = document.createElement("span"); wrapEl.className = "filepick";
+    var b = document.createElement("span"); b.className = "btn sm"; b.textContent = inp.multiple ? "Bestanden kiezen" : "Bestand kiezen";
+    var n = document.createElement("span"); n.className = "fp-name muted small"; n.textContent = "Geen bestand gekozen";
+    inp.parentNode.insertBefore(wrapEl, inp); wrapEl.appendChild(inp); wrapEl.appendChild(b); wrapEl.appendChild(n);
+    inp.classList.add("fp-native");
+    inp.addEventListener("invalid", function () { inp.setCustomValidity(inp.multiple ? "Kies één of meer bestanden." : "Kies een bestand."); });
+    inp.addEventListener("change", function () {
+      inp.setCustomValidity("");
+      var c = inp.files ? inp.files.length : 0;
+      n.textContent = c === 0 ? "Geen bestand gekozen" : c === 1 ? inp.files[0].name : c + " bestanden gekozen";
+    });
+    if (inp.closest("form")) inp.closest("form").addEventListener("reset", function () { setTimeout(function () { n.textContent = "Geen bestand gekozen"; }); });
+  });
 })();

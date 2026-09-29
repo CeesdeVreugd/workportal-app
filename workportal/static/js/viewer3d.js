@@ -32,6 +32,32 @@
   function fmt(n, d) { return n.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d }); }
   function keyOf(ud) { var id = ud && ud.originalMeshInstance && ud.originalMeshInstance.id; return id ? id.nodeId + ":" + id.meshIndex : ""; }
 
+  // Engine-teksten in het Nederlands (de engine zelf blijft Engels voor de foutherkenning hieronder)
+  var NL = [
+    [/Failed to import model\./g, "Inlezen van het model mislukt."],
+    [/Failed to load file for import\./g, "Ophalen van het bestand mislukt."],
+    [/Failed to load occt-import-js\./g, "De STEP-lezer kon niet worden geladen of is vastgelopen."],
+    [/No importable file found\./g, "Geen bruikbaar 3D-bestand gevonden."],
+    [/No importable object found\./g, "Geen bruikbaar 3D-object gevonden."],
+    [/The model contains no faces\./g, "Het model bevat geen vlakken."],
+    [/The model contains no vertices\./g, "Het model bevat geen punten."],
+    [/The model doesn't contain any (3D )?meshes\.[^)]*/g, "Het model bevat geen 3D-geometrie."],
+    [/Unsupported extension: ([^.]*)\./g, "Bestandstype niet ondersteund: $1."],
+    [/Unknown error\./g, "Onbekende fout."],
+    [/Invalid [^.)]*\./g, "Ongeldig of beschadigd bestand."],
+    [/Failed to parse [^.)]*\./g, "Bestand kon niet worden gelezen."],
+    [/import mislukt/g, "het bestand kon niet worden gelezen"],
+    [/(Uncaught )?RuntimeError: ?Aborted\([^)]*\)/g, "interne fout van de STEP-lezer"],
+    [/(Uncaught )?RuntimeError: ?/g, "interne fout: "],
+    [/out of memory|OOM/gi, "geheugen vol"]
+  ];
+  function nl(t) { t = String(t || ""); NL.forEach(function (r) { t = t.replace(r[0], r[1]); }); return t.replace(/[<>&]/g, "").slice(0, 200); }
+  if (OV.SetLocalizedStrings && OV.SetLanguageCode) {
+    OV.SetLocalizedStrings({ "Mesh {0}": { nl: "Deel {0}" }, "Unknown": { nl: "Onbekend" }, "Mesh": { nl: "Deel" }, "Material": { nl: "Materiaal" },
+      "True": { nl: "Ja" }, "False": { nl: "Nee" }, "Type": { nl: "Soort" }, "Properties": { nl: "Eigenschappen" } });
+    OV.SetLanguageCode("nl");
+  }
+
   var ev = new OV.EmbeddedViewer(wrap, {
     backgroundColor: new OV.RGBAColor(244, 246, 250, 255),
     defaultColor: new OV.RGBColor(190, 196, 208),
@@ -50,7 +76,7 @@
     if (window.WP3D_occtError) {
       var err = String(window.WP3D_occtError);
       fail(/memory|alloc|OOM|abort/i.test(err) ? "Het bestand is te groot voor de browser (geheugen vol). Exporteer een lichtere STEP (bijv. zonder bevestigingsmateriaal) of open het in eDrawings." :
-        "De STEP-lezer gaf een fout: " + err.replace(/[<>&]/g, "").slice(0, 160));
+        "De STEP-lezer gaf een fout: " + nl(err) + ".");
       return;
     }
     var pd = ev.progressDiv;
@@ -65,7 +91,7 @@
             "De STEP/IGES-lezer kon niet worden geladen op de server (zie README, 3D-modellen).") :
           isStep ? "De STEP-lezer kon dit bestand niet verwerken. Exporteer het opnieuw als STEP AP214 (solids) en probeer het nog eens." :
           "Controleer of het een geldig STEP-, IGES-, STL-, OBJ- of 3MF-bestand is.";
-        fail(why + "<br><span class='small muted'>Technische melding: " + t.replace(/[<>&]/g, "").slice(0, 200) + "</span>");
+        fail(why + "<br><span class='small muted'>Technische melding: " + nl(t) + "</span>");
         return;
       }
       lastText = t;
@@ -184,7 +210,7 @@
         if (meshes.length > 1) meshes.forEach(function (mi) {
           var l2 = document.createElement("li"); l2.dataset.keys = node.GetId() + ":" + mi;
           l2.innerHTML = '<div class="v3d-node"><span class="tw"></span><label><input type="checkbox" checked> <span class="nm"></span></label><button type="button" class="solo" title="Alleen dit onderdeel tonen">◎</button></div>';
-          l2.querySelector(".nm").textContent = model.GetMesh(mi).GetName() || "body " + (mi + 1);
+          l2.querySelector(".nm").textContent = model.GetMesh(mi).GetName() || "deel " + (mi + 1);
           sub.appendChild(l2); count++;
         });
         li.appendChild(sub);
