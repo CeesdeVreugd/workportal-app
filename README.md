@@ -215,6 +215,10 @@ randen, orthografisch, volledig scherm, en meten:
   tussen de lijnen, anders de hoek plus de kleinste afstand tussen de randen.
 - **Diameter:** één klik op een ronde rand (bijv. het kopvlak van een buis of de rand van een gat) of op het ronde
   vlak zelf geeft Ø en R. Bij een deel van een cirkel (afronding, boog) wordt de radius getoond.
+Alleen echte randen tellen bij het meten: de hulplijnen tussen de facetten van een rond vlak zijn niet aan te klikken
+(een ronde rand of rond vlak meet je met Diameter). Alleen de gekozen meting staat in beeld; de laatste 10 staan in
+de lijst en zijn met een klik weer te tonen.
+Op een groot scherm staat de onderdelenboom altijd rechts (met doorsnede of metingen eronder).
 Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
 
 **Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,

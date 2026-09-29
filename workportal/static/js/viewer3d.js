@@ -19,7 +19,13 @@
   var selected = null;
   var mode = "draai";         // draai | punt | vlak
   var pending = null;         // eerste klik van een meting
-  var measures = [];
+  var measures = [];          // laatste metingen (max. 10); alleen de gekozen meting staat in beeld
+  var shown = -1, measureNo = 0, MAX_MEASURES = 10;
+  function addMeasure(m) {
+    m.no = ++measureNo; measures.push(m);
+    if (measures.length > MAX_MEASURES) measures.shift();
+    shown = measures.length - 1;
+  }
   var section = { on: false, axis: "z", flip: false, pos: 0, min: 0, max: 0 };
 
   function setStatus(text, kind) {
@@ -144,7 +150,7 @@
     var origRender = viewer.Render.bind(viewer);
     viewer.Render = function () { origRender(); drawOverlay(); };
     viewer.SetMouseClickHandler(onClick);
-    hidden.clear(); measures = []; pending = null; selected = null;
+    hidden.clear(); measures = []; shown = -1; pending = null; selected = null;
     buildTree();
     initSection();
     setView("iso");
@@ -280,7 +286,7 @@
   }
 
   // ------------------------------------------------------------ topologie (vlakken en randen uit het beeldmodel)
-  var COS_PLANAR = Math.cos(0.5 * Math.PI / 180), COS_SHARP = Math.cos(15 * Math.PI / 180);
+  var COS_PLANAR = Math.cos(0.5 * Math.PI / 180), COS_SHARP = Math.cos(25 * Math.PI / 180);  // zelfde grens als 'Randen': alleen echte randen
   function topo(obj) {
     if (obj.userData.wpTopo !== undefined) return obj.userData.wpTopo;
     var geo = obj.geometry, pos = geo.attributes.position, idx = geo.index;
@@ -354,28 +360,53 @@
     return p.distanceTo(a.clone().add(ab.multiplyScalar(t)));
   }
   // rechte lijn = scherpe rand van het aangeklikte vlak, doorgetrokken over rechte stukken
+  function vertEdges(tp) {
+    if (tp.VE) return tp.VE;
+    var VE = new Map();
+    tp.E.forEach(function (tris, k) {
+      var ab = k.split(","), e = [+ab[0], +ab[1]];
+      [e[0], e[1]].forEach(function (v) { var l = VE.get(v); if (l) l.push(e); else VE.set(v, [e]); });
+    });
+    tp.VE = VE;
+    return VE;
+  }
+  var ROUND_EDGE = "Dit is een ronde rand. Gebruik Diameter om die te meten.";
+  // rechte lijn = echte (scherpe) rand bij de klik, doorgetrokken over rechte stukken.
+  // Hulplijnen van het beeldmodel (tussen de facetten van een rond vlak) tellen niet mee.
   function pickLine(h) {
     var tp = topo(h.obj); if (!tp) return null;
     var reg = faceRegion(tp, h.tri);
-    var cand = reg.border.slice();
+    var cand = reg.border.filter(function (e) { return isSharp(tp, e); });
     triEdges(tp, h.tri).forEach(function (e) { if (isSharp(tp, e)) cand.push(e); });
-    if (!cand.length) return null;
+    if (!cand.length) return { err: "Geen rechte rand bij deze klik. Klik op een vlak, dicht bij een echte rand." };
     var best = null, bd = Infinity;
     cand.forEach(function (e) { var d = segDist(h.p, vtx(tp, e[0]), vtx(tp, e[1])); if (d < bd) { bd = d; best = e; } });
     var a = vtx(tp, best[0]), b = vtx(tp, best[1]), dir = b.clone().sub(a).normalize();
-    // doortrekken langs randen met dezelfde richting
-    var pool = reg.border.concat(cand), used = new Set([best[0] + "," + best[1]]), ends = [best[0], best[1]], grew = true;
-    while (grew) {
-      grew = false;
-      for (var i = 0; i < pool.length; i++) {
-        var e = pool[i], k = e[0] + "," + e[1]; if (used.has(k)) continue;
-        for (var s = 0; s < 2; s++) {
-          var at = ends[s], other = e[0] === at ? e[1] : e[1] === at ? e[0] : -1;
-          if (other < 0) continue;
-          var d2 = vtx(tp, other).sub(vtx(tp, at)).normalize();
-          if (Math.abs(d2.dot(dir)) > 0.99995) { ends[s] = other; used.add(k); grew = true; break; }
+    var VE = vertEdges(tp), used = new Set([best[0] + "," + best[1]]), ends = [best[0], best[1]];
+    // doortrekken langs echte randen met dezelfde richting
+    for (var s = 0; s < 2; s++) {
+      var grew = true, guard = 0;
+      while (grew && guard++ < 100000) {
+        grew = false;
+        var at = ends[s], list = VE.get(at) || [];
+        for (var i = 0; i < list.length; i++) {
+          var e = list[i], k = e[0] + "," + e[1];
+          if (used.has(k) || !isSharp(tp, e)) continue;
+          var other = e[0] === at ? e[1] : e[0];
+          if (Math.abs(vtx(tp, other).sub(vtx(tp, at)).normalize().dot(dir)) > 0.99995) { ends[s] = other; used.add(k); grew = true; break; }
         }
       }
+    }
+    // loopt de rand aan een uiteinde met een kleine knik verder, dan is het een boog en geen rechte lijn
+    var COS_BEND = Math.cos(30 * Math.PI / 180), COS_STRAIGHT = Math.cos(0.5 * Math.PI / 180);
+    for (s = 0; s < 2; s++) {
+      var at2 = ends[s], out = vtx(tp, at2).sub(vtx(tp, ends[1 - s])).normalize();
+      var bend = (VE.get(at2) || []).some(function (e) {
+        if (used.has(e[0] + "," + e[1]) || !isSharp(tp, e)) return false;
+        var o = e[0] === at2 ? e[1] : e[0], d = vtx(tp, o).sub(vtx(tp, at2)).normalize().dot(out);
+        return d > COS_BEND && d < COS_STRAIGHT;
+      });
+      if (bend) return { err: ROUND_EDGE };
     }
     return { a: vtx(tp, ends[0]), b: vtx(tp, ends[1]), dir: dir, segs: [[vtx(tp, ends[0]), vtx(tp, ends[1])]] };
   }
@@ -383,10 +414,12 @@
     var tp = topo(h.obj);
     if (!tp) return { n: h.n, c: h.p, pts: [h.p], tris: [], segs: [], tp: null };
     var reg = faceRegion(tp, h.tri), c = new V3(0, 0, 0), vs = new Set();
+    var soft = reg.border.filter(function (e) { return !isSharp(tp, e); }).length;
+    if (reg.border.length && soft / reg.border.length > 0.3) return { err: "Dit is een rond vlak. Gebruik Diameter om het te meten." };
     reg.tris.forEach(function (t) { for (var k = 0; k < 3; k++) vs.add(tp.T[t * 3 + k]); });
     var pts = []; vs.forEach(function (v) { pts.push(vtx(tp, v)); c.add(pts[pts.length - 1]); });
     c.multiplyScalar(1 / pts.length);
-    var segs = reg.border.slice(0, 4000).map(function (e) { return [vtx(tp, e[0]), vtx(tp, e[1])]; });
+    var segs = reg.border.filter(function (e) { return isSharp(tp, e); }).slice(0, 4000).map(function (e) { return [vtx(tp, e[0]), vtx(tp, e[1])]; });
     return { n: reg.n, c: c, pts: pts, tris: reg.tris, tp: tp, segs: segs, planar: reg.tris.length > 1 };
   }
   // ------------------------------------------------------------ diameter / radius
@@ -572,14 +605,16 @@
       m1.label = full ? "Ø " + fmt(2 * f.r, 2) + " mm" : "R " + fmt(f.r, 2) + " mm";
       m1.extra = (full ? "Diameter (R " + fmt(f.r, 2) + " mm)" : "Radius van een boog van ca. " + Math.round(f.cover) + "° (Ø " + fmt(2 * f.r, 2) + " mm)") +
         (f.src === "rand" ? ", gemeten op de ronde rand" : ", gemeten op het ronde vlak") + ". Benadering uit het beeldmodel.";
-      measures.push(m1); info(m1.label); renderMeasures(); viewer.Render();
+      addMeasure(m1); info(m1.label); renderMeasures(); viewer.Render();
       return;
     }
     var sel;
     if (mode === "punt") sel = { p: h.p, segs: [] };
     else if (mode === "vlak") sel = pickFace(h);
-    else { sel = pickLine(h); if (!sel) { info("Geen rechte rand gevonden. Klik dichter bij een rand."); return; } }
-    if (!pending) { pending = sel; info("Klik " + MODE_TXT[mode][1] + "."); viewer.Render(); return; }
+    else sel = pickLine(h);
+    if (!sel) { info("Hier kan niet worden gemeten. Klik op een ander deel van het model."); return; }
+    if (sel.err) { info(sel.err); return; }
+    if (!pending) { pending = sel; shown = -1; info("Klik " + MODE_TXT[mode][1] + "."); viewer.Render(); return; }
     var A = pending, B = sel, m = { type: mode, segs: (A.segs || []).concat(B.segs || []) };
     pending = null;
     if (mode === "punt") {
@@ -616,7 +651,7 @@
         m.extra = "Hoek tussen de randen en kleinste afstand";
       }
     }
-    measures.push(m);
+    addMeasure(m);
     info(m.label);
     renderMeasures();
     viewer.Render();
@@ -642,13 +677,14 @@
     var w = wrap.clientWidth, h = wrap.clientHeight, s = "";
     overlay.setAttribute("viewBox", "0 0 " + w + " " + h);
     measures.forEach(function (m, i) {
+      if (i !== shown) return;
       var col = COLORS[m.type];
       s += segsSvg(m.segs || [], col, m.type === "lijn" ? 4 : 2.5);
       var a = toScreen(m.a), b = toScreen(m.b);
       if (!a.ok || !b.ok) return;
       s += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="' + (m.type === "punt" ? "" : "6 4") + '"/>';
       s += '<circle cx="' + a.x + '" cy="' + a.y + '" r="5" fill="' + col + '" stroke="#fff" stroke-width="2"/><circle cx="' + b.x + '" cy="' + b.y + '" r="5" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
-      var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, label = (i + 1) + ": " + m.label, tw = label.length * 7.2 + 14;
+      var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, label = m.label, tw = label.length * 7.2 + 14;
       s += '<g transform="translate(' + (mx - tw / 2) + ',' + (my - 26) + ')"><rect width="' + tw + '" height="22" rx="6" fill="#14163A" opacity=".88"/>' +
         '<text x="' + (tw / 2) + '" y="15" fill="#fff" font-size="12.5" font-family="Ubuntu, system-ui, sans-serif" text-anchor="middle">' + label + '</text></g>';
     });
@@ -661,11 +697,23 @@
   var TYPE_TXT = { punt: "Punt–punt", vlak: "Vlak–vlak", lijn: "Lijn–lijn", rond: "Diameter" };
   function renderMeasures() {
     if (!measures.length) { measureList.innerHTML = '<p class="muted small">Nog geen metingen. Kies <b>Punt–punt</b>, <b>Vlak–vlak</b> of <b>Lijn–lijn</b> en klik twee keer op het model, of kies <b>Diameter</b> en klik één keer op een ronde rand.</p>'; return; }
-    measureList.innerHTML = measures.map(function (m, i) {
-      var extra = m.type === "punt" ? "ΔX " + fmt(m.dx, 2) + " · ΔY " + fmt(m.dy, 2) + " · ΔZ " + fmt(m.dz, 2) + " mm" : m.extra;
-      return '<div class="v3d-m"><b>' + (i + 1) + '. ' + TYPE_TXT[m.type] + ': ' + m.label + '</b><div class="small muted">' + extra + '</div></div>';
-    }).join("") + '<button type="button" class="btn sm" id="v3d-clearm">Metingen wissen</button>';
-    document.getElementById("v3d-clearm").onclick = function () { measures = []; pending = null; renderMeasures(); info(""); viewer.Render(); };
+    var html = '<p class="small muted" style="margin:0 0 6px">Alleen de gekozen meting staat in beeld. Klik op een meting om die te tonen. De laatste ' + MAX_MEASURES + ' worden bewaard zolang dit scherm open is.</p>';
+    for (var i = measures.length - 1; i >= 0; i--) {
+      var m = measures[i], extra = m.type === "punt" ? "ΔX " + fmt(m.dx, 2) + " · ΔY " + fmt(m.dy, 2) + " · ΔZ " + fmt(m.dz, 2) + " mm" : m.extra;
+      html += '<div class="v3d-m' + (i === shown ? ' on' : '') + '" data-i="' + i + '"><div class="v3d-m-t"><b>' + TYPE_TXT[m.type] + ': ' + m.label + '</b>' +
+        '<button type="button" class="v3d-m-x" data-del="' + i + '" title="Meting verwijderen" aria-label="Meting verwijderen">×</button></div><div class="small muted">' + extra + '</div></div>';
+    }
+    measureList.innerHTML = html + '<div class="v3d-m-btns"><button type="button" class="btn sm" id="v3d-hidem">Niets tonen</button> <button type="button" class="btn sm" id="v3d-clearm">Alles wissen</button></div>';
+    measureList.querySelectorAll(".v3d-m").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        var del = e.target.closest("[data-del]");
+        if (del) { var k = +del.dataset.del; measures.splice(k, 1); if (shown === k) shown = -1; else if (shown > k) shown--; }
+        else { var j = +el.dataset.i; shown = shown === j ? -1 : j; }
+        pending = null; renderMeasures(); viewer.Render();
+      });
+    });
+    document.getElementById("v3d-hidem").onclick = function () { shown = -1; pending = null; info(""); renderMeasures(); viewer.Render(); };
+    document.getElementById("v3d-clearm").onclick = function () { measures = []; shown = -1; pending = null; renderMeasures(); info(""); viewer.Render(); };
   }
 
   // ------------------------------------------------------------ doorsnede
@@ -729,25 +777,40 @@
   });
   document.addEventListener("fullscreenchange", function () { setTimeout(function () { ev.Resize(); }, 60); });
 
-  // panelen (onderdelen / doorsnede / meten)
+  // panelen: op een groot scherm staat de onderdelenboom altijd rechts, doorsnede/metingen eronder.
+  // Op telefoon/tablet staand is er één paneel tegelijk (onderin).
+  var wideMq = window.matchMedia("(min-width: 900px)");
+  var treeOn = wideMq.matches, active = null;
+  function layoutPanels() {
+    var wide = wideMq.matches, side = document.getElementById("v3d-side"), any = false;
+    if (!wide && active && treeOn) treeOn = active === "onderdelen";
+    document.querySelectorAll(".v3d-panel").forEach(function (p) {
+      var name = p.id.replace("v3d-p-", "");
+      var show = name === "onderdelen" ? (treeOn && (wide || !active || active === "onderdelen")) : name === active;
+      p.hidden = !show; if (show) any = true;
+    });
+    document.querySelectorAll("[data-panel]").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.panel === "onderdelen" ? treeOn : b.dataset.panel === active);
+    });
+    side.classList.toggle("open", any);
+    side.classList.toggle("both", any && treeOn && !!active && active !== "onderdelen" && wide);
+    setTimeout(function () { ev.Resize(); if (viewer) viewer.Render(); }, 30);
+  }
   function openPanel(name) {
-    document.querySelectorAll(".v3d-panel").forEach(function (p) { p.hidden = p.id !== "v3d-p-" + name ? true : false; });
-    document.querySelectorAll("[data-panel]").forEach(function (b) { b.classList.toggle("on", b.dataset.panel === name); });
-    document.getElementById("v3d-side").classList.add("open");
-    setTimeout(function () { ev.Resize(); }, 30);
+    if (name === "onderdelen") { treeOn = true; if (!wideMq.matches) active = null; }
+    else { active = name; if (!wideMq.matches) treeOn = false; }
+    layoutPanels();
   }
   document.querySelectorAll("[data-panel]").forEach(function (b) {
     b.addEventListener("click", function () {
-      var side = document.getElementById("v3d-side");
-      if (b.classList.contains("on") && side.classList.contains("open")) { side.classList.remove("open"); b.classList.remove("on"); setTimeout(function () { ev.Resize(); }, 30); }
-      else openPanel(b.dataset.panel);
+      var name = b.dataset.panel;
+      if (b.classList.contains("on")) { if (name === "onderdelen") treeOn = false; else active = null; layoutPanels(); }
+      else openPanel(name);
     });
   });
-  document.getElementById("v3d-close").addEventListener("click", function () {
-    document.getElementById("v3d-side").classList.remove("open");
-    document.querySelectorAll("[data-panel]").forEach(function (b) { b.classList.remove("on"); });
-    setTimeout(function () { ev.Resize(); }, 30);
-  });
+  document.getElementById("v3d-close").addEventListener("click", function () { treeOn = false; active = null; layoutPanels(); });
+  (wideMq.addEventListener ? wideMq.addEventListener.bind(wideMq, "change") : wideMq.addListener.bind(wideMq))(layoutPanels);
+  layoutPanels();
 
   // lokaal bestand openen (zonder upload)
   var picker = document.getElementById("v3d-file");
@@ -772,7 +835,7 @@
   wrap.addEventListener("drop", function (e) { e.preventDefault(); openFiles(e.dataTransfer.files); });
 
   window.addEventListener("resize", function () { ev.Resize(); });
-  window.WP3D_viewer = function () { return { viewer: viewer, model: model, measures: measures, hidden: hidden, section: section, toScreen: function (x, y, z) { return toScreen(new V3(x, y, z)); } }; };
+  window.WP3D_viewer = function () { return { viewer: viewer, model: model, measures: measures, shown: shown, hidden: hidden, section: section, toScreen: function (x, y, z) { return toScreen(new V3(x, y, z)); } }; };
   renderMeasures();
   load();
 })();

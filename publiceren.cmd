@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V35: diameter meten met één klik op een ronde rand; 3D-viewer en bestandskiezer in het Nederlands; STEP-lezer 0.0.24"
+set "OMSCHRIJVING=WorkPortal V36: 3D - onderdelenboom altijd rechts, één meting tegelijk in beeld, hulplijnen niet meetbaar, diameter meten"
 
 echo.
 echo ============================================
