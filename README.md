@@ -209,7 +209,10 @@ nette melding. Bestanden die al in SharePoint staan mogen groter zijn (ze worden
 doorsnede langs X/Y/Z met schuif en omdraaien, onderdelen tonen/verbergen of één onderdeel isoleren,
 randen, orthografisch, volledig scherm, en meten:
 - **Punt–punt:** afstand plus ΔX/ΔY/ΔZ in mm.
-- **Vlak–vlak:** hoek tussen twee vlakken; zijn ze evenwijdig, dan de loodrechte afstand.
+- **Vlak–vlak:** klik twee vlakken; het hele vlak wordt herkend en gemarkeerd. Evenwijdig → loodrechte afstand,
+  anders de hoek plus de kleinste afstand tussen de twee vlakken.
+- **Lijn–lijn:** klik vlak bij twee rechte randen; de rand wordt over de volle lengte herkend. Evenwijdig → afstand
+  tussen de lijnen, anders de hoek plus de kleinste afstand tussen de randen.
 Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
 
 **Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,

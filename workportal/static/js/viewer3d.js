@@ -207,13 +207,171 @@
     var h = viewer.GetMeshIntersectionUnderMouse(OV.IntersectionMode.MeshOnly, coords);
     if (!h || !h.face) return null;
     var n = h.face.normal.clone().transformDirection(h.object.matrixWorld).normalize();
-    return { p: h.point.clone(), n: n, ud: h.object.userData };
+    return { p: h.point.clone(), n: n, ud: h.object.userData, obj: h.object, tri: h.faceIndex };
   }
   function clipped(p) {
     if (!section.on) return false;
     var v = section.axis === "x" ? p.x : section.axis === "y" ? p.y : p.z;
     return section.flip ? v < section.pos : v > section.pos;
   }
+
+  // ------------------------------------------------------------ topologie (vlakken en randen uit het beeldmodel)
+  var COS_PLANAR = Math.cos(0.5 * Math.PI / 180), COS_SHARP = Math.cos(15 * Math.PI / 180);
+  function topo(obj) {
+    if (obj.userData.wpTopo !== undefined) return obj.userData.wpTopo;
+    var geo = obj.geometry, pos = geo.attributes.position, idx = geo.index;
+    var triCount = idx ? idx.count / 3 : pos.count / 3;
+    if (triCount > 800000) { obj.userData.wpTopo = null; return null; }
+    var m = obj.matrixWorld.elements, n = pos.count, P = new Float64Array(n * 3), i;
+    var minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
+    for (i = 0; i < n; i++) {
+      var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      var wx = m[0] * x + m[4] * y + m[8] * z + m[12], wy = m[1] * x + m[5] * y + m[9] * z + m[13], wz = m[2] * x + m[6] * y + m[10] * z + m[14];
+      P[i * 3] = wx; P[i * 3 + 1] = wy; P[i * 3 + 2] = wz;
+      if (wx < minx) minx = wx; if (wy < miny) miny = wy; if (wz < minz) minz = wz;
+      if (wx > maxx) maxx = wx; if (wy > maxy) maxy = wy; if (wz > maxz) maxz = wz;
+    }
+    var diag = Math.hypot(maxx - minx, maxy - miny, maxz - minz) || 1, q = diag * 1e-6;
+    var map = new Map(), vid = new Int32Array(n), W = [];
+    for (i = 0; i < n; i++) {
+      var k = Math.round(P[i * 3] / q) + "," + Math.round(P[i * 3 + 1] / q) + "," + Math.round(P[i * 3 + 2] / q);
+      var id = map.get(k);
+      if (id === undefined) { id = W.length / 3; map.set(k, id); W.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); }
+      vid[i] = id;
+    }
+    var T = new Int32Array(triCount * 3), N = new Float64Array(triCount * 3), E = new Map();
+    for (var t = 0; t < triCount; t++) {
+      for (var c = 0; c < 3; c++) T[t * 3 + c] = vid[idx ? idx.getX(t * 3 + c) : t * 3 + c];
+      var a0 = T[t * 3] * 3, b0 = T[t * 3 + 1] * 3, c0 = T[t * 3 + 2] * 3;
+      var ux = W[b0] - W[a0], uy = W[b0 + 1] - W[a0 + 1], uz = W[b0 + 2] - W[a0 + 2];
+      var vx = W[c0] - W[a0], vy = W[c0 + 1] - W[a0 + 1], vz = W[c0 + 2] - W[a0 + 2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+      N[t * 3] = nx / l; N[t * 3 + 1] = ny / l; N[t * 3 + 2] = nz / l;
+      for (c = 0; c < 3; c++) {
+        var va = T[t * 3 + c], vb = T[t * 3 + (c + 1) % 3], ek = va < vb ? va + "," + vb : vb + "," + va;
+        var list = E.get(ek); if (list) list.push(t); else E.set(ek, [t]);
+      }
+    }
+    obj.userData.wpTopo = { W: W, T: T, N: N, E: E, tol: diag * 1e-5 };
+    return obj.userData.wpTopo;
+  }
+  function vtx(tp, i) { return new V3(tp.W[i * 3], tp.W[i * 3 + 1], tp.W[i * 3 + 2]); }
+  function ndot(tp, a, b) { return tp.N[a * 3] * tp.N[b * 3] + tp.N[a * 3 + 1] * tp.N[b * 3 + 1] + tp.N[a * 3 + 2] * tp.N[b * 3 + 2]; }
+  function triEdges(tp, t) {
+    var out = [];
+    for (var c = 0; c < 3; c++) { var a = tp.T[t * 3 + c], b = tp.T[t * 3 + (c + 1) % 3]; out.push(a < b ? [a, b] : [b, a]); }
+    return out;
+  }
+  // vlak = aaneengesloten driehoeken met (vrijwel) dezelfde normaal
+  function faceRegion(tp, t0) {
+    var seen = new Set([t0]), stack = [t0], tris = [];
+    while (stack.length && tris.length < 200000) {
+      var t = stack.pop(); tris.push(t);
+      triEdges(tp, t).forEach(function (e) {
+        (tp.E.get(e[0] + "," + e[1]) || []).forEach(function (u) {
+          if (!seen.has(u) && ndot(tp, u, t0) > COS_PLANAR) { seen.add(u); stack.push(u); }
+        });
+      });
+    }
+    // rand van het vlak: randen die maar bij één driehoek van het vlak horen
+    var cnt = new Map();
+    tris.forEach(function (t) { triEdges(tp, t).forEach(function (e) { var k = e[0] + "," + e[1]; cnt.set(k, (cnt.get(k) || 0) + 1); }); });
+    var border = [];
+    cnt.forEach(function (v, k) { if (v === 1) { var ab = k.split(","); border.push([+ab[0], +ab[1]]); } });
+    var n = new V3(tp.N[t0 * 3], tp.N[t0 * 3 + 1], tp.N[t0 * 3 + 2]);
+    return { tris: tris, set: seen, border: border, n: n };
+  }
+  function isSharp(tp, e) {
+    var l = tp.E.get(e[0] + "," + e[1]) || [];
+    return l.length !== 2 || ndot(tp, l[0], l[1]) < COS_SHARP;
+  }
+  function segDist(p, a, b) {
+    var ab = b.clone().sub(a), t = ab.lengthSq() ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq())) : 0;
+    return p.distanceTo(a.clone().add(ab.multiplyScalar(t)));
+  }
+  // rechte lijn = scherpe rand van het aangeklikte vlak, doorgetrokken over rechte stukken
+  function pickLine(h) {
+    var tp = topo(h.obj); if (!tp) return null;
+    var reg = faceRegion(tp, h.tri);
+    var cand = reg.border.slice();
+    triEdges(tp, h.tri).forEach(function (e) { if (isSharp(tp, e)) cand.push(e); });
+    if (!cand.length) return null;
+    var best = null, bd = Infinity;
+    cand.forEach(function (e) { var d = segDist(h.p, vtx(tp, e[0]), vtx(tp, e[1])); if (d < bd) { bd = d; best = e; } });
+    var a = vtx(tp, best[0]), b = vtx(tp, best[1]), dir = b.clone().sub(a).normalize();
+    // doortrekken langs randen met dezelfde richting
+    var pool = reg.border.concat(cand), used = new Set([best[0] + "," + best[1]]), ends = [best[0], best[1]], grew = true;
+    while (grew) {
+      grew = false;
+      for (var i = 0; i < pool.length; i++) {
+        var e = pool[i], k = e[0] + "," + e[1]; if (used.has(k)) continue;
+        for (var s = 0; s < 2; s++) {
+          var at = ends[s], other = e[0] === at ? e[1] : e[1] === at ? e[0] : -1;
+          if (other < 0) continue;
+          var d2 = vtx(tp, other).sub(vtx(tp, at)).normalize();
+          if (Math.abs(d2.dot(dir)) > 0.99995) { ends[s] = other; used.add(k); grew = true; break; }
+        }
+      }
+    }
+    return { a: vtx(tp, ends[0]), b: vtx(tp, ends[1]), dir: dir, segs: [[vtx(tp, ends[0]), vtx(tp, ends[1])]] };
+  }
+  function pickFace(h) {
+    var tp = topo(h.obj);
+    if (!tp) return { n: h.n, c: h.p, pts: [h.p], tris: [], segs: [], tp: null };
+    var reg = faceRegion(tp, h.tri), c = new V3(0, 0, 0), vs = new Set();
+    reg.tris.forEach(function (t) { for (var k = 0; k < 3; k++) vs.add(tp.T[t * 3 + k]); });
+    var pts = []; vs.forEach(function (v) { pts.push(vtx(tp, v)); c.add(pts[pts.length - 1]); });
+    c.multiplyScalar(1 / pts.length);
+    var segs = reg.border.slice(0, 4000).map(function (e) { return [vtx(tp, e[0]), vtx(tp, e[1])]; });
+    return { n: reg.n, c: c, pts: pts, tris: reg.tris, tp: tp, segs: segs, planar: reg.tris.length > 1 };
+  }
+  // kleinste afstand punt-driehoek
+  function ptTri(p, a, b, c) {
+    var ab = b.clone().sub(a), ac = c.clone().sub(a), ap = p.clone().sub(a);
+    var d1 = ab.dot(ap), d2 = ac.dot(ap); if (d1 <= 0 && d2 <= 0) return p.distanceTo(a);
+    var bp = p.clone().sub(b), d3 = ab.dot(bp), d4 = ac.dot(bp); if (d3 >= 0 && d4 <= d3) return p.distanceTo(b);
+    var vc = d1 * d4 - d3 * d2; if (vc <= 0 && d1 >= 0 && d3 <= 0) return p.distanceTo(a.clone().add(ab.multiplyScalar(d1 / (d1 - d3))));
+    var cp = p.clone().sub(c), d5 = ab.dot(cp), d6 = ac.dot(cp); if (d6 >= 0 && d5 <= d6) return p.distanceTo(c);
+    var vb = d5 * d2 - d1 * d6; if (vb <= 0 && d2 >= 0 && d6 <= 0) return p.distanceTo(a.clone().add(ac.multiplyScalar(d2 / (d2 - d6))));
+    var va = d3 * d6 - d5 * d4;
+    if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return p.distanceTo(b.clone().add(c.clone().sub(b).multiplyScalar((d4 - d3) / ((d4 - d3) + (d5 - d6)))));
+    var den = 1 / (va + vb + vc);
+    return p.distanceTo(a.clone().add(ab.multiplyScalar(vb * den)).add(ac.multiplyScalar(vc * den)));
+  }
+  function minFaceDist(A, B) {
+    if (!A.tp || !B.tp) return A.c.distanceTo(B.c);
+    var best = Infinity;
+    function oneWay(P, Q) {
+      var pts = P.pts, tris = Q.tris, step = Math.max(1, Math.ceil(pts.length * tris.length / 3e6));
+      for (var i = 0; i < pts.length; i += step) for (var j = 0; j < tris.length; j++) {
+        var t = tris[j], d = ptTri(pts[i], vtx(Q.tp, Q.tp.T[t * 3]), vtx(Q.tp, Q.tp.T[t * 3 + 1]), vtx(Q.tp, Q.tp.T[t * 3 + 2]));
+        if (d < best) best = d;
+      }
+    }
+    oneWay(A, B); oneWay(B, A);
+    return best;
+  }
+  // kleinste afstand tussen twee lijnstukken
+  function segSeg(p1, q1, p2, q2) {
+    var d1 = q1.clone().sub(p1), d2 = q2.clone().sub(p2), r = p1.clone().sub(p2);
+    var a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r), s, t;
+    if (a <= 1e-12 && e <= 1e-12) return p1.distanceTo(p2);
+    if (a <= 1e-12) { s = 0; t = Math.max(0, Math.min(1, f / e)); }
+    else {
+      var c = d1.dot(r);
+      if (e <= 1e-12) { t = 0; s = Math.max(0, Math.min(1, -c / a)); }
+      else {
+        var b = d1.dot(d2), den = a * e - b * b;
+        s = den !== 0 ? Math.max(0, Math.min(1, (b * f - c * e) / den)) : 0;
+        t = (b * s + f) / e;
+        if (t < 0) { t = 0; s = Math.max(0, Math.min(1, -c / a)); } else if (t > 1) { t = 1; s = Math.max(0, Math.min(1, (b - c) / a)); }
+      }
+    }
+    return p1.clone().add(d1.multiplyScalar(s)).distanceTo(p2.clone().add(d2.multiplyScalar(t)));
+  }
+
+  // ------------------------------------------------------------ klikken: selecteren of meten
+  var MODE_TXT = { punt: ["het eerste punt", "het tweede punt"], vlak: ["het eerste vlak", "het tweede vlak"], lijn: ["de eerste rand (klik vlak bij een rechte rand)", "de tweede rand"] };
   function onClick(button, coords) {
     if (!viewer || button !== 1 && button !== 0) return;
     var h = hitAt(coords);
@@ -224,24 +382,45 @@
     }
     if (!h) { info("Klik op het model."); return; }
     if (clipped(h.p)) { info("Dat punt ligt in het weggesneden deel. Draai het model of zet de doorsnede uit."); return; }
-    if (!pending) { pending = h; info(mode === "punt" ? "Klik het tweede punt." : "Klik het tweede vlak."); viewer.Render(); return; }
-    var a = pending, b = h; pending = null;
-    var m = { type: mode, a: a.p, b: b.p };
+    var sel;
+    if (mode === "punt") sel = { p: h.p, segs: [] };
+    else if (mode === "vlak") sel = pickFace(h);
+    else { sel = pickLine(h); if (!sel) { info("Geen rechte rand gevonden. Klik dichter bij een rand."); return; } }
+    if (!pending) { pending = sel; info("Klik " + MODE_TXT[mode][1] + "."); viewer.Render(); return; }
+    var A = pending, B = sel, m = { type: mode, segs: (A.segs || []).concat(B.segs || []) };
+    pending = null;
     if (mode === "punt") {
-      m.dist = a.p.distanceTo(b.p);
-      m.dx = Math.abs(b.p.x - a.p.x); m.dy = Math.abs(b.p.y - a.p.y); m.dz = Math.abs(b.p.z - a.p.z);
+      m.a = A.p; m.b = B.p; m.dist = A.p.distanceTo(B.p);
+      m.dx = Math.abs(B.p.x - A.p.x); m.dy = Math.abs(B.p.y - A.p.y); m.dz = Math.abs(B.p.z - A.p.z);
       m.label = fmt(m.dist, 2) + " mm";
-    } else {
-      var dot = Math.max(-1, Math.min(1, a.n.dot(b.n)));
+    } else if (mode === "vlak") {
+      m.a = A.c; m.b = B.c;
+      var dot = Math.max(-1, Math.min(1, A.n.dot(B.n)));
       m.angle = Math.acos(dot) * 180 / Math.PI;
       m.parallel = m.angle < 0.5 || m.angle > 179.5;
       if (m.parallel) {
-        var diff = b.p.clone().sub(a.p);
-        m.dist = Math.abs(diff.dot(a.n));
-        m.label = fmt(m.dist, 2) + " mm (evenwijdig)";
+        m.dist = Math.abs(B.c.clone().sub(A.c).dot(A.n));
+        m.label = fmt(m.dist, 2) + " mm";
+        m.extra = "Evenwijdige vlakken, loodrechte afstand";
       } else {
-        m.label = fmt(m.angle, 1) + "°";
-        m.dist = a.p.distanceTo(b.p);
+        m.dist = minFaceDist(A, B);
+        m.label = fmt(m.angle, 1) + "° · " + fmt(m.dist, 2) + " mm";
+        m.extra = "Hoek tussen de vlakken en kleinste afstand" + (m.dist < 0.005 ? " (vlakken raken elkaar)" : "");
+      }
+    } else {
+      m.a = A.a.clone().add(A.b).multiplyScalar(0.5); m.b = B.a.clone().add(B.b).multiplyScalar(0.5);
+      var cosl = Math.abs(Math.max(-1, Math.min(1, A.dir.dot(B.dir))));
+      m.angle = Math.acos(cosl) * 180 / Math.PI;
+      m.parallel = m.angle < 0.2;
+      if (m.parallel) {
+        var r = B.a.clone().sub(A.a);
+        m.dist = r.clone().sub(A.dir.clone().multiplyScalar(r.dot(A.dir))).length();
+        m.label = fmt(m.dist, 2) + " mm";
+        m.extra = "Evenwijdige randen, afstand tussen de lijnen (lengtes " + fmt(A.a.distanceTo(A.b), 1) + " / " + fmt(B.a.distanceTo(B.b), 1) + " mm)";
+      } else {
+        m.dist = segSeg(A.a, A.b, B.a, B.b);
+        m.label = fmt(m.angle, 1) + "° · " + fmt(m.dist, 2) + " mm";
+        m.extra = "Hoek tussen de randen en kleinste afstand";
       }
     }
     measures.push(m);
@@ -251,34 +430,47 @@
   }
 
   // ------------------------------------------------------------ meetoverlay (SVG)
+  var COLORS = { punt: "#0080FF", vlak: "#E5484D", lijn: "#1FA35B" };
   function toScreen(v) {
     var cam = viewer.camera, w = wrap.clientWidth, h = wrap.clientHeight;
     var p = v.clone().project(cam);
     return { x: (p.x + 1) / 2 * w, y: (1 - p.y) / 2 * h, ok: p.z < 1 && p.z > -1 };
+  }
+  function segsSvg(segs, col, width) {
+    var d = "";
+    for (var i = 0; i < segs.length && i < 4000; i++) {
+      var a = toScreen(segs[i][0]), b = toScreen(segs[i][1]);
+      if (a.ok && b.ok) d += "M" + a.x.toFixed(1) + " " + a.y.toFixed(1) + "L" + b.x.toFixed(1) + " " + b.y.toFixed(1);
+    }
+    return d ? '<path d="' + d + '" stroke="' + col + '" stroke-width="' + width + '" fill="none" stroke-linecap="round"/>' : "";
   }
   function drawOverlay() {
     if (!viewer || !V3) return;
     var w = wrap.clientWidth, h = wrap.clientHeight, s = "";
     overlay.setAttribute("viewBox", "0 0 " + w + " " + h);
     measures.forEach(function (m, i) {
+      var col = COLORS[m.type];
+      s += segsSvg(m.segs || [], col, m.type === "lijn" ? 4 : 2.5);
       var a = toScreen(m.a), b = toScreen(m.b);
       if (!a.ok || !b.ok) return;
-      var col = m.type === "punt" ? "#0080FF" : "#E5484D";
-      s += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="' + (m.type === "vlak" ? "6 4" : "") + '"/>';
+      s += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="' + (m.type === "punt" ? "" : "6 4") + '"/>';
       s += '<circle cx="' + a.x + '" cy="' + a.y + '" r="5" fill="' + col + '" stroke="#fff" stroke-width="2"/><circle cx="' + b.x + '" cy="' + b.y + '" r="5" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
       var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, label = (i + 1) + ": " + m.label, tw = label.length * 7.2 + 14;
       s += '<g transform="translate(' + (mx - tw / 2) + ',' + (my - 26) + ')"><rect width="' + tw + '" height="22" rx="6" fill="#14163A" opacity=".88"/>' +
         '<text x="' + (tw / 2) + '" y="15" fill="#fff" font-size="12.5" font-family="Ubuntu, system-ui, sans-serif" text-anchor="middle">' + label + '</text></g>';
     });
-    if (pending) { var q = toScreen(pending.p); if (q.ok) s += '<circle cx="' + q.x + '" cy="' + q.y + '" r="6" fill="#F2A516" stroke="#fff" stroke-width="2"/>'; }
+    if (pending) {
+      s += segsSvg(pending.segs || [], "#F2A516", 4);
+      var q = toScreen(pending.p || pending.c || pending.a); if (q.ok) s += '<circle cx="' + q.x + '" cy="' + q.y + '" r="6" fill="#F2A516" stroke="#fff" stroke-width="2"/>';
+    }
     overlay.innerHTML = s;
   }
+  var TYPE_TXT = { punt: "Punt–punt", vlak: "Vlak–vlak", lijn: "Lijn–lijn" };
   function renderMeasures() {
-    if (!measures.length) { measureList.innerHTML = '<p class="muted small">Nog geen metingen. Kies <b>Punt–punt</b> of <b>Vlak–vlak</b> en klik twee keer op het model.</p>'; return; }
+    if (!measures.length) { measureList.innerHTML = '<p class="muted small">Nog geen metingen. Kies <b>Punt–punt</b>, <b>Vlak–vlak</b> of <b>Lijn–lijn</b> en klik twee keer op het model.</p>'; return; }
     measureList.innerHTML = measures.map(function (m, i) {
-      var extra = m.type === "punt" ? "ΔX " + fmt(m.dx, 2) + " · ΔY " + fmt(m.dy, 2) + " · ΔZ " + fmt(m.dz, 2) + " mm"
-        : (m.parallel ? "Vlakken evenwijdig, loodrechte afstand" : "Hoek tussen de vlakken (afstand klikpunten " + fmt(m.dist, 2) + " mm)");
-      return '<div class="v3d-m"><b>' + (i + 1) + '. ' + (m.type === "punt" ? "Punt–punt" : "Vlak–vlak") + ': ' + m.label + '</b><div class="small muted">' + extra + '</div></div>';
+      var extra = m.type === "punt" ? "ΔX " + fmt(m.dx, 2) + " · ΔY " + fmt(m.dy, 2) + " · ΔZ " + fmt(m.dz, 2) + " mm" : m.extra;
+      return '<div class="v3d-m"><b>' + (i + 1) + '. ' + TYPE_TXT[m.type] + ': ' + m.label + '</b><div class="small muted">' + extra + '</div></div>';
     }).join("") + '<button type="button" class="btn sm" id="v3d-clearm">Metingen wissen</button>';
     document.getElementById("v3d-clearm").onclick = function () { measures = []; pending = null; renderMeasures(); info(""); viewer.Render(); };
   }
@@ -324,7 +516,7 @@
     b.addEventListener("click", function () {
       mode = b.dataset.mode; pending = null;
       document.querySelectorAll("[data-mode]").forEach(function (x) { x.classList.toggle("on", x === b); });
-      info(mode === "punt" ? "Meten punt–punt: klik het eerste punt." : mode === "vlak" ? "Meten vlak–vlak: klik het eerste vlak." : "");
+      info(mode === "draai" ? "" : "Meten " + TYPE_TXT[mode].toLowerCase() + ": klik " + MODE_TXT[mode][0] + ".");
       if (mode !== "draai") openPanel("meten");
       if (viewer) viewer.Render();
     });
@@ -381,7 +573,7 @@
   wrap.addEventListener("drop", function (e) { e.preventDefault(); openFiles(e.dataTransfer.files); });
 
   window.addEventListener("resize", function () { ev.Resize(); });
-  window.WP3D_viewer = function () { return { viewer: viewer, model: model, measures: measures, hidden: hidden, section: section }; };
+  window.WP3D_viewer = function () { return { viewer: viewer, model: model, measures: measures, hidden: hidden, section: section, toScreen: function (x, y, z) { return toScreen(new V3(x, y, z)); } }; };
   renderMeasures();
   load();
 })();

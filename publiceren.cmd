@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V31: 3D-viewer (STEP/IGES/STL/OBJ/3MF) met doorsnede en meten; DC01-tab; bestaande Komdex-orders met orderbon"
+set "OMSCHRIJVING=WorkPortal V32: 3D-viewer met meten punt-, vlak- en lijn-lijn; notitieformulier standaard dicht; DC01-tab; Komdex-orders met orderbon"
 
 echo.
 echo ============================================
