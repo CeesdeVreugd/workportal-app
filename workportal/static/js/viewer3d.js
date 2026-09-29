@@ -389,6 +389,123 @@
     var segs = reg.border.slice(0, 4000).map(function (e) { return [vtx(tp, e[0]), vtx(tp, e[1])]; });
     return { n: reg.n, c: c, pts: pts, tris: reg.tris, tp: tp, segs: segs, planar: reg.tris.length > 1 };
   }
+  // ------------------------------------------------------------ diameter / radius
+  function eigSym3(A) {  // Jacobi: eigenwaarden en -vectoren van een symmetrische 3x3
+    var a = [A[0].slice(), A[1].slice(), A[2].slice()], v = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    for (var it = 0; it < 50; it++) {
+      var p = 0, q = 1, mx = Math.abs(a[0][1]);
+      if (Math.abs(a[0][2]) > mx) { p = 0; q = 2; mx = Math.abs(a[0][2]); }
+      if (Math.abs(a[1][2]) > mx) { p = 1; q = 2; mx = Math.abs(a[1][2]); }
+      if (mx < 1e-12) break;
+      var th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1));
+      var c = 1 / Math.sqrt(t * t + 1), sn = t * c;
+      for (var k = 0; k < 3; k++) {
+        var akp = a[k][p], akq = a[k][q]; a[k][p] = c * akp - sn * akq; a[k][q] = sn * akp + c * akq;
+      }
+      for (k = 0; k < 3; k++) {
+        var apk = a[p][k], aqk = a[q][k]; a[p][k] = c * apk - sn * aqk; a[q][k] = sn * apk + c * aqk;
+      }
+      for (k = 0; k < 3; k++) {
+        var vkp = v[k][p], vkq = v[k][q]; v[k][p] = c * vkp - sn * vkq; v[k][q] = sn * vkp + c * vkq;
+      }
+    }
+    return [0, 1, 2].map(function (i) { return { val: a[i][i], vec: new V3(v[0][i], v[1][i], v[2][i]) }; }).sort(function (x, y) { return x.val - y.val; });
+  }
+  function planeBasis(n) {
+    var u = Math.abs(n.x) < 0.9 ? new V3(1, 0, 0) : new V3(0, 1, 0);
+    u = u.sub(n.clone().multiplyScalar(u.dot(n))).normalize();
+    return { u: u, v: n.clone().cross(u).normalize() };
+  }
+  // cirkel door punten (in het vlak loodrecht op 'axis'), kleinste kwadraten
+  function fitCircle(pts, axis) {
+    var b = planeBasis(axis), o = pts[0], n = pts.length, P = [], mu = 0, mv = 0;
+    pts.forEach(function (p) { var d = p.clone().sub(o), x = d.dot(b.u), y = d.dot(b.v); P.push([x, y]); mu += x; mv += y; });
+    mu /= n; mv /= n;
+    var suu = 0, svv = 0, suv = 0, suuu = 0, svvv = 0, suvv = 0, svuu = 0;
+    P.forEach(function (q) { var x = q[0] - mu, y = q[1] - mv; suu += x * x; svv += y * y; suv += x * y; suuu += x * x * x; svvv += y * y * y; suvv += x * y * y; svuu += y * x * x; });
+    var det = suu * svv - suv * suv;
+    if (Math.abs(det) < 1e-12) return null;
+    var r1 = 0.5 * (suuu + suvv), r2 = 0.5 * (svvv + svuu);
+    var uc = (r1 * svv - r2 * suv) / det, vc = (suu * r2 - suv * r1) / det;
+    var r = Math.sqrt(uc * uc + vc * vc + (suu + svv) / n);
+    var cx = uc + mu, cy = vc + mv, err = 0, angs = [];
+    P.forEach(function (q) { var dx = q[0] - cx, dy = q[1] - cy; err += Math.pow(Math.hypot(dx, dy) - r, 2); angs.push(Math.atan2(dy, dx)); });
+    angs.sort(function (x, y) { return x - y; });
+    var gap = angs[0] + 2 * Math.PI - angs[angs.length - 1];
+    for (var i = 1; i < angs.length; i++) gap = Math.max(gap, angs[i] - angs[i - 1]);
+    var center = o.clone().add(b.u.clone().multiplyScalar(cx)).add(b.v.clone().multiplyScalar(cy));
+    return { c: center, r: r, rms: Math.sqrt(err / n), cover: 360 - gap * 180 / Math.PI, u: b.u, v: b.v, axis: axis };
+  }
+  function circleSegs(f, k) {
+    var out = [], prev = null;
+    for (var i = 0; i <= (k || 72); i++) {
+      var a = i / (k || 72) * 2 * Math.PI;
+      var p = f.c.clone().add(f.u.clone().multiplyScalar(Math.cos(a) * f.r)).add(f.v.clone().multiplyScalar(Math.sin(a) * f.r));
+      if (prev) out.push([prev, p]); prev = p;
+    }
+    return out;
+  }
+  // randlussen van een vlak, de lus die het dichtst bij de klik ligt
+  function nearestLoop(tp, border, p) {
+    var adj = new Map();
+    border.forEach(function (e, i) { [e[0], e[1]].forEach(function (v) { var l = adj.get(v); if (l) l.push(i); else adj.set(v, [i]); }); });
+    var comp = new Int32Array(border.length).fill(-1), loops = [];
+    for (var i = 0; i < border.length; i++) {
+      if (comp[i] >= 0) continue;
+      var stack = [i], L = []; comp[i] = loops.length;
+      while (stack.length) {
+        var e = stack.pop(); L.push(e);
+        [border[e][0], border[e][1]].forEach(function (v) { adj.get(v).forEach(function (f) { if (comp[f] < 0) { comp[f] = loops.length; stack.push(f); } }); });
+      }
+      loops.push(L);
+    }
+    var best = null, bd = Infinity;
+    loops.forEach(function (L) {
+      L.forEach(function (e) { var d = segDist(p, vtx(tp, border[e][0]), vtx(tp, border[e][1])); if (d < bd) { bd = d; best = L; } });
+    });
+    return best ? best.map(function (e) { return border[e]; }) : null;
+  }
+  function pickRound(h) {
+    var tp = topo(h.obj); if (!tp) return null;
+    var cand = [];
+    // 1) rond vlak (cilinder/boring): aaneengesloten gladde driehoeken rond één as
+    var seen = new Set([h.tri]), stack = [h.tri], tris = [], COS_SMOOTH = Math.cos(32 * Math.PI / 180);
+    while (stack.length && tris.length < 60000) {
+      var t = stack.pop(); tris.push(t);
+      triEdges(tp, t).forEach(function (e) {
+        (tp.E.get(e[0] + "," + e[1]) || []).forEach(function (u) { if (!seen.has(u) && ndot(tp, u, t) > COS_SMOOTH) { seen.add(u); stack.push(u); } });
+      });
+    }
+    var M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    tris.forEach(function (t) {
+      var n = [tp.N[t * 3], tp.N[t * 3 + 1], tp.N[t * 3 + 2]];
+      for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) M[i][j] += n[i] * n[j];
+    });
+    var eg = eigSym3(M);
+    if (tris.length >= 4 && eg[1].val > 0.02 * tris.length) {
+      var axis = eg[0].vec.normalize(), vs = new Set(), pts = [];
+      tris.forEach(function (t) { for (var k = 0; k < 3; k++) vs.add(tp.T[t * 3 + k]); });
+      vs.forEach(function (v) { pts.push(vtx(tp, v)); });
+      var f = fitCircle(pts, axis);
+      if (f && f.rms < Math.max(0.02 * f.r, 0.01)) {
+        f.c.add(axis.clone().multiplyScalar(h.p.clone().sub(f.c).dot(axis)));  // op de hoogte van de klik
+        f.src = "vlak"; cand.push(f);
+      }
+    }
+    // 2) ronde rand van een vlak vlak (bijv. het kopvlak van een buis of een gat in een plaat)
+    if (!cand.length) {
+      var reg = faceRegion(tp, h.tri), loop = nearestLoop(tp, reg.border, h.p);
+      if (loop && loop.length >= 6) {
+        var lv = new Set(), lp = [];
+        loop.forEach(function (e) { lv.add(e[0]); lv.add(e[1]); });
+        lv.forEach(function (v) { lp.push(vtx(tp, v)); });
+        var g = fitCircle(lp, reg.n);
+        if (g && g.rms < Math.max(0.02 * g.r, 0.01)) { g.src = "rand"; cand.push(g); }
+      }
+    }
+    return cand[0] || null;
+  }
+
   // kleinste afstand punt-driehoek
   function ptTri(p, a, b, c) {
     var ab = b.clone().sub(a), ac = c.clone().sub(a), ap = p.clone().sub(a);
@@ -435,7 +552,7 @@
   }
 
   // ------------------------------------------------------------ klikken: selecteren of meten
-  var MODE_TXT = { punt: ["het eerste punt", "het tweede punt"], vlak: ["het eerste vlak", "het tweede vlak"], lijn: ["de eerste rand (klik vlak bij een rechte rand)", "de tweede rand"] };
+  var MODE_TXT = { punt: ["het eerste punt", "het tweede punt"], vlak: ["het eerste vlak", "het tweede vlak"], lijn: ["de eerste rand (klik vlak bij een rechte rand)", "de tweede rand"], rond: ["op een ronde rand of een rond vlak", ""] };
   function onClick(button, coords) {
     if (!viewer || button !== 1 && button !== 0) return;
     var h = hitAt(coords);
@@ -446,6 +563,18 @@
     }
     if (!h) { info("Klik op het model."); return; }
     if (clipped(h.p)) { info("Dat punt ligt in het weggesneden deel. Draai het model of zet de doorsnede uit."); return; }
+    if (mode === "rond") {
+      var f = pickRound(h);
+      if (!f) { info("Geen ronde rand of rond vlak herkend. Klik op het ronde vlak zelf of vlak naast de ronde rand."); return; }
+      var full = f.cover > 200;
+      var m1 = { type: "rond", segs: circleSegs(f), a: f.c.clone().sub(f.u.clone().multiplyScalar(f.r)), b: f.c.clone().add(f.u.clone().multiplyScalar(f.r)),
+        dist: 2 * f.r, r: f.r };
+      m1.label = full ? "Ø " + fmt(2 * f.r, 2) + " mm" : "R " + fmt(f.r, 2) + " mm";
+      m1.extra = (full ? "Diameter (R " + fmt(f.r, 2) + " mm)" : "Radius van een boog van ca. " + Math.round(f.cover) + "° (Ø " + fmt(2 * f.r, 2) + " mm)") +
+        (f.src === "rand" ? ", gemeten op de ronde rand" : ", gemeten op het ronde vlak") + ". Benadering uit het beeldmodel.";
+      measures.push(m1); info(m1.label); renderMeasures(); viewer.Render();
+      return;
+    }
     var sel;
     if (mode === "punt") sel = { p: h.p, segs: [] };
     else if (mode === "vlak") sel = pickFace(h);
@@ -494,7 +623,7 @@
   }
 
   // ------------------------------------------------------------ meetoverlay (SVG)
-  var COLORS = { punt: "#0080FF", vlak: "#E5484D", lijn: "#1FA35B" };
+  var COLORS = { punt: "#0080FF", vlak: "#E5484D", lijn: "#1FA35B", rond: "#8E4EC6" };
   function toScreen(v) {
     var cam = viewer.camera, w = wrap.clientWidth, h = wrap.clientHeight;
     var p = v.clone().project(cam);
@@ -529,9 +658,9 @@
     }
     overlay.innerHTML = s;
   }
-  var TYPE_TXT = { punt: "Punt–punt", vlak: "Vlak–vlak", lijn: "Lijn–lijn" };
+  var TYPE_TXT = { punt: "Punt–punt", vlak: "Vlak–vlak", lijn: "Lijn–lijn", rond: "Diameter" };
   function renderMeasures() {
-    if (!measures.length) { measureList.innerHTML = '<p class="muted small">Nog geen metingen. Kies <b>Punt–punt</b>, <b>Vlak–vlak</b> of <b>Lijn–lijn</b> en klik twee keer op het model.</p>'; return; }
+    if (!measures.length) { measureList.innerHTML = '<p class="muted small">Nog geen metingen. Kies <b>Punt–punt</b>, <b>Vlak–vlak</b> of <b>Lijn–lijn</b> en klik twee keer op het model, of kies <b>Diameter</b> en klik één keer op een ronde rand.</p>'; return; }
     measureList.innerHTML = measures.map(function (m, i) {
       var extra = m.type === "punt" ? "ΔX " + fmt(m.dx, 2) + " · ΔY " + fmt(m.dy, 2) + " · ΔZ " + fmt(m.dz, 2) + " mm" : m.extra;
       return '<div class="v3d-m"><b>' + (i + 1) + '. ' + TYPE_TXT[m.type] + ': ' + m.label + '</b><div class="small muted">' + extra + '</div></div>';

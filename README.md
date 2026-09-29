@@ -213,6 +213,8 @@ randen, orthografisch, volledig scherm, en meten:
   anders de hoek plus de kleinste afstand tussen de twee vlakken.
 - **Lijn–lijn:** klik vlak bij twee rechte randen; de rand wordt over de volle lengte herkend. Evenwijdig → afstand
   tussen de lijnen, anders de hoek plus de kleinste afstand tussen de randen.
+- **Diameter:** één klik op een ronde rand (bijv. het kopvlak van een buis of de rand van een gat) of op het ronde
+  vlak zelf geeft Ø en R. Bij een deel van een cirkel (afronding, boog) wordt de radius getoond.
 Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
 
 **Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,
@@ -228,8 +230,8 @@ geen vlakken in het bestand, of de STEP-lezer kan het bestand niet verwerken).
 **Niet mogelijk (buiten scope):**
 - SolidWorks (.sldprt/.sldasm) en eDrawings (.easm/.eprt/.edrw) kunnen niet worden geopend. Exporteer vanuit
   SolidWorks als **STEP AP214** met **Export face/edge properties** aan, dan blijven de kleuren behouden.
-- Exact meten van gatdiameters en radiussen: er wordt gemeten op het beeldmodel (driehoeken), dus op ronde
-  vlakken is het een benadering. De doorsnede is open (geen dichte snijvlakken).
+- Exact meten van gatdiameters en radiussen: er wordt gemeten op het beeldmodel (driehoeken). De diameter wordt
+  door de hoekpunten gepast en is daardoor nauwkeurig, maar blijft een benadering van de CAD-maat. De doorsnede is open (geen dichte snijvlakken).
 
 **Fase 2 (voorbereid, niet gebouwd):** grote samenstellingen sneller laden door bij upload op de server STEP om
 te zetten naar glTF (.glb) met Python/OpenCascade in de container. Aanhaakpunt: `convert_to_gltf()` in
