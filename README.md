@@ -183,7 +183,54 @@ order (in te stellen onderaan **Orders → Nieuwe orders**, of met het vinkje "v
 goedzetten) en is de klant bekend met een klantmap, dan maakt WorkPortal het project of de order zelf aan,
 met map. Anders komt hij in het actievenster, met de gegevens van de bon al ingevuld. Een melding gaat pas
 de deur uit als er na 10 minuten nog steeds actie nodig is. De werkomschrijving en de orderbon zijn te zien
-bij het project/de order en bij gekoppelde servicetickets.
+bij het project/de order en bij gekoppelde servicetickets. Ook bestaande ordermappen (van vóór de koppeling) waar een orderbon
+in staat, komen in WorkPortal: als order of project volgens het ordertype (onbekend = order), zonder map in
+SharePoint en zonder melding. Het overzicht van alle mappen staat onder **Beheer → DC01**.
+
+## 3D-modellen
+
+Module **3D-modellen** (rechten: Lezen = bekijken en meten, Bewerken = uploaden, Beheer = verwijderen).
+Menu **Uitvoering → 3D-viewer**, en het blok *3D-modellen* bij elk project, elke order en elk serviceticket.
+
+**Waar staan de modellen?**
+- In SharePoint: alle 3D-bestanden in de map **1 Tekeningen** van de project-/ordermap (ook in submappen).
+  De naam van die submap is aan te passen onder Beheer → SharePoint. Bestaat de map niet, dan wordt de hele
+  projectmap doorzocht.
+- Uploaden in WorkPortal: bij een project/order met SharePoint-map gaat het bestand naar **1 Tekeningen** in
+  SharePoint; bij een project/order zonder map en bij een serviceticket wordt het in `/data/uploads` bewaard.
+  Een ticket toont ook de modellen van het gekoppelde project.
+- Via **3D-viewer → Bestand van deze computer openen** bekijk je een bestand zonder het te uploaden.
+
+**Formaten:** STEP (.step/.stp, AP203/AP214 met kleuren), IGES (.iges/.igs), STL, OBJ en 3MF.
+Maximaal 60 MB per upload (Nginx `client_max_body_size 60m`); bij een groter bestand geeft WorkPortal een
+nette melding. Bestanden die al in SharePoint staan mogen groter zijn (ze worden gestreamd).
+
+**De viewer:** draaien/zoomen/pannen (muis of vingers), standaardaanzichten (passend, voor, boven, rechts),
+doorsnede langs X/Y/Z met schuif en omdraaien, onderdelen tonen/verbergen of één onderdeel isoleren,
+randen, orthografisch, volledig scherm, en meten:
+- **Punt–punt:** afstand plus ΔX/ΔY/ΔZ in mm.
+- **Vlak–vlak:** hoek tussen twee vlakken; zijn ze evenwijdig, dan de loodrechte afstand.
+Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
+
+**Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,
+three.js ingebouwd) staat in `workportal/static/3d/o3dv.min.js`. STEP/IGES worden gelezen met
+occt-import-js 0.0.22 (OpenCascade, WASM; LGPL-2.1 met uitzondering). Die bestanden worden tijdens
+`docker build` éénmalig opgehaald door `scripts/fetch_3d_libs.py` en daarna door WorkPortal zelf geserveerd
+uit `workportal/static/3d/occt/` (geen CDN in de browser). Heeft de Docker-host tijdens het bouwen geen internet,
+zet de bestanden dan handmatig neer:
+`npm pack occt-import-js@0.0.22` → uitpakken → `package/dist/occt-import-js.js`, `occt-import-js.wasm`,
+`occt-import-js-worker.js` naar `workportal/static/3d/occt/`. Zonder die bestanden werken STL/OBJ/3MF wel,
+STEP/IGES niet (de 3D-viewer-pagina meldt dat).
+
+**Niet mogelijk (buiten scope):**
+- SolidWorks (.sldprt/.sldasm) en eDrawings (.easm/.eprt/.edrw) kunnen niet worden geopend. Exporteer vanuit
+  SolidWorks als **STEP AP214** met **Export face/edge properties** aan, dan blijven de kleuren behouden.
+- Exact meten van gatdiameters en radiussen: er wordt gemeten op het beeldmodel (driehoeken), dus op ronde
+  vlakken is het een benadering. De doorsnede is open (geen dichte snijvlakken).
+
+**Fase 2 (voorbereid, niet gebouwd):** grote samenstellingen sneller laden door bij upload op de server STEP om
+te zetten naar glTF (.glb) met Python/OpenCascade in de container. Aanhaakpunt: `convert_to_gltf()` in
+`workportal/models3d.py`; de viewer kan een .glb direct openen.
 
 ## Back-ups
 

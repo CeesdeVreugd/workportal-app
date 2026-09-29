@@ -62,6 +62,7 @@
     <label class="check full"><input type="checkbox" name="sp_auto_create" value="1" {{ 'checked' if v.sp_auto_create != '0' }}> <span><b>Nieuwe ordermappen automatisch als project aanmaken</b><br><span class="hint">Uit: alleen bestaande projecten met hetzelfde ordernummer worden gekoppeld.</span></span></label>
     <label class="f">Submap voor werkbonnen<input name="sp_sub_werkbon" value="{{ v.sp_sub_werkbon or '' }}"><span class="hint">In de projectmap, bijv. <code>Service</code>. Leeg = direct in de projectmap.</span></label>
     <label class="f">Submap voor druktestrapporten<input name="sp_sub_druktest" value="{{ v.sp_sub_druktest or '' }}"><span class="hint">Bijv. <code>Werkvoorbereiding/Druktesten</code>.</span></label>
+    <label class="f">Submap met 3D-modellen (STEP)<input name="sp_sub_3d" value="{{ v.sp_sub_3d or '' }}"><span class="hint">Standaard <code>1 Tekeningen</code>; submappen worden ook doorzocht. Uploads uit WorkPortal komen hier.</span></label>
   </div>
   <div><button class="btn primary" name="action" value="instellingen">Opslaan</button></div>
 </form>

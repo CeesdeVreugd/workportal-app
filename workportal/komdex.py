@@ -121,7 +121,7 @@ def create_from_inbox(conn, it, kind, number, name, cid, user_id=None, status="v
     pid = cur.lastrowid
     if it["bon_file_id"]:
         conn.execute("UPDATE files SET entity = 'project', entity_id = ? WHERE id = ?", (pid, it["bon_file_id"]))
-    conn.execute("UPDATE order_inbox SET status = ?, project_id = ?, customer_id = ?, handled_by = ?, handled_at = ? WHERE id = ?",
+    conn.execute("UPDATE order_inbox SET status = ?, project_id = ?, customer_id = ?, handled_by = ?, handled_at = ?, note = NULL WHERE id = ?",
                  (status, pid, cid, user_id, now_iso(), it["id"]))
     conn.commit()
     return pid
@@ -149,6 +149,8 @@ def auto_process(conn, iid):
     if it["project_id"]:
         _enrich(conn, it["project_id"], it)
         return "aangevuld"
+    if it["status"] == "bestaand":
+        return _from_existing(conn, it)
     if it["status"] != "nieuw":
         return "overgeslagen"
     bon = bon_of(it) or {}
@@ -185,6 +187,26 @@ def auto_process(conn, iid):
         conn.commit()
         msg += "; " + spmsg
     return msg
+
+
+def _from_existing(conn, it):
+    """Bestaande Komdex-map met orderbon: altijd in WorkPortal zetten, maar zonder mappen in SharePoint,
+    zonder melding en zonder actievenster. Onbekend ordertype wordt een order (later om te zetten)."""
+    bon = bon_of(it) or {}
+    number = it["number"] or bon.get("number")
+    existing = conn.execute("SELECT id FROM projects WHERE number = ?", (number,)).fetchone()
+    if existing:
+        conn.execute("UPDATE order_inbox SET project_id = ? WHERE id = ?", (existing["id"], it["id"]))
+        conn.commit()
+        _enrich(conn, existing["id"], conn.execute("SELECT * FROM order_inbox WHERE id = ?", (it["id"],)).fetchone())
+        return "aangevuld"
+    kind = type_kind(conn, bon.get("order_type")) or "order"
+    name = bon.get("description") or it["description"] or f"Order {number}"
+    create_from_inbox(conn, it, kind, number, name, it["customer_id"], None, status="bestaand")
+    conn.execute("UPDATE order_inbox SET note = ? WHERE id = ?",
+                 ("Bestaande map: aangemaakt als " + kind + " zonder map in SharePoint.", it["id"]))
+    conn.commit()
+    return f"bestaande map aangemaakt als {kind} (zonder SharePoint-map)"
 
 
 def notify_pending(conn):
@@ -267,13 +289,18 @@ def receive(conn, folders):
     sp.set_setting(conn, "komdex_baseline", "1")
     sp.set_setting(conn, "komdex_last_push", now)
     sp.set_setting(conn, "komdex_last_count", str(len(seen)))
+    if seen:
+        sample = next(iter(seen))
+        sp.set_setting(conn, "komdex_order_dir", re.split(r"[\\/]\d{4}[\\/]\d{8}|[\\/]\d{8}", sample)[0])
     # welke mappen mogen hun orderbon nog sturen?
     since = iso(now_utc() - BON_WINDOW)
     # nieuwe mappen (30 dagen) en bestaande mappen die aan een project/order hangen (alleen aanvullen, nooit aanmaken)
+    # nieuwe mappen (30 dagen), alle bestaande mappen (een orderbon zet ze alsnog in WorkPortal, zonder SharePoint-map)
+    # en mappen die aan een project/order hangen (aanvullen)
     want = [r["path"] for r in conn.execute(
         "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status <> 'genegeerd'"
-        " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR project_id IS NOT NULL)"
-        " ORDER BY number DESC LIMIT 400", (since,))]
+        " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR status = 'bestaand' OR project_id IS NOT NULL)"
+        " ORDER BY number DESC LIMIT 2000", (since,))]
     return {"ontvangen": len(folders), "ordermappen": len(seen), "nieuw": len(new_items), "eerste_keer": first,
             "want": want}
 

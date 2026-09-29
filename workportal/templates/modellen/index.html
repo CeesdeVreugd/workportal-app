@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}3D-viewer{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>3D-viewer</h1><p>STEP, IGES, STL, OBJ en 3MF bekijken, doorsnijden en meten</p></div>
+  <div class="actions"><a class="btn primary" href="{{ url_for('modellen.view_local_file') }}">{{ icon('cube') }}Bestand van deze computer openen</a></div></div>
+{% if not occt %}<div class="alertbox"><b>STEP/IGES nog niet beschikbaar.</b> De STEP-lezer (occt-import-js) wordt bij het bouwen van de container opgehaald; dat is niet gelukt. STL, OBJ en 3MF werken wel. Zie README, sectie 3D-modellen.</div>{% endif %}
+<div class="grid g2 stack">
+  <section class="card"><h2>Waar vind ik de modellen?</h2>
+    <ul class="steps-list" style="margin-top:0">
+      <li>Bij een <b>project</b> of <b>order</b>: blok <i>3D-modellen</i>. Daar staan de STEP-bestanden uit de map <b>1 Tekeningen</b> in SharePoint en wat er in WorkPortal is geüpload.</li>
+      <li>Bij een <b>serviceticket</b>: modellen van het ticket en van het gekoppelde project.</li>
+      <li>Hier boven: een bestand van je eigen computer bekijken, zonder het te uploaden.</li>
+    </ul>
+    <p class="small muted">SolidWorks (.sldprt/.sldasm) en eDrawings (.easm/.eprt/.edrw) kunnen niet worden geopend. Exporteer vanuit SolidWorks als <b>STEP AP214</b> met <i>Export face/edge properties</i> aan, dan blijven de kleuren behouden.</p>
+  </section>
+  <section class="card"><h2>Laatst geüpload in WorkPortal</h2>
+    <div class="rows">{% for f in items %}<a class="rowitem" href="{{ url_for('modellen.view_local', fid=f.id) }}"><span class="ficon cube">{{ icon('cube') }}</span><div class="grow"><div class="t">{{ f.filename }}</div><div class="s">{{ f.where }} · {{ f.created_at|date }}{{ ' · ' ~ f.who if f.who }}</div></div></a>{% else %}<div class="empty">Nog niets geüpload.</div>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}

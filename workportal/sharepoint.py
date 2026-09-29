@@ -52,6 +52,7 @@ DEFAULTS = {
     "sp_existing_status": "actief",
     "sp_sub_werkbon": "Service",
     "sp_sub_druktest": "Druktesten",
+    "sp_sub_3d": "1 Tekeningen",
 }
 
 _lock = threading.Lock()
@@ -815,3 +816,46 @@ def upload_document(conn, project_id, sub, filename, data, g=None):
         return True, f"Opgeslagen in SharePoint ({folder_name(p['number'], p['sp_name'] or p['name'], p['kind'])}/{sub})"
     except GraphError as exc:
         return False, f"Opslaan in SharePoint mislukt: {exc.message}"
+
+
+# ------------------------------------------------------------------ 3D-modellen in de projectmap
+
+MODEL_EXT = (".step", ".stp", ".iges", ".igs", ".stl", ".obj", ".3mf")
+
+
+def list_models(conn, pid, g=None, max_items=400):
+    """3D-bestanden in <projectmap>/<submap 3D> (standaard '1 Tekeningen'), ook in submappen.
+    Bestaat die submap niet, dan wordt de hele projectmap doorzocht (max. 3 niveaus)."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    if not p or not p["sp_item_id"]:
+        return [], None
+    sub = (setting(conn, "sp_sub_3d") or "1 Tekeningen").strip("/ ")
+    found, used = [], sub
+
+    def walk(rel, depth):
+        if depth < 0 or len(found) >= max_items:
+            return
+        for i in g.children(drive, p["sp_item_id"], rel):
+            path = f"{rel}/{i['name']}" if rel else i["name"]
+            if "folder" in i:
+                walk(path, depth - 1)
+            elif i["name"].lower().endswith(MODEL_EXT):
+                found.append({"name": i["name"], "path": path, "size": i.get("size") or 0,
+                              "modified": i.get("lastModifiedDateTime"), "web_url": i.get("webUrl")})
+    try:
+        walk(sub, 5)
+    except GraphError as exc:
+        if exc.status != 404:
+            raise
+        used = ""
+        walk("", 3)
+    found.sort(key=lambda x: x["path"].lower())
+    return found, used
+
+
+def upload_model(conn, pid, filename, data, g=None):
+    """Zet een 3D-bestand in <projectmap>/<submap 3D>. Geeft (ok, melding) of None als er geen projectmap is."""
+    sub = (setting(conn, "sp_sub_3d") or "1 Tekeningen").strip("/ ")
+    return upload_document(conn, pid, sub, filename, data, g=g)

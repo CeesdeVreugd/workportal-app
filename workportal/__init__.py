@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.11.2"
+VERSION = "1.13.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon"}
 
@@ -41,7 +41,7 @@ def create_app(test_config=None, start_scheduler=True):
         UPLOAD_DIR=os.path.join(data_dir, "uploads"),
         BACKUP_DIR=os.path.join(data_dir, "backups"),
         SECRET_KEY=_secret_key(data_dir),
-        MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "60")) * 1024 * 1024,
+        MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "65")) * 1024 * 1024,
         SESSION_COOKIE_NAME="wp_session",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -78,8 +78,9 @@ def create_app(test_config=None, start_scheduler=True):
     from .kennis import bp as kennis_bp
     from .beheer import bp as beheer_bp
     from .komdex import bp as komdex_bp
+    from .models3d import bp as models3d_bp
     from . import werk
-    for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp, komdex_bp):
+    for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp, komdex_bp, models3d_bp):
         app.register_blueprint(bp)
     # Projecten en Orders: dezelfde code, twee modules
     app.register_blueprint(werk.bp, url_prefix="/projecten", name="projecten")
@@ -171,7 +172,8 @@ def create_app(test_config=None, start_scheduler=True):
     @app.errorhandler(413)
     def e413(e):
         return render_template("error.html", code=413, title="Bestand te groot",
-                               message="De upload is te groot. Probeer minder of kleinere bestanden."), 413
+                               message="De upload is te groot (maximaal 60 MB per keer). Upload grote 3D-bestanden één voor één, "
+                                       "of exporteer de STEP met minder detail."), 413
 
     if start_scheduler and os.environ.get("WP_NO_SCHEDULER") != "1":
         from .scheduler import start

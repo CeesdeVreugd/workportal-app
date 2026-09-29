@@ -1,0 +1,19 @@
+{# Blok '3D-modellen' voor project/order (entity='project') en ticket (entity='ticket'). Vereist: entity, eid, to_sp #}
+{% from "partials/icons.html" import icon %}
+{% if can('modellen3d') %}
+<section class="card" id="modellen">
+  <div class="card-head"><h2>{{ icon('cube') }} 3D-modellen</h2>
+    {% if can('modellen3d', 2) %}<button class="btn sm" type="button" onclick="document.getElementById('m3dform').classList.toggle('hidden')">{{ icon('upload') }}Uploaden</button>{% endif %}</div>
+  {% if can('modellen3d', 2) %}
+  <form id="m3dform" method="post" action="{{ url_for('modellen.upload', entity=entity, eid=eid) }}" enctype="multipart/form-data" class="form hidden m3dform" data-maxmb="60">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f full">STEP, IGES, STL, OBJ of 3MF (max. 60 MB per bestand)<input type="file" name="files" multiple accept=".step,.stp,.iges,.igs,.stl,.obj,.3mf" required></label>
+    <p class="hint" style="margin:0">{% if to_sp %}Wordt opgeslagen in SharePoint, in de map <b>1 Tekeningen</b> van de {{ 'order' if kind == 'order' else 'project' }}map.{% else %}Wordt opgeslagen in WorkPortal.{% endif %}
+      SolidWorks/eDrawings kan niet: exporteer als STEP AP214 met "Export face/edge properties" aan.</p>
+    <p class="m3dmsg hint" hidden></p>
+    <div class="actions"><button class="btn primary">Uploaden</button></div>
+  </form>
+  {% endif %}
+  <div data-partial="{{ url_for('modellen.listing', entity=entity, eid=eid) }}"><div class="empty">3D-modellen laden…</div></div>
+</section>
+{% endif %}

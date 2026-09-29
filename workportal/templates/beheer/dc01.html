@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}DC01{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-ordermappen op DC01</p></div></div>
+{% include "beheer/_nav.html" %}
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Status</h2>
+    <dl class="dl">
+      <dt>Koppeling</dt><dd>{% if not status.configured %}<span class="badge b-warn">KOMDEX_KEY niet ingesteld</span>{% elif status.stale %}<span class="badge b-warn">Script stil (langer dan een uur)</span>{% elif status.last_push %}<span class="badge b-ok">Actief</span>{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
+      <dt>Laatste run script</dt><dd>{{ status.last_push|dt if status.last_push else '–' }}</dd>
+      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">{{ order_dir or '–' }}</dd>
+      <dt>Ordermappen gezien</dt><dd>{{ status.count or 0 }} <span class="muted">(bij laatste run)</span></dd>
+      <dt>Met orderbon</dt><dd>{{ counts.bon or 0 }}</dd>
+      <dt>Gekoppeld aan project/order</dt><dd>{{ counts.gekoppeld or 0 }}</dd>
+      <dt>Actie nodig</dt><dd>{% if counts.actie %}<a href="{{ url_for('orders.inbox') }}">{{ counts.actie }} in het actievenster</a>{% else %}0{% endif %}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Zo werkt de sync</h2>
+    <ul class="steps-list" style="margin-top:0">
+      <li>Het script <code>komdex-orders.ps1</code> draait elke paar minuten op DC01 en stuurt de lijst met ordermappen (dit jaar en vorig jaar).</li>
+      <li>Staat er een PDF met <i>orderbon</i> in de naam in een map, dan stuurt het script die mee.</li>
+      <li><b>Nieuwe map met orderbon:</b> automatisch project/order volgens het ordertype, anders naar het actievenster.</li>
+      <li><b>Bestaande map met orderbon:</b> altijd in WorkPortal gezet (onbekend type = order), zonder SharePoint-map en zonder melding.</li>
+      <li><b>Map met bestaand ordernummer:</b> alleen gekoppeld en lege velden aangevuld.</li>
+    </ul>
+  </section>
+</div>
+
+<form class="search" style="max-width:none" method="get">
+  <input type="hidden" name="filter" value="{{ flt }}">
+  {{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op ordernummer, map of klant">
+</form>
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('beheer.dc01', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
+<div class="fchips">
+  {{ fbtn('alle', 'Alle', counts.alle) }}{{ fbtn('bon', 'Met orderbon', counts.bon) }}{{ fbtn('zonderbon', 'Zonder orderbon', counts.zonderbon) }}
+  {{ fbtn('gekoppeld', 'Gekoppeld', counts.gekoppeld) }}{{ fbtn('niet', 'Niet in WorkPortal', counts.niet) }}{{ fbtn('actie', 'Actie nodig', counts.actie) }}{% if counts.weg %}{{ fbtn('weg', 'Verdwenen', counts.weg) }}{% endif %}
+</div>
+
+<form method="post" id="bulkform">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="filter" value="{{ flt }}"><input type="hidden" name="q" value="{{ q }}">
+<div class="bulkbar hidden" id="bulkbar"><span><b id="bulkn">0</b> geselecteerd</span>
+  <button class="btn sm primary" name="action" value="opnieuw">{{ icon('refresh') }}Orderbon opnieuw ophalen</button>
+  <button class="btn sm ghost" type="button" data-bulk-clear>Selectie wissen</button></div>
+<div class="card flush tablewrap"><table class="table">
+  <thead><tr><th class="chk"><input type="checkbox" data-bulk-all aria-label="Alles selecteren"></th><th>Ordermap</th><th>Orderbon</th><th class="hide-m">Klant</th><th>WorkPortal</th><th class="hide-m">Status</th></tr></thead>
+  <tbody>
+  {% for it in items %}
+  <tr class="{{ 'muted' if it.missing }}">
+    <td class="chk"><input type="checkbox" name="ids" value="{{ it.id }}" aria-label="Selecteer {{ it.number }}"></td>
+    <td><b>{{ it.number }}</b>{% if it.folder != it.number %} <span class="small">{{ it.folder[9:] }}</span>{% endif %}<div class="small muted" style="overflow-wrap:anywhere">{{ it.path }}</div></td>
+    <td class="nowrap">{% if it.bon %}{% if it.bon_file_id %}<a class="iconlink" href="{{ url_for('main.file', fid=it.bon_file_id) }}" target="_blank" rel="noopener">{{ icon('pdf') }} {{ it.bon.order_type or 'bon' }}</a>{% else %}{{ it.bon.order_type }}{% endif %}{% elif it.note and 'gelezen' in it.note %}<span class="badge b-warn">Niet leesbaar</span>{% else %}<span class="muted">–</span>{% endif %}</td>
+    <td class="hide-m">{{ it.customer or (it.bon.customer if it.bon else '') or '' }}</td>
+    <td>{% if it.project_id %}<a href="{{ werk_url('detail', it.kind or 'order', pid=it.project_id) }}">{{ (it.kind or '')|capitalize }} {{ it.pnumber }}</a>{% else %}<span class="muted">–</span>{% endif %}</td>
+    <td class="hide-m">{% set st = {'bestaand':'Bestaand','nieuw':'Actie nodig','gekoppeld':'Gekoppeld','verwerkt':'Verwerkt','automatisch':'Automatisch','genegeerd':'Genegeerd'} %}
+      <span class="badge {{ 'b-warn' if it.status == 'nieuw' else 'b-ok' if it.status in ['verwerkt','automatisch','gekoppeld'] else '' }}">{{ 'Verdwenen' if it.missing else st.get(it.status, it.status) }}</span>{% if it.note %}<div class="small muted">{{ it.note }}</div>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="empty">Geen ordermappen gevonden.</td></tr>{% endfor %}
+  </tbody></table></div>
+</form>
+{% if items|length >= 600 %}<p class="small muted">Eerste 600 getoond; gebruik zoeken of filters.</p>{% endif %}
+{% endblock %}

@@ -37,9 +37,10 @@
       {% if can('klanten') %}{{ navlink('klanten.index', 'Relaties', 'klanten', 'klanten.') }}{% endif %}
       {% if can('projecten') %}{{ navlink('projecten.index', 'Projecten', 'project', 'projecten.') }}{% endif %}
       {% if can('orders') %}<a href="{{ url_for('orders.index') }}" class="{{ 'active' if ep.startswith('orders.') }}">{{ icon('order') }}<span>Orders</span>{% if inbox_count() %}<span class="navbadge" title="Nieuwe orders uit Komdex">{{ inbox_count() }}</span>{% endif %}</a>{% endif %}
-      {% if can('service') or can('druktest') %}<div class="navhead">Uitvoering</div>{% endif %}
+      {% if can('service') or can('druktest') or can('modellen3d') %}<div class="navhead">Uitvoering</div>{% endif %}
       {% if can('service') %}{{ navlink('service.index', 'Service & onderhoud', 'service', 'service.') }}{% endif %}
       {% if can('druktest') %}{{ navlink('druktest.index', 'Druktesten', 'druktest', 'druktest.') }}{% endif %}
+      {% if can('modellen3d') %}{{ navlink('modellen.index', '3D-viewer', 'cube', 'modellen.') }}{% endif %}
       {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
       {% if can('calculatie') %}{{ navlink('calculatie.index', 'Calculatie', 'calculatie', 'calculatie.') }}{% endif %}
       {% if can('nacalculatie') %}{{ navlink('nacalc.index', 'Na-calculatie', 'nacalculatie', 'nacalc.') }}{% endif %}

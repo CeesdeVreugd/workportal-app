@@ -1,0 +1,29 @@
+{% from "partials/icons.html" import icon %}
+{% macro size(n) %}{{ ((n or 0) / 1048576)|num(1) ~ ' MB' if (n or 0) >= 1048576 else (((n or 0) / 1024)|round|int ~ ' kB') }}{% endmacro %}
+{% if error %}<div class="empty">{{ error }}</div>{% endif %}
+{% if remote %}
+<div class="small muted" style="margin:0 0 6px">SharePoint · {{ (prow.number ~ ' / ' ~ sub) if sub else prow.number ~ ' (hele map)' }}</div>
+<div class="rows files">
+{% for m in remote %}
+  <div class="rowitem"><span class="ficon cube">{{ icon('cube') }}</span>
+    <div class="grow"><div class="t">{{ m.name }}</div><div class="s">{{ m.path.rsplit('/', 1)[0] if '/' in m.path else '' }}{{ ' · ' if '/' in m.path }}{{ size(m.size) }} · {{ m.modified|date }}</div></div>
+    <a class="btn sm primary" href="{{ url_for('modellen.view_sp', pid=pid, pad=m.path) }}">{{ icon('cube') }}Bekijk 3D</a></div>
+{% endfor %}
+</div>
+{% elif prow and prow.sp_item_id and not error %}
+<div class="empty">Geen 3D-bestanden in {{ sub or 'de projectmap' }} in SharePoint.</div>
+{% endif %}
+{% set all_local = local|list + project_local|list %}
+{% if all_local %}
+<div class="small muted" style="margin:{{ '14px' if remote else '0' }} 0 6px">In WorkPortal opgeslagen</div>
+<div class="rows files">
+{% for f in all_local %}
+  <div class="rowitem"><span class="ficon cube">{{ icon('cube') }}</span>
+    <div class="grow"><div class="t">{{ f.filename }}</div><div class="s">{{ size(f.size) }} · {{ f.created_at|date }}{{ ' · bij project' if f.entity == 'project' and entity == 'ticket' }}</div></div>
+    <a class="btn sm primary" href="{{ url_for('modellen.view_local', fid=f.id) }}">{{ icon('cube') }}Bekijk 3D</a>
+    {% if can('modellen3d', 3) and f.entity == entity %}<form method="post" action="{{ url_for('modellen.delete', fid=f.id) }}" onsubmit="return confirm('{{ f.filename }} verwijderen?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
+{% endfor %}
+</div>
+{% elif not remote and not (prow and prow.sp_item_id) and not error %}
+<div class="empty">Nog geen 3D-modellen.</div>
+{% endif %}

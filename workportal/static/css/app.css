@@ -461,3 +461,6 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .bulkbar .btn.ghost { color: #fff; background: transparent; border-color: rgba(255,255,255,.55); }
 .bulkbar .btn.ghost:hover { background: rgba(255,255,255,.12); }
 @media (max-width: 760px) { .bulkbar { top: 64px; } }
+.iconlink { display: inline-flex; align-items: center; gap: 5px; } .iconlink svg { width: 16px; height: 16px; }
+.ficon.cube { background: #EFEDFE; color: #4B3FB8; }
+.m3dform { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }

@@ -232,3 +232,29 @@
     }
   });
 })();
+
+/* Blokken die hun inhoud los laden (bijv. 3D-modellen uit SharePoint) */
+(function () {
+  document.querySelectorAll("[data-partial]").forEach(function (box) {
+    fetch(box.getAttribute("data-partial"), { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) { box.innerHTML = html; })
+      .catch(function () { box.innerHTML = '<div class="empty">Kon de lijst niet laden.</div>'; });
+  });
+  /* 3D-upload: te groot bestand meteen melden */
+  document.querySelectorAll("form.m3dform").forEach(function (f) {
+    f.addEventListener("submit", function (e) {
+      var max = (parseInt(f.getAttribute("data-maxmb"), 10) || 60) * 1024 * 1024, msg = f.querySelector(".m3dmsg");
+      var files = f.querySelector('input[type=file]').files, total = 0, big = [];
+      for (var i = 0; i < files.length; i++) { total += files[i].size; if (files[i].size > max) big.push(files[i].name); }
+      if (big.length || total > max) {
+        e.preventDefault();
+        msg.hidden = false; msg.style.color = "var(--bad)";
+        msg.textContent = big.length ? big.join(", ") + " is groter dan 60 MB. Exporteer de STEP opnieuw met minder detail, of zet hem direct in de map 1 Tekeningen in SharePoint."
+          : "Samen groter dan 60 MB. Upload de bestanden één voor één.";
+        return;
+      }
+      var btn = f.querySelector("button"); btn.disabled = true; btn.textContent = "Bezig met uploaden…";
+    });
+  });
+})();

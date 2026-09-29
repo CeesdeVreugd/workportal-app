@@ -1,0 +1,71 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – 3D – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+</head>
+<body class="v3d-body">
+<div id="v3d-app" class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b id="v3d-title">{{ title }}</b>{% if subtitle %}<span>{{ subtitle }}</span>{% endif %}</div>
+    {% if url %}<a class="iconbtn light" href="{{ url }}?download=1" aria-label="Downloaden" title="Downloaden">{{ icon('download') }}</a>{% else %}
+    <label class="btn sm v3d-open">{{ icon('upload') }}<span>Bestand openen</span><input type="file" id="v3d-file" accept=".step,.stp,.iges,.igs,.stl,.obj,.3mf" hidden></label>{% endif %}
+  </header>
+  <div class="v3d-tools" role="toolbar" aria-label="3D-gereedschap">
+    <div class="grp"><button type="button" class="tb on" data-mode="draai" title="Draaien en onderdelen selecteren">{{ icon('rotate') }}<span>Draaien</span></button>
+      <button type="button" class="tb" data-mode="punt" title="Afstand tussen twee punten">{{ icon('ruler') }}<span>Punt–punt</span></button>
+      <button type="button" class="tb" data-mode="vlak" title="Hoek of afstand tussen twee vlakken">{{ icon('angle') }}<span>Vlak–vlak</span></button></div>
+    <div class="grp"><button type="button" class="tb" data-panel="onderdelen">{{ icon('layers') }}<span>Onderdelen</span></button>
+      <button type="button" class="tb" data-panel="doorsnede">{{ icon('section') }}<span>Doorsnede</span></button>
+      <button type="button" class="tb" data-panel="meten">{{ icon('ruler') }}<span>Metingen</span></button></div>
+    <div class="grp"><button type="button" class="tb" data-view="iso" title="Passend en isometrisch">{{ icon('fit') }}<span>Passend</span></button>
+      <button type="button" class="tb sm" data-view="voor">Voor</button><button type="button" class="tb sm" data-view="boven">Boven</button>
+      <button type="button" class="tb sm" data-view="rechts">Rechts</button></div>
+    <div class="grp"><button type="button" class="tb" id="v3d-edges" title="Randen tonen">{{ icon('edges') }}<span>Randen</span></button>
+      <button type="button" class="tb" id="v3d-ortho" title="Orthografisch (zonder perspectief)">{{ icon('cube') }}<span>Ortho</span></button>
+      <button type="button" class="tb" id="v3d-full" title="Volledig scherm">{{ icon('fullscreen') }}<span>Scherm</span></button></div>
+  </div>
+  <main class="v3d-main">
+    <div class="v3d-stage">
+      <div id="v3d-canvas" class="v3d-canvas"></div>
+      <svg id="v3d-overlay" class="v3d-overlay" aria-hidden="true"></svg>
+      <div id="v3d-status" class="v3d-status" hidden></div>
+      <div id="v3d-info" class="v3d-info" hidden></div>
+    </div>
+    <aside id="v3d-side" class="v3d-side">
+      <button type="button" class="v3d-x" id="v3d-close" aria-label="Paneel sluiten">×</button>
+      <section class="v3d-panel" id="v3d-p-onderdelen" hidden>
+        <h3>Onderdelen <span class="muted small" id="v3d-partcount"></span></h3>
+        <p class="small muted" style="margin:0 0 8px">Vinkje uit = verbergen · ◎ = alleen dit tonen · klik op een naam om te markeren.</p>
+        <button type="button" class="btn sm" id="v3d-showall">Alles tonen</button>
+        <div id="v3d-tree" class="v3d-tree"></div>
+      </section>
+      <section class="v3d-panel" id="v3d-p-doorsnede" hidden>
+        <h3>Doorsnede</h3>
+        <label class="check"><input type="checkbox" id="v3d-sec-on"> Doorsnede aan</label>
+        <div id="v3d-sec-ctl" hidden>
+          <div class="v3d-axes"><button type="button" class="tb sm" data-axis="x">X</button><button type="button" class="tb sm" data-axis="y">Y</button><button type="button" class="tb sm on" data-axis="z">Z</button>
+            <button type="button" class="tb sm" id="v3d-sec-flip" title="Andere kant tonen">⇄ Omdraaien</button></div>
+          <input type="range" id="v3d-sec-range" min="0" max="1000" value="500" aria-label="Positie doorsnede">
+          <div class="small muted" id="v3d-sec-val"></div>
+        </div>
+      </section>
+      <section class="v3d-panel" id="v3d-p-meten" hidden>
+        <h3>Metingen</h3>
+        <p class="small muted" style="margin:0 0 8px">Gemeten op het beeldmodel (benadering van de CAD-geometrie). Eenheid mm.</p>
+        <div id="v3d-measures"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+<script>window.WP3D = {{ {"url": url, "title": title, "occt": occt, "occtBase": url_for('static', filename='3d/occt/'), "maxMb": max_mb, "sizeMb": ((size or 0) / 1048576)}|tojson }};</script>
+<script src="{{ url_for('static', filename='3d/o3dv.min.js') }}?v={{ VERSION }}"></script>
+<script src="{{ url_for('static', filename='js/viewer3d.js') }}?v={{ VERSION }}"></script>
+</body>
+</html>

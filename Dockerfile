@@ -12,6 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN sed -i "s/\r$//" docker-entrypoint.sh && chmod +x docker-entrypoint.sh && mkdir -p /data
+# 3D-viewer: STEP/IGES-lezer (occt-import-js, OpenCascade WASM) eenmalig ophalen en zelf hosten
+RUN python scripts/fetch_3d_libs.py
 
 EXPOSE 3000
 VOLUME ["/data"]

@@ -44,6 +44,8 @@
   {% endif %}
 </section>
 {% endif %}
+{% with entity='project', eid=p.id, to_sp=(sp_on and p.sp_item_id and not p.sp_missing), kind=p.kind %}{% include "modellen/_section.html" %}{% endwith %}
+
 <section class="card" id="notities">
   <div class="card-head"><h2>Gespreksnotities</h2>{% if can_note %}<button class="btn sm" type="button" onclick="var f=document.getElementById('noteform');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Notitie</button>{% endif %}</div>
   {% if can_note %}

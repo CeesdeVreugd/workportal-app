@@ -171,7 +171,7 @@ def sharepoint():
                     flash("Volledige synchronisatie gestart.", "ok")
             elif action == "instellingen":
                 sp.set_setting(conn, "sp_auto_create", "1" if request.form.get("sp_auto_create") else "0")
-                for k in ("sp_sub_werkbon", "sp_sub_druktest"):
+                for k in ("sp_sub_werkbon", "sp_sub_druktest", "sp_sub_3d"):
                     sp.set_setting(conn, k, re.sub(r'["*:<>?\\|#%]+', "", request.form.get(k) or "").strip("/ "))
                 flash("Instellingen opgeslagen.", "ok")
             elif action == "koppel":
@@ -206,7 +206,7 @@ def sharepoint():
                    " (SELECT COUNT(*) FROM projects WHERE sp_item_id IS NOT NULL AND customer_id IS NULL) AS nocust", one=True)
     customers = query("SELECT id, name FROM customers WHERE active = 1 ORDER BY name COLLATE NOCASE")
     v = {k: sp.setting(conn, k) for k in ("sp_url", "sp_root_name", "sp_root_web", "sp_site_name", "sp_last_sync", "sp_last_full",
-                                           "sp_last_error", "sp_auto_create", "sp_sub_werkbon", "sp_sub_druktest", "sp_root_id",
+                                           "sp_last_error", "sp_auto_create", "sp_sub_werkbon", "sp_sub_druktest", "sp_sub_3d", "sp_root_id",
                                            "sp_running", "sp_last_result")}
     if v["sp_last_result"] and "|" in v["sp_last_result"]:
         v["result_at"], v["result"] = v["sp_last_result"].split("|", 1)
@@ -240,6 +240,53 @@ def sharepoint_snelstart():
     for p in plan:
         counts[p["status"]] = counts.get(p["status"], 0) + 1
     return render_template("beheer/sharepoint_snelstart.html", plan=plan, counts=counts, extra=extra)
+
+
+@bp.route("/dc01", methods=["GET", "POST"])
+@require("beheer", BEHEER)
+def dc01():
+    """Sync met de Komdex-ordermappen op de server DC01 (via het script komdex-orders.ps1)."""
+    from . import komdex
+    if request.method == "POST":
+        ids = [to_int(x) for x in request.form.getlist("ids") if to_int(x)]
+        if request.form.get("action") == "opnieuw" and ids:
+            execute(f"UPDATE order_inbox SET bon_received_at = NULL, note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
+            flash(f"Orderbon wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
+        return redirect(url_for("beheer.dc01", filter=request.form.get("filter"), q=request.form.get("q") or None))
+    flt = request.args.get("filter") or "alle"
+    q = (request.args.get("q") or "").strip()
+    where, params = ["1=1"], []
+    if flt == "bon":
+        where.append("i.bon_json IS NOT NULL")
+    elif flt == "zonderbon":
+        where.append("i.bon_json IS NULL AND i.missing = 0")
+    elif flt == "gekoppeld":
+        where.append("i.project_id IS NOT NULL")
+    elif flt == "niet":
+        where.append("i.project_id IS NULL AND i.missing = 0 AND i.status <> 'genegeerd'")
+    elif flt == "actie":
+        where.append("i.status = 'nieuw' AND i.missing = 0")
+    elif flt == "weg":
+        where.append("i.missing = 1")
+    else:
+        flt = "alle"
+    if q:
+        where.append("(i.number LIKE ? OR i.path LIKE ? OR IFNULL(c.name,'') LIKE ?)")
+        params += [f"%{q}%"] * 3
+    rows = query("SELECT i.*, c.name AS customer, p.kind, p.name AS pname, p.number AS pnumber FROM order_inbox i"
+                 " LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN projects p ON p.id = i.project_id"
+                 " WHERE " + " AND ".join(where) + " ORDER BY i.number DESC LIMIT 600", params)
+    items = []
+    for r in rows:
+        d = dict(r)
+        d["bon"] = komdex.bon_of(r)
+        items.append(d)
+    counts = query("SELECT COUNT(*) AS alle, SUM(bon_json IS NOT NULL) AS bon, SUM(bon_json IS NULL AND missing = 0) AS zonderbon,"
+                   " SUM(project_id IS NOT NULL) AS gekoppeld,"
+                   " SUM(project_id IS NULL AND missing = 0 AND status <> 'genegeerd') AS niet,"
+                   " SUM(status = 'nieuw' AND missing = 0) AS actie, SUM(missing = 1) AS weg FROM order_inbox", one=True)
+    return render_template("beheer/dc01.html", items=items, counts=counts, flt=flt, q=q, status=komdex.status(),
+                           order_dir=sp.setting(get_db(), "komdex_order_dir"))
 
 
 @bp.route("/testmail", methods=["POST"])
