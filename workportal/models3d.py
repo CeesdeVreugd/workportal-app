@@ -217,7 +217,7 @@ def sp_file(pid, rel):
     except sp.GraphError as exc:
         abort(404 if exc.status == 404 else 502)
     headers = {"Cache-Control": "private, max-age=600"}
-    if meta.get("size"):
+    if meta.get("size") and not r.headers.get("Content-Encoding"):
         headers["Content-Length"] = str(meta["size"])
     if request.args.get("download") == "1":
         headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(meta.get('name') or 'model')}"

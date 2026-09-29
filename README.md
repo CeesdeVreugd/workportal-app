@@ -217,13 +217,13 @@ Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
 
 **Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,
 three.js ingebouwd) staat in `workportal/static/3d/o3dv.min.js`. STEP/IGES worden gelezen met
-occt-import-js 0.0.22 (OpenCascade, WASM; LGPL-2.1 met uitzondering). Die bestanden worden tijdens
-`docker build` éénmalig opgehaald door `scripts/fetch_3d_libs.py` en daarna door WorkPortal zelf geserveerd
-uit `workportal/static/3d/occt/` (geen CDN in de browser). Heeft de Docker-host tijdens het bouwen geen internet,
-zet de bestanden dan handmatig neer:
-`npm pack occt-import-js@0.0.22` → uitpakken → `package/dist/occt-import-js.js`, `occt-import-js.wasm`,
-`occt-import-js-worker.js` naar `workportal/static/3d/occt/`. Zonder die bestanden werken STL/OBJ/3MF wel,
-STEP/IGES niet (de 3D-viewer-pagina meldt dat).
+occt-import-js 0.0.24 (OpenCascade, WASM; LGPL-2.1 met uitzondering, licenties in dezelfde map). Die bestanden
+staan in de repository in `workportal/static/3d/occt/` en worden door WorkPortal zelf geserveerd (geen CDN in de
+browser). Ontbreken ze, dan probeert `scripts/fetch_3d_libs.py` ze tijdens `docker build` op te halen. Zonder die
+bestanden werken STL/OBJ/3MF wel, STEP/IGES niet (de 3D-viewer-pagina meldt dat).
+
+Opent een model niet, dan toont de viewer de reden plus de technische melding van de lezer (ophalen mislukt,
+geen vlakken in het bestand, of de STEP-lezer kan het bestand niet verwerken).
 
 **Niet mogelijk (buiten scope):**
 - SolidWorks (.sldprt/.sldasm) en eDrawings (.easm/.eprt/.edrw) kunnen niet worden geopend. Exporteer vanuit

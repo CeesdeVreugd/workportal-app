@@ -3,3 +3,4 @@
 *.png binary
 *.cmd text eol=crlf
 *.ps1 eol=crlf
+*.wasm binary

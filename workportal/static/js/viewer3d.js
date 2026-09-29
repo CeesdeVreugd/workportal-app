@@ -35,35 +35,73 @@
   var ev = new OV.EmbeddedViewer(wrap, {
     backgroundColor: new OV.RGBAColor(244, 246, 250, 255),
     defaultColor: new OV.RGBColor(190, 196, 208),
-    edgeSettings: new OV.EdgeSettings(false, new OV.RGBColor(20, 22, 58), 1),
+    edgeSettings: new OV.EdgeSettings(false, new OV.RGBColor(20, 22, 58), 25),
     onModelLoaded: onLoaded
   });
 
   // voortgang/fouten van de engine opvangen
-  var watch = null;
+  var occtOk = false, watch = null, t0 = Date.now(), lastText = "", isStep = /\.(step|stp|iges|igs)$/i.test(cfg.url || cfg.title || "");
+  function elapsed() { var s = Math.round((Date.now() - t0) / 1000); return Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2); }
+  function fail(msg) {
+    clearInterval(watch);
+    setStatus("Het model kon niet worden geopend. " + msg + (cfg.url ? ' <a href="' + cfg.url + (cfg.url.indexOf("?") < 0 ? "?" : "&") + 'download=1">Bestand downloaden</a>' : ""), "error");
+  }
   function poll() {
+    if (window.WP3D_occtError) {
+      var err = String(window.WP3D_occtError);
+      fail(/memory|alloc|OOM|abort/i.test(err) ? "Het bestand is te groot voor de browser (geheugen vol). Exporteer een lichtere STEP (bijv. zonder bevestigingsmateriaal) of open het in eDrawings." :
+        "De STEP-lezer gaf een fout: " + err.replace(/[<>&]/g, "").slice(0, 160));
+      return;
+    }
     var pd = ev.progressDiv;
     if (pd && pd.innerHTML) {
       var t = pd.textContent || "";
       pd.style.display = "none";
-      if (/error|failed|unknown|no importable|not/i.test(t) && !/model\.\.\./i.test(t)) {
-        clearInterval(watch);
-        setStatus("Het model kon niet worden geopend. " + (/no importable/i.test(t) ? "Dit bestandstype wordt niet ondersteund." :
-          (cfg.occt ? "Controleer of het een geldig STEP-, IGES-, STL-, OBJ- of 3MF-bestand is." :
-            "STEP/IGES-ondersteuning is nog niet geïnstalleerd op de server (zie README, 3D-modellen).")), "error");
-      } else {
-        setStatus(t.replace("Loading model...", "Model ophalen…").replace("Importing model...", "Model inlezen… (grote STEP-bestanden kunnen even duren)")
-          .replace("Visualizing model...", "Model opbouwen…"));
+      if (/error|failed|no importable|contain/i.test(t) && !/model\.\.\./i.test(t)) {
+        var why = /no importable/i.test(t) ? "Dit bestandstype wordt niet ondersteund." :
+          /load file for import/i.test(t) ? "Het bestand kon niet van de server of SharePoint worden opgehaald. Probeer het opnieuw; blijft het fout gaan, download het bestand dan en open het via 3D-modellen > Bestand van deze computer." :
+          /no faces|no vertices|any meshes|no importable object/i.test(t) ? "Het bestand bevat geen vlakken (bijvoorbeeld alleen lijnen, punten of een lege samenstelling). Exporteer vanuit SolidWorks als STEP AP214 met de solids/bodies aan." :
+          /occt/i.test(t) ? (occtOk ? "De STEP-lezer is vastgelopen tijdens het inlezen, meestal omdat het bestand te groot of te complex is voor de browser. Exporteer een lichtere STEP of open het in eDrawings." :
+            "De STEP/IGES-lezer kon niet worden geladen op de server (zie README, 3D-modellen).") :
+          isStep ? "De STEP-lezer kon dit bestand niet verwerken. Exporteer het opnieuw als STEP AP214 (solids) en probeer het nog eens." :
+          "Controleer of het een geldig STEP-, IGES-, STL-, OBJ- of 3MF-bestand is.";
+        fail(why + "<br><span class='small muted'>Technische melding: " + t.replace(/[<>&]/g, "").slice(0, 200) + "</span>");
+        return;
       }
+      lastText = t;
     }
+    if (!lastText) return;
+    var txt = lastText.replace("Loading model...", "Model ophalen…").replace("Importing model...", "Model inlezen…").replace("Visualizing model...", "Model opbouwen…");
+    var sec = (Date.now() - t0) / 1000, extra = "";
+    if (/Importing/.test(lastText) && isStep) {
+      extra = sec < 60 ? "<br><span class='small muted'>Grote STEP-bestanden kunnen even duren.</span>" :
+        "<br><span class='small muted'>Nog bezig. Een grote samenstelling kan enkele minuten duren. Duurt het langer dan ca. 5 minuten, " +
+        "dan is het bestand waarschijnlijk te zwaar voor de browser.</span>";
+    }
+    setStatus(txt + " <b>" + elapsed() + "</b>" + extra);
   }
-  function startWatch() { clearInterval(watch); watch = setInterval(poll, 150); }
+  function startWatch() { clearInterval(watch); t0 = Date.now(); lastText = ""; window.WP3D_occtError = null; watch = setInterval(poll, 250); }
   startWatch();
+
+  // STEP/IGES: eerst controleren of de lezer op de server staat
+  function checkOcct() {
+    return Promise.all(["occt-import-js-worker.js", "occt-import-js.wasm"].map(function (f) {
+      return fetch(cfg.occtBase + f, { method: "HEAD", cache: "no-store" }).then(function (r) { return r.ok; }).catch(function () { return false; });
+    })).then(function (oks) { return oks[0] && oks[1]; });
+  }
 
   function load() {
     if (cfg.url) {
       setStatus("Model ophalen…" + (cfg.sizeMb ? " (" + fmt(cfg.sizeMb, 1) + " MB)" : ""));
-      ev.LoadModelFromUrlList([cfg.url]);
+      if (isStep) {
+        checkOcct().then(function (ok) {
+          occtOk = ok;
+          if (!ok) { fail("De STEP/IGES-lezer ontbreekt op de server (map static/3d/occt, zie README, 3D-modellen). STL/OBJ/3MF werken wel."); return; }
+          startWatch(); ev.LoadModelFromUrlList([cfg.url]);
+        });
+      } else {
+        ev.LoadModelFromUrlList([cfg.url]);
+      }
     } else {
       setStatus("Kies of sleep een 3D-bestand (STEP, IGES, STL, OBJ of 3MF) om het te bekijken. Het bestand wordt niet geüpload.", "hint");
     }
@@ -524,7 +562,7 @@
   var edges = false, ortho = false;
   document.getElementById("v3d-edges").addEventListener("click", function (e) {
     edges = !edges; e.currentTarget.classList.toggle("on", edges);
-    if (viewer) viewer.SetEdgeSettings(new OV.EdgeSettings(edges, new OV.RGBColor(20, 22, 58), 1));
+    if (viewer) viewer.SetEdgeSettings(new OV.EdgeSettings(edges, new OV.RGBColor(20, 22, 58), 25));
   });
   document.getElementById("v3d-ortho").addEventListener("click", function (e) {
     ortho = !ortho; e.currentTarget.classList.toggle("on", ortho);
@@ -565,8 +603,14 @@
     cfg.title = f.name;
     document.getElementById("v3d-title").textContent = f.name;
     setStatus("Model inlezen…");
+    isStep = /\.(step|stp|iges|igs)$/i.test(f.name);
     startWatch();
-    ev.LoadModelFromFileList(files);
+    if (!isStep) { ev.LoadModelFromFileList(files); return; }
+    checkOcct().then(function (ok) {
+      occtOk = ok;
+      if (!ok) { fail("De STEP/IGES-lezer ontbreekt op de server (map static/3d/occt, zie README, 3D-modellen). STL/OBJ/3MF werken wel."); return; }
+      ev.LoadModelFromFileList(files);
+    });
   }
   if (picker) picker.addEventListener("change", function () { openFiles(picker.files); });
   wrap.addEventListener("dragover", function (e) { e.preventDefault(); });
