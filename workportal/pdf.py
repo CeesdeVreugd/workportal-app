@@ -345,28 +345,33 @@ def _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf):
                             ("Kostprijs per machine (basis)", fmt_eur(summary["unit_cost"], 2)),
                             ("Verkoopprijs per machine (basis)", fmt_eur(summary["unit_sale"], 2))], W))
     story.append(Paragraph("Per item", S["h2"]))
-    data = [["Pos", "Item", "Uren", "Totaal ikp", "Totaal vkp", "Aantal", "Stuks ikp", "Stuks vkp"]]
+    kinds = {"basis": "Basis", "versie": "Versie", "optie": "Optie"}
+    data = [["Pos", "Item", "Uren", "Totaal ikp", "Totaal vkp", "Soort"]]
     for it in items:
         if not it.get("lines"):
             continue
-        div = it.get("div") or 1
-        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]) + (" <font color='#6B7280'>(optie)</font>" if it.get("is_option") else ""), S["cell"]),
-                     fmt_num(it.get("hours_total"), 1), fmt_eur(it.get("cost_total"), 2), fmt_eur(it.get("sale_total"), 2),
-                     fmt_num(div, 0 if div == int(div) else 2), fmt_eur(it["cost"], 2), fmt_eur(it["sale"], 2)])
+        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]), S["cell"]), fmt_num(it.get("hours_total"), 1),
+                     fmt_eur(it.get("cost_total"), 2), fmt_eur(it.get("sale_total"), 2), kinds.get(it.get("kind"), "Basis")])
     data.append(["", Paragraph("<b>Totaal</b>", S["cell"]), fmt_num(summary["hours_total"], 1), fmt_eur(summary["cost_total"], 2),
-                 fmt_eur(summary["sale_total"], 2), "", fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)])
-    t = _grid(data, [10 * mm, W - 125 * mm, 12 * mm, 24 * mm, 24 * mm, 12 * mm, 21 * mm, 22 * mm], align_right=(2, 3, 4, 5, 6, 7))
+                 fmt_eur(summary["sale_total"], 2), ""])
+    t = _grid(data, [11 * mm, W - 103 * mm, 14 * mm, 28 * mm, 28 * mm, 22 * mm], align_right=(2, 3, 4))
     t.setStyle(TableStyle([("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"), ("BACKGROUND", (0, -1), (-1, -1), LIGHT)]))
     story.append(t)
     story.append(Paragraph("Prijs per machine", S["h2"]))
-    rows = [["Machine / uitvoering", "Kostprijs per stuk", "Verkoopprijs per stuk"],
-            [Paragraph("<b>Basis</b> (zonder opties)", S["cell"]), fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)]]
-    for o in summary.get("option_items") or []:
-        rows.append([Paragraph(f"Optie: {esc(o['desc'])} (per stuk)", S["cell"]), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+
+    def cnt(o):
+        d = o.get("div") or 1
+        return fmt_num(d, 0 if d == int(d) else 2)
+    rows = [["Machine / onderdeel", "Aantal", "Kostprijs per stuk", "Verkoopprijs per stuk"],
+            [Paragraph("<b>Basis</b> (zonder versie)", S["cell"]), fmt_num(summary["machines"], 0), fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)]]
     for v in summary.get("variants") or []:
-        rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>basis + {esc(' + '.join(v['options']))}</font>" if v["options"] else ""), S["cell"]),
-                     fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
-    story.append(_grid(rows, [W - 80 * mm, 40 * mm, 40 * mm], align_right=(1, 2)))
+        rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>basis + {esc(' + '.join(v['versions']))}</font>" if v["versions"] else ""), S["cell"]),
+                     "", fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
+    for o in summary.get("version_items") or []:
+        rows.append([Paragraph(f"Versie: {esc(o['desc'])} <font color='#6B7280'>(in machineprijs)</font>", S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+    for o in summary.get("option_items") or []:
+        rows.append([Paragraph(f"Optie: {esc(o['desc'])} <font color='#6B7280'>(apart boeken)</font>", S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+    story.append(_grid(rows, [W - 95 * mm, 15 * mm, 40 * mm, 40 * mm], align_right=(1, 2, 3)))
     story.append(Spacer(1, 6))
     story.append(Paragraph("Kostprijs per stuk → orderregel productieorder en kostprijs materiaalregel verkooporder. "
                            "Verkoopprijs per stuk → verkoopprijs materiaalregel verkooporder.", S["small"]))

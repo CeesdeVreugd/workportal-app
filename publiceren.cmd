@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V48: na-calculatie - calculatie uit Excel, Standaard machine (kostprijs per stuk, opties, uitvoeringen), overzicht nieuwste order boven"
+set "OMSCHRIJVING=WorkPortal V49: productieorder-na-calculatie met basis, versie en optie; soort en aantal machines bovenaan; calculatie uit Excel"
 
 echo.
 echo ============================================

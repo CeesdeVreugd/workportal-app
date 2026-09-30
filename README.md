@@ -344,9 +344,11 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   kolommen Aantal / Prijs per stuk / marge / Totaal / Inclusief marge) worden geüpload. De onderdelen (Engineering,
   Inkopen incl. koopdelen, Werkplaats, Besturing, Transport, Montage) worden automatisch aan de items gekoppeld; de
   koppeling is aan te passen. Geldt voor alle imports van dezelfde order. Een gekozen WorkPortal-calculatie gaat voor.
-- **Standaard machine (bijv. PalletRotator):** interne productieorder, alleen om de kostprijs per stuk te bepalen.
-  Automatisch bij ordertype met "Standaard Machine" (of te kiezen bij Soort na-calculatie). Per item een aantal
-  (geen deling over het geheel), items als optie te markeren, en machines/uitvoeringen = basis + gekozen opties.
-  Resultaat: kostprijs per stuk (orderregel productieorder en kostprijs materiaalregel verkooporder) en verkoopprijs
-  per stuk (verkooporder); bedragen zijn met een klik te kopiëren. Geen winstbeoordeling (winst zit in de verkooporder).
+- **Standaard machine / productieorder (bijv. PalletRotator):** interne productieorder, alleen om de kostprijs per
+  machine te bepalen. Bovenaan kies je de soort (automatisch bij ordertype met "Standaard Machine") en het aantal
+  gebouwde machines; er wordt dan niet met een calculatie vergeleken. Per item: **Basis** (in elke machine, gedeeld
+  door het aantal machines), **Versie** (onderdelen voor een type, bijv. K13/EPT; eigen aantal; zit in de
+  machineprijs) of **Optie** (bijv. safety / cold storage; eigen aantal; apart boeken). Machines/uitvoeringen = basis
+  + gekozen versies. Kostprijs per stuk → orderregel productieorder en kostprijs materiaalregel verkooporder;
+  verkoopprijs per stuk → verkooporder. Bedragen met een klik te kopiëren. Geen winstbeoordeling.
 - Overzicht gesorteerd op ordernummer, nieuwste boven.

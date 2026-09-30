@@ -40,8 +40,12 @@ def excel_calc(n):
 
 
 def evaluate(nid):
+    from .engine import nacalc_mode
     n, lines = _load(nid)
-    calc = load_calc(n["calc_id"]) if n["calc_id"] else excel_calc(n)
+    if nacalc_mode(n) == "kostprijs":
+        calc = None  # productieorder: niet vergelijken met een calculatie
+    else:
+        calc = load_calc(n["calc_id"]) if n["calc_id"] else excel_calc(n)
     summary, items = compute_nacalc(n, lines, calc)
     return n, lines, calc, summary, items
 
@@ -280,24 +284,46 @@ def note_delete(nid, xid):
 @bp.route("/<int:nid>/instellingen", methods=["POST"])
 @require("nacalculatie", BEWERKEN)
 def settings(nid):
-    _load(nid)
+    n, _ = _load(nid)
     divide_by = to_float(request.form.get("divide_by"), 1) or 1
     per_item = {}
     for key, val in zip(request.form.getlist("item_key"), request.form.getlist("item_div")):
         d = to_float(val, None)
         if key and d and d > 0:
             per_item[key] = d
-    mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs") else "auto"
-    options = [k for k in request.form.getlist("item_option") if k]
+    old = _opts(n)
+    if request.form.get("part") == "top":
+        # alleen soort en aantal machines (bovenaan de pagina); de rest blijft staan
+        mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs") else "auto"
+        old["mode"] = mode
+        execute("UPDATE nacalcs SET divide_by = ?, no_divide = ? WHERE id = ?", (max(divide_by, 1), json.dumps(old), nid))
+        flash("Opgeslagen.", "ok")
+        return redirect(url_for("nacalc.detail", nid=nid))
+    mode = old.get("mode") or "auto"
+    item_kind = {}
+    for key, kind in zip(request.form.getlist("item_key"), request.form.getlist("item_kind")):
+        if key and kind in ("basis", "versie", "optie"):
+            item_kind[key] = kind
+    versions = [k for k, v in item_kind.items() if v == "versie"]
     variants = []
     for i in range(20):
         name = (request.form.get(f"var_{i}_name") or "").strip()
         if name:
-            variants.append({"name": name[:120], "options": [k for k in request.form.getlist(f"var_{i}_opt") if k in options]})
-    opts = {"items": [], "per_item": per_item, "order": request.form.get("divide_order") == "1", "mode": mode,
-            "options": options, "variants": variants}
+            variants.append({"name": name[:120], "versions": [k for k in request.form.getlist(f"var_{i}_ver") if k in versions]})
+    if request.form.get("part") == "kostprijs":
+        per_item = {}
+        for key in request.form.getlist("item_key"):
+            d = to_float(request.form.get(f"cnt_{key}"), None)
+            if d and d > 0:
+                per_item[key] = d
+        opts = {**old, "per_item": per_item, "item_kind": item_kind, "variants": variants, "options": [], "mode": mode}
+    else:
+        opts = {**old, "items": [], "per_item": per_item, "order": request.form.get("divide_order") == "1", "mode": mode}
+    calc_id = n["calc_id"] if "calc_id" not in request.form else (None if request.form.get("calc_id") == "excel" else to_int(request.form.get("calc_id")))
+    if "divide_by" not in request.form:
+        divide_by = n["divide_by"] or 1
     execute("UPDATE nacalcs SET divide_by = ?, no_divide = ?, calc_id = ? WHERE id = ?",
-            (max(divide_by, 1), json.dumps(opts), None if request.form.get("calc_id") == "excel" else to_int(request.form.get("calc_id")), nid))
+            (max(divide_by, 1), json.dumps(opts), calc_id, nid))
     audit("instellingen", "nacalc", nid, f"aantal {divide_by}, per item {per_item}")
     flash("Instellingen opgeslagen.", "ok")
     return redirect(url_for("nacalc.detail", nid=nid))
