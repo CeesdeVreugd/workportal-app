@@ -795,6 +795,11 @@ def open_file(conn, pid, relpath, g=None):
     return g.download(drive, p["sp_item_id"], rel)
 
 
+def item_version(item):
+    """Versie-kenmerk van een bestand; verandert als de inhoud verandert."""
+    return item.get("cTag") or item.get("eTag") or item.get("lastModifiedDateTime") or ""
+
+
 def file_meta(conn, pid, relpath, g=None):
     """Alleen de gegevens (grootte, versie) van een bestand in de projectmap, zonder te downloaden."""
     g = g or client()
@@ -855,7 +860,8 @@ def list_models(conn, pid, g=None, max_items=400):
                 walk(path, depth - 1)
             elif i["name"].lower().endswith(MODEL_EXT):
                 found.append({"name": i["name"], "path": path, "size": i.get("size") or 0,
-                              "modified": i.get("lastModifiedDateTime"), "web_url": i.get("webUrl")})
+                              "modified": i.get("lastModifiedDateTime"), "web_url": i.get("webUrl"),
+                              "version": item_version(i)})
     try:
         walk(sub, 5)
     except GraphError as exc:

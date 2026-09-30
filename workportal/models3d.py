@@ -18,6 +18,7 @@ from flask import (Blueprint, render_template, request, redirect, url_for, flash
                    stream_with_context, current_app, jsonify, g)
 
 from . import sharepoint as sp
+from . import convert3d
 from .db import query, execute, get_db
 from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
 from .util import audit, save_bytes, file_path, safe_filename
@@ -57,9 +58,50 @@ def cache_mb():
         return 10
 
 
-def convert_to_gltf(file_row):  # pragma: no cover - fase 2
-    """Fase 2: STEP -> glTF op de server. Nu nog niet actief."""
-    return None
+def convert_to_gltf(file_row):
+    """Na een upload: grote STEP/IGES alvast op de server omzetten naar GLB."""
+    if file_row and convert3d.is_step(file_row["filename"]) and (file_row["size"] or 0) >= cache_mb() * 1048576:
+        _conv_local(file_row)
+
+
+def _server_convert_on():
+    return convert3d.available(current_app._get_current_object())
+
+
+def _conv_sp(pid, rel, version, size):
+    """Zet een grote STEP uit SharePoint (op de achtergrond) om naar GLB. Geeft info voor de viewer of None."""
+    if not (version and convert3d.is_step(rel) and (size or 0) >= cache_mb() * 1048576 and _server_convert_on()):
+        return None
+    app = current_app._get_current_object()
+    db_path = app.config["DB_PATH"]
+
+    def fetch(dest):
+        from .db import raw_connection
+        conn = raw_connection(db_path)
+        try:
+            _meta, r = sp.open_file(conn, pid, rel)
+            with open(dest, "wb") as fh:
+                for chunk in r.iter_content(1024 * 1024):
+                    fh.write(chunk)
+        finally:
+            conn.close()
+
+    key, st = convert3d.ensure(app, f"sp/{pid}/{rel}", version, rel.split("/")[-1], fetch)
+    return _conv_info(key, st)
+
+
+def _conv_local(f):
+    if not (convert3d.is_step(f["filename"]) and (f["size"] or 0) >= cache_mb() * 1048576 and _server_convert_on()):
+        return None
+    src = file_path(f)
+    key, st = convert3d.ensure(current_app._get_current_object(), f"lokaal/{f['id']}", str(f["size"]), f["filename"],
+                               lambda dest: __import__("shutil").copyfile(src, dest))
+    return _conv_info(key, st)
+
+
+def _conv_info(key, st):
+    return {"key": key, "state": (st or {}).get("state"), "status": url_for("modellen.conv_status", key=key),
+            "glb": url_for("modellen.conv_glb", key=key)}
 
 
 # ---------------------------------------------------------------- overzicht / losse viewer
@@ -108,6 +150,11 @@ def listing(entity, eid):
             error = f"SharePoint gaf een fout ({exc.status})."
         except (requests.RequestException, RuntimeError):
             error = "SharePoint is op dit moment niet bereikbaar."
+    for m in remote:  # grote STEP-bestanden alvast op de server omzetten, dan openen ze straks direct
+        try:
+            _conv_sp(pid, m["path"], m.get("version"), m.get("size"))
+        except Exception:  # noqa: BLE001 - de lijst mag hier nooit op stuk gaan
+            pass
     project_local = []
     if entity == "ticket" and pid:
         project_local = query("SELECT * FROM files WHERE entity = 'project' AND entity_id = ? AND kind = 'model3d' ORDER BY filename",
@@ -185,7 +232,7 @@ def view_local(fid):
     return render_template("modellen/viewer.html", url=url_for("modellen.local_file", fid=fid, name=f["filename"]),
                            title=f["filename"], size=f["size"], back=_back(f["entity"], f["entity_id"]),
                            occt=occt_installed(), max_mb=MAX_MB,
-                           cache_key=f"lokaal/{fid}/{f['size']}", cache_mb=cache_mb())
+                           cache_key=f"lokaal/{fid}/{f['size']}", cache_mb=cache_mb(), conv=_conv_local(f))
 
 
 @bp.route("/bekijk/sharepoint/<int:pid>")
@@ -199,18 +246,19 @@ def view_sp(pid):
     if not rel or not is_model(rel) or not p["sp_item_id"]:
         abort(404)
     back = request.args.get("terug") if (request.args.get("terug") or "").startswith("/") else _back("project", pid)
-    size, cache_key = None, None
+    size, cache_key, version = None, None, None
     try:  # versie van het bestand, zodat een gewijzigde STEP opnieuw wordt gedownload
         meta = sp.file_meta(get_db(), pid, rel)
         size = meta.get("size")
-        version = meta.get("cTag") or meta.get("eTag") or meta.get("lastModifiedDateTime")
+        version = sp.item_version(meta)
         if version:
             cache_key = f"sp/{pid}/{rel}?v={version}"
     except (sp.GraphError, ValueError, requests.RequestException, RuntimeError):
         pass
     return render_template("modellen/viewer.html", url=url_for("modellen.sp_file", pid=pid, rel=rel),
                            title=rel.split("/")[-1], subtitle=f"{p['number']} · {rel}", back=back,
-                           occt=occt_installed(), max_mb=MAX_MB, size=size, cache_key=cache_key, cache_mb=cache_mb())
+                           occt=occt_installed(), max_mb=MAX_MB, size=size, cache_key=cache_key, cache_mb=cache_mb(),
+                           conv=_conv_sp(pid, rel, version, size) if cache_key else None)
 
 
 @bp.route("/bestand/<int:fid>/<path:name>")
@@ -239,3 +287,27 @@ def sp_file(pid, rel):
     if request.args.get("download") == "1":
         headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(meta.get('name') or 'model')}"
     return Response(stream_with_context(r.iter_content(256 * 1024)), mimetype="application/octet-stream", headers=headers)
+
+
+# ---------------------------------------------------------------- omgezette modellen (GLB)
+
+@bp.route("/omzet/<key>/status")
+@require("modellen3d", LEZEN)
+def conv_status(key):
+    if not convert3d.valid_key(key):
+        abort(404)
+    st = convert3d.status(current_app._get_current_object(), key) or {"state": "onbekend"}
+    now = __import__("time").time()
+    out = {"state": st.get("state"), "step": st.get("step"), "error": st.get("error"), "size": st.get("size"),
+           "src_size": st.get("src_size"), "wait": round(now - (st.get("started") or st.get("queued") or now))}
+    return jsonify(out)
+
+
+@bp.route("/omzet/<key>.glb")
+@require("modellen3d", LEZEN)
+def conv_glb(key):
+    app = current_app._get_current_object()
+    if not convert3d.valid_key(key) or not os.path.exists(convert3d.glb_path(app, key)):
+        abort(404)
+    convert3d.touch(app, key)
+    return send_file(convert3d.glb_path(app, key), mimetype="model/gltf-binary", max_age=86400)

@@ -245,9 +245,13 @@ geen vlakken in het bestand, of de STEP-lezer kan het bestand niet verwerken).
 - Exact meten van gatdiameters en radiussen: er wordt gemeten op het beeldmodel (driehoeken). De diameter wordt
   door de hoekpunten gepast en is daardoor nauwkeurig, maar blijft een benadering van de CAD-maat. De doorsnede is open (geen dichte snijvlakken).
 
-**Fase 2 (voorbereid, niet gebouwd):** grote samenstellingen sneller laden door bij upload op de server STEP om
-te zetten naar glTF (.glb) met Python/OpenCascade in de container. Aanhaakpunt: `convert_to_gltf()` in
-`workportal/models3d.py`; de viewer kan een .glb direct openen.
+**Grote STEP-bestanden op de server omzetten:** STEP/IGES vanaf de ingestelde grootte (Beheer > SharePoint) worden
+één keer op de server omgezet naar GLB met Node.js + dezelfde OpenCascade-lezer (`scripts/step2glb.js`, zit in de
+container). Dat gebeurt al zodra het blok 3D-modellen van een project/order wordt geopend of na een upload, op de
+achtergrond, één model tegelijk (max. 30 min per model, `WP3D_CONVERT_TIMEOUT`; geheugen `WP3D_NODE_HEAP_MB`).
+Het resultaat staat in `/data/3d-cache` (na 120 dagen niet gebruikt opgeruimd) en opent daarna voor iedereen in
+seconden, ook op telefoon en iPad. Een gewijzigde STEP in SharePoint krijgt een nieuwe versie en wordt opnieuw
+omgezet. Lukt omzetten niet (bijv. te weinig geheugen), dan leest de browser de STEP zoals voorheen.
 
 ## Back-ups
 

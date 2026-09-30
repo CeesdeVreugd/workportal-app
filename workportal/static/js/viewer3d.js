@@ -76,6 +76,7 @@
   function elapsed() { var s = Math.round((Date.now() - t0) / 1000); return Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2); }
   function fail(msg) {
     clearInterval(watch);
+    info("");
     setStatus("Het model kon niet worden geopend. " + msg + (cfg.url ? ' <a href="' + cfg.url + (cfg.url.indexOf("?") < 0 ? "?" : "&") + 'download=1">Bestand downloaden</a>' : ""), "error");
   }
   function poll() {
@@ -123,7 +124,10 @@
   }
 
   function load() {
-    if (cfg.url) {
+    if (cfg.url && cfg.conv) {
+      setStatus("Model voorbereiden…");
+      loadConverted();
+    } else if (cfg.url) {
       setStatus("Model ophalen…" + (cfg.sizeMb ? " (" + fmt(cfg.sizeMb, 1) + " MB)" : ""));
       if (isStep) {
         checkOcct().then(function (ok) {
@@ -144,11 +148,12 @@
   // apparaat gezet (pc, telefoon, iPad). Daarna opent de viewer het vanaf het apparaat. Een nieuwe versie in
   // SharePoint heeft een andere sleutel en wordt dus opnieuw opgehaald; de oude versie wordt dan opgeruimd.
   var CACHE = "wp3d-modellen-v1";
+  var src = { url: cfg.url, name: cfg.title || "model", key: cfg.cacheKey, sizeMb: cfg.sizeMb };
   function cacheable() {
-    return !!(cfg.cacheKey && window.caches && window.isSecureContext !== false && cfg.sizeMb >= (cfg.cacheMb || 0));
+    return !!(src.key && window.caches && window.isSecureContext !== false && src.sizeMb >= (cfg.cacheMb || 0));
   }
   function cacheUrl(key) { return location.origin + "/__wp3d_cache/" + encodeURI(key); }
-  function fileName() { return (cfg.title || "model").replace(/[\\/]/g, "_"); }
+  function fileName() { return (src.name || "model").replace(/[\\/]/g, "_"); }
   function loadBlob(blob, fromDevice) {
     var file = new File([blob], fileName(), { type: "application/octet-stream" });
     setStatus(fromDevice ? "Model openen vanaf dit apparaat…" : "Model inlezen…");
@@ -158,9 +163,9 @@
     setTimeout(function () { if (/apparaat/.test(infoEl.textContent)) info(""); }, 7000);
   }
   function download(onProgress) {
-    return fetch(cfg.url, { credentials: "same-origin" }).then(function (r) {
+    return fetch(src.url, { credentials: "same-origin" }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
-      var total = +(r.headers.get("Content-Length") || 0) || (cfg.sizeMb * 1048576), got = 0;
+      var total = +(r.headers.get("Content-Length") || 0) || (src.sizeMb * 1048576), got = 0;
       if (!r.body || !r.body.getReader) return r.blob();
       var reader = r.body.getReader(), parts = [];
       function pump() {
@@ -174,15 +179,15 @@
     });
   }
   function loadRemote() {
-    if (!cacheable()) { ev.LoadModelFromUrlList([cfg.url]); return; }
-    var key = cacheUrl(cfg.cacheKey), base = cacheUrl(cfg.cacheKey.split("?v=")[0]), store;
+    if (!cacheable()) { startWatch(); ev.LoadModelFromUrlList([src.url]); return; }
+    var key = cacheUrl(src.key), base = cacheUrl(src.key.split("?v=")[0]), store;
     caches.open(CACHE).then(function (c) {
       store = c;
       return c.match(key);
     }).then(function (hit) {
       if (hit) return hit.blob().then(function (b) { loadBlob(b, true); });
       clearInterval(watch);
-      setStatus("Groot bestand (" + fmt(cfg.sizeMb, 1) + " MB): eenmalig downloaden naar dit apparaat…");
+      setStatus("Groot bestand (" + fmt(src.sizeMb, 1) + " MB): eenmalig downloaden naar dit apparaat…");
       return download(function (got, total) {
         setStatus("Groot bestand eenmalig downloaden naar dit apparaat… <b>" + Math.min(99, Math.round(got / total * 100)) + "%</b>" +
           "<br><span class='small muted'>" + fmt(got / 1048576, 1) + " van " + fmt(total / 1048576, 1) + " MB. Daarna opent het de volgende keer direct.</span>");
@@ -198,9 +203,51 @@
       });
     }).catch(function () {
       // opslag niet beschikbaar (privévenster, geen ruimte): gewoon rechtstreeks laden
-      if (isStep) startWatch();
-      ev.LoadModelFromUrlList([cfg.url]);
+      startWatch();
+      ev.LoadModelFromUrlList([src.url]);
     });
+  }
+
+  // Grote STEP: de server zet het model eenmalig om naar GLB. Wachten op de server, dan de GLB laden.
+  function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2); }
+  function loadConverted() {
+    var c = cfg.conv, t1 = Date.now(), fails = 0;
+    function useGlb(size) {
+      isStep = false;
+      src = { url: c.glb, name: (cfg.title || "model").replace(/\.[^.]+$/, "") + ".glb", key: "glb/" + c.key, sizeMb: (size || 0) / 1048576 };
+      loadRemote();
+    }
+    function browserFallback(msg) {
+      info(msg); setTimeout(function () { info(""); }, 9000);
+      checkOcct().then(function (ok) {
+        occtOk = ok;
+        if (!ok) { fail("De STEP/IGES-lezer ontbreekt op de server."); return; }
+        loadRemote();
+      });
+    }
+    function tick() {
+      fetch(c.status, { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }).then(function (st) {
+        fails = 0;
+        if (st.state === "klaar") { useGlb(st.size); return; }
+        if (st.state === "fout") {
+          if (/geen 3D|no meshes|geen meshes/i.test(st.error || "")) { fail("Het bestand bevat geen 3D-geometrie (vlakken). Exporteer vanuit SolidWorks als STEP AP214 met de solids/bodies aan."); return; }
+          if (/kon niet worden gelezen/i.test(st.error || "")) { fail("De STEP-lezer kon dit bestand niet verwerken. Exporteer het opnieuw als STEP AP214 (solids) en probeer het nog eens."); return; }
+          browserFallback("Voorbereiden op de server lukte niet (" + nl(st.error || "") + "). Het model wordt nu in de browser ingelezen.");
+          return;
+        }
+        if (st.state === "onbekend") { browserFallback("Het model wordt in de browser ingelezen."); return; }
+        var stap = st.state === "wachtrij" ? "in de wachtrij" : st.step === "ophalen" ? "ophalen uit SharePoint" : "omzetten";
+        setStatus("Groot model: de server zet het eenmalig klaar (" + stap + ")… <b>" + mmss((Date.now() - t1) / 1000) + "</b>" +
+          "<br><span class='small muted'>" + (st.src_size ? fmt(st.src_size / 1048576, 1) + " MB · " : "") +
+          "Je kunt dit scherm gerust sluiten. Daarna opent het model voor iedereen direct, ook op telefoon en iPad.</span>");
+        setTimeout(tick, 2000);
+      }).catch(function () {
+        if (++fails > 5) { browserFallback("De server reageert niet; het model wordt in de browser ingelezen."); return; }
+        setTimeout(tick, 3000);
+      });
+    }
+    clearInterval(watch);
+    tick();
   }
 
   // ------------------------------------------------------------ na laden

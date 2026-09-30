@@ -7,6 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TZ=Europe/Amsterdam
 
 WORKDIR /app
+# Node.js: grote STEP-bestanden op de server omzetten naar GLB (scripts/step2glb.js)
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
