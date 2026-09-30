@@ -357,19 +357,27 @@ def _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf):
     t = _grid(data, [11 * mm, W - 103 * mm, 14 * mm, 28 * mm, 28 * mm, 22 * mm], align_right=(2, 3, 4))
     t.setStyle(TableStyle([("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"), ("BACKGROUND", (0, -1), (-1, -1), LIGHT)]))
     story.append(t)
-    story.append(Paragraph("Prijs per machine", S["h2"]))
+    story.append(Paragraph("Prijs per machine/optie", S["h2"]))
 
     def cnt(o):
         d = o.get("div") or 1
         return fmt_num(d, 0 if d == int(d) else 2)
-    rows = [["Machine / optie", "Aantal", "Kostprijs per stuk", "Verkoopprijs per stuk"]]
+    rows = [["Machine / optie", "Aantal", "Kostprijs per stuk", "Verkoopprijs per stuk"],
+            [Paragraph("<b>Machines</b> <font color='#6B7280'>(boeken als orderregel)</font>", S["cell"]), "", "", ""]]
+    groups = [1]
     for v in summary.get("variants") or []:
         c = v.get("count") or 0
         rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>incl. {esc(' + '.join(v['versions']))}</font>" if v["versions"] else ""), S["cell"]),
                      fmt_num(c, 0 if c == int(c) else 2), fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
-    for o in summary.get("option_items") or []:
-        rows.append([Paragraph(f"Optie: {esc(o['desc'])} <font color='#6B7280'>(apart boeken)</font>", S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
-    story.append(_grid(rows, [W - 95 * mm, 15 * mm, 40 * mm, 40 * mm], align_right=(1, 2, 3)))
+    if summary.get("option_items"):
+        groups.append(len(rows))
+        rows.append([Paragraph("<b>Opties</b> <font color='#6B7280'>(apart boeken als eigen orderregel)</font>", S["cell"]), "", "", ""])
+        for o in summary["option_items"]:
+            rows.append([Paragraph(esc(o["desc"]), S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+    pt = _grid(rows, [W - 95 * mm, 15 * mm, 40 * mm, 40 * mm], align_right=(1, 2, 3))
+    pt.setStyle(TableStyle([st for g in groups for st in (("BACKGROUND", (0, g), (-1, g), LIGHT), ("SPAN", (0, g), (-1, g)))]))
+    story.append(pt)
+
     story.append(Spacer(1, 6))
     story.append(Paragraph("Kostprijs per stuk → orderregel productieorder en kostprijs materiaalregel verkooporder. "
                            "Verkoopprijs per stuk → verkoopprijs materiaalregel verkooporder.", S["small"]))
