@@ -192,8 +192,8 @@ def compute_nacalc(n, lines, calc_data=None):
     N = to_float(n.get("divide_by"), 1) or 1
     mode = nacalc_mode(n, opts)
     machines = N                   # productieorder: aantal gebouwde machines
-    if mode == "kostprijs":
-        divide_order = False
+    divide_order = False
+    N_order = 1
     option_keys = set(str(k) for k in (opts.get("options") or []))
     item_kind = {str(k): v for k, v in (opts.get("item_kind") or {}).items()}
 
@@ -231,10 +231,8 @@ def compute_nacalc(n, lines, calc_data=None):
         if mode == "kostprijs":
             # basis: gedeeld door het aantal machines; versie/optie: door het eigen aantal
             d = machines if kind == "basis" else (to_float(per_item.get(str(key)), 1) or 1)
-        elif str(key) in per_item:
-            d = to_float(per_item.get(str(key)), 1) or 1
         else:
-            d = 1 if it["pos"] in no_div else N
+            d = 1  # vaste prijs en regie: niet delen (seriebouw loopt via Standaard machine)
         d = d if d > 0 else 1
         it["cost_total"], it["sale_total"], it["hours_total"] = it["cost"], it["sale"], it["hours"]
         it["kind"] = kind if mode == "kostprijs" else "basis"

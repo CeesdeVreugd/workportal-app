@@ -18,8 +18,9 @@ LINE_FIELDS = ["item_id", "item_desc", "pos", "qty", "line_type", "unit", "artic
 
 def _load(nid):
     n = query("SELECT n.*, p.number AS project_no, p.name AS project_name, p.order_type AS project_order_type, p.kind AS project_kind, p.order_props AS project_order_props,"
-              " c.number AS calc_no, c.title AS calc_title"
+              " c.number AS calc_no, c.title AS calc_title, cu.name AS customer_name, cu.id AS customer_id"
               " FROM nacalcs n LEFT JOIN projects p ON p.id = n.project_id LEFT JOIN calculations c ON c.id = n.calc_id"
+              " LEFT JOIN customers cu ON cu.id = p.customer_id"
               " WHERE n.id = ?", (nid,), one=True)
     if not n:
         abort(404)
@@ -58,12 +59,15 @@ def latest_results():
     for r in rows:
         n, _, calc, s, _ = evaluate(r["id"])
         out.append({"id": n["id"], "order_no": n["order_no"], "order_desc": n["order_desc"], "project_id": n["project_id"],
+                    "customer": n.get("customer_name"),
                     "project_no": n["project_no"], "calc_no": n["calc_no"], "imported_at": n["imported_at"],
                     "order_total": s["order_total"], "cost": s["cost"], "sale": s["sale"], "result": s["result"],
                     "margin_pct": s["margin_pct"], "status": s["status"], "label": s["label"],
                     "extra": s["above_min"] if s["mode"] == "normaal" and s["order_total"] > 0 and s["above_min"] > 0.005 else None,
                     "mode": s["mode"], "unit_cost": s.get("unit_cost"), "unit_sale": s.get("unit_sale"),
                     "excel": bool(calc and calc.get("excel")),
+                    "explained": bool(s.get("regie_short")) and bool(query("SELECT 1 FROM nacalc_notes WHERE order_no = ? AND body LIKE ? LIMIT 1",
+                                                                          (n["order_no"], REGIE_PREFIX + "%"), one=True)),
                     "cost_total": s.get("cost_total", s["cost"])})
     return out
 
@@ -172,7 +176,7 @@ def detail(nid):
     calcs = query("SELECT id, number, title FROM calculations ORDER BY updated_at DESC")
     return render_template("nacalc/detail.html", n=n, calc=calc, s=summary, items=items, hist=hist, calcs=calcs,
                            pa=nacalc_configured(), notes=notes_for(n), oprops=_oprops(n), opts=_opts(n),
-                           xcalc=json.loads(n["xcalc_json"]) if n.get("xcalc_json") else None)
+                           xcalc=json.loads(n["xcalc_json"]) if n.get("xcalc_json") else None, REGIE_PREFIX=REGIE_PREFIX)
 
 
 def _opts(n):
@@ -188,6 +192,9 @@ def _oprops(n):
     if not n.get("project_id"):
         return {}
     return order_props(query("SELECT order_props FROM projects WHERE id = ?", (n["project_id"],), one=True))
+
+
+REGIE_PREFIX = "Reactie op lager orderbedrag: "
 
 
 def notes_for(n):
@@ -260,6 +267,8 @@ def excel_delete(nid):
 def note_add(nid):
     n, _ = _load(nid)
     body = (request.form.get("body") or "").strip()
+    if body and request.form.get("prefix") == "regie":
+        body = REGIE_PREFIX + body
     if not body:
         flash("Vul een opmerking in.", "error")
     else:
@@ -296,7 +305,10 @@ def settings(nid):
         # alleen soort en aantal machines (bovenaan de pagina); de rest blijft staan
         mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs", "regie") else "auto"
         old["mode"] = mode
-        execute("UPDATE nacalcs SET divide_by = ?, no_divide = ? WHERE id = ?", (max(divide_by, 1), json.dumps(old), nid))
+        calc_id = n["calc_id"] if "calc_id" not in request.form else (None if request.form.get("calc_id") == "excel" else to_int(request.form.get("calc_id")))
+        if "divide_by" not in request.form:
+            divide_by = n["divide_by"] or 1
+        execute("UPDATE nacalcs SET divide_by = ?, no_divide = ?, calc_id = ? WHERE id = ?", (max(divide_by, 1), json.dumps(old), calc_id, nid))
         flash("Opgeslagen.", "ok")
         return redirect(url_for("nacalc.detail", nid=nid))
     mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs", "regie") else (old.get("mode") or "auto")

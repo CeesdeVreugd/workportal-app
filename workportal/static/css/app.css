@@ -482,3 +482,5 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .copyval.done::after { content: " ✓"; }
 .nc-var input[type=text], .nc-var input:not([type]) { min-width: 220px; }
 .nc-top { margin-bottom: 14px; } .grouprow td { background: #F6F8FC; }
+.show-m { display: none; }
+@media (max-width: 900px) { .show-m { display: block; } }

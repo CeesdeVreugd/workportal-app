@@ -30,6 +30,7 @@
       <option value="regie" {{ 'selected' if opts.mode == 'regie' }}>Regie: marge uit de regels</option>
       <option value="kostprijs" {{ 'selected' if opts.mode == 'kostprijs' }}>Standaard machine / productieorder: kostprijs per machine</option>
       <option value="auto" {{ 'selected' if (opts.mode or 'auto') == 'auto' }}>Automatisch volgens orderbon (nu: {{ {'kostprijs': 'standaard machine', 'regie': 'regie', 'normaal': 'vaste prijs'}[s.mode] }})</option></select></label>
+    {% if s.mode == 'normaal' %}<label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% if xcalc %}<option value="excel" {{ 'selected' if not n.calc_id }}>Excel: {{ n.xcalc_name }}</option>{% endif %}{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>{% endif %}
     {% if s.mode == 'kostprijs' %}<label class="f">Aantal gebouwde machines<input type="number" name="divide_by" min="1" step="1" value="{{ (n.divide_by or 1)|int }}"><span class="hint">De basis-items worden hierdoor gedeeld.</span></label>{% endif %}
   </div>
   {% if s.mode == 'kostprijs' %}
@@ -80,6 +81,15 @@
 
 <div class="result {{ s.status }}">
   {% if s.mode == 'regie' and s.regie_short %}<b>Let op, orderbedrag lager dan de regiewaarde:</b> het orderbedrag in het ERP is {{ s.order_amount|eur }}, volgens de regels is het {{ s.regie_value|eur }} ({{ s.regie_short|eur }} minder). Met het orderbedrag is de winst {{ s.result|eur }} ({{ s.margin_pct|num(1) }}%). Controleer of alles gefactureerd is.
+  <div class="regie-replies" style="margin-top:8px">
+    {% for x in notes if x.body.startswith(REGIE_PREFIX) %}<div class="small" style="margin-top:4px;padding:6px 10px;background:rgba(255,255,255,.6);border-radius:8px"><b>{{ x.who or 'Reactie' }}</b> <span class="muted">{{ x.created_at|dt }}</span><div style="white-space:pre-wrap">{{ x.body[REGIE_PREFIX|length:] }}</div></div>{% endfor %}
+    {% if can('nacalculatie', 2) %}<button type="button" class="btn sm" style="margin-top:6px" onclick="var f=document.getElementById('regie-reply');f.classList.toggle('hidden');f.querySelector('textarea').focus()">Reageren / nuance</button>
+    <form id="regie-reply" method="post" action="{{ url_for('nacalc.note_add', nid=n.id) }}" class="form hidden" style="margin-top:6px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="prefix" value="regie">
+      <textarea name="body" rows="2" required placeholder="Bijv. korting afgesproken met de klant, meerwerk nog te factureren, deel gefactureerd op andere order…"></textarea>
+      <div><button class="btn primary sm">Opslaan</button></div>
+    </form>{% endif %}
+  </div>
   {% elif s.mode == 'regie' %}<b>Regie (geen vaste prijs):</b> gefactureerd volgens de regels; de marge komt uit de regels: {{ s.result|eur }} ({{ s.margin_pct|num(1) }}% van de regiewaarde). Er is dus geen marge bovenop de marge.
   {% elif s.status == 'bad' %}<b>Verlies:</b> het orderbedrag dekt de werkelijke kostprijs niet ({{ (s.order_total - s.cost)|eur }}).
   {% elif s.status == 'warn' %}<b>Onder minimale marge:</b> {{ (s.sale - s.order_total)|eur }} te weinig om de normale marges te halen. Wel {{ s.result|eur }} boven kostprijs.
@@ -204,31 +214,7 @@
 {% endif %}
 {% endif %}
 
-<div class="grid g2 stack" {% if s.mode == 'kostprijs' %}style="grid-template-columns:1fr"{% endif %}>
-{% if s.mode == 'kostprijs' %}
-{% else %}
-  {% if can('nacalculatie', 2) %}
-  <form method="post" action="{{ url_for('nacalc.settings', nid=n.id) }}" class="card form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <h2>Instellingen</h2>
-    <div class="fgrid">
-{% if s.mode != 'regie' %}      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% if xcalc %}<option value="excel" {{ 'selected' if not n.calc_id }}>Excel: {{ n.xcalc_name }}</option>{% endif %}{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>{% endif %}
-
-      <label class="f">Aantal machines (seriebouw)<input type="number" name="divide_by" id="nc-n" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Voor het orderbedrag en als standaard per item. Bijv. 5 als deze order 5 machines bevat.</span></label>
-    </div>
-    <label class="check"><input type="checkbox" name="divide_order" value="1" {{ 'checked' if s.divide_order }}> Orderbedrag ook delen (per-stuk-weergave)</label>
-    <div><label class="f">Aantal per item <span class="hint" style="display:inline">(1 = niet delen)</span></label>
-      <table class="table nc-div">
-        <tbody>{% for it in items if it.lines %}<tr>
-          <td class="nowrap muted">{{ it.pos or '' }}</td><td>{{ it.desc }}</td>
-          <td style="width:110px"><input type="hidden" name="item_key" value="{{ it.key }}"><input type="number" name="item_div" min="0.01" step="any" inputmode="decimal" value="{{ it.div|int if it.div == it.div|int else it.div }}" aria-label="Aantal voor {{ it.desc }}" style="width:90px"></td>
-        </tr>{% endfor %}</tbody>
-      </table>
-      <p class="hint" style="margin-top:6px"><button type="button" class="btn sm ghost" onclick="var v=document.getElementById('nc-n').value;document.querySelectorAll('.nc-div input[name=item_div]').forEach(function(i){i.value=v})">Aantal machines bij alle items invullen</button></p></div>
-    <div><button class="btn primary">Opslaan &amp; herberekenen</button></div>
-  </form>
-  {% endif %}
-{% endif %}
+<div class="grid g2 stack" style="grid-template-columns:1fr">
   <section class="card">
     <h2>Verloop (alle imports van deze order)</h2>
     <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">{% if h.mode == 'kostprijs' %}Kostprijs per machine {{ h.unit_cost|eur(2) }} · totaal {{ h.cost|eur }}{% else %}Kostprijs {{ h.cost|eur }} · winst op order {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%){% endif %}</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
