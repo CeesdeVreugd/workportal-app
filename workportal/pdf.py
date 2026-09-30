@@ -293,7 +293,8 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
              Spacer(1, 8)]
     if summary.get("mode") == "kostprijs":
         return _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf)
-    pairs = [("Orderbedrag", fmt_eur(summary["order_total"], 2)), ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
+    pairs = [("Regiewaarde (volgens regels)" if summary.get("mode") == "regie" else "Orderbedrag", fmt_eur(summary["order_total"], 2)),
+             ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
              ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
              ("Winst in % van orderbedrag", f"{fmt_num(summary['margin_pct'], 1)}%"), ("Beoordeling", summary["label"])]
     if calc:

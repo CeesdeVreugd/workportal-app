@@ -26,9 +26,10 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="part" value="{{ 'kostprijs' if s.mode == 'kostprijs' else 'top' }}">
   <div class="fgrid">
     <label class="f">Soort na-calculatie<select name="mode">
-      <option value="normaal" {{ 'selected' if opts.mode == 'normaal' }}>Normaal: winst op de order</option>
+      <option value="normaal" {{ 'selected' if opts.mode == 'normaal' }}>Vaste prijs: winst op het orderbedrag</option>
+      <option value="regie" {{ 'selected' if opts.mode == 'regie' }}>Regie: marge uit de regels</option>
       <option value="kostprijs" {{ 'selected' if opts.mode == 'kostprijs' }}>Standaard machine / productieorder: kostprijs per machine</option>
-      <option value="auto" {{ 'selected' if (opts.mode or 'auto') == 'auto' }}>Automatisch volgens ordertype (nu: {{ 'standaard machine' if s.mode == 'kostprijs' else 'normaal' }})</option></select></label>
+      <option value="auto" {{ 'selected' if (opts.mode or 'auto') == 'auto' }}>Automatisch volgens orderbon (nu: {{ {'kostprijs': 'standaard machine', 'regie': 'regie', 'normaal': 'vaste prijs'}[s.mode] }})</option></select></label>
     {% if s.mode == 'kostprijs' %}<label class="f">Aantal gebouwde machines<input type="number" name="divide_by" min="1" step="1" value="{{ (n.divide_by or 1)|int }}"><span class="hint">De basis-items worden hierdoor gedeeld.</span></label>{% endif %}
   </div>
   {% if s.mode == 'kostprijs' %}
@@ -69,15 +70,17 @@
 <div class="result info"><b>Standaard machine / productieorder: kostprijsbepaling.</b> Geen winstbeoordeling en geen calculatie: de winst valt in de verkooporder. Geef per item aan of het basis, versie of optie is; basis wordt gedeeld door het aantal machines, versies en opties door hun eigen aantal.</div>
 {% else %}
 <div class="grid g4">
-  <div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
+  {% if s.mode == 'regie' %}<div class="card kpi"><div class="label">Regiewaarde (verkoop volgens regels)</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
+  {% else %}<div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>{% endif %}
   <div class="card kpi"><div class="label">Werkelijke kostprijs</div><div class="value">{{ s.cost|eur }}</div><div class="sub">{{ s.hours|num(1) }} uur</div></div>
   <div class="card kpi"><div class="label">Verkoopwaarde incl. marges</div><div class="value">{{ s.sale|eur }}</div><div class="sub">= minimaal gewenst orderbedrag</div></div>
   <div class="card kpi dark"><div class="label">Totale winst op order</div><div class="value">{{ s.result|eur }}</div>
-    <div class="sub" style="color:#C9D4FF">{{ s.margin_pct|num(1) }}% van het orderbedrag (orderbedrag − kostprijs)</div></div>
+    <div class="sub" style="color:#C9D4FF">{% if s.mode == 'regie' %}{{ s.margin_pct|num(1) }}% van de regiewaarde (marge uit de regels){% else %}{{ s.margin_pct|num(1) }}% van het orderbedrag (orderbedrag − kostprijs){% endif %}</div></div>
 </div>
 
 <div class="result {{ s.status }}">
-  {% if s.status == 'bad' %}<b>Verlies:</b> het orderbedrag dekt de werkelijke kostprijs niet ({{ (s.order_total - s.cost)|eur }}).
+  {% if s.mode == 'regie' %}<b>Regie (geen vaste prijs):</b> gefactureerd volgens de regels; de marge komt uit de regels: {{ s.result|eur }} ({{ s.margin_pct|num(1) }}% van de regiewaarde). Er is dus geen marge bovenop de marge.
+  {% elif s.status == 'bad' %}<b>Verlies:</b> het orderbedrag dekt de werkelijke kostprijs niet ({{ (s.order_total - s.cost)|eur }}).
   {% elif s.status == 'warn' %}<b>Onder minimale marge:</b> {{ (s.sale - s.order_total)|eur }} te weinig om de normale marges te halen. Wel {{ s.result|eur }} boven kostprijs.
   {% elif s.status == 'ok' %}<b>Minimale marge gehaald</b> ({{ s.above_min|eur }} boven de verkoopwaarde). Doel voor extra: {{ s.extra_pct|num(0) }}% erboven.
   {% elif s.status == 'okplus' %}<b>Extra bovenop de marge:</b> {{ s.above_min|eur }} boven de verkoopwaarde.

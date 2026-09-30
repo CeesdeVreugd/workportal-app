@@ -17,7 +17,7 @@ LINE_FIELDS = ["item_id", "item_desc", "pos", "qty", "line_type", "unit", "artic
 
 
 def _load(nid):
-    n = query("SELECT n.*, p.number AS project_no, p.name AS project_name, p.order_type AS project_order_type, p.kind AS project_kind,"
+    n = query("SELECT n.*, p.number AS project_no, p.name AS project_name, p.order_type AS project_order_type, p.kind AS project_kind, p.order_props AS project_order_props,"
               " c.number AS calc_no, c.title AS calc_title"
               " FROM nacalcs n LEFT JOIN projects p ON p.id = n.project_id LEFT JOIN calculations c ON c.id = n.calc_id"
               " WHERE n.id = ?", (nid,), one=True)
@@ -294,12 +294,12 @@ def settings(nid):
     old = _opts(n)
     if request.form.get("part") == "top":
         # alleen soort en aantal machines (bovenaan de pagina); de rest blijft staan
-        mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs") else "auto"
+        mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs", "regie") else "auto"
         old["mode"] = mode
         execute("UPDATE nacalcs SET divide_by = ?, no_divide = ? WHERE id = ?", (max(divide_by, 1), json.dumps(old), nid))
         flash("Opgeslagen.", "ok")
         return redirect(url_for("nacalc.detail", nid=nid))
-    mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs") else (old.get("mode") or "auto")
+    mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs", "regie") else (old.get("mode") or "auto")
     item_kind = {}
     for key, kind in zip(request.form.getlist("item_key"), request.form.getlist("item_kind")):
         if key and kind in ("basis", "versie", "optie"):

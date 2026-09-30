@@ -165,9 +165,17 @@ def nacalc_mode(n, opts=None):
         if not isinstance(opts, dict):
             opts = {}
     m = opts.get("mode") or "auto"
-    if m in ("normaal", "kostprijs"):
+    if m in ("normaal", "kostprijs", "regie"):
         return m
-    return "kostprijs" if "standaard machine" in (n.get("project_order_type") or "").lower() else "normaal"
+    if "standaard machine" in (n.get("project_order_type") or "").lower():
+        return "kostprijs"
+    try:  # orderbon zonder vinkje 'Vaste prijs' = regie
+        props = json.loads(n.get("project_order_props") or "{}")
+    except (ValueError, TypeError):
+        props = {}
+    if isinstance(props, dict) and props.get("vaste_prijs") is False:
+        return "regie"
+    return "normaal"
 
 
 def compute_nacalc(n, lines, calc_data=None):
@@ -298,6 +306,14 @@ def compute_nacalc(n, lines, calc_data=None):
         "extra_pct": extra,
     }
     summary["mode"] = mode
+    if mode == "regie":
+        # regie: gefactureerd volgens de regels; de marge komt uit de regels, er is geen 'extra bovenop de marge'
+        result = sale - cost
+        summary.update({
+            "order_total": sale, "result": result, "margin_pct": (result / sale * 100) if sale else 0.0,
+            "status": "ok" if result >= 0 else "bad", "label": "Regie: marge uit de regels" if result >= 0 else "Regie: verlies",
+            "above_min": 0.0, "divide_order": False,
+        })
     if mode == "kostprijs":
         real = [i for i in out if i.get("lines")]
         base = [i for i in real if i["kind"] == "basis"]

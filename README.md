@@ -351,4 +351,7 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   machineprijs) of **Optie** (bijv. safety / cold storage; eigen aantal; apart boeken). Machines/uitvoeringen = basis
   + gekozen versies. Kostprijs per stuk → orderregel productieorder en kostprijs materiaalregel verkooporder;
   verkoopprijs per stuk → verkooporder. Bedragen met een klik te kopiëren. Geen winstbeoordeling.
+- **Regie (geen vaste prijs):** staat op de orderbon geen vinkje bij *Vaste prijs*, dan is de order regie: de winst is
+  de marge uit de regels (verkoopwaarde − kostprijs), er is geen 'extra bovenop de marge'. Automatisch via de vinkjes
+  van de orderbon, of te kiezen bij Soort na-calculatie.
 - Overzicht gesorteerd op ordernummer, nieuwste boven.
