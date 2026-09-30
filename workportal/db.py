@@ -453,6 +453,18 @@ MIGRATIONS = [
     ALTER TABLE order_inbox ADD COLUMN nacalc_id INTEGER;
     ALTER TABLE order_inbox ADD COLUMN nacalc_note TEXT;
     """,
+    # 11 - opmerkingen/nuances bij de na-calculatie (per order, zichtbaar bij elke import)
+    """
+    CREATE TABLE nacalc_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_no TEXT,
+        nacalc_id INTEGER REFERENCES nacalcs(id) ON DELETE SET NULL,
+        body TEXT NOT NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_nacalc_notes_order ON nacalc_notes(order_no);
+    """,
 ]
 
 

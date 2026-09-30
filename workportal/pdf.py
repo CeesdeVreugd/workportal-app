@@ -280,7 +280,7 @@ def visit_pdf(ticket, visit, photos, signature_path):
 
 # ---------------------------------------------------------------- na-calculatie
 
-def nacalc_pdf(n, summary, items, calc):
+def nacalc_pdf(n, summary, items, calc, notes=None):
     buf = io.BytesIO()
     doc = _doc(buf, "Na-calculatie", n.get("order_no") or "")
     W = doc.width
@@ -314,5 +314,11 @@ def nacalc_pdf(n, summary, items, calc):
     story.append(t)
     story.append(Spacer(1, 6))
     story.append(Paragraph("Verschil = gecalculeerd − werkelijke verkoopwaarde. Negatief betekent meer besteed dan gecalculeerd.", S["small"]))
+    if notes:
+        story.append(Paragraph("Opmerkingen", S["h2"]))
+        for x in notes:
+            story.append(Paragraph(f"<b>{esc(fmt_dt(x['created_at']))}{' · ' + esc(x['who']) if x['who'] else ''}</b>", S["small"]))
+            story.append(Paragraph(esc(x["body"]).replace("\n", "<br/>"), S["cell"]))
+            story.append(Spacer(1, 4))
     doc.build(story)
     return buf.getvalue()

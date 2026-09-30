@@ -6,7 +6,7 @@ from .db import query, execute, get_db
 from .engine import parse_erp_xlsx, compute_nacalc, load_calc
 from .integrations import fetch_nacalc, nacalc_configured
 from .pdf import nacalc_pdf
-from .permissions import require, LEZEN, BEWERKEN, BEHEER
+from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
 from .util import now_iso, audit, to_float, to_int, save_bytes, safe_filename
 
 bp = Blueprint("nacalc", __name__, url_prefix="/nacalculatie")
@@ -146,7 +146,42 @@ def detail(nid):
                      "margin_pct": s["margin_pct"], "status": s["status"]})
     calcs = query("SELECT id, number, title FROM calculations ORDER BY updated_at DESC")
     return render_template("nacalc/detail.html", n=n, calc=calc, s=summary, items=items, hist=hist, calcs=calcs,
-                           pa=nacalc_configured())
+                           pa=nacalc_configured(), notes=notes_for(n))
+
+
+def notes_for(n):
+    """Opmerkingen horen bij de order: ze blijven staan bij een nieuwe import van dezelfde order."""
+    if n.get("order_no"):
+        return query("SELECT x.*, u.name AS who FROM nacalc_notes x LEFT JOIN users u ON u.id = x.created_by"
+                     " WHERE x.order_no = ? ORDER BY x.created_at DESC", (n["order_no"],))
+    return query("SELECT x.*, u.name AS who FROM nacalc_notes x LEFT JOIN users u ON u.id = x.created_by"
+                 " WHERE x.nacalc_id = ? ORDER BY x.created_at DESC", (n["id"],))
+
+
+@bp.route("/<int:nid>/opmerking", methods=["POST"])
+@require("nacalculatie", BEWERKEN)
+def note_add(nid):
+    n, _ = _load(nid)
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        flash("Vul een opmerking in.", "error")
+    else:
+        execute("INSERT INTO nacalc_notes (order_no, nacalc_id, body, created_by, created_at) VALUES (?,?,?,?,?)",
+                (n["order_no"], nid, body[:4000], g.user["id"], now_iso()))
+        audit("opmerking", "nacalc", nid, body[:200])
+        flash("Opmerking opgeslagen.", "ok")
+    return redirect(url_for("nacalc.detail", nid=nid) + "#opmerkingen")
+
+
+@bp.route("/<int:nid>/opmerking/<int:xid>/verwijderen", methods=["POST"])
+@require("nacalculatie", BEWERKEN)
+def note_delete(nid, xid):
+    x = query("SELECT * FROM nacalc_notes WHERE id = ?", (xid,), one=True) or abort(404)
+    if x["created_by"] != g.user["id"] and not can("nacalculatie", BEHEER):
+        abort(403)
+    execute("DELETE FROM nacalc_notes WHERE id = ?", (xid,))
+    flash("Opmerking verwijderd.", "ok")
+    return redirect(url_for("nacalc.detail", nid=nid) + "#opmerkingen")
 
 
 @bp.route("/<int:nid>/instellingen", methods=["POST"])
@@ -154,13 +189,15 @@ def detail(nid):
 def settings(nid):
     _load(nid)
     divide_by = to_float(request.form.get("divide_by"), 1) or 1
-    shared = [to_int(x) for x in request.form.getlist("divide_item")]
-    all_pos = [to_int(x) for x in request.form.getlist("all_pos")]
-    no_div = [p for p in all_pos if p not in shared]
-    opts = {"items": no_div, "order": request.form.get("divide_order") == "1"}
+    per_item = {}
+    for key, val in zip(request.form.getlist("item_key"), request.form.getlist("item_div")):
+        d = to_float(val, None)
+        if key and d and d > 0:
+            per_item[key] = d
+    opts = {"items": [], "per_item": per_item, "order": request.form.get("divide_order") == "1"}
     execute("UPDATE nacalcs SET divide_by = ?, no_divide = ?, calc_id = ? WHERE id = ?",
             (max(divide_by, 1), json.dumps(opts), to_int(request.form.get("calc_id")), nid))
-    audit("instellingen", "nacalc", nid, f"delen door {divide_by}")
+    audit("instellingen", "nacalc", nid, f"aantal {divide_by}, per item {per_item}")
     flash("Instellingen opgeslagen.", "ok")
     return redirect(url_for("nacalc.detail", nid=nid))
 
@@ -169,7 +206,7 @@ def settings(nid):
 @require("nacalculatie", LEZEN)
 def report(nid):
     n, lines, calc, summary, items = evaluate(nid)
-    pdf = nacalc_pdf(n, summary, items, calc)
+    pdf = nacalc_pdf(n, summary, items, calc, notes=notes_for(n))
     fname = safe_filename(f"Na-calculatie {n['order_no']}.pdf")
     return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="{fname}"'})
 

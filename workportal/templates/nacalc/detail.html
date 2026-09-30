@@ -34,6 +34,24 @@
   {% if calc %}<div class="small" style="margin-top:4px">Gecalculeerd (incl. marge): {{ s.calc_total|eur }} · {{ s.calc_hours|num(1) }} uur gecalculeerd tegen {{ s.hours|num(1) }} uur werkelijk.</div>{% endif %}
 </div>
 
+<section class="card" id="opmerkingen">
+  <div class="card-head"><h2>Opmerkingen &amp; nuances</h2>{% if can('nacalculatie', 2) %}<button class="btn sm" type="button" onclick="var f=document.getElementById('ncnote');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Opmerking</button>{% endif %}</div>
+  {% if can('nacalculatie', 2) %}
+  <form id="ncnote" method="post" action="{{ url_for('nacalc.note_add', nid=n.id) }}" class="form hidden">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f full">Opmerking<textarea name="body" rows="3" placeholder="Bijv. meerwerk nog niet gefactureerd, uitbesteding loopt door in volgende order, uren van montage bij klant nog niet geboekt…" required></textarea></label>
+    <div><button class="btn primary sm">Opslaan</button></div>
+  </form>
+  {% endif %}
+  {% for x in notes %}
+  <div class="note-row" style="padding:10px 0;border-top:1px solid var(--line-2)">
+    <div class="small muted">{{ x.created_at|dt }}{{ ' · ' ~ x.who if x.who }}{% if x.nacalc_id and x.nacalc_id != n.id %} · bij een eerdere import{% endif %}
+      {% if x.created_by == g.user.id or can('nacalculatie', 3) %}<form method="post" action="{{ url_for('nacalc.note_delete', nid=n.id, xid=x.id) }}" style="float:right" onsubmit="return confirm('Opmerking verwijderen?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Verwijderen" aria-label="Opmerking verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
+    <div style="white-space:pre-wrap">{{ x.body }}</div>
+  </div>
+  {% else %}<p class="muted small" style="margin:0">Nog geen opmerkingen. Leg hier uitleg of nuances vast bij deze na-calculatie; ze komen ook in het PDF-rapport en blijven staan bij een nieuwe import van deze order.</p>{% endfor %}
+</section>
+
 <section class="card flush">
   <div class="tablewrap"><table class="table">
     <thead><tr><th>Pos.</th><th>Item</th>{% if calc %}<th class="num">Uren calc.</th>{% endif %}<th class="num">Uren werk.</th>{% if calc %}<th class="num">Gecalculeerd</th>{% endif %}<th class="num">Kostprijs</th><th class="num">Verkoopwaarde</th>{% if calc %}<th class="num">Verschil</th>{% endif %}<th>Beoordeling</th></tr></thead>
@@ -41,7 +59,7 @@
     <tbody>
       <tr class="link" onclick="var d=document.getElementById('it{{ loop.index }}');d.classList.toggle('hidden');this.querySelector('.chev').style.transform=d.classList.contains('hidden')?'':'rotate(90deg)'">
         <td class="nowrap"><span class="chev">›</span> {{ it.pos or '' }}</td>
-        <td><b>{{ it.desc }}</b>{% if it.divided %} <span class="badge">÷ {{ s.divide_by|num(0) }}</span>{% endif %}<div class="small muted">{{ it.lines|length }} regel(s)</div></td>
+        <td><b>{{ it.desc }}</b>{% if it.divided %} <span class="badge">÷ {{ it.div|num(0) if it.div == it.div|int else it.div|num(2) }}</span>{% endif %}<div class="small muted">{{ it.lines|length }} regel(s)</div></td>
         {% if calc %}<td class="num">{{ it.calc_hours|num(1) if it.calc_hours is not none else '–' }}</td>{% endif %}
         <td class="num">{{ it.hours|num(1) }}</td>
         {% if calc %}<td class="num">{{ it.calc|eur if it.calc is not none else '–' }}</td>{% endif %}
@@ -68,11 +86,17 @@
     <h2>Instellingen</h2>
     <div class="fgrid">
       <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>
-      <label class="f">Delen door (seriebouw)<input type="number" name="divide_by" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Bijv. 5 als deze order 5 machines bevat of kosten over 5 machines verdeeld worden.</span></label>
+      <label class="f">Aantal machines (seriebouw)<input type="number" name="divide_by" id="nc-n" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Voor het orderbedrag en als standaard per item. Bijv. 5 als deze order 5 machines bevat.</span></label>
     </div>
     <label class="check"><input type="checkbox" name="divide_order" value="1" {{ 'checked' if s.divide_order }}> Orderbedrag ook delen (per-stuk-weergave)</label>
-    <div><label class="f">Welke items delen?</label>
-      <div class="chips">{% for it in items if it.pos %}<input type="hidden" name="all_pos" value="{{ it.pos }}"><label class="chip"><input type="checkbox" name="divide_item" value="{{ it.pos }}" {{ 'checked' if it.pos not in s.no_divide }}><span>{{ it.pos }} {{ it.desc[:28] }}</span></label>{% endfor %}</div></div>
+    <div><label class="f">Aantal per item <span class="hint" style="display:inline">(1 = niet delen)</span></label>
+      <table class="table nc-div">
+        <tbody>{% for it in items if it.lines %}<tr>
+          <td class="nowrap muted">{{ it.pos or '' }}</td><td>{{ it.desc }}</td>
+          <td style="width:110px"><input type="hidden" name="item_key" value="{{ it.key }}"><input type="number" name="item_div" min="0.01" step="any" inputmode="decimal" value="{{ it.div|int if it.div == it.div|int else it.div }}" aria-label="Aantal voor {{ it.desc }}" style="width:90px"></td>
+        </tr>{% endfor %}</tbody>
+      </table>
+      <p class="hint" style="margin-top:6px"><button type="button" class="btn sm ghost" onclick="var v=document.getElementById('nc-n').value;document.querySelectorAll('.nc-div input[name=item_div]').forEach(function(i){i.value=v})">Aantal machines bij alle items invullen</button></p></div>
     <div><button class="btn primary">Opslaan &amp; herberekenen</button></div>
   </form>
   {% endif %}

@@ -164,6 +164,7 @@ def compute_nacalc(n, lines, calc_data=None):
     if isinstance(opts, list):
         opts = {"items": opts}
     no_div = set(int(x) for x in opts.get("items", []))
+    per_item = opts.get("per_item") or {}          # aantal per item (sleutel = item), overschrijft het standaardaantal
     divide_order = opts.get("order", True)
     N = to_float(n.get("divide_by"), 1) or 1
 
@@ -193,12 +194,18 @@ def compute_nacalc(n, lines, calc_data=None):
     out = []
     for key in order:
         it = items[key]
-        divided = N != 1 and it["pos"] not in no_div
+        if str(key) in per_item:
+            d = to_float(per_item.get(str(key)), 1) or 1
+        else:
+            d = 1 if it["pos"] in no_div else N
+        d = d if d > 0 else 1
+        divided = d != 1
         if divided:
-            it["cost"] /= N
-            it["sale"] /= N
-            it["hours"] /= N
+            it["cost"] /= d
+            it["sale"] /= d
+            it["hours"] /= d
         it["divided"] = divided
+        it["div"] = d
         it["calc"] = None
         it["calc_hours"] = None
         if calc:
@@ -224,7 +231,7 @@ def compute_nacalc(n, lines, calc_data=None):
         for pos, c in sorted(calc["by_pos"].items()):
             if pos not in known and (c["total"] or c["hours"]):
                 out.append({"key": f"calc-{pos}", "item_id": None, "desc": c["title"] + " (alleen gecalculeerd)", "pos": pos,
-                            "cost": 0.0, "sale": 0.0, "hours": 0.0, "lines": [], "divided": False, "calc": c["total"],
+                            "cost": 0.0, "sale": 0.0, "hours": 0.0, "lines": [], "divided": False, "div": 1, "calc": c["total"],
                             "calc_hours": c["hours"], "diff": c["total"], "margin": 0.0, "status": "ok",
                             "label": "Nog geen kosten"})
     out.sort(key=lambda x: (x["pos"] is None, x["pos"] or 0))
