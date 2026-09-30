@@ -72,6 +72,8 @@ def _conv_sp(pid, rel, version, size):
     """Zet een grote STEP uit SharePoint (op de achtergrond) om naar GLB. Geeft info voor de viewer of None."""
     if not (version and convert3d.is_step(rel) and (size or 0) >= cache_mb() * 1048576 and _server_convert_on()):
         return None
+    if (size or 0) > convert3d.MAX_MB * 1048576:
+        return None
     app = current_app._get_current_object()
     db_path = app.config["DB_PATH"]
 
@@ -92,6 +94,8 @@ def _conv_sp(pid, rel, version, size):
 
 def _conv_local(f):
     if not (convert3d.is_step(f["filename"]) and (f["size"] or 0) >= cache_mb() * 1048576 and _server_convert_on()):
+        return None
+    if (f["size"] or 0) > convert3d.MAX_MB * 1048576:
         return None
     src = file_path(f)
     key, st = convert3d.ensure(current_app._get_current_object(), f"lokaal/{f['id']}", str(f["size"]), f["filename"],
@@ -150,11 +154,6 @@ def listing(entity, eid):
             error = f"SharePoint gaf een fout ({exc.status})."
         except (requests.RequestException, RuntimeError):
             error = "SharePoint is op dit moment niet bereikbaar."
-    for m in remote:  # grote STEP-bestanden alvast op de server omzetten, dan openen ze straks direct
-        try:
-            _conv_sp(pid, m["path"], m.get("version"), m.get("size"))
-        except Exception:  # noqa: BLE001 - de lijst mag hier nooit op stuk gaan
-            pass
     project_local = []
     if entity == "ticket" and pid:
         project_local = query("SELECT * FROM files WHERE entity = 'project' AND entity_id = ? AND kind = 'model3d' ORDER BY filename",

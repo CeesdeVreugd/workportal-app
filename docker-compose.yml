@@ -7,6 +7,10 @@ services:
     pull_policy: build
     container_name: workportal-app
     restart: unless-stopped
+    # Geheugengrens: een zwaar 3D-model omzetten kan dan nooit de hele VM platleggen.
+    # Wordt de grens bereikt, dan stopt alleen het omzetten (WorkPortal blijft draaien).
+    mem_limit: ${WP_MEM_LIMIT:-2g}
+    memswap_limit: ${WP_MEM_LIMIT:-2g}
     environment:
       APP_URL: ${APP_URL}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -31,6 +35,9 @@ services:
       PA_SHAREPOINT_URL: ${PA_SHAREPOINT_URL:-}
       PA_NACALC_URL: ${PA_NACALC_URL:-}
       PA_SECRET: ${PA_SECRET:-}
+      # 3D: grote STEP-bestanden op de server omzetten (0 = uit), en tot welke bestandsgrootte (MB)
+      WP3D_CONVERT: ${WP3D_CONVERT:-1}
+      WP3D_CONVERT_MAX_MB: ${WP3D_CONVERT_MAX_MB:-150}
       TZ: Europe/Amsterdam
     volumes:
       - workportal-data:/data

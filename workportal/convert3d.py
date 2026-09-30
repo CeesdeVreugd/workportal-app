@@ -19,7 +19,8 @@ import time
 
 STEP_EXT = (".step", ".stp", ".iges", ".igs")
 TIMEOUT = int(os.environ.get("WP3D_CONVERT_TIMEOUT", "1800"))      # max. 30 minuten per model
-NODE_HEAP_MB = int(os.environ.get("WP3D_NODE_HEAP_MB", "6144"))
+NODE_HEAP_MB = int(os.environ.get("WP3D_NODE_HEAP_MB", "1024"))
+MAX_MB = int(os.environ.get("WP3D_CONVERT_MAX_MB", "150"))
 KEEP_DAYS = 120
 
 _q = queue.Queue()
@@ -37,9 +38,13 @@ def node_bin():
     return shutil.which("node") or shutil.which("nodejs")
 
 
+def enabled():
+    return os.environ.get("WP3D_CONVERT", "1").strip().lower() not in ("0", "nee", "uit", "false", "no", "off")
+
+
 def available(app):
     root = app.root_path
-    return bool(node_bin()) and os.path.exists(os.path.join(root, "static", "3d", "occt", "occt-import-js.wasm")) \
+    return enabled() and bool(node_bin()) and os.path.exists(os.path.join(root, "static", "3d", "occt", "occt-import-js.wasm")) \
         and os.path.exists(os.path.join(os.path.dirname(root), "scripts", "step2glb.js"))
 
 
@@ -90,8 +95,11 @@ def status(app, key):
             st = json.load(fh)
     except (OSError, ValueError):
         return None
-    # een 'bezig' van een vorige herstart geldt niet meer
     if st.get("state") in ("wachtrij", "bezig") and key not in _busy:
+        if st.get("state") == "bezig" and st.get("started"):
+            # vorige poging is halverwege afgebroken (container gestopt of geheugen vol): niet blind opnieuw proberen
+            return {**st, "state": "fout", "finished": st.get("started"),
+                    "error": "Vorige poging is afgebroken, waarschijnlijk te weinig geheugen op de server"}
         return None
     return st
 
@@ -144,13 +152,17 @@ def _convert(app, key, name, fetch):
     with tempfile.TemporaryDirectory(prefix="wp3d-") as tmp:
         src = os.path.join(tmp, "bron" + ext)
         fetch(src)
-        _write_state(app, key, step="inlezen", src_size=os.path.getsize(src))
+        size = os.path.getsize(src)
+        _write_state(app, key, step="inlezen", src_size=size)
+        if size > MAX_MB * 1048576:
+            raise RuntimeError(f"Bestand is groter dan {MAX_MB} MB; te zwaar om op de server om te zetten")
         out = os.path.join(tmp, "model.glb")
         script = os.path.join(os.path.dirname(app.root_path), "scripts", "step2glb.js")
         occt = os.path.join(app.root_path, "static", "3d", "occt")
         cmd = [node_bin(), f"--max-old-space-size={NODE_HEAP_MB}", script, src, out, occt]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT,
+                           preexec_fn=lambda: os.nice(19))  # lage prioriteit: de rest van de server blijft vlot
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"Omzetten duurde langer dan {TIMEOUT // 60} minuten")
         if r.returncode != 0 or not os.path.exists(out):

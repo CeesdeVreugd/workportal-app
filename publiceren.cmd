@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V38: grote STEP-bestanden eenmalig op de server omzetten (GLB) zodat ze snel openen; Node.js in container"
+set "OMSCHRIJVING=WorkPortal V40: Node.js zonder apt-get (build liep vast op geheugen), geheugengrens container, veilig omzetten grote STEP"
 
 echo.
 echo ============================================

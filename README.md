@@ -247,11 +247,16 @@ geen vlakken in het bestand, of de STEP-lezer kan het bestand niet verwerken).
 
 **Grote STEP-bestanden op de server omzetten:** STEP/IGES vanaf de ingestelde grootte (Beheer > SharePoint) worden
 één keer op de server omgezet naar GLB met Node.js + dezelfde OpenCascade-lezer (`scripts/step2glb.js`, zit in de
-container). Dat gebeurt al zodra het blok 3D-modellen van een project/order wordt geopend of na een upload, op de
+container). Dat gebeurt zodra iemand het model opent of na een upload, op de
 achtergrond, één model tegelijk (max. 30 min per model, `WP3D_CONVERT_TIMEOUT`; geheugen `WP3D_NODE_HEAP_MB`).
 Het resultaat staat in `/data/3d-cache` (na 120 dagen niet gebruikt opgeruimd) en opent daarna voor iedereen in
 seconden, ook op telefoon en iPad. Een gewijzigde STEP in SharePoint krijgt een nieuwe versie en wordt opnieuw
 omgezet. Lukt omzetten niet (bijv. te weinig geheugen), dan leest de browser de STEP zoals voorheen.
+Veiligheid: de container heeft een geheugengrens (`WP_MEM_LIMIT`, standaard `2g`, zonder swap). Vraagt een model
+meer, dan stopt alleen het omzetten; WorkPortal, Nginx en Portainer blijven draaien. Omzetten draait met lage
+prioriteit, alleen als iemand het model opent (of na upload), en alleen voor bestanden tot `WP3D_CONVERT_MAX_MB`
+(standaard 150). Is een poging halverwege afgebroken, dan wordt dat model 6 uur niet opnieuw geprobeerd.
+Helemaal uitzetten: `WP3D_CONVERT=0` in de stack.
 
 ## Back-ups
 
