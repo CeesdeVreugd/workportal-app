@@ -43,7 +43,8 @@ def latest_results():
         out.append({"id": n["id"], "order_no": n["order_no"], "order_desc": n["order_desc"], "project_id": n["project_id"],
                     "project_no": n["project_no"], "calc_no": n["calc_no"], "imported_at": n["imported_at"],
                     "order_total": s["order_total"], "cost": s["cost"], "sale": s["sale"], "result": s["result"],
-                    "margin_pct": s["margin_pct"], "status": s["status"], "label": s["label"]})
+                    "margin_pct": s["margin_pct"], "status": s["status"], "label": s["label"],
+                    "extra": s["above_min"] if s["order_total"] > 0 and s["above_min"] > 0.005 else None})
     return out
 
 

@@ -34,15 +34,16 @@
 {% endif %}
 <section class="card flush tablewrap">
   <table class="table">
-    <thead><tr><th>Order</th><th>Omschrijving</th><th class="hide-m">Calculatie</th><th class="num">Orderbedrag</th><th class="num hide-m">Kostprijs</th><th class="num">Winst op order</th><th>Beoordeling</th></tr></thead>
+    <thead><tr><th>Order</th><th>Omschrijving</th><th class="hide-m">Calculatie</th><th class="num">Orderbedrag</th><th class="num hide-m">Kostprijs</th><th class="num">Winst op order</th><th class="num hide-m">Extra winst op marge</th><th>Beoordeling</th></tr></thead>
     <tbody>
     {% for r in results %}<tr class="link" data-href="{{ url_for('nacalc.detail', nid=r.id) }}">
       <td class="nowrap"><b>{{ r.order_no }}</b><div class="small muted">{{ r.imported_at|date }}</div></td>
       <td>{{ r.order_desc or '' }}</td><td class="hide-m">{{ r.calc_no or '–' }}</td>
       <td class="num">{{ r.order_total|eur }}</td><td class="num hide-m">{{ r.cost|eur }}</td>
       <td class="num"><b>{{ r.result|eur }}</b><div class="small muted">{{ r.margin_pct|num(1) }}%</div></td>
+      <td class="num hide-m">{% if r.extra is not none %}<b>{{ r.extra|eur }}</b>{% else %}<span class="muted">–</span>{% endif %}</td>
       <td><span class="badge {{ badge[r.status] }}">{{ r.label }}</span></td></tr>
-    {% else %}<tr><td colspan="7" class="empty">Nog geen na-calculaties. Importeer een regie-export uit het ERP.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="8" class="empty">Nog geen na-calculaties. Importeer een regie-export uit het ERP.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>

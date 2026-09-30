@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V45: orderbonnen printen via Printix, PDF-scherm met terug-knop, PDF-uitlijning, aantal per item en opmerkingen bij na-calculatie"
+set "OMSCHRIJVING=WorkPortal V46: kolom Extra winst op marge in na-calculatie-overzicht"
 
 echo.
 echo ============================================
