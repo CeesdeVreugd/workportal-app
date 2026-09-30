@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V36: 3D - onderdelenboom altijd rechts, één meting tegelijk in beeld, hulplijnen niet meetbaar, diameter meten"
+set "OMSCHRIJVING=WorkPortal V37: grote 3D-modellen eenmalig downloaden en op het apparaat bewaren; onderdelenboom rechts; één meting in beeld"
 
 echo.
 echo ============================================

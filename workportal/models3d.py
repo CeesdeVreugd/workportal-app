@@ -50,6 +50,13 @@ def _back(entity, eid):
     return werk_url("detail", p, pid=eid) + "#modellen"
 
 
+def cache_mb():
+    try:
+        return int(sp.setting(get_db(), "sp_3d_cache_mb") or 10)
+    except (TypeError, ValueError):
+        return 10
+
+
 def convert_to_gltf(file_row):  # pragma: no cover - fase 2
     """Fase 2: STEP -> glTF op de server. Nu nog niet actief."""
     return None
@@ -72,7 +79,7 @@ def index():
             t = query("SELECT number, title FROM tickets WHERE id = ?", (f["entity_id"],), one=True)
             d["where"] = f"Ticket {t['number']}" if t else "–"
         items.append(d)
-    return render_template("modellen/index.html", items=items, occt=occt_installed(), max_mb=MAX_MB)
+    return render_template("modellen/index.html", items=items, occt=occt_installed(), max_mb=MAX_MB, cache_mb=cache_mb())
 
 
 @bp.route("/bekijk")
@@ -177,7 +184,8 @@ def view_local(fid):
     f = query("SELECT * FROM files WHERE id = ? AND kind = 'model3d'", (fid,), one=True) or abort(404)
     return render_template("modellen/viewer.html", url=url_for("modellen.local_file", fid=fid, name=f["filename"]),
                            title=f["filename"], size=f["size"], back=_back(f["entity"], f["entity_id"]),
-                           occt=occt_installed(), max_mb=MAX_MB)
+                           occt=occt_installed(), max_mb=MAX_MB,
+                           cache_key=f"lokaal/{fid}/{f['size']}", cache_mb=cache_mb())
 
 
 @bp.route("/bekijk/sharepoint/<int:pid>")
@@ -191,9 +199,18 @@ def view_sp(pid):
     if not rel or not is_model(rel) or not p["sp_item_id"]:
         abort(404)
     back = request.args.get("terug") if (request.args.get("terug") or "").startswith("/") else _back("project", pid)
+    size, cache_key = None, None
+    try:  # versie van het bestand, zodat een gewijzigde STEP opnieuw wordt gedownload
+        meta = sp.file_meta(get_db(), pid, rel)
+        size = meta.get("size")
+        version = meta.get("cTag") or meta.get("eTag") or meta.get("lastModifiedDateTime")
+        if version:
+            cache_key = f"sp/{pid}/{rel}?v={version}"
+    except (sp.GraphError, ValueError, requests.RequestException, RuntimeError):
+        pass
     return render_template("modellen/viewer.html", url=url_for("modellen.sp_file", pid=pid, rel=rel),
                            title=rel.split("/")[-1], subtitle=f"{p['number']} · {rel}", back=back,
-                           occt=occt_installed(), max_mb=MAX_MB)
+                           occt=occt_installed(), max_mb=MAX_MB, size=size, cache_key=cache_key, cache_mb=cache_mb())
 
 
 @bp.route("/bestand/<int:fid>/<path:name>")

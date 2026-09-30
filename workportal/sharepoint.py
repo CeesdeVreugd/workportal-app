@@ -53,6 +53,7 @@ DEFAULTS = {
     "sp_sub_werkbon": "Service",
     "sp_sub_druktest": "Druktesten",
     "sp_sub_3d": "1 Tekeningen",
+    "sp_3d_cache_mb": "10",
 }
 
 _lock = threading.Lock()
@@ -792,6 +793,17 @@ def open_file(conn, pid, relpath, g=None):
     if not rel:
         raise ValueError("Geen bestand")
     return g.download(drive, p["sp_item_id"], rel)
+
+
+def file_meta(conn, pid, relpath, g=None):
+    """Alleen de gegevens (grootte, versie) van een bestand in de projectmap, zonder te downloaden."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    rel = safe_rel(relpath)
+    if not rel:
+        raise ValueError("Geen bestand")
+    return g.item_by_path(drive, rel, p["sp_item_id"])
 
 
 def upload_document(conn, project_id, sub, filename, data, g=None):

@@ -17,5 +17,34 @@
   <section class="card"><h2>Laatst geüpload in WorkPortal</h2>
     <div class="rows">{% for f in items %}<a class="rowitem" href="{{ url_for('modellen.view_local', fid=f.id) }}"><span class="ficon cube">{{ icon('cube') }}</span><div class="grow"><div class="t">{{ f.filename }}</div><div class="s">{{ f.where }} · {{ f.created_at|date }}{{ ' · ' ~ f.who if f.who }}</div></div></a>{% else %}<div class="empty">Nog niets geüpload.</div>{% endfor %}</div>
   </section>
+  <section class="card" id="m3d-device"><h2>Op dit apparaat bewaard</h2>
+    <p class="small muted" style="margin-top:0">Modellen vanaf {{ cache_mb }} MB worden één keer gedownload en in de opslag van de browser op dit apparaat bewaard (pc, telefoon of iPad). Daarna openen ze direct. Wordt het bestand in SharePoint gewijzigd, dan haalt WorkPortal automatisch de nieuwe versie op.</p>
+    <div class="rows" id="m3d-cache-list"><div class="empty">Bezig met kijken…</div></div>
+    <p><button type="button" class="btn sm" id="m3d-cache-clear" hidden>Alles van dit apparaat verwijderen</button></p>
+  </section>
 </div>
+<script>
+(function () {
+  var list = document.getElementById("m3d-cache-list"), btn = document.getElementById("m3d-cache-clear");
+  function mb(n) { return (n / 1048576).toLocaleString("nl-NL", { maximumFractionDigits: 1 }) + " MB"; }
+  function show() {
+    if (!window.caches) { list.innerHTML = '<div class="empty">Deze browser kan geen modellen bewaren (bijvoorbeeld in een privévenster).</div>'; return; }
+    caches.open("wp3d-modellen-v1").then(function (c) {
+      return c.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return c.match(k).then(function (r) { return { k: k, r: r }; }); })); });
+    }).then(function (rows) {
+      if (!rows.length) { list.innerHTML = '<div class="empty">Nog niets bewaard op dit apparaat.</div>'; btn.hidden = true; return; }
+      var total = 0;
+      list.innerHTML = rows.map(function (x) {
+        var size = +(x.r.headers.get("Content-Length") || 0), name = decodeURIComponent(x.r.headers.get("X-WP-Name") || "model"), when = x.r.headers.get("X-WP-Saved");
+        total += size;
+        return '<div class="rowitem"><div class="grow"><div class="t"></div><div class="s">' + mb(size) + (when ? " · " + new Date(when).toLocaleDateString("nl-NL") : "") + '</div></div></div>';
+      }).join("") + '<div class="small muted" style="padding:6px 2px">Totaal ' + mb(total) + '</div>';
+      list.querySelectorAll(".t").forEach(function (el, i) { el.textContent = decodeURIComponent(rows[i].r.headers.get("X-WP-Name") || "model"); });
+      btn.hidden = false;
+    }).catch(function () { list.innerHTML = '<div class="empty">Kon de opslag op dit apparaat niet lezen.</div>'; });
+  }
+  btn.addEventListener("click", function () { caches.delete("wp3d-modellen-v1").then(show); });
+  show();
+})();
+</script>
 {% endblock %}

@@ -129,14 +129,78 @@
         checkOcct().then(function (ok) {
           occtOk = ok;
           if (!ok) { fail("De STEP/IGES-lezer ontbreekt op de server (map static/3d/occt, zie README, 3D-modellen). STL/OBJ/3MF werken wel."); return; }
-          startWatch(); ev.LoadModelFromUrlList([cfg.url]);
+          startWatch(); loadRemote();
         });
       } else {
-        ev.LoadModelFromUrlList([cfg.url]);
+        loadRemote();
       }
     } else {
       setStatus("Kies of sleep een 3D-bestand (STEP, IGES, STL, OBJ of 3MF) om het te bekijken. Het bestand wordt niet geüpload.", "hint");
     }
+  }
+
+  // ------------------------------------------------------------ grote bestanden op het apparaat bewaren
+  // Boven de ingestelde grootte wordt het model één keer gedownload en in de opslag van de browser op dit
+  // apparaat gezet (pc, telefoon, iPad). Daarna opent de viewer het vanaf het apparaat. Een nieuwe versie in
+  // SharePoint heeft een andere sleutel en wordt dus opnieuw opgehaald; de oude versie wordt dan opgeruimd.
+  var CACHE = "wp3d-modellen-v1";
+  function cacheable() {
+    return !!(cfg.cacheKey && window.caches && window.isSecureContext !== false && cfg.sizeMb >= (cfg.cacheMb || 0));
+  }
+  function cacheUrl(key) { return location.origin + "/__wp3d_cache/" + encodeURI(key); }
+  function fileName() { return (cfg.title || "model").replace(/[\\/]/g, "_"); }
+  function loadBlob(blob, fromDevice) {
+    var file = new File([blob], fileName(), { type: "application/octet-stream" });
+    setStatus(fromDevice ? "Model openen vanaf dit apparaat…" : "Model inlezen…");
+    startWatch();
+    ev.LoadModelFromFileList([file]);
+    info(fromDevice ? "Geopend vanaf dit apparaat (niet opnieuw gedownload)." : "Model is op dit apparaat bewaard. De volgende keer opent het direct.");
+    setTimeout(function () { if (/apparaat/.test(infoEl.textContent)) info(""); }, 7000);
+  }
+  function download(onProgress) {
+    return fetch(cfg.url, { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      var total = +(r.headers.get("Content-Length") || 0) || (cfg.sizeMb * 1048576), got = 0;
+      if (!r.body || !r.body.getReader) return r.blob();
+      var reader = r.body.getReader(), parts = [];
+      function pump() {
+        return reader.read().then(function (res) {
+          if (res.done) return new Blob(parts);
+          parts.push(res.value); got += res.value.length; onProgress(got, total);
+          return pump();
+        });
+      }
+      return pump();
+    });
+  }
+  function loadRemote() {
+    if (!cacheable()) { ev.LoadModelFromUrlList([cfg.url]); return; }
+    var key = cacheUrl(cfg.cacheKey), base = cacheUrl(cfg.cacheKey.split("?v=")[0]), store;
+    caches.open(CACHE).then(function (c) {
+      store = c;
+      return c.match(key);
+    }).then(function (hit) {
+      if (hit) return hit.blob().then(function (b) { loadBlob(b, true); });
+      clearInterval(watch);
+      setStatus("Groot bestand (" + fmt(cfg.sizeMb, 1) + " MB): eenmalig downloaden naar dit apparaat…");
+      return download(function (got, total) {
+        setStatus("Groot bestand eenmalig downloaden naar dit apparaat… <b>" + Math.min(99, Math.round(got / total * 100)) + "%</b>" +
+          "<br><span class='small muted'>" + fmt(got / 1048576, 1) + " van " + fmt(total / 1048576, 1) + " MB. Daarna opent het de volgende keer direct.</span>");
+      }).then(function (blob) {
+        var saved = store.keys().then(function (keys) {  // oude versies van hetzelfde bestand opruimen
+          return Promise.all(keys.filter(function (k) { return k.url !== key && k.url.split("?v=")[0] === base; }).map(function (k) { return store.delete(k); }));
+        }).then(function () {
+          return store.put(key, new Response(blob, { headers: { "Content-Type": "application/octet-stream", "X-WP-Name": encodeURIComponent(fileName()),
+            "X-WP-Saved": new Date().toISOString(), "Content-Length": String(blob.size) } }));
+        }).catch(function () { /* opslag vol of geweigerd: gewoon tonen */ });
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+        return saved.then(function () { loadBlob(blob, false); });
+      });
+    }).catch(function () {
+      // opslag niet beschikbaar (privévenster, geen ruimte): gewoon rechtstreeks laden
+      if (isStep) startWatch();
+      ev.LoadModelFromUrlList([cfg.url]);
+    });
   }
 
   // ------------------------------------------------------------ na laden

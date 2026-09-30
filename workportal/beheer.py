@@ -173,6 +173,8 @@ def sharepoint():
                 sp.set_setting(conn, "sp_auto_create", "1" if request.form.get("sp_auto_create") else "0")
                 for k in ("sp_sub_werkbon", "sp_sub_druktest", "sp_sub_3d"):
                     sp.set_setting(conn, k, re.sub(r'["*:<>?\\|#%]+', "", request.form.get(k) or "").strip("/ "))
+                mb = re.sub(r"[^0-9]", "", request.form.get("sp_3d_cache_mb") or "")
+                sp.set_setting(conn, "sp_3d_cache_mb", str(min(int(mb), 2000)) if mb else "10")
                 flash("Instellingen opgeslagen.", "ok")
             elif action == "koppel":
                 m = re.search(r"#(\d+)\s*$", request.form.get("customer") or "")
@@ -206,7 +208,7 @@ def sharepoint():
                    " (SELECT COUNT(*) FROM projects WHERE sp_item_id IS NOT NULL AND customer_id IS NULL) AS nocust", one=True)
     customers = query("SELECT id, name FROM customers WHERE active = 1 ORDER BY name COLLATE NOCASE")
     v = {k: sp.setting(conn, k) for k in ("sp_url", "sp_root_name", "sp_root_web", "sp_site_name", "sp_last_sync", "sp_last_full",
-                                           "sp_last_error", "sp_auto_create", "sp_sub_werkbon", "sp_sub_druktest", "sp_sub_3d", "sp_root_id",
+                                           "sp_last_error", "sp_auto_create", "sp_sub_werkbon", "sp_sub_druktest", "sp_sub_3d", "sp_3d_cache_mb", "sp_root_id",
                                            "sp_running", "sp_last_result")}
     if v["sp_last_result"] and "|" in v["sp_last_result"]:
         v["result_at"], v["result"] = v["sp_last_result"].split("|", 1)

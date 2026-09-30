@@ -219,6 +219,14 @@ Alleen echte randen tellen bij het meten: de hulplijnen tussen de facetten van e
 (een ronde rand of rond vlak meet je met Diameter). Alleen de gekozen meting staat in beeld; de laatste 10 staan in
 de lijst en zijn met een klik weer te tonen.
 Op een groot scherm staat de onderdelenboom altijd rechts (met doorsnede of metingen eronder).
+
+**Grote bestanden op het apparaat:** modellen vanaf een instelbare grootte (Beheer > SharePoint, standaard 10 MB)
+worden één keer gedownload (met voortgang in %) en in de opslag van de browser op de pc, telefoon of iPad bewaard
+(Cache Storage). Daarna opent de viewer ze vanaf het apparaat. De sleutel bevat de versie uit SharePoint (cTag/eTag),
+dus een gewijzigde STEP wordt automatisch opnieuw opgehaald en de oude versie opgeruimd. Op de pagina 3D-viewer
+staat wat er op dit apparaat bewaard is, met een knop om alles te verwijderen. Een browser mag niet zomaar in een
+eigen map op C:\ schrijven; de opslag staat in het browserprofiel op het apparaat. In een privévenster of bij een
+volle schijf wordt het model gewoon rechtstreeks geladen.
 Werkt op pc, tablet en telefoon (op de telefoon opent het paneel onderin).
 
 **Techniek (geen licentiekosten):** [Online3DViewer](https://github.com/kovacsv/Online3DViewer) 0.18 (MIT,

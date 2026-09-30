@@ -63,6 +63,7 @@
     <label class="f">Submap voor werkbonnen<input name="sp_sub_werkbon" value="{{ v.sp_sub_werkbon or '' }}"><span class="hint">In de projectmap, bijv. <code>Service</code>. Leeg = direct in de projectmap.</span></label>
     <label class="f">Submap voor druktestrapporten<input name="sp_sub_druktest" value="{{ v.sp_sub_druktest or '' }}"><span class="hint">Bijv. <code>Werkvoorbereiding/Druktesten</code>.</span></label>
     <label class="f">Submap met 3D-modellen (STEP)<input name="sp_sub_3d" value="{{ v.sp_sub_3d or '' }}"><span class="hint">Standaard <code>1 Tekeningen</code>; submappen worden ook doorzocht. Uploads uit WorkPortal komen hier.</span></label>
+    <label class="f">3D-bestanden op het apparaat bewaren vanaf (MB)<input name="sp_3d_cache_mb" inputmode="numeric" value="{{ v.sp_3d_cache_mb or '10' }}"><span class="hint">Grotere modellen worden één keer gedownload en op de pc, telefoon of iPad bewaard. Daarna opent WorkPortal ze vanaf het apparaat. <code>0</code> = altijd bewaren.</span></label>
   </div>
   <div><button class="btn primary" name="action" value="instellingen">Opslaan</button></div>
 </form>
