@@ -29,6 +29,11 @@ NUM_RE = re.compile(r"^\s*(\d{8})(?:\s*[-_–]+\s*|\s+|$)(.*?)\s*$")
 MAX_FOLDERS = 50000
 
 
+# Excel met na-calculatie in de ordermap: naam begint met "Nacalculatie" (ook de schrijfwijze "Nacacalculatie")
+NACALC_RE = re.compile(r"^\s*na\s*-?\s*(ca)?calculatie.*\.xls[xm]?$", re.I)
+NACALC_PER_RUN = 20   # max. aantal na-calculaties per ronde van het script (eerste keer niet alles tegelijk)
+
+
 def configured():
     return bool(os.environ.get("KOMDEX_KEY"))
 
@@ -248,7 +253,7 @@ def receive(conn, folders):
     now = now_iso()
     first = sp.setting(conn, "komdex_baseline") != "1"
     known = {r["path"]: r for r in conn.execute("SELECT id, path, status FROM order_inbox")}
-    seen, new_items = set(), []
+    seen, new_items, nacalc_seen = set(), [], {}
     for f in folders[:MAX_FOLDERS]:
         if not isinstance(f, dict):
             continue
@@ -258,6 +263,9 @@ def receive(conn, folders):
         if not path or not m:
             continue
         seen.add(path)
+        nc = f.get("nacalc")
+        if isinstance(nc, dict) and nc.get("name") and NACALC_RE.match(str(nc.get("name"))):
+            nacalc_seen[path] = f"{nc.get('name')}|{nc.get('modified') or ''}|{nc.get('size') or ''}"[:400]
         if path in known:
             conn.execute("UPDATE order_inbox SET last_seen = ?, missing = 0 WHERE id = ?", (now, known[path]["id"]))
             continue
@@ -301,8 +309,17 @@ def receive(conn, folders):
         "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status <> 'genegeerd'"
         " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR status = 'bestaand' OR project_id IS NOT NULL)"
         " ORDER BY number DESC LIMIT 2000", (since,))]
+    # na-calculatie: nieuwste Excel "Nacalculatie..." per map; alleen opvragen als hij nieuw of gewijzigd is
+    want_nacalc = []
+    if nacalc_seen:
+        stored = {r["path"]: r["nacalc_sig"] for r in conn.execute("SELECT path, nacalc_sig FROM order_inbox WHERE missing = 0")}
+        for path, sig in sorted(nacalc_seen.items(), key=lambda kv: kv[0], reverse=True):
+            if path in stored and stored[path] != sig:
+                want_nacalc.append(path)
+            if len(want_nacalc) >= NACALC_PER_RUN:
+                break
     return {"ontvangen": len(folders), "ordermappen": len(seen), "nieuw": len(new_items), "eerste_keer": first,
-            "want": want}
+            "want": want, "want_nacalc": want_nacalc, "nacalc_gezien": len(nacalc_seen)}
 
 
 def _key_ok():
@@ -345,6 +362,44 @@ def orderbon():
     conn.commit()
     result = auto_process(conn, it["id"])
     return jsonify({"ok": True, "ordertype": bon.get("order_type"), "resultaat": result})
+
+
+@bp.route("/api/komdex/nacalculatie", methods=["POST"])
+def nacalculatie():
+    """Het script stuurt de nieuwste Excel 'Nacalculatie...' uit een ordermap; WorkPortal importeert hem als na-calculatie."""
+    if not _key_ok():
+        return jsonify({"error": "Ongeldige sleutel"}), 401
+    from .nacalc import import_file
+    js = request.get_json(silent=True) or {}
+    conn = get_db()
+    it = conn.execute("SELECT * FROM order_inbox WHERE path = ?", (str(js.get("path") or ""),)).fetchone()
+    if not it:
+        return jsonify({"error": "Onbekende map"}), 404
+    fname = re.sub(r'[\\/:*?"<>|]+', "_", str(js.get("filename") or "nacalculatie.xlsx"))[:150]
+    sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
+    try:
+        data = base64.b64decode(js.get("data") or "", validate=True)
+    except (binascii.Error, ValueError):
+        return jsonify({"error": "Ongeldige inhoud"}), 400
+    now = now_iso()
+    if not NACALC_RE.match(fname) or not data:
+        return jsonify({"error": "Geen na-calculatie"}), 400
+    pid = it["project_id"]
+    if not pid:
+        p = conn.execute("SELECT id FROM projects WHERE number = ? ORDER BY id LIMIT 1", (it["number"],)).fetchone()
+        pid = p["id"] if p else None
+    try:
+        nid = import_file(data, fname, project_id=pid, source="komdex")
+    except Exception as exc:  # noqa: BLE001 - onleesbaar bestand: onthouden, niet elke 2 minuten opnieuw proberen
+        conn.execute("UPDATE order_inbox SET nacalc_sig = ?, nacalc_at = ?, nacalc_note = ? WHERE id = ?",
+                     (sig, now, f"'{fname}' kon niet worden ingelezen: {exc}"[:500], it["id"]))
+        conn.commit()
+        return jsonify({"ok": False, "resultaat": "niet leesbaar"}), 200
+    n = conn.execute("SELECT project_id FROM nacalcs WHERE id = ?", (nid,)).fetchone()
+    conn.execute("UPDATE order_inbox SET nacalc_sig = ?, nacalc_at = ?, nacalc_id = ?, nacalc_note = NULL,"
+                 " project_id = COALESCE(project_id, ?) WHERE id = ?", (sig, now, nid, n["project_id"] if n else None, it["id"]))
+    conn.commit()
+    return jsonify({"ok": True, "resultaat": f"geïmporteerd (na-calculatie {nid})"})
 
 
 @bp.route("/api/komdex/orders", methods=["POST"])

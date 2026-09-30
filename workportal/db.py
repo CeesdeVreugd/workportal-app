@@ -446,6 +446,13 @@ MIGRATIONS = [
     CREATE INDEX idx_notes_project ON project_notes(project_id, date);
     CREATE INDEX idx_notes_follow ON project_notes(follow_up) WHERE follow_up IS NOT NULL AND follow_done = 0;
     """,
+    # 10 - na-calculatie (Excel "Nacalculatie...") uit de ordermap op de server
+    """
+    ALTER TABLE order_inbox ADD COLUMN nacalc_sig TEXT;
+    ALTER TABLE order_inbox ADD COLUMN nacalc_at TEXT;
+    ALTER TABLE order_inbox ADD COLUMN nacalc_id INTEGER;
+    ALTER TABLE order_inbox ADD COLUMN nacalc_note TEXT;
+    """,
 ]
 
 

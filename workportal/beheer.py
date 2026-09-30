@@ -254,6 +254,9 @@ def dc01():
         if request.form.get("action") == "opnieuw" and ids:
             execute(f"UPDATE order_inbox SET bon_received_at = NULL, note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
             flash(f"Orderbon wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
+        elif request.form.get("action") == "nacalc" and ids:
+            execute(f"UPDATE order_inbox SET nacalc_sig = NULL, nacalc_note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
+            flash(f"Na-calculatie wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
         return redirect(url_for("beheer.dc01", filter=request.form.get("filter"), q=request.form.get("q") or None))
     flt = request.args.get("filter") or "alle"
     q = (request.args.get("q") or "").strip()
@@ -270,6 +273,8 @@ def dc01():
         where.append("i.status = 'nieuw' AND i.missing = 0")
     elif flt == "weg":
         where.append("i.missing = 1")
+    elif flt == "nacalc":
+        where.append("i.nacalc_sig IS NOT NULL")
     else:
         flt = "alle"
     if q:
@@ -286,7 +291,8 @@ def dc01():
     counts = query("SELECT COUNT(*) AS alle, SUM(bon_json IS NOT NULL) AS bon, SUM(bon_json IS NULL AND missing = 0) AS zonderbon,"
                    " SUM(project_id IS NOT NULL) AS gekoppeld,"
                    " SUM(project_id IS NULL AND missing = 0 AND status <> 'genegeerd') AS niet,"
-                   " SUM(status = 'nieuw' AND missing = 0) AS actie, SUM(missing = 1) AS weg FROM order_inbox", one=True)
+                   " SUM(status = 'nieuw' AND missing = 0) AS actie, SUM(missing = 1) AS weg,"
+                   " SUM(nacalc_sig IS NOT NULL) AS nacalc, SUM(nacalc_note IS NOT NULL) AS nacalc_fout FROM order_inbox", one=True)
     return render_template("beheer/dc01.html", items=items, counts=counts, flt=flt, q=q, status=komdex.status(),
                            order_dir=sp.setting(get_db(), "komdex_order_dir"))
 

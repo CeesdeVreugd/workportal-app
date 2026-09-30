@@ -187,6 +187,14 @@ bij het project/de order en bij gekoppelde servicetickets. Ook bestaande orderma
 in staat, komen in WorkPortal: als order of project volgens het ordertype (onbekend = order), zonder map in
 SharePoint en zonder melding. Het overzicht van alle mappen staat onder **Beheer → DC01**.
 
+### Na-calculatie uit de ordermap
+Staat er in een ordermap op DC01 een Excel waarvan de naam begint met **Nacalculatie** (ook de schrijfwijze
+*Nacacalculatie*; .xlsx/.xlsm), dan stuurt het script de nieuwste daarvan mee en leest WorkPortal hem in als
+na-calculatie van die order (zelfde import als handmatig uploaden). Een gewijzigd of nieuwer bestand wordt opnieuw
+ingelezen; een onleesbaar bestand wordt onthouden en niet elke run opnieuw geprobeerd. Maximaal 20 per run, zodat
+de eerste keer niet alles tegelijk komt. Overzicht en "opnieuw ophalen": Beheer > DC01, filter *Met na-calculatie*.
+Werk hiervoor `komdex-orders.ps1` op DC01 bij (de instellingen bovenaan blijven gelijk).
+
 ## 3D-modellen
 
 Module **3D-modellen** (rechten: Lezen = bekijken en meten, Bewerken = uploaden, Beheer = verwijderen).

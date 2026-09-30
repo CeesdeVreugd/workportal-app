@@ -72,7 +72,8 @@ def import_file(data, filename, project_id=None, calc_id=None, source="upload"):
         "INSERT INTO nacalcs (project_id, calc_id, order_no, order_desc, order_total, invoiced_total, divide_by, no_divide,"
         " source, filename, imported_by, imported_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (project_id, calc_id, order_no, header.get("order_desc"), header.get("order_total"), header.get("invoiced_total"),
-         prev["divide_by"] if prev else 1, prev["no_divide"] if prev else None, source, filename, g.user["id"], now_iso()))
+         prev["divide_by"] if prev else 1, prev["no_divide"] if prev else None, source, filename,
+         g.user["id"] if getattr(g, "user", None) else None, now_iso()))
     nid = cur.lastrowid
     for l in lines:
         db.execute(f"INSERT INTO nacalc_lines (nacalc_id, {', '.join(LINE_FIELDS)}) VALUES (?{', ?' * len(LINE_FIELDS)})",
