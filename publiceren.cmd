@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V47: vinkjes van de orderbon (vaste prijs, geleverd, afgesloten, afgefactureerd, vervallen); gewijzigde orderbon opnieuw ophalen"
+set "OMSCHRIJVING=WorkPortal V48: na-calculatie - calculatie uit Excel, Standaard machine (kostprijs per stuk, opties, uitvoeringen), overzicht nieuwste order boven"
 
 echo.
 echo ============================================

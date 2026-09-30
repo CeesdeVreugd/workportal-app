@@ -337,3 +337,16 @@ Bestaande ordermappen worden nooit automatisch geprint; elke orderbon hoogstens 
 ## PDF's
 PDF's (rapporten, werkbonnen, orderbonnen, PDF's in de projectmap) openen in een eigen scherm met terug-knop,
 downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app van de telefoon.
+
+
+## Na-calculatie: Excel-calculatie en Standaard machine
+- **Calculatie uit Excel:** bij een na-calculatie kan het eigen calculatieblad (Excel met 'Tabblad 01', 'Tabblad 02',
+  kolommen Aantal / Prijs per stuk / marge / Totaal / Inclusief marge) worden geüpload. De onderdelen (Engineering,
+  Inkopen incl. koopdelen, Werkplaats, Besturing, Transport, Montage) worden automatisch aan de items gekoppeld; de
+  koppeling is aan te passen. Geldt voor alle imports van dezelfde order. Een gekozen WorkPortal-calculatie gaat voor.
+- **Standaard machine (bijv. PalletRotator):** interne productieorder, alleen om de kostprijs per stuk te bepalen.
+  Automatisch bij ordertype met "Standaard Machine" (of te kiezen bij Soort na-calculatie). Per item een aantal
+  (geen deling over het geheel), items als optie te markeren, en machines/uitvoeringen = basis + gekozen opties.
+  Resultaat: kostprijs per stuk (orderregel productieorder en kostprijs materiaalregel verkooporder) en verkoopprijs
+  per stuk (verkooporder); bedragen zijn met een klik te kopiëren. Geen winstbeoordeling (winst zit in de verkooporder).
+- Overzicht gesorteerd op ordernummer, nieuwste boven.

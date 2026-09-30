@@ -3,6 +3,7 @@
 {% from "partials/orderprops.html" import order_props %}
 {% from "partials/macros.html" import opt %}
 {% block title %}Na-calculatie {{ n.order_no }}{% endblock %}
+{% macro copyval(v) %}<button type="button" class="copyval" title="Kopiëren" onclick="var t=this.dataset.v;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){},function(){});this.classList.add('done');var b=this;setTimeout(function(){b.classList.remove('done')},1200)" data-v="{{ '%.2f'|format(v or 0)|replace('.', ',') }}">{{ v|eur(2) }}</button>{% endmacro %}
 {% block content %}
 {% set badge = {'bad':'b-bad','warn':'b-warn','ok':'b-ok','okplus':'b-okplus','info':'b-blue','':''} %}
 <div class="crumbs"><a href="{{ url_for('nacalc.index') }}">Na-calculatie</a> / {{ n.order_no }}</div>
@@ -10,7 +11,7 @@
   <div><div class="eyebrow">Order {{ n.order_no }}{% if n.project_id %} · <a href="{{ url_for('projecten.detail', pid=n.project_id) }}">{{ n.project_no }}</a>{% endif %}</div>
     <h1>{{ n.order_desc or 'Na-calculatie' }}</h1>
     {% if oprops %}<div style="margin:4px 0 6px">{{ order_props(oprops, all=False) }}{% if not oprops.vaste_prijs %} <span class="oprop off" title="Op de orderbon staat geen vinkje bij Vaste prijs">Geen vaste prijs (regie)</span>{% endif %}</div>{% endif %}
-    <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
+    <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc and calc.excel %} · vergeleken met <a href="#calculatie">calculatie {{ calc.number }}</a>{% elif calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
   <div class="actions">
     <a class="btn" href="{{ url_for('nacalc.report', nid=n.id) }}" data-pdf="Na-calculatie {{ n.order_no }}" target="_blank">{{ icon('pdf') }}PDF-rapport</a>
     {% if pa and can('nacalculatie', 2) %}
@@ -19,6 +20,15 @@
   </div>
 </div>
 
+{% if s.mode == 'kostprijs' %}
+<div class="grid g4">
+  <div class="card kpi"><div class="label">Totale kostprijs (ikp)</div><div class="value">{{ s.cost_total|eur }}</div><div class="sub">{{ s.hours_total|num(1) }} uur</div></div>
+  <div class="card kpi"><div class="label">Totale verkoopwaarde (vkp)</div><div class="value">{{ s.sale_total|eur }}</div><div class="sub">incl. marges</div></div>
+  <div class="card kpi dark"><div class="label">Kostprijs per machine (basis)</div><div class="value">{{ s.unit_cost|eur(2) }}</div><div class="sub" style="color:#C9D4FF">→ orderregel productieorder / materiaalregel verkooporder</div></div>
+  <div class="card kpi"><div class="label">Verkoopprijs per machine (basis)</div><div class="value">{{ s.unit_sale|eur(2) }}</div><div class="sub">→ verkoopprijs per stuk verkooporder</div></div>
+</div>
+<div class="result info"><b>Productieorder (intern): kostprijsbepaling.</b> Geen winstbeoordeling: de winst valt in de verkooporder. Vul per item in over hoeveel stuks het gaat en markeer opties; de kostprijs en verkoopprijs per stuk staan hieronder per machine.</div>
+{% else %}
 <div class="grid g4">
   <div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
   <div class="card kpi"><div class="label">Werkelijke kostprijs</div><div class="value">{{ s.cost|eur }}</div><div class="sub">{{ s.hours|num(1) }} uur</div></div>
@@ -35,6 +45,7 @@
   {% else %}Er is geen orderbedrag bekend. Vul in de calculatie een prijsafspraak in of controleer de ERP-export.{% endif %}
   {% if calc %}<div class="small" style="margin-top:4px">Gecalculeerd (incl. marge): {{ s.calc_total|eur }} · {{ s.calc_hours|num(1) }} uur gecalculeerd tegen {{ s.hours|num(1) }} uur werkelijk.</div>{% endif %}
 </div>
+{% endif %}
 
 <section class="card" id="opmerkingen">
   <div class="card-head"><h2>Opmerkingen &amp; nuances</h2>{% if can('nacalculatie', 2) %}<button class="btn sm" type="button" onclick="var f=document.getElementById('ncnote');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Opmerking</button>{% endif %}</div>
@@ -54,13 +65,55 @@
   {% else %}<p class="muted small" style="margin:0">Nog geen opmerkingen. Leg hier uitleg of nuances vast bij deze na-calculatie; ze komen ook in het PDF-rapport en blijven staan bij een nieuwe import van deze order.</p>{% endfor %}
 </section>
 
+{% if s.mode == 'kostprijs' %}
+<section class="card flush">
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th>Pos.</th><th>Item</th><th class="num">Uren</th><th class="num">Totaal ikp</th><th class="num">Totaal vkp</th><th class="num">Aantal</th><th class="num">Stuks ikp</th><th class="num">Stuks vkp</th><th>Soort</th></tr></thead>
+    {% for it in items if it.lines %}
+    <tbody>
+      <tr class="link" onclick="var d=document.getElementById('it{{ loop.index }}');d.classList.toggle('hidden');this.querySelector('.chev').style.transform=d.classList.contains('hidden')?'':'rotate(90deg)'">
+        <td class="nowrap"><span class="chev">›</span> {{ it.pos or '' }}</td>
+        <td><b>{{ it.desc }}</b><div class="small muted">{{ it.lines|length }} regel(s)</div></td>
+        <td class="num">{{ it.hours_total|num(1) }}</td>
+        <td class="num">{{ it.cost_total|eur(2) }}</td><td class="num">{{ it.sale_total|eur(2) }}</td>
+        <td class="num"><b>{{ it.div|num(0) if it.div == it.div|int else it.div|num(2) }}</b></td>
+        <td class="num">{{ it.cost|eur(2) }}</td><td class="num">{{ it.sale|eur(2) }}</td>
+        <td>{% if it.is_option %}<span class="badge b-blue">Optie</span>{% else %}<span class="badge">Basis</span>{% endif %}</td>
+      </tr>
+      <tr id="it{{ loop.index }}" class="hidden"><td colspan="9" style="background:#FAFBFE;padding:0 0 0 30px">
+        <table class="table subtable"><thead><tr><th>Pos</th><th>Omschrijving</th><th class="num">Aantal</th><th>Eenh.</th><th class="num">Kostprijs</th><th class="num">Marge</th><th class="num">Verkoop</th></tr></thead><tbody>
+        {% for l in it.lines %}<tr><td>{{ l.pos }}</td><td style="white-space:pre-line">{{ l.description or '' }}{% if l.article %} <span class="muted">({{ l.article }})</span>{% endif %}</td><td class="num">{{ l.qty|num(2) }}</td><td>{{ l.unit or '' }}</td><td class="num">{{ l.cost_subtotal|eur(2) }}</td><td class="num">{{ l.margin|num(2) }}</td><td class="num">{{ l.sale_subtotal|eur(2) }}</td></tr>{% endfor %}
+        </tbody></table></td></tr>
+    </tbody>
+    {% endfor %}
+    <tfoot><tr><td></td><td>Totaal</td><td class="num">{{ s.hours_total|num(1) }}</td><td class="num">{{ s.cost_total|eur(2) }}</td><td class="num">{{ s.sale_total|eur(2) }}</td><td></td><td class="num">{{ s.unit_cost|eur(2) }}</td><td class="num">{{ s.unit_sale|eur(2) }}</td><td class="small muted">basis</td></tr></tfoot>
+  </table></div>
+</section>
+
+<section class="card flush" id="machines">
+  <div class="card-head" style="padding:16px 18px 0"><h2>Prijs per machine</h2></div>
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th>Machine / uitvoering</th><th class="num">Kostprijs per stuk</th><th class="num">Verkoopprijs per stuk</th></tr></thead>
+    <tbody>
+      <tr><td><b>Basis</b> <span class="small muted">(zonder opties)</span></td>
+        <td class="num">{{ copyval(s.unit_cost) }}</td><td class="num">{{ copyval(s.unit_sale) }}</td></tr>
+      {% for o in s.option_items %}<tr><td><span class="badge b-blue">Optie</span> {{ o.desc }} <span class="small muted">(per stuk, los)</span></td>
+        <td class="num">{{ copyval(o.cost) }}</td><td class="num">{{ copyval(o.sale) }}</td></tr>{% endfor %}
+      {% for v in s.variants %}<tr><td><b>{{ v.name }}</b>{% if v.options %}<div class="small muted">basis + {{ v.options|join(' + ') }}</div>{% endif %}</td>
+        <td class="num">{{ copyval(v.cost) }}</td><td class="num">{{ copyval(v.sale) }}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <p class="hint" style="padding:0 18px 14px">Kostprijs per stuk → orderregel van de productieorder én kostprijs in de materiaalregel van de verkooporder. Verkoopprijs per stuk → verkoopprijs in de materiaalregel van de verkooporder. Klik op een bedrag om het te kopiëren.</p>
+</section>
+
+{% else %}
 <section class="card flush">
   <div class="tablewrap"><table class="table">
     <thead><tr><th>Pos.</th><th>Item</th>{% if calc %}<th class="num">Uren calc.</th>{% endif %}<th class="num">Uren werk.</th>{% if calc %}<th class="num">Gecalculeerd</th>{% endif %}<th class="num">Kostprijs</th><th class="num">Verkoopwaarde</th>{% if calc %}<th class="num">Verschil</th>{% endif %}<th>Beoordeling</th></tr></thead>
     {% for it in items %}
     <tbody>
       <tr class="link" onclick="var d=document.getElementById('it{{ loop.index }}');d.classList.toggle('hidden');this.querySelector('.chev').style.transform=d.classList.contains('hidden')?'':'rotate(90deg)'">
-        <td class="nowrap"><span class="chev">›</span> {{ it.pos or '' }}</td>
+        <td class="nowrap"><span class="chev">›</span> {{ it.pos if it.pos and it.pos < 9000 else '' }}</td>
         <td><b>{{ it.desc }}</b>{% if it.divided %} <span class="badge">÷ {{ it.div|num(0) if it.div == it.div|int else it.div|num(2) }}</span>{% endif %}<div class="small muted">{{ it.lines|length }} regel(s)</div></td>
         {% if calc %}<td class="num">{{ it.calc_hours|num(1) if it.calc_hours is not none else '–' }}</td>{% endif %}
         <td class="num">{{ it.hours|num(1) }}</td>
@@ -81,30 +134,73 @@
   </table></div>
 </section>
 
-<div class="grid g2 stack">
+{% endif %}
+
+{% if s.mode != 'kostprijs' %}
+<section class="card" id="calculatie">
+  <div class="card-head"><h2>Calculatie uit Excel</h2>{% if xcalc and n.xcalc_file_id %}<a class="btn sm" href="{{ url_for('main.file', fid=n.xcalc_file_id, download=1) }}">{{ icon('download') }}Excel</a>{% endif %}</div>
+  {% if xcalc %}
+  <p class="small muted" style="margin-top:0"><b>{{ n.xcalc_name }}</b> · totaal {{ xcalc.total|eur(2) }} · {{ xcalc.hours|num(1) }} uur{% if xcalc.agreed_price %} · prijsafspraak {{ xcalc.agreed_price|eur(2) }}{% endif %}{% if n.calc_id %} · <span class="badge b-warn">niet in gebruik: er is een WorkPortal-calculatie gekozen</span>{% endif %}</p>
+  <form method="post" action="{{ url_for('nacalc.excel_map', nid=n.id) }}" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <table class="table"><thead><tr><th>Onderdeel in de Excel</th><th class="num">Uren</th><th class="num">Bedrag</th><th>Vergelijken met item</th></tr></thead><tbody>
+    {% for sec in xcalc.sections %}<tr><td>{{ sec.name }}</td><td class="num">{{ sec.hours|num(1) }}</td><td class="num">{{ sec.total|eur(2) }}</td>
+      <td>{% if can('nacalculatie', 2) %}<select name="map_{{ loop.index0 }}"><option value="">– (alleen gecalculeerd)</option>{% for it in items if it.lines %}<option value="{{ it.key }}" {{ 'selected' if (xcalc.map or {}).get(sec.name)|string == it.key|string }}>{{ it.pos or '' }} {{ it.desc }}</option>{% endfor %}</select>{% else %}{{ (xcalc.map or {}).get(sec.name) or '–' }}{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+    {% if can('nacalculatie', 2) %}<div class="actions"><button class="btn primary sm">Koppeling opslaan</button>
+      <button class="btn sm ghost" formaction="{{ url_for('nacalc.excel_delete', nid=n.id) }}" onclick="return confirm('Excel-calculatie loskoppelen?')">Loskoppelen</button></div>{% endif %}
+  </form>
+  {% endif %}
+  {% if can('nacalculatie', 2) %}
+  <form method="post" action="{{ url_for('nacalc.excel_upload', nid=n.id) }}" enctype="multipart/form-data" class="form" style="margin-top:10px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f full">{{ 'Andere' if xcalc else 'Onze' }} calculatie-Excel uploaden<input type="file" name="file" accept=".xlsx,.xlsm" required><span class="hint">Het calculatieblad met de tabbladen 'Tabblad 01', 'Tabblad 02', … De onderdelen (Engineering, Inkopen, Werkplaats, …) worden automatisch aan de items gekoppeld; controleer de koppeling hierboven. Geldt voor alle imports van deze order.</span></label>
+    <div><button class="btn sm primary">{{ icon('upload') }}Inlezen</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="grid g2 stack" {% if s.mode == 'kostprijs' %}style="grid-template-columns:1fr"{% endif %}>
   {% if can('nacalculatie', 2) %}
   <form method="post" action="{{ url_for('nacalc.settings', nid=n.id) }}" class="card form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h2>Instellingen</h2>
     <div class="fgrid">
-      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>
-      <label class="f">Aantal machines (seriebouw)<input type="number" name="divide_by" id="nc-n" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Voor het orderbedrag en als standaard per item. Bijv. 5 als deze order 5 machines bevat.</span></label>
+      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% if xcalc %}<option value="excel" {{ 'selected' if not n.calc_id }}>Excel: {{ n.xcalc_name }}</option>{% endif %}{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>
+      <label class="f">Soort na-calculatie<select name="mode">
+        <option value="auto" {{ 'selected' if (opts.mode or 'auto') == 'auto' }}>Automatisch ({{ 'Standaard machine' if s.mode == 'kostprijs' else 'normaal' }}, volgens ordertype)</option>
+        <option value="normaal" {{ 'selected' if opts.mode == 'normaal' }}>Normaal: winst op de order</option>
+        <option value="kostprijs" {{ 'selected' if opts.mode == 'kostprijs' }}>Standaard machine: kostprijs per stuk (productieorder)</option></select></label>
+      {% if s.mode != 'kostprijs' %}<label class="f">Aantal machines (seriebouw)<input type="number" name="divide_by" id="nc-n" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Voor het orderbedrag en als standaard per item. Bijv. 5 als deze order 5 machines bevat.</span></label>
+      {% else %}<input type="hidden" name="divide_by" value="{{ n.divide_by|int or 1 }}"><label class="f">Aantal (hulp)<input type="number" id="nc-n" min="1" step="1" value="{{ (items|selectattr('lines')|map(attribute='div')|max) |int if items else 1 }}"><span class="hint">Alleen om snel bij alle items in te vullen.</span></label>{% endif %}
     </div>
-    <label class="check"><input type="checkbox" name="divide_order" value="1" {{ 'checked' if s.divide_order }}> Orderbedrag ook delen (per-stuk-weergave)</label>
+    {% if s.mode != 'kostprijs' %}<label class="check"><input type="checkbox" name="divide_order" value="1" {{ 'checked' if s.divide_order }}> Orderbedrag ook delen (per-stuk-weergave)</label>{% endif %}
     <div><label class="f">Aantal per item <span class="hint" style="display:inline">(1 = niet delen)</span></label>
       <table class="table nc-div">
+        {% if s.mode == 'kostprijs' %}<thead><tr><th>Pos</th><th>Item</th><th>Aantal</th><th>Optie</th></tr></thead>{% endif %}
         <tbody>{% for it in items if it.lines %}<tr>
           <td class="nowrap muted">{{ it.pos or '' }}</td><td>{{ it.desc }}</td>
           <td style="width:110px"><input type="hidden" name="item_key" value="{{ it.key }}"><input type="number" name="item_div" min="0.01" step="any" inputmode="decimal" value="{{ it.div|int if it.div == it.div|int else it.div }}" aria-label="Aantal voor {{ it.desc }}" style="width:90px"></td>
+          {% if s.mode == 'kostprijs' %}<td class="nowrap"><label class="check" style="margin:0" title="Optie: telt niet mee in de basis, alleen bij de machines waar je hem aanvinkt"><input type="checkbox" name="item_option" value="{{ it.key }}" {{ 'checked' if it.is_option }}> <span>optie</span></label></td>{% endif %}
         </tr>{% endfor %}</tbody>
       </table>
-      <p class="hint" style="margin-top:6px"><button type="button" class="btn sm ghost" onclick="var v=document.getElementById('nc-n').value;document.querySelectorAll('.nc-div input[name=item_div]').forEach(function(i){i.value=v})">Aantal machines bij alle items invullen</button></p></div>
+      <p class="hint" style="margin-top:6px"><button type="button" class="btn sm ghost" onclick="var v=document.getElementById('nc-n').value;document.querySelectorAll('.nc-div input[name=item_div]').forEach(function(i){i.value=v})">{{ 'Dit aantal bij alle items invullen' if s.mode == 'kostprijs' else 'Aantal machines bij alle items invullen' }}</button></p></div>
+    {% if s.mode == 'kostprijs' %}
+    <div><label class="f">Machines / uitvoeringen <span class="hint" style="display:inline">(basis + gekozen opties; leeg = niet gebruikt)</span></label>
+      {% set optitems = items|selectattr('is_option')|list %}
+      {% set vs = (opts.variants or []) + [{}, {}] %}
+      <table class="table nc-var"><tbody>{% for v in vs %}{% set i = loop.index0 %}<tr>
+        <td><input name="var_{{ i }}_name" value="{{ v.name or '' }}" placeholder="Bijv. PalletRotator K11 - 2000kg - std" style="width:100%"></td>
+        <td>{% for o in optitems %}<label class="check" style="margin:0 10px 0 0;display:inline-flex"><input type="checkbox" name="var_{{ i }}_opt" value="{{ o.key }}" {{ 'checked' if o.key|string in (v.options or [])|map('string')|list }}> {{ o.desc }}</label>{% else %}<span class="small muted">Markeer eerst items als optie en sla op.</span>{% endfor %}</td>
+      </tr>{% endfor %}</tbody></table></div>
+    {% endif %}
     <div><button class="btn primary">Opslaan &amp; herberekenen</button></div>
   </form>
   {% endif %}
   <section class="card">
     <h2>Verloop (alle imports van deze order)</h2>
-    <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">Kostprijs {{ h.cost|eur }} · winst op order {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%)</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
+    <div class="rows">{% for h in hist %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=h.id) }}"><div class="grow"><div class="t">{{ h.imported_at|dt }}{% if h.id == n.id %} <span class="badge b-blue">deze</span>{% endif %}</div><div class="s">{% if h.mode == 'kostprijs' %}Kostprijs per machine {{ h.unit_cost|eur(2) }} · totaal {{ h.cost|eur }}{% else %}Kostprijs {{ h.cost|eur }} · winst op order {{ h.result|eur }} ({{ h.margin_pct|num(1) }}%){% endif %}</div></div><span class="badge {{ badge[h.status] }}">&nbsp;</span></a>{% endfor %}</div>
     <p class="hint">Elke import wordt bewaard, zodat je ziet hoe het resultaat zich tijdens het project ontwikkelt.</p>
   </section>
 </div>

@@ -475,6 +475,12 @@ MIGRATIONS = [
     ALTER TABLE projects ADD COLUMN order_props TEXT;
     ALTER TABLE order_inbox ADD COLUMN bon_sig TEXT;
     """,
+    # 14 - calculatie uit Excel bij een na-calculatie
+    """
+    ALTER TABLE nacalcs ADD COLUMN xcalc_json TEXT;
+    ALTER TABLE nacalcs ADD COLUMN xcalc_name TEXT;
+    ALTER TABLE nacalcs ADD COLUMN xcalc_file_id INTEGER;
+    """,
 ]
 
 

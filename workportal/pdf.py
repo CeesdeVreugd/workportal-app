@@ -291,6 +291,8 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
                        + (f" · vergeleken met calculatie {esc(calc['number'])}" if calc else " · zonder calculatie")
                        + (" · kosten per item gedeeld door het aantal (seriebouw)" if any((it.get("div") or 1) != 1 for it in items) else ""), S["small"]),
              Spacer(1, 8)]
+    if summary.get("mode") == "kostprijs":
+        return _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf)
     pairs = [("Orderbedrag", fmt_eur(summary["order_total"], 2)), ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
              ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
              ("Winst in % van orderbedrag", f"{fmt_num(summary['margin_pct'], 1)}%"), ("Beoordeling", summary["label"])]
@@ -301,7 +303,7 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
     data = [["Pos", "Item", "Uren calc.", "Uren werk.", "Gecalculeerd", "Kostprijs", "Verkoopwaarde", "Verschil"]]
     for it in items:
         div = it.get("div") or 1
-        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]) + (f" <font color='#6B7280'>(÷ {fmt_num(div, 0 if div == int(div) else 2)})</font>" if div != 1 else ""), S["cell"]),
+        data.append([str(it["pos"]) if it["pos"] and it["pos"] < 9000 else "", Paragraph(esc(it["desc"]) + (f" <font color='#6B7280'>(÷ {fmt_num(div, 0 if div == int(div) else 2)})</font>" if div != 1 else ""), S["cell"]),
                      fmt_num(it.get("calc_hours"), 1) if it.get("calc_hours") is not None else "–",
                      fmt_num(it["hours"], 1),
                      fmt_eur(it["calc"], 0) if it.get("calc") is not None else "–",
@@ -322,6 +324,53 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
             story.append(Paragraph(f"<b>{esc(fmt_dt(x['created_at']))}{' · ' + esc(x['who']) if x['who'] else ''}</b>", S["small"]))
             story.append(Paragraph(esc(x["body"]).replace("\n", "<br/>"), S["cell"]))
             story.append(Spacer(1, 4))
+    doc.build(story)
+    return buf.getvalue()
+
+
+def _notes_block(story, notes):
+    if notes:
+        story.append(Paragraph("Opmerkingen", S["h2"]))
+        for x in notes:
+            story.append(Paragraph(f"<b>{esc(fmt_dt(x['created_at']))}{' · ' + esc(x['who']) if x['who'] else ''}</b>", S["small"]))
+            story.append(Paragraph(esc(x["body"]), S["cell"]))
+            story.append(Spacer(1, 4))
+
+
+def _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf):
+    """Productieorder (Standaard machine): kostprijs en verkoopprijs per stuk."""
+    story[2] = Paragraph(f"ERP-export van {fmt_dt(n['imported_at'])} · productieorder (intern): kostprijsbepaling", S["small"])
+    story.append(_kv_table([("Totale kostprijs (ikp)", fmt_eur(summary["cost_total"], 2)),
+                            ("Totale verkoopwaarde (vkp)", fmt_eur(summary["sale_total"], 2)),
+                            ("Kostprijs per machine (basis)", fmt_eur(summary["unit_cost"], 2)),
+                            ("Verkoopprijs per machine (basis)", fmt_eur(summary["unit_sale"], 2))], W))
+    story.append(Paragraph("Per item", S["h2"]))
+    data = [["Pos", "Item", "Uren", "Totaal ikp", "Totaal vkp", "Aantal", "Stuks ikp", "Stuks vkp"]]
+    for it in items:
+        if not it.get("lines"):
+            continue
+        div = it.get("div") or 1
+        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]) + (" <font color='#6B7280'>(optie)</font>" if it.get("is_option") else ""), S["cell"]),
+                     fmt_num(it.get("hours_total"), 1), fmt_eur(it.get("cost_total"), 2), fmt_eur(it.get("sale_total"), 2),
+                     fmt_num(div, 0 if div == int(div) else 2), fmt_eur(it["cost"], 2), fmt_eur(it["sale"], 2)])
+    data.append(["", Paragraph("<b>Totaal</b>", S["cell"]), fmt_num(summary["hours_total"], 1), fmt_eur(summary["cost_total"], 2),
+                 fmt_eur(summary["sale_total"], 2), "", fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)])
+    t = _grid(data, [10 * mm, W - 125 * mm, 12 * mm, 24 * mm, 24 * mm, 12 * mm, 21 * mm, 22 * mm], align_right=(2, 3, 4, 5, 6, 7))
+    t.setStyle(TableStyle([("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"), ("BACKGROUND", (0, -1), (-1, -1), LIGHT)]))
+    story.append(t)
+    story.append(Paragraph("Prijs per machine", S["h2"]))
+    rows = [["Machine / uitvoering", "Kostprijs per stuk", "Verkoopprijs per stuk"],
+            [Paragraph("<b>Basis</b> (zonder opties)", S["cell"]), fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)]]
+    for o in summary.get("option_items") or []:
+        rows.append([Paragraph(f"Optie: {esc(o['desc'])} (per stuk)", S["cell"]), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+    for v in summary.get("variants") or []:
+        rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>basis + {esc(' + '.join(v['options']))}</font>" if v["options"] else ""), S["cell"]),
+                     fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
+    story.append(_grid(rows, [W - 80 * mm, 40 * mm, 40 * mm], align_right=(1, 2)))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph("Kostprijs per stuk → orderregel productieorder en kostprijs materiaalregel verkooporder. "
+                           "Verkoopprijs per stuk → verkoopprijs materiaalregel verkooporder.", S["small"]))
+    _notes_block(story, notes)
     doc.build(story)
     return buf.getvalue()
 

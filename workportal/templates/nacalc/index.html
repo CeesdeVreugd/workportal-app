@@ -38,11 +38,17 @@
     <tbody>
     {% for r in results %}<tr class="link" data-href="{{ url_for('nacalc.detail', nid=r.id) }}">
       <td class="nowrap"><b>{{ r.order_no }}</b><div class="small muted">{{ r.imported_at|date }}</div></td>
-      <td>{{ r.order_desc or '' }}</td><td class="hide-m">{{ r.calc_no or '–' }}</td>
+      <td>{{ r.order_desc or '' }}</td><td class="hide-m">{{ r.calc_no or ('Excel' if r.excel else '–') }}</td>
+      {% if r.mode == 'kostprijs' %}
+      <td class="num muted">intern</td><td class="num hide-m">{{ r.cost_total|eur }}</td>
+      <td class="num"><span class="muted">–</span></td><td class="num hide-m"><span class="muted">–</span></td>
+      <td><span class="badge b-blue">Kostprijs {{ r.unit_cost|eur }} p/st</span></td></tr>
+      {% else %}
       <td class="num">{{ r.order_total|eur }}</td><td class="num hide-m">{{ r.cost|eur }}</td>
       <td class="num"><b>{{ r.result|eur }}</b><div class="small muted">{{ r.margin_pct|num(1) }}%</div></td>
       <td class="num hide-m">{% if r.extra is not none %}<b>{{ r.extra|eur }}</b>{% else %}<span class="muted">–</span>{% endif %}</td>
       <td><span class="badge {{ badge[r.status] }}">{{ r.label }}</span></td></tr>
+      {% endif %}
     {% else %}<tr><td colspan="8" class="empty">Nog geen na-calculaties. Importeer een regie-export uit het ERP.</td></tr>{% endfor %}
     </tbody>
   </table>

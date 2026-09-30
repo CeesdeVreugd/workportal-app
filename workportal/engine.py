@@ -155,6 +155,21 @@ def _is_hours(l):
     return (l.get("unit") or "").lower() in HOUR_UNITS or l.get("line_type") == 4
 
 
+def nacalc_mode(n, opts=None):
+    """'kostprijs' voor een interne productieorder (Standaard Machine, bijv. PalletRotator), anders 'normaal'."""
+    if opts is None:
+        try:
+            opts = json.loads(n.get("no_divide") or "{}")
+        except ValueError:
+            opts = {}
+        if not isinstance(opts, dict):
+            opts = {}
+    m = opts.get("mode") or "auto"
+    if m in ("normaal", "kostprijs"):
+        return m
+    return "kostprijs" if "standaard machine" in (n.get("project_order_type") or "").lower() else "normaal"
+
+
 def compute_nacalc(n, lines, calc_data=None):
     """n: dict nacalcs-rij; lines: lijst dicts. Geeft (samenvatting, items)."""
     try:
@@ -167,6 +182,10 @@ def compute_nacalc(n, lines, calc_data=None):
     per_item = opts.get("per_item") or {}          # aantal per item (sleutel = item), overschrijft het standaardaantal
     divide_order = opts.get("order", True)
     N = to_float(n.get("divide_by"), 1) or 1
+    mode = nacalc_mode(n, opts)
+    if mode == "kostprijs":  # productieorder: alleen aantallen per item, geen deling over het geheel
+        N, divide_order = 1, False
+    option_keys = set(str(k) for k in (opts.get("options") or []))
 
     items = {}
     order = []
@@ -190,7 +209,11 @@ def compute_nacalc(n, lines, calc_data=None):
             it["hours"] += l.get("qty") or 0
         it["lines"].append(l)
 
-    calc = compute_calc(calc_data) if calc_data else None
+    if calc_data and calc_data.get("_excel"):
+        from .xcalc import as_calc
+        calc = as_calc(calc_data["_excel"], [{"key": k, "desc": items[k]["desc"], "pos": items[k]["pos"]} for k in order])
+    else:
+        calc = compute_calc(calc_data) if calc_data else None
     out = []
     for key in order:
         it = items[key]
@@ -199,6 +222,8 @@ def compute_nacalc(n, lines, calc_data=None):
         else:
             d = 1 if it["pos"] in no_div else N
         d = d if d > 0 else 1
+        it["cost_total"], it["sale_total"], it["hours_total"] = it["cost"], it["sale"], it["hours"]
+        it["is_option"] = str(key) in option_keys
         divided = d != 1
         if divided:
             it["cost"] /= d
@@ -231,7 +256,8 @@ def compute_nacalc(n, lines, calc_data=None):
         for pos, c in sorted(calc["by_pos"].items()):
             if pos not in known and (c["total"] or c["hours"]):
                 out.append({"key": f"calc-{pos}", "item_id": None, "desc": c["title"] + " (alleen gecalculeerd)", "pos": pos,
-                            "cost": 0.0, "sale": 0.0, "hours": 0.0, "lines": [], "divided": False, "div": 1, "calc": c["total"],
+                            "cost": 0.0, "sale": 0.0, "hours": 0.0, "lines": [], "divided": False, "div": 1, "cost_total": 0.0, "sale_total": 0.0, "hours_total": 0.0,
+                            "is_option": False, "calc": c["total"],
                             "calc_hours": c["hours"], "diff": c["total"], "margin": 0.0, "status": "ok",
                             "label": "Nog geen kosten"})
     out.sort(key=lambda x: (x["pos"] is None, x["pos"] or 0))
@@ -264,6 +290,24 @@ def compute_nacalc(n, lines, calc_data=None):
         "above_min": order_total - sale, "divide_by": N, "divide_order": divide_order, "no_divide": sorted(no_div),
         "extra_pct": extra,
     }
+    summary["mode"] = mode
+    if mode == "kostprijs":
+        real = [i for i in out if i.get("lines")]
+        base = [i for i in real if not i["is_option"]]
+        opts_items = [i for i in real if i["is_option"]]
+        unit_cost = sum(i["cost"] for i in base)
+        unit_sale = sum(i["sale"] for i in base)
+        variants = []
+        for v in opts.get("variants") or []:
+            chosen = [i for i in opts_items if str(i["key"]) in set(str(k) for k in v.get("options") or [])]
+            variants.append({"name": v.get("name") or "Variant", "options": [i["desc"] for i in chosen],
+                             "cost": unit_cost + sum(i["cost"] for i in chosen), "sale": unit_sale + sum(i["sale"] for i in chosen)})
+        summary.update({
+            "status": "info", "label": "Kostprijsbepaling", "unit_cost": unit_cost, "unit_sale": unit_sale,
+            "cost_total": sum(i["cost_total"] for i in real), "sale_total": sum(i["sale_total"] for i in real),
+            "hours_total": sum(i["hours_total"] for i in real), "option_items": opts_items, "variants": variants,
+            "result": 0.0, "margin_pct": 0.0, "above_min": 0.0,
+        })
     if calc:
         summary["calc_total"] = calc["total"]
         summary["calc_hours"] = calc["hours"]
