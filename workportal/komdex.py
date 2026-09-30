@@ -364,6 +364,15 @@ def orderbon():
     return jsonify({"ok": True, "ordertype": bon.get("order_type"), "resultaat": result})
 
 
+def _nacalc_reden(fname, exc):
+    msg = str(exc)
+    if fname.lower().endswith(".xls") or "zip file" in msg.lower():
+        return "geen .xlsx-bestand (oud .xls-formaat of beschadigd). Sla het op als Excel-werkmap (.xlsx)."
+    if "keyerror" in msg.lower() or "worksheet" in msg.lower() or "kolom" in msg.lower():
+        return f"andere opbouw dan de ERP-export ({msg})."
+    return msg
+
+
 @bp.route("/api/komdex/nacalculatie", methods=["POST"])
 def nacalculatie():
     """Het script stuurt de nieuwste Excel 'Nacalculatie...' uit een ordermap; WorkPortal importeert hem als na-calculatie."""
@@ -392,7 +401,7 @@ def nacalculatie():
         nid = import_file(data, fname, project_id=pid, source="komdex")
     except Exception as exc:  # noqa: BLE001 - onleesbaar bestand: onthouden, niet elke 2 minuten opnieuw proberen
         conn.execute("UPDATE order_inbox SET nacalc_sig = ?, nacalc_at = ?, nacalc_note = ? WHERE id = ?",
-                     (sig, now, f"'{fname}' kon niet worden ingelezen: {exc}"[:500], it["id"]))
+                     (sig, now, f"'{fname}' kon niet worden ingelezen: {_nacalc_reden(fname, exc)}"[:500], it["id"]))
         conn.commit()
         return jsonify({"ok": False, "resultaat": "niet leesbaar"}), 200
     n = conn.execute("SELECT project_id FROM nacalcs WHERE id = ?", (nid,)).fetchone()

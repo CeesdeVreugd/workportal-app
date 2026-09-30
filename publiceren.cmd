@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V42: na-calculatie (Excel Nacalculatie...) automatisch uit de ordermap op DC01; 3D rechtop-knop en soepeler draaien"
+set "OMSCHRIJVING=WorkPortal V43: DC01-overzicht met omschrijving en duidelijke reden bij onleesbare na-calculatie"
 
 echo.
 echo ============================================
