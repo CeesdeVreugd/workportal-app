@@ -299,7 +299,7 @@ def settings(nid):
         execute("UPDATE nacalcs SET divide_by = ?, no_divide = ? WHERE id = ?", (max(divide_by, 1), json.dumps(old), nid))
         flash("Opgeslagen.", "ok")
         return redirect(url_for("nacalc.detail", nid=nid))
-    mode = old.get("mode") or "auto"
+    mode = request.form.get("mode") if request.form.get("mode") in ("auto", "normaal", "kostprijs") else (old.get("mode") or "auto")
     item_kind = {}
     for key, kind in zip(request.form.getlist("item_key"), request.form.getlist("item_kind")):
         if key and kind in ("basis", "versie", "optie"):
