@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V53: regie-orders (geen vaste prijs) met marge uit de regels, geen extra marge"
+set "OMSCHRIJVING=WorkPortal V54: regie zonder calculatie-vergelijking, melding als orderbedrag lager is dan regiewaarde"
 
 echo.
 echo ============================================

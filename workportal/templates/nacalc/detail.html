@@ -70,7 +70,7 @@
 <div class="result info"><b>Standaard machine / productieorder: kostprijsbepaling.</b> Geen winstbeoordeling en geen calculatie: de winst valt in de verkooporder. Geef per item aan of het basis, versie of optie is; basis wordt gedeeld door het aantal machines, versies en opties door hun eigen aantal.</div>
 {% else %}
 <div class="grid g4">
-  {% if s.mode == 'regie' %}<div class="card kpi"><div class="label">Regiewaarde (verkoop volgens regels)</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>
+  {% if s.mode == 'regie' %}<div class="card kpi"><div class="label">Regiewaarde (verkoop volgens regels)</div><div class="value">{{ s.regie_value|eur }}</div><div class="sub">Orderbedrag ERP {{ s.order_amount|eur if s.order_amount else '–' }} · gefactureerd {{ n.invoiced_total|eur }}</div></div>
   {% else %}<div class="card kpi"><div class="label">Orderbedrag{% if s.divide_by != 1 and s.divide_order %} (÷ {{ s.divide_by|num(0) }}){% endif %}</div><div class="value">{{ s.order_total|eur }}</div><div class="sub">Gefactureerd {{ n.invoiced_total|eur }}</div></div>{% endif %}
   <div class="card kpi"><div class="label">Werkelijke kostprijs</div><div class="value">{{ s.cost|eur }}</div><div class="sub">{{ s.hours|num(1) }} uur</div></div>
   <div class="card kpi"><div class="label">Verkoopwaarde incl. marges</div><div class="value">{{ s.sale|eur }}</div><div class="sub">= minimaal gewenst orderbedrag</div></div>
@@ -79,7 +79,8 @@
 </div>
 
 <div class="result {{ s.status }}">
-  {% if s.mode == 'regie' %}<b>Regie (geen vaste prijs):</b> gefactureerd volgens de regels; de marge komt uit de regels: {{ s.result|eur }} ({{ s.margin_pct|num(1) }}% van de regiewaarde). Er is dus geen marge bovenop de marge.
+  {% if s.mode == 'regie' and s.regie_short %}<b>Let op, orderbedrag lager dan de regiewaarde:</b> het orderbedrag in het ERP is {{ s.order_amount|eur }}, volgens de regels is het {{ s.regie_value|eur }} ({{ s.regie_short|eur }} minder). Met het orderbedrag is de winst {{ s.result|eur }} ({{ s.margin_pct|num(1) }}%). Controleer of alles gefactureerd is.
+  {% elif s.mode == 'regie' %}<b>Regie (geen vaste prijs):</b> gefactureerd volgens de regels; de marge komt uit de regels: {{ s.result|eur }} ({{ s.margin_pct|num(1) }}% van de regiewaarde). Er is dus geen marge bovenop de marge.
   {% elif s.status == 'bad' %}<b>Verlies:</b> het orderbedrag dekt de werkelijke kostprijs niet ({{ (s.order_total - s.cost)|eur }}).
   {% elif s.status == 'warn' %}<b>Onder minimale marge:</b> {{ (s.sale - s.order_total)|eur }} te weinig om de normale marges te halen. Wel {{ s.result|eur }} boven kostprijs.
   {% elif s.status == 'ok' %}<b>Minimale marge gehaald</b> ({{ s.above_min|eur }} boven de verkoopwaarde). Doel voor extra: {{ s.extra_pct|num(0) }}% erboven.
@@ -177,7 +178,7 @@
 
 
 
-{% if s.mode != 'kostprijs' %}
+{% if s.mode not in ['kostprijs', 'regie'] %}
 <section class="card" id="calculatie">
   <div class="card-head"><h2>Calculatie uit Excel</h2>{% if xcalc and n.xcalc_file_id %}<a class="btn sm" href="{{ url_for('main.file', fid=n.xcalc_file_id, download=1) }}">{{ icon('download') }}Excel</a>{% endif %}</div>
   {% if xcalc %}
@@ -211,7 +212,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h2>Instellingen</h2>
     <div class="fgrid">
-      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% if xcalc %}<option value="excel" {{ 'selected' if not n.calc_id }}>Excel: {{ n.xcalc_name }}</option>{% endif %}{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>
+{% if s.mode != 'regie' %}      <label class="f">Vergelijken met calculatie<select name="calc_id"><option value="">Geen (na-calculeren zonder calculatie)</option>{% if xcalc %}<option value="excel" {{ 'selected' if not n.calc_id }}>Excel: {{ n.xcalc_name }}</option>{% endif %}{% for c in calcs %}{{ opt(c.id, c.number ~ ' · ' ~ c.title, n.calc_id) }}{% endfor %}</select></label>{% endif %}
 
       <label class="f">Aantal machines (seriebouw)<input type="number" name="divide_by" id="nc-n" min="1" step="1" value="{{ s.divide_by|int }}"><span class="hint">Voor het orderbedrag en als standaard per item. Bijv. 5 als deze order 5 machines bevat.</span></label>
     </div>

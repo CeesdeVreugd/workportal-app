@@ -307,12 +307,22 @@ def compute_nacalc(n, lines, calc_data=None):
     }
     summary["mode"] = mode
     if mode == "regie":
-        # regie: gefactureerd volgens de regels; de marge komt uit de regels, er is geen 'extra bovenop de marge'
-        result = sale - cost
+        # regie: gefactureerd volgens de regels; de marge komt uit de regels, er is geen 'extra bovenop de marge'.
+        # Is het orderbedrag in het ERP lager dan de regiewaarde, dan telt het orderbedrag en volgt een melding.
+        amount = to_float(n.get("order_total")) or 0.0
+        short = amount > 0 and amount < sale - 0.005
+        revenue = amount if short else sale
+        result = revenue - cost
+        if result < 0:
+            status, label = "bad", "Regie: verlies"
+        elif short:
+            status, label = "warn", "Regie: orderbedrag lager dan regiewaarde"
+        else:
+            status, label = "ok", "Regie: marge uit de regels"
         summary.update({
-            "order_total": sale, "result": result, "margin_pct": (result / sale * 100) if sale else 0.0,
-            "status": "ok" if result >= 0 else "bad", "label": "Regie: marge uit de regels" if result >= 0 else "Regie: verlies",
-            "above_min": 0.0, "divide_order": False,
+            "order_total": revenue, "regie_value": sale, "order_amount": amount, "regie_short": sale - amount if short else 0.0,
+            "result": result, "margin_pct": (result / revenue * 100) if revenue else 0.0,
+            "status": status, "label": label, "above_min": 0.0, "divide_order": False,
         })
     if mode == "kostprijs":
         real = [i for i in out if i.get("lines")]

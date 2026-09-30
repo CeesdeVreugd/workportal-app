@@ -42,8 +42,8 @@ def excel_calc(n):
 def evaluate(nid):
     from .engine import nacalc_mode
     n, lines = _load(nid)
-    if nacalc_mode(n) == "kostprijs":
-        calc = None  # productieorder: niet vergelijken met een calculatie
+    if nacalc_mode(n) in ("kostprijs", "regie"):
+        calc = None  # productieorder en regie: niet vergelijken met een calculatie
     else:
         calc = load_calc(n["calc_id"]) if n["calc_id"] else excel_calc(n)
     summary, items = compute_nacalc(n, lines, calc)

@@ -293,13 +293,22 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
              Spacer(1, 8)]
     if summary.get("mode") == "kostprijs":
         return _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf)
-    pairs = [("Regiewaarde (volgens regels)" if summary.get("mode") == "regie" else "Orderbedrag", fmt_eur(summary["order_total"], 2)),
-             ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
-             ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
+    if summary.get("mode") == "regie":
+        pairs = [("Regiewaarde (volgens regels)", fmt_eur(summary["regie_value"], 2)),
+                 ("Orderbedrag ERP", fmt_eur(summary["order_amount"], 2) if summary.get("order_amount") else "–")]
+    else:
+        pairs = [("Orderbedrag", fmt_eur(summary["order_total"], 2))]
+    pairs += [("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
+              ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
              ("Winst in % van orderbedrag", f"{fmt_num(summary['margin_pct'], 1)}%"), ("Beoordeling", summary["label"])]
     if calc:
         pairs.append(("Gecalculeerd (incl. marge)", fmt_eur(summary.get("calc_total"), 2)))
     story.append(_kv_table(pairs, W))
+    if summary.get("regie_short"):
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(f"<font color='#B42318'><b>Let op:</b> orderbedrag in het ERP ({fmt_eur(summary['order_amount'], 2)}) is "
+                               f"{fmt_eur(summary['regie_short'], 2)} lager dan de regiewaarde ({fmt_eur(summary['regie_value'], 2)}). "
+                               f"Controleer of alles gefactureerd is.</font>", S["small"]))
     story.append(Paragraph("Per item", S["h2"]))
     data = [["Pos", "Item", "Uren calc.", "Uren werk.", "Gecalculeerd", "Kostprijs", "Verkoopwaarde", "Verschil"]]
     for it in items:
