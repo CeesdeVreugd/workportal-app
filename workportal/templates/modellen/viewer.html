@@ -13,7 +13,7 @@
 <div id="v3d-app" class="v3d-app">
   <header class="v3d-head">
     <a class="iconbtn light" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
-    <div class="v3d-titles"><b id="v3d-title">{{ title }}</b>{% if subtitle %}<span>{{ subtitle }}</span>{% endif %}</div>
+    <div class="v3d-titles"><b id="v3d-title">{{ title }}</b>{% if subtitle %}<span>{{ subtitle }}{% if from_step %} · 3MF geopend in plaats van de STEP (lichter){% endif %}</span>{% endif %}</div>
     {% if url %}<a class="iconbtn light" href="{{ url }}?download=1" aria-label="Downloaden" title="Downloaden">{{ icon('download') }}</a>{% else %}
     <label class="btn sm v3d-open">{{ icon('upload') }}<span>Bestand openen</span><input type="file" id="v3d-file" accept=".step,.stp,.iges,.igs,.stl,.obj,.3mf" hidden></label>{% endif %}
   </header>
@@ -28,7 +28,8 @@
       <button type="button" class="tb" data-panel="meten">{{ icon('ruler') }}<span>Metingen</span></button></div>
     <div class="grp"><button type="button" class="tb" data-view="iso" title="Passend en isometrisch">{{ icon('fit') }}<span>Passend</span></button>
       <button type="button" class="tb sm" data-view="voor">Voor</button><button type="button" class="tb sm" data-view="boven">Boven</button>
-      <button type="button" class="tb sm" data-view="rechts">Rechts</button></div>
+      <button type="button" class="tb sm" data-view="rechts">Rechts</button>
+      <button type="button" class="tb" id="v3d-up" title="Model rechtop zetten: wissel welke as omhoog wijst (SolidWorks = Y)">{{ icon('rotate') }}<span id="v3d-up-lbl">Boven: Y</span></button></div>
     <div class="grp"><button type="button" class="tb" id="v3d-edges" title="Randen tonen">{{ icon('edges') }}<span>Randen</span></button>
       <button type="button" class="tb" id="v3d-ortho" title="Orthografisch (zonder perspectief)">{{ icon('cube') }}<span>Ortho</span></button>
       <button type="button" class="tb" id="v3d-full" title="Volledig scherm">{{ icon('fullscreen') }}<span>Scherm</span></button></div>
@@ -66,7 +67,7 @@
     </aside>
   </main>
 </div>
-<script>window.WP3D = {{ {"url": url, "title": title, "occt": occt, "occtBase": url_for('static', filename='3d/occt/'), "maxMb": max_mb, "sizeMb": ((size or 0) / 1048576), "cacheKey": cache_key or none, "cacheMb": cache_mb or 0, "conv": conv or none}|tojson }};</script>
+<script>window.WP3D = {{ {"url": url, "title": title, "occt": occt, "occtBase": url_for('static', filename='3d/occt/'), "maxMb": max_mb, "sizeMb": ((size or 0) / 1048576), "cacheKey": cache_key or none, "cacheMb": cache_mb or 0, "conv": conv or none, "tooBig": too_big or false, "stepMax": step_max or 0, "fromStep": from_step or false}|tojson }};</script>
 <script src="{{ url_for('static', filename='3d/o3dv.min.js') }}?v={{ VERSION }}"></script>
 <script src="{{ url_for('static', filename='js/viewer3d.js') }}?v={{ VERSION }}"></script>
 </body>

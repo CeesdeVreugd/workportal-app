@@ -258,6 +258,16 @@ prioriteit, alleen als iemand het model opent (of na upload), en alleen voor bes
 (standaard 150). Is een poging halverwege afgebroken, dan wordt dat model 6 uur niet opnieuw geprobeerd.
 Helemaal uitzetten: `WP3D_CONVERT=0` in de stack.
 
+**Hele grote samenstellingen: 3MF naast de STEP.** Een STEP groter dan `WP3D_STEP_MAX_MB` (standaard 80 MB) wordt
+niet meer ingelezen; de viewer vraagt om vanuit SolidWorks ook een 3MF op te slaan (Opslaan als → 3D Manufacturing
+Format) met dezelfde naam in dezelfde map. Staat die er, dan opent "Bekijk 3D" bij de STEP automatisch de 3MF
+(`?step=1` forceert de STEP). Let op: SolidWorks zet in de 3MF alleen kleuren als de uiterlijken meegaan.
+
+**Oriëntatie:** knop "Boven: Y/Z" in de werkbalk wisselt welke as omhoog wijst (Y, Z, -Y, -Z). Standaard Z voor
+3MF/STL/OBJ en Y voor STEP/IGES; de keuze wordt per bestand en per bestandstype onthouden op het apparaat.
+**Soepel draaien:** bij grote modellen tekent de viewer tijdens slepen/zoomen in lagere resolutie en bij stilstand
+weer scherp.
+
 ## Back-ups
 
 - Elke nacht om 02:00 maakt de app een kopie van de database in `/data/backups`

@@ -124,6 +124,11 @@
   }
 
   function load() {
+    if (cfg.url && cfg.tooBig) {
+      fail("Deze STEP is groter dan " + cfg.stepMax + " MB en te zwaar om in te lezen. Sla in SolidWorks de samenstelling ook op als " +
+        "<b>3MF</b> (Opslaan als → 3D Manufacturing Format) met dezelfde naam in dezelfde map. WorkPortal opent dan automatisch de 3MF.");
+      return;
+    }
     if (cfg.url && cfg.conv) {
       setStatus("Model voorbereiden…");
       loadConverted();
@@ -257,7 +262,7 @@
     viewer = ev.GetViewer();
     model = ev.GetModel();
     V3 = viewer.camera.position.constructor;
-    viewer.SetUpVector(OV.Direction.Z, false);
+    applyUp(false);
     var origRender = viewer.Render.bind(viewer);
     viewer.Render = function () { origRender(); drawOverlay(); };
     viewer.SetMouseClickHandler(onClick);
@@ -270,21 +275,83 @@
   }
 
   // ------------------------------------------------------------ aanzichten
-  var DIRS = { iso: [1, -1, 0.8], voor: [0, -1, 0], achter: [0, 1, 0], links: [-1, 0, 0], rechts: [1, 0, 0], boven: [0, 0, 1], onder: [0, 0, -1] };
+  // Oriëntatie: welke as wijst omhoog. Met de knop wissel je (Y, Z, -Y, -Z); de keuze wordt per bestand
+  // en per bestandstype onthouden (op dit apparaat).
+  var UPS = [
+    { id: "Y", U: [0, 1, 0], F: [0, 0, 1] },
+    { id: "Z", U: [0, 0, 1], F: [0, -1, 0] },
+    { id: "-Y", U: [0, -1, 0], F: [0, 0, -1] },
+    { id: "-Z", U: [0, 0, -1], F: [0, 1, 0] }
+  ];
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } return null; }
+  var upKey = "wp3d-up:" + (cfg.cacheKey ? cfg.cacheKey.split("?v=")[0] : (cfg.url || cfg.title || ""));
+  var extM = /\.([a-z0-9]+)$/i.exec(cfg.title || cfg.url || ""), ext = extM ? extM[1].toLowerCase() : "";
+  var extKey = "wp3d-up:type:" + (ext === "stp" ? "step" : ext === "igs" ? "iges" : ext);
+  var upIdx = (function () {
+    // eerst wat voor dit bestand is gekozen, dan wat voor dit bestandstype het laatst is gekozen,
+    // anders: 3MF/STL/OBJ staan volgens de norm met Z omhoog, STEP/IGES uit SolidWorks met Y omhoog
+    var want = store(upKey) || store(extKey) || (/^(3mf|stl|obj)$/.test(ext) ? "Z" : "Y");
+    for (var i = 0; i < UPS.length; i++) if (UPS[i].id === want) return i;
+    return 0;
+  })();
+  function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function applyUp(remember) {
+    var up = UPS[upIdx], axis = up.id.replace("-", "");
+    viewer.SetUpVector(axis === "Y" ? OV.Direction.Y : OV.Direction.Z, false);
+    if (up.id.charAt(0) === "-") viewer.FlipUpVector();
+    var lbl = document.getElementById("v3d-up-lbl"); if (lbl) lbl.textContent = "Boven: " + up.id;
+    if (remember) { store(upKey, up.id); store(extKey, up.id); }
+  }
+  function dirs() {
+    var up = UPS[upIdx], U = up.U, F = up.F, R = cross(U, F);
+    function add() { var o = [0, 0, 0]; for (var i = 0; i < arguments.length; i += 2) for (var k = 0; k < 3; k++) o[k] += arguments[i][k] * arguments[i + 1]; return o; }
+    return { iso: add(F, 1, R, 1, U, 0.8), voor: F, achter: add(F, -1), rechts: R, links: add(R, -1), boven: U, onder: add(U, -1), _U: U, _F: F };
+  }
   function visibleSphere() { return viewer.GetBoundingSphere(function (ud) { return !hidden.has(keyOf(ud)); }); }
   function setView(name) {
     if (!viewer) return;
-    var d = DIRS[name] || DIRS.iso;
+    var D = dirs(), d = D[name] || D.iso;
     var s = visibleSphere() || viewer.GetBoundingSphere(function () { return true; });
     if (!s) return;
     var cam = viewer.GetCamera().Clone();
     var len = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
     cam.center = new OV.Coord3D(s.center.x, s.center.y, s.center.z);
     cam.eye = new OV.Coord3D(s.center.x + d[0] / len * s.radius * 3, s.center.y + d[1] / len * s.radius * 3, s.center.z + d[2] / len * s.radius * 3);
-    cam.up = (name === "boven" || name === "onder") ? new OV.Coord3D(0, 1, 0) : new OV.Coord3D(0, 0, 1);
+    var cu = (name === "boven") ? D._F.map(function (v) { return -v; }) : (name === "onder") ? D._F : D._U;
+    cam.up = new OV.Coord3D(cu[0], cu[1], cu[2]);
     viewer.SetCamera(cam);
     viewer.FitSphereToWindow(s, false);
   }
+  document.getElementById("v3d-up").addEventListener("click", function () {
+    if (!viewer) return;
+    upIdx = (upIdx + 1) % UPS.length;
+    applyUp(true); setView("iso");
+  });
+
+  // Soepel draaien: tijdens slepen/zoomen in lagere resolutie tekenen, bij stilstand weer scherp.
+  var fullRatio = window.devicePixelRatio || 1, lowTimer = null, isLow = false;
+  function setRatio(r) {
+    try {
+      var sz = viewer.renderer.getSize({ x: 0, y: 0, set: function (x, y) { this.x = x; this.y = y; return this; } });
+      viewer.renderer.setPixelRatio(r);
+      viewer.renderer.setSize(sz.x, sz.y);
+      viewer.Render();
+    } catch (e) { /* oudere engine: gewoon volle resolutie */ }
+  }
+  function goLow() {
+    if (!viewer || isLow) return;
+    var tris = triCount(); if (tris < 300000 && fullRatio <= 1) return;
+    isLow = true; setRatio(Math.max(0.5, Math.min(1, fullRatio) * (tris > 1500000 ? 0.5 : 0.7)));
+  }
+  function goHigh() { clearTimeout(lowTimer); lowTimer = setTimeout(function () { if (!isLow || !viewer) return; isLow = false; fullRatio = window.devicePixelRatio || 1; setRatio(fullRatio); }, 250); }
+  var _tris = null;
+  function triCount() {
+    if (_tris !== null) return _tris;
+    var n = 0; try { viewer.scene.traverse(function (o) { if (o.isMesh && o.geometry) { var g = o.geometry; n += g.index ? g.index.count / 3 : (g.attributes.position ? g.attributes.position.count / 3 : 0); } }); } catch (e) { n = 0; }
+    _tris = n; return n;
+  }
+  ["pointerdown", "wheel", "touchstart"].forEach(function (ev) { wrap.addEventListener(ev, function () { goLow(); if (ev === "wheel") goHigh(); }, { passive: true }); });
+  ["pointerup", "pointercancel", "touchend"].forEach(function (ev) { window.addEventListener(ev, goHigh, { passive: true }); });
 
   // ------------------------------------------------------------ onderdelen (boom)
   function nodeKeys(node, out) {

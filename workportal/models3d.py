@@ -27,6 +27,7 @@ bp = Blueprint("modellen", __name__, url_prefix="/3d")
 
 EXT = sp.MODEL_EXT
 MAX_MB = 60
+STEP_MAX_MB = int(os.environ.get("WP3D_STEP_MAX_MB", "80"))  # grotere STEP: te zwaar, advies 3MF
 ENTITIES = {"project": "projects", "ticket": "tickets"}
 
 
@@ -254,10 +255,23 @@ def view_sp(pid):
             cache_key = f"sp/{pid}/{rel}?v={version}"
     except (sp.GraphError, ValueError, requests.RequestException, RuntimeError):
         pass
+    # Staat er naast de STEP een 3MF met dezelfde naam (uit SolidWorks), dan die openen: veel lichter.
+    if convert3d.is_step(rel) and request.args.get("step") != "1":
+        stem = rel.rsplit(".", 1)[0]
+        for ext in (".3MF", ".3mf"):
+            try:
+                alt = sp.file_meta(get_db(), pid, stem + ext)
+            except (sp.GraphError, ValueError, requests.RequestException, RuntimeError):
+                continue
+            if alt and alt.get("name"):
+                alt_rel = (rel.rsplit("/", 1)[0] + "/" if "/" in rel else "") + alt["name"]
+                return redirect(url_for("modellen.view_sp", pid=pid, pad=alt_rel, terug=back, van="step"))
+    too_big = bool(convert3d.is_step(rel) and (size or 0) > STEP_MAX_MB * 1048576)
     return render_template("modellen/viewer.html", url=url_for("modellen.sp_file", pid=pid, rel=rel),
                            title=rel.split("/")[-1], subtitle=f"{p['number']} · {rel}", back=back,
                            occt=occt_installed(), max_mb=MAX_MB, size=size, cache_key=cache_key, cache_mb=cache_mb(),
-                           conv=_conv_sp(pid, rel, version, size) if cache_key else None)
+                           conv=None if too_big else (_conv_sp(pid, rel, version, size) if cache_key else None),
+                           too_big=too_big, step_max=STEP_MAX_MB, from_step=request.args.get("van") == "step")
 
 
 @bp.route("/bestand/<int:fid>/<path:name>")

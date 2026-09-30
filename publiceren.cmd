@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V40: Node.js zonder apt-get (build liep vast op geheugen), geheugengrens container, veilig omzetten grote STEP"
+set "OMSCHRIJVING=WorkPortal V41: 3D - knop rechtop zetten, soepeler draaien, 3MF naast grote STEP automatisch openen"
 
 echo.
 echo ============================================
