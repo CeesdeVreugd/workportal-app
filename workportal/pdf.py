@@ -362,13 +362,11 @@ def _nacalc_kostprijs(doc, story, n, summary, items, notes, W, buf):
     def cnt(o):
         d = o.get("div") or 1
         return fmt_num(d, 0 if d == int(d) else 2)
-    rows = [["Machine / onderdeel", "Aantal", "Kostprijs per stuk", "Verkoopprijs per stuk"],
-            [Paragraph("<b>Basis</b> (zonder versie)", S["cell"]), fmt_num(summary["machines"], 0), fmt_eur(summary["unit_cost"], 2), fmt_eur(summary["unit_sale"], 2)]]
+    rows = [["Machine / optie", "Aantal", "Kostprijs per stuk", "Verkoopprijs per stuk"]]
     for v in summary.get("variants") or []:
-        rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>basis + {esc(' + '.join(v['versions']))}</font>" if v["versions"] else ""), S["cell"]),
-                     "", fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
-    for o in summary.get("version_items") or []:
-        rows.append([Paragraph(f"Versie: {esc(o['desc'])} <font color='#6B7280'>(in machineprijs)</font>", S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
+        c = v.get("count") or 0
+        rows.append([Paragraph(f"<b>{esc(v['name'])}</b>" + (f"<br/><font color='#6B7280'>incl. {esc(' + '.join(v['versions']))}</font>" if v["versions"] else ""), S["cell"]),
+                     fmt_num(c, 0 if c == int(c) else 2), fmt_eur(v["cost"], 2), fmt_eur(v["sale"], 2)])
     for o in summary.get("option_items") or []:
         rows.append([Paragraph(f"Optie: {esc(o['desc'])} <font color='#6B7280'>(apart boeken)</font>", S["cell"]), cnt(o), fmt_eur(o["cost"], 2), fmt_eur(o["sale"], 2)])
     story.append(_grid(rows, [W - 95 * mm, 15 * mm, 40 * mm, 40 * mm], align_right=(1, 2, 3)))

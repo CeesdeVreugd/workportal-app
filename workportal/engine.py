@@ -306,11 +306,21 @@ def compute_nacalc(n, lines, calc_data=None):
         unit_cost = sum(i["cost"] for i in base)
         unit_sale = sum(i["sale"] for i in base)
         variants = []
-        for v in opts.get("variants") or []:
+        defs = opts.get("variants") or []
+        if not defs:  # nog niets ingesteld: standaard + één uitvoering per versie
+            defs = [{"name": "Standaard (zonder versie)", "versions": []}] + \
+                   [{"name": f"Met {i['desc']}", "versions": [i["key"]]} for i in versions]
+        for v in defs:
             keys = set(str(k) for k in (v.get("versions") or v.get("options") or []))
             chosen = [i for i in versions if str(i["key"]) in keys]
             variants.append({"name": v.get("name") or "Uitvoering", "versions": [i["desc"] for i in chosen],
+                             "count": min(i["div"] for i in chosen) if chosen else None,
                              "cost": unit_cost + sum(i["cost"] for i in chosen), "sale": unit_sale + sum(i["sale"] for i in chosen)})
+        # machines zonder versie = totaal − machines met een versie
+        with_version = sum(v["count"] for v in variants if v["count"])
+        for v in variants:
+            if v["count"] is None:
+                v["count"] = max(machines - with_version, 0)
         summary.update({
             "status": "info", "label": "Kostprijsbepaling", "machines": machines, "unit_cost": unit_cost, "unit_sale": unit_sale,
             "base_cost_total": sum(i["cost_total"] for i in base), "base_sale_total": sum(i["sale_total"] for i in base),

@@ -109,12 +109,10 @@
   <div class="tablewrap"><table class="table">
     <thead><tr><th>Machine / onderdeel</th><th class="num">Aantal</th><th class="num">Kostprijs per stuk</th><th class="num">Verkoopprijs per stuk</th></tr></thead>
     <tbody>
-      <tr class="grouprow"><td colspan="4"><b>Machines</b> <span class="small muted">(basis + versie; boeken als orderregel)</span></td></tr>
-      <tr><td>Basis <span class="small muted">(zonder versie)</span></td><td class="num">{{ s.machines|num(0) }}</td><td class="num">{{ copyval(s.unit_cost) }}</td><td class="num">{{ copyval(s.unit_sale) }}</td></tr>
-      {% for v in s.variants %}<tr><td><b>{{ v.name }}</b>{% if v.versions %}<div class="small muted">basis + {{ v.versions|join(' + ') }}</div>{% endif %}</td><td></td>
+      <tr class="grouprow"><td colspan="4"><b>Machines</b> <span class="small muted">(boeken als orderregel)</span></td></tr>
+      {% for v in s.variants %}<tr><td><b>{{ v.name }}</b>{% if v.versions %}<div class="small muted">incl. {{ v.versions|join(' + ') }}</div>{% endif %}</td>
+        <td class="num">{{ v.count|num(0) if v.count == v.count|int else v.count|num(2) }}</td>
         <td class="num">{{ copyval(v.cost) }}</td><td class="num">{{ copyval(v.sale) }}</td></tr>{% endfor %}
-      {% if s.version_items %}<tr class="grouprow"><td colspan="4"><b>Versies</b> <span class="small muted">(meerprijs per machine van die versie; zit in de machineprijs, niet apart boeken)</span></td></tr>
-      {% for o in s.version_items %}<tr><td>{{ o.desc }}</td><td class="num">{{ o.div|num(0) if o.div == o.div|int else o.div|num(2) }}</td><td class="num">{{ o.cost|eur(2) }}</td><td class="num">{{ o.sale|eur(2) }}</td></tr>{% endfor %}{% endif %}
       {% if s.option_items %}<tr class="grouprow"><td colspan="4"><b>Opties</b> <span class="small muted">(apart boeken als eigen orderregel)</span></td></tr>
       {% for o in s.option_items %}<tr><td>{{ o.desc }}</td><td class="num">{{ o.div|num(0) if o.div == o.div|int else o.div|num(2) }}</td><td class="num">{{ copyval(o.cost) }}</td><td class="num">{{ copyval(o.sale) }}</td></tr>{% endfor %}{% endif %}
     </tbody>
@@ -192,7 +190,7 @@
           <option value="basis" {{ 'selected' if it.kind == 'basis' }}>Basis</option><option value="versie" {{ 'selected' if it.kind == 'versie' }}>Versie</option><option value="optie" {{ 'selected' if it.kind == 'optie' }}>Optie</option></select></td>
         <td style="width:120px"><input class="cnt" type="number" name="cnt_{{ it.key }}" min="1" step="1" value="{{ (it.div|int) if it.kind != 'basis' else '' }}" placeholder="aantal" style="width:90px" {{ 'hidden' if it.kind == 'basis' }}></td>
       </tr>{% endfor %}</tbody></table>
-    <div><label class="f">Machines / uitvoeringen <span class="hint" style="display:inline">(basis + gekozen versies; leeg = niet gebruikt)</span></label>
+    <div><label class="f">Machines / uitvoeringen <span class="hint" style="display:inline">(aantal volgt vanzelf: met versie = aantal van die versie, zonder versie = de rest; leeg = standaard indeling)</span></label>
       {% set vitems = items|selectattr('kind', 'equalto', 'versie')|list %}
       {% set vs = (opts.variants or []) + [{}, {}] %}
       <table class="table nc-var"><tbody>{% for v in vs %}{% set i = loop.index0 %}<tr>
