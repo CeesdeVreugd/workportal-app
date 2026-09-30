@@ -1,0 +1,4 @@
+{% macro order_props(props, all=True) -%}
+{%- set labels = [('vaste_prijs','Vaste prijs'),('geleverd','Geleverd'),('afgesloten','Afgesloten'),('afgefactureerd','Afgefactureerd'),('vervallen','Vervallen')] -%}
+{%- if props -%}<span class="oprops">{% for key, label in labels if key in props and (all or props[key]) %}<span class="oprop {{ 'on' if props[key] else 'off' }}" title="{{ label }}: {{ 'aangevinkt' if props[key] else 'niet aangevinkt' }} op de orderbon">{{ '✓' if props[key] else '–' }} {{ label }}</span>{% endfor %}</span>{%- endif -%}
+{%- endmacro %}

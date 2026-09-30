@@ -181,7 +181,8 @@ def detail(pid):
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
-                           folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print())
+                           folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),
+                           oprops=__import__("workportal.komdex", fromlist=["order_props"]).order_props(p))
 
 
 @bp.route("/<int:pid>/bewerken", methods=["GET", "POST"])

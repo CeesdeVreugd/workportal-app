@@ -19,6 +19,52 @@ LEFT = {"order": "number", "omschrijving": "description", "uitvoerder": "executo
 RIGHT = {"bedrijf": "customer", "adres": "address", "plaats": "city", "tel": "phone", "ref. nr.": "reference",
          "ref.nr.": "reference", "t.a.v.": "contact"}
 STOP = ("ordereigenschappen", "productie memo", "pos aantal")
+# vinkjes onder "Ordereigenschappen" (in de PDF kleine plaatjes: vinkje of leeg)
+PROPS = [("vaste prijs", "vaste_prijs"), ("geleverd", "geleverd"), ("afgesloten", "afgesloten"),
+         ("afgefactureerd", "afgefactureerd"), ("vervallen", "vervallen")]
+PROP_LABELS = {"vaste_prijs": "Vaste prijs", "geleverd": "Geleverd", "afgesloten": "Afgesloten",
+               "afgefactureerd": "Afgefactureerd", "vervallen": "Vervallen"}
+CHECK_CHARS = set("✓✔☑☒✗✘xX■")
+
+
+def _dark_ratio(page, box):
+    try:
+        im = page.crop(box).to_image(resolution=100).original.convert("L")
+    except Exception:
+        return 0.0
+    hist = im.histogram()
+    total = sum(hist) or 1
+    return sum(hist[:128]) / total
+
+
+def _props(page, lines):
+    """Welke ordereigenschappen zijn aangevinkt? Geeft {sleutel: True/False} voor de gevonden regels."""
+    out = {}
+    start = next((top for top, ws in lines if ws and ws[0]["text"].lower() == "ordereigenschappen"), None)
+    if start is None:
+        return out
+    small = [i for i in page.images if (i["x1"] - i["x0"]) < 30 and (i["bottom"] - i["top"]) < 30]
+    chars = page.chars
+    for top, ws in lines:
+        if top <= start or top > start + 120:
+            continue
+        text = " ".join(w["text"] for w in ws).lower()
+        for label, key in PROPS:
+            if not text.startswith(label):
+                continue
+            n = len(label.split())
+            lab_x1 = ws[n - 1]["x1"]
+            y0, y1 = min(w["top"] for w in ws[:n]), max(w["bottom"] for w in ws[:n])
+            mid = (y0 + y1) / 2
+            checked = False
+            for im in small:  # plaatje op dezelfde regel, rechts van het label
+                if im["top"] - 4 <= mid <= im["bottom"] + 4 and lab_x1 < im["x0"] < lab_x1 + 160:
+                    checked = checked or _dark_ratio(page, (im["x0"], im["top"], im["x1"], im["bottom"])) > 0.02
+            for c in chars:  # of een vinkje als teken
+                if c["text"] in CHECK_CHARS and y0 - 4 <= (c["top"] + c["bottom"]) / 2 <= y1 + 4 and lab_x1 < c["x0"] < lab_x1 + 160:
+                    checked = True
+            out[key] = checked
+    return out
 
 
 def _lines(words, tol=3):
@@ -78,6 +124,7 @@ def parse(data):
         words = page.extract_words(keep_blank_chars=False, use_text_flow=False)
         if not any(w["text"].lower() == "orderbon" for w in words[:10]):
             return None
+        props = _props(page, _lines(words))
         cut = next((w["top"] for w in words if w["text"] in ("Ordereigenschappen", "Pos")), page.height)
         lines = [ln for ln in _lines(words) if ln[0] < cut - 2]
         split = next((w["x0"] for w in words if w["text"] == "Klantgegevens"), page.width * 0.5) - 5
@@ -118,4 +165,5 @@ def parse(data):
         "reference": right.get("reference") or None,
         "contact": right.get("contact") or None,
         "work": "\n".join(work).strip() or None,
+        "props": props,
     }

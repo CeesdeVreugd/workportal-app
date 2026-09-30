@@ -187,6 +187,13 @@ bij het project/de order en bij gekoppelde servicetickets. Ook bestaande orderma
 in staat, komen in WorkPortal: als order of project volgens het ordertype (onbekend = order), zonder map in
 SharePoint en zonder melding. Het overzicht van alle mappen staat onder **Beheer → DC01**.
 
+### Vinkjes op de orderbon
+Bij "Ordereigenschappen" leest WorkPortal de vinkjes Vaste prijs, Geleverd, Afgesloten, Afgefactureerd en Vervallen
+(in de PDF kleine plaatjes; een vinkje = donkere pixels). Ze staan bij de order/het project (Ordergegevens), in het
+actievenster, in Beheer > DC01 en bij de na-calculatie ("Geen vaste prijs (regie)" als dat vinkje ontbreekt).
+Wordt de orderbon in de map opnieuw opgeslagen (andere datum/grootte), dan haalt het script hem opnieuw op en worden
+de vinkjes bijgewerkt; er wordt dan niet opnieuw geprint.
+
 ### Na-calculatie uit de ordermap
 Staat er in een ordermap op DC01 een Excel waarvan de naam begint met **Nacalculatie** (ook de schrijfwijze
 *Nacacalculatie*; .xlsx/.xlsm), dan stuurt het script de nieuwste daarvan mee en leest WorkPortal hem in als

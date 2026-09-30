@@ -43,6 +43,10 @@ function Map($dir) {
     $nc = Get-ChildItem -LiteralPath $dir.FullName -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match $NacalcPatroon } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($nc) { $info.nacalc = @{ name = $nc.Name; modified = $nc.LastWriteTimeUtc.ToString("o"); size = $nc.Length } }
+    # orderbon: naam/datum/grootte, zodat WorkPortal een opnieuw opgeslagen orderbon (andere vinkjes) opnieuw ophaalt
+    $ob = Get-ChildItem -LiteralPath $dir.FullName -File -Filter "*orderbon*.pdf" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($ob) { $info.bon = @{ name = $ob.Name; modified = $ob.LastWriteTimeUtc.ToString("o"); size = $ob.Length } }
     return [pscustomobject]$info
 }
 function LeesBestand($pad) {
@@ -82,8 +86,8 @@ try {
         $bon = Get-ChildItem -LiteralPath $pad -File -Filter "*orderbon*.pdf" -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if (-not $bon) { continue }
-        $body = @{ path = $pad; filename = $bon.Name; data = [Convert]::ToBase64String([IO.File]::ReadAllBytes($bon.FullName)) } |
-            ConvertTo-Json -Compress
+        $body = @{ path = $pad; filename = $bon.Name; modified = $bon.LastWriteTimeUtc.ToString("o"); size = $bon.Length
+                   data = [Convert]::ToBase64String((LeesBestand $bon.FullName)) } | ConvertTo-Json -Compress
         $r2 = Invoke-RestMethod -Uri "$WorkPortal/api/komdex/orderbon" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($body)) `
             -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
         Log ("Orderbon {0}: {1} {2}" -f $bon.Name, $r2.ordertype, $r2.resultaat)

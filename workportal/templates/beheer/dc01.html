@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/orderprops.html" import order_props %}
 {% block title %}DC01{% endblock %}
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-ordermappen op DC01</p></div></div>
@@ -56,7 +57,7 @@
   <tr class="{{ 'muted' if it.missing }}">
     <td class="chk"><input type="checkbox" name="ids" value="{{ it.id }}" aria-label="Selecteer {{ it.number }}"></td>
     <td>{% set oms = it.pname or it.description or (it.bon.description if it.bon else '') or (it.folder[9:]|trim(' -') if it.folder != it.number else '') %}<b>{{ it.number }}</b>{% if oms %} <span>{{ oms }}</span>{% endif %}<div class="small muted" style="overflow-wrap:anywhere">{{ it.path }}</div></td>
-    <td class="nowrap">{% if it.bon %}{% if it.bon_file_id %}<a class="iconlink" href="{{ url_for('main.file', fid=it.bon_file_id) }}" data-pdf="Orderbon {{ it.number }}" target="_blank" rel="noopener">{{ icon('pdf') }} {{ it.bon.order_type or 'bon' }}</a>{% else %}{{ it.bon.order_type }}{% endif %}{% elif it.note and 'gelezen' in it.note %}<span class="badge b-warn">Niet leesbaar</span>{% else %}<span class="muted">–</span>{% endif %}{% if it.print_note %}<div class="small {{ 'muted' if it.printed_at else '' }}" style="{{ '' if it.printed_at else 'color:var(--bad)' }}">{{ 'Geprint ' ~ (it.printed_at|dt) if it.printed_at else it.print_note }}</div>{% endif %}</td>
+    <td class="nowrap">{% if it.bon %}{% if it.bon_file_id %}<a class="iconlink" href="{{ url_for('main.file', fid=it.bon_file_id) }}" data-pdf="Orderbon {{ it.number }}" target="_blank" rel="noopener">{{ icon('pdf') }} {{ it.bon.order_type or 'bon' }}</a>{% else %}{{ it.bon.order_type }}{% endif %}{% elif it.note and 'gelezen' in it.note %}<span class="badge b-warn">Niet leesbaar</span>{% else %}<span class="muted">–</span>{% endif %}{% if it.bon and it.bon.props %}<div style="margin-top:3px">{{ order_props(it.bon.props, all=False) }}</div>{% endif %}{% if it.print_note %}<div class="small {{ 'muted' if it.printed_at else '' }}" style="{{ '' if it.printed_at else 'color:var(--bad)' }}">{{ 'Geprint ' ~ (it.printed_at|dt) if it.printed_at else it.print_note }}</div>{% endif %}</td>
     <td class="hide-m nowrap">{% if it.nacalc_id %}<a class="iconlink" href="{{ url_for('nacalc.detail', nid=it.nacalc_id) }}">{{ icon('nacalculatie') }} {{ it.nacalc_at|date }}</a>{% endif %}{% if it.nacalc_note %} <span class="badge b-warn" title="{{ it.nacalc_note }}">Nieuwste niet leesbaar</span><div class="small muted" style="white-space:normal;max-width:260px">{{ it.nacalc_note }}</div>{% endif %}{% if not it.nacalc_id and not it.nacalc_note %}<span class="muted">–</span>{% endif %}</td>
     <td class="hide-m">{{ it.customer or (it.bon.customer if it.bon else '') or '' }}</td>
     <td>{% if it.project_id %}<a href="{{ werk_url('detail', it.kind or 'order', pid=it.project_id) }}">{{ (it.kind or '')|capitalize }} {{ it.pnumber }}</a>{% else %}<span class="muted">–</span>{% endif %}</td>

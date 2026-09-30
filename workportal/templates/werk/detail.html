@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/orderprops.html" import order_props %}
 {% from "partials/macros.html" import ticket_status, calc_status %}
 {% block title %}{{ K.label }} {{ p.number }}{% endblock %}
 {% block content %}
@@ -23,6 +24,7 @@
       {% if p.delivery_date %}<dt>Leverdatum</dt><dd>{{ p.delivery_date|date }}{% if p.delivery_week %} · week {{ p.delivery_week }}{% endif %}</dd>{% endif %}
       {% if p.contact_name %}<dt>T.a.v.</dt><dd>{{ p.contact_name }}</dd>{% endif %}
       {% if p.reference %}<dt>Ref. nr.</dt><dd>{{ p.reference }}</dd>{% endif %}
+      {% if oprops %}<dt>Orderbon</dt><dd>{{ order_props(oprops) }}</dd>{% endif %}
     </dl></section>
   {% if p.work_description %}<section class="card"><h2>Werkomschrijving</h2><div class="prose worklist">{% for line in p.work_description.split('\n') %}<p>{{ line }}</p>{% endfor %}</div></section>{% endif %}
 </div>

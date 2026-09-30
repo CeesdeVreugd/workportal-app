@@ -147,7 +147,14 @@ def detail(nid):
                      "margin_pct": s["margin_pct"], "status": s["status"]})
     calcs = query("SELECT id, number, title FROM calculations ORDER BY updated_at DESC")
     return render_template("nacalc/detail.html", n=n, calc=calc, s=summary, items=items, hist=hist, calcs=calcs,
-                           pa=nacalc_configured(), notes=notes_for(n))
+                           pa=nacalc_configured(), notes=notes_for(n), oprops=_oprops(n))
+
+
+def _oprops(n):
+    from .komdex import order_props
+    if not n.get("project_id"):
+        return {}
+    return order_props(query("SELECT order_props FROM projects WHERE id = ?", (n["project_id"],), one=True))
 
 
 def notes_for(n):

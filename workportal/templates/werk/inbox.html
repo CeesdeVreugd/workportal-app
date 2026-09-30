@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/orderprops.html" import order_props %}
 {% from "partials/macros.html" import opt %}
 {% block title %}Nieuwe orders{% endblock %}
 {% block content %}
@@ -28,6 +29,7 @@
       {% if b.contact %}<dt>T.a.v.</dt><dd>{{ b.contact }}</dd>{% endif %}
       {% if b.executor %}<dt>Uitvoerder</dt><dd>{{ b.executor }}</dd>{% endif %}
       {% if b.delivery_date %}<dt>Leverdatum</dt><dd>{{ b.delivery_date|date }}{% if b.delivery_week %} (week {{ b.delivery_week }}){% endif %}</dd>{% endif %}
+      {% if b.props %}<dt>Vinkjes</dt><dd>{{ order_props(b.props) }}</dd>{% endif %}
     </dl>
   </div>
   {% elif not it.note %}<p class="small muted" style="margin:0 0 10px">Nog geen orderbon in de map gevonden.</p>{% endif %}

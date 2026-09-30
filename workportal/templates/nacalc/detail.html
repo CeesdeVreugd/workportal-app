@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/orderprops.html" import order_props %}
 {% from "partials/macros.html" import opt %}
 {% block title %}Na-calculatie {{ n.order_no }}{% endblock %}
 {% block content %}
@@ -8,6 +9,7 @@
 <div class="pagehead">
   <div><div class="eyebrow">Order {{ n.order_no }}{% if n.project_id %} · <a href="{{ url_for('projecten.detail', pid=n.project_id) }}">{{ n.project_no }}</a>{% endif %}</div>
     <h1>{{ n.order_desc or 'Na-calculatie' }}</h1>
+    {% if oprops %}<div style="margin:4px 0 6px">{{ order_props(oprops, all=False) }}{% if not oprops.vaste_prijs %} <span class="oprop off" title="Op de orderbon staat geen vinkje bij Vaste prijs">Geen vaste prijs (regie)</span>{% endif %}</div>{% endif %}
     <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
   <div class="actions">
     <a class="btn" href="{{ url_for('nacalc.report', nid=n.id) }}" data-pdf="Na-calculatie {{ n.order_no }}" target="_blank">{{ icon('pdf') }}PDF-rapport</a>

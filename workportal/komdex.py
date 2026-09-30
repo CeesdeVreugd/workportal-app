@@ -124,12 +124,26 @@ def create_from_inbox(conn, it, kind, number, name, cid, user_id=None, status="v
          bon.get("delivery_date"), bon.get("delivery_week"), bon.get("reference"), bon.get("contact"), bon.get("work"),
          it["bon_file_id"]))
     pid = cur.lastrowid
+    _set_props(conn, pid, bon)
     if it["bon_file_id"]:
         conn.execute("UPDATE files SET entity = 'project', entity_id = ? WHERE id = ?", (pid, it["bon_file_id"]))
     conn.execute("UPDATE order_inbox SET status = ?, project_id = ?, customer_id = ?, handled_by = ?, handled_at = ?, note = NULL WHERE id = ?",
                  (status, pid, cid, user_id, now_iso(), it["id"]))
     conn.commit()
     return pid
+
+
+def _set_props(conn, pid, bon):
+    """Vinkjes van de orderbon altijd bijwerken (die veranderen: geleverd, afgefactureerd, ...)."""
+    if isinstance(bon.get("props"), dict) and bon["props"]:
+        conn.execute("UPDATE projects SET order_props = ? WHERE id = ?", (json.dumps(bon["props"]), pid))
+
+
+def order_props(row):
+    try:
+        return json.loads(row["order_props"] or "{}") if row and row["order_props"] else {}
+    except (ValueError, KeyError, IndexError):
+        return {}
 
 
 def _enrich(conn, pid, it):
@@ -142,8 +156,9 @@ def _enrich(conn, pid, it):
     for col, key in fields.items():
         if bon.get(key):
             conn.execute(f"UPDATE projects SET {col} = COALESCE(NULLIF({col}, ''), ?) WHERE id = ?", (bon[key], pid))
-    if it["bon_file_id"]:
-        conn.execute("UPDATE projects SET bon_file_id = COALESCE(bon_file_id, ?) WHERE id = ?", (it["bon_file_id"], pid))
+    _set_props(conn, pid, bon)
+    if it["bon_file_id"]:  # altijd de nieuwste orderbon
+        conn.execute("UPDATE projects SET bon_file_id = ? WHERE id = ?", (it["bon_file_id"], pid))
         conn.execute("UPDATE files SET entity = 'project', entity_id = ? WHERE id = ?", (pid, it["bon_file_id"]))
     conn.commit()
 
@@ -253,7 +268,7 @@ def receive(conn, folders):
     now = now_iso()
     first = sp.setting(conn, "komdex_baseline") != "1"
     known = {r["path"]: r for r in conn.execute("SELECT id, path, status FROM order_inbox")}
-    seen, new_items, nacalc_seen = set(), [], {}
+    seen, new_items, nacalc_seen, bon_seen = set(), [], {}, {}
     for f in folders[:MAX_FOLDERS]:
         if not isinstance(f, dict):
             continue
@@ -263,6 +278,9 @@ def receive(conn, folders):
         if not path or not m:
             continue
         seen.add(path)
+        bi = f.get("bon")
+        if isinstance(bi, dict) and bi.get("name"):
+            bon_seen[path] = f"{bi.get('name')}|{bi.get('modified') or ''}|{bi.get('size') or ''}"[:400]
         nc = f.get("nacalc")
         if isinstance(nc, dict) and nc.get("name") and NACALC_RE.match(str(nc.get("name"))):
             nacalc_seen[path] = f"{nc.get('name')}|{nc.get('modified') or ''}|{nc.get('size') or ''}"[:400]
@@ -309,6 +327,14 @@ def receive(conn, folders):
         "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status <> 'genegeerd'"
         " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR status = 'bestaand' OR project_id IS NOT NULL)"
         " ORDER BY number DESC LIMIT 2000", (since,))]
+    # orderbon gewijzigd (opnieuw opgeslagen in de map): opnieuw ophalen, zodat o.a. de vinkjes bijgewerkt worden
+    if bon_seen:
+        have = set(want)
+        for r in conn.execute("SELECT path, bon_sig FROM order_inbox WHERE bon_received_at IS NOT NULL AND missing = 0"
+                              " AND status <> 'genegeerd'"):
+            sig = bon_seen.get(r["path"])
+            if sig and sig != r["bon_sig"] and r["path"] not in have and len(want) < 2000:
+                want.append(r["path"])
     # na-calculatie: nieuwste Excel "Nacalculatie..." per map; alleen opvragen als hij nieuw of gewijzigd is
     want_nacalc = []
     if nacalc_seen:
@@ -348,22 +374,24 @@ def orderbon():
     bon = parse(data) if data[:4] == b"%PDF" else None
     now = now_iso()
     if not bon:
-        conn.execute("UPDATE order_inbox SET bon_received_at = ?, note = ? WHERE id = ?",
-                     (now, f"Orderbon '{fname}' kon niet worden gelezen.", it["id"]))
+        conn.execute("UPDATE order_inbox SET bon_received_at = ?, note = ?, bon_sig = COALESCE(?, bon_sig) WHERE id = ?",
+                     (now, f"Orderbon '{fname}' kon niet worden gelezen.",
+                      f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400] if js.get("modified") else None, it["id"]))
         conn.commit()
         return jsonify({"ok": False, "melding": "Orderbon niet leesbaar"}), 200
     fid = save_bytes("order_inbox", it["id"], data, fname, kind="orderbon", mime="application/pdf")
     cid = it["customer_id"]
     if bon.get("customer"):
         cid = sp._match_customer(conn, bon["customer"]) or cid
+    sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400] if js.get("modified") else None
     conn.execute("UPDATE order_inbox SET bon_json = ?, bon_file_id = ?, bon_received_at = ?, customer_id = ?,"
-                 " description = COALESCE(?, description) WHERE id = ?",
-                 (json.dumps(bon, ensure_ascii=False), fid, now, cid, bon.get("description"), it["id"]))
+                 " description = COALESCE(?, description), bon_sig = COALESCE(?, bon_sig) WHERE id = ?",
+                 (json.dumps(bon, ensure_ascii=False), fid, now, cid, bon.get("description"), sig, it["id"]))
     conn.commit()
     result = auto_process(conn, it["id"])
-    # nieuwe order (geen bestaande map van vóór de koppeling): orderbon automatisch printen via Printix
+    # nieuwe order (geen bestaande map van vóór de koppeling), eerste keer dat de orderbon binnenkomt: automatisch printen
     from . import printix
-    if (it["status"] != "bestaand" and not it["printed_at"] and printix.configured()
+    if (it["status"] != "bestaand" and not it["printed_at"] and not it["bon_received_at"] and printix.configured()
             and printix.setting(conn, "printix_auto_orderbon") == "1" and printix.printer(conn)):
         printix.print_background(current_app.config["DB_PATH"], data, f"Orderbon {it['number']}", it["id"])
         result = (result or "") + " · wordt geprint"

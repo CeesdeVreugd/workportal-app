@@ -470,6 +470,11 @@ MIGRATIONS = [
     ALTER TABLE order_inbox ADD COLUMN printed_at TEXT;
     ALTER TABLE order_inbox ADD COLUMN print_note TEXT;
     """,
+    # 13 - vinkjes van de orderbon (vaste prijs, geleverd, ...) en herkennen van een gewijzigde orderbon
+    """
+    ALTER TABLE projects ADD COLUMN order_props TEXT;
+    ALTER TABLE order_inbox ADD COLUMN bon_sig TEXT;
+    """,
 ]
 
 
