@@ -181,7 +181,7 @@ def detail(pid):
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
-                           folder_name=sp.folder_name(p["number"], p["name"], p["kind"]))
+                           folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print())
 
 
 @bp.route("/<int:pid>/bewerken", methods=["GET", "POST"])
@@ -357,6 +357,34 @@ def make_project_folder(pid):
         flash("SharePoint is niet gekoppeld.", "error")
         return redirect(target)
     return make_folder(pid, target) or redirect(target)
+
+
+def _can_print():
+    from . import printix
+    return printix.configured() and bool(printix.printer(get_db()))
+
+
+@bp.route("/<int:pid>/orderbon-printen", methods=["POST"])
+def print_bon(pid):
+    from flask import current_app
+    from . import printix
+    from .util import file_path
+    p = _row(pid)
+    _need(LEZEN, KINDS[BP_OF_KIND[p["kind"]]]["module"])
+    target = werk_url("detail", p, pid=pid)
+    f = query("SELECT * FROM files WHERE id = ?", (p["bon_file_id"],), one=True) if p["bon_file_id"] else None
+    if not f:
+        flash("Er is geen orderbon bij deze order.", "error")
+    elif not (printix.configured() and printix.printer(get_db())):
+        flash("Printen is nog niet ingesteld (Beheer > Printen).", "error")
+    else:
+        inbox = query("SELECT id FROM order_inbox WHERE bon_file_id = ?", (f["id"],), one=True)
+        with open(file_path(f), "rb") as fh:
+            printix.print_background(current_app.config["DB_PATH"], fh.read(), f"Orderbon {p['number']}",
+                                     inbox["id"] if inbox else None)
+        audit("orderbon geprint", "project", pid)
+        flash("Orderbon naar de printer gestuurd.", "ok")
+    return redirect(target)
 
 
 @bp.route("/<int:pid>/verwijderen", methods=["POST"])

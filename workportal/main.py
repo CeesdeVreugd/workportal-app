@@ -114,6 +114,19 @@ def file(fid, name=None):
 
 # ---------------------------------------------------------------- push
 
+@bp.route("/pdf")
+def pdfview():
+    """PDF bekijken binnen WorkPortal, met een terug-knop (ook in de app op pc, telefoon en iPad)."""
+    src = request.args.get("src") or ""
+    if not src.startswith("/") or src.startswith("//") or "\\" in src:
+        abort(400)
+    back = request.args.get("terug") or ""
+    if not back.startswith("/") or back.startswith("//"):
+        back = url_for("main.index")
+    title = (request.args.get("titel") or "PDF")[:150]
+    return render_template("pdfview.html", src=src, back=back, title=title)
+
+
 @bp.route("/api/push/key")
 def push_key():
     _, pub = vapid_keys(get_db())

@@ -21,7 +21,7 @@
   {% if it.note %}<div class="alertbox" style="margin:0 0 12px">{{ it.note }}</div>{% endif %}
   {% if it.bon %}{% set b = it.bon %}
   <div class="bonbox">
-    <div class="bonhead">{{ icon('pdf') }} <b>Orderbon</b>{% if it.bon_file_id %} · <a href="{{ url_for('main.file', fid=it.bon_file_id) }}" target="_blank" rel="noopener">openen</a>{% endif %}</div>
+    <div class="bonhead">{{ icon('pdf') }} <b>Orderbon</b>{% if it.bon_file_id %} · <a href="{{ url_for('main.file', fid=it.bon_file_id) }}" data-pdf="Orderbon {{ it.number }}" target="_blank" rel="noopener">openen</a>{% endif %}</div>
     <dl class="dl compact">
       <dt>Ordertype</dt><dd><b>{{ b.order_type or '–' }}</b></dd>
       <dt>Klant (bon)</dt><dd>{{ b.customer or '–' }}{% if b.city %} · {{ b.city }}{% endif %}</dd>

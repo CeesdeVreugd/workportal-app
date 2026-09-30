@@ -10,7 +10,7 @@
     <h1>{{ n.order_desc or 'Na-calculatie' }}</h1>
     <p>ERP-export van {{ n.imported_at|dt }} ({{ 'Power Automate' if n.source == 'powerautomate' else 'upload' }}){% if calc %} · vergeleken met <a href="{{ url_for('calculatie.edit', cid=calc.id) }}">calculatie {{ calc.number }}</a>{% else %} · zonder calculatie{% endif %}</p></div>
   <div class="actions">
-    <a class="btn" href="{{ url_for('nacalc.report', nid=n.id) }}" target="_blank">{{ icon('pdf') }}PDF-rapport</a>
+    <a class="btn" href="{{ url_for('nacalc.report', nid=n.id) }}" data-pdf="Na-calculatie {{ n.order_no }}" target="_blank">{{ icon('pdf') }}PDF-rapport</a>
     {% if pa and can('nacalculatie', 2) %}
     <form method="post" action="{{ url_for('nacalc.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="order_no" value="{{ n.order_no }}"><input type="hidden" name="project_id" value="{{ n.project_id or '' }}"><input type="hidden" name="calc_id" value="{{ n.calc_id or '' }}"><button class="btn primary">{{ icon('refresh') }}Opnieuw ophalen</button></form>
     {% endif %}

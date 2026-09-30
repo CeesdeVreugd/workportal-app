@@ -8,7 +8,7 @@
 <div class="card" style="max-width:760px">
   <dl class="dl"><dt>Bezoek</dt><dd>{{ v.date|date }} · {{ v.technicians or '' }} · {{ v.hours|num(2) }} uur</dd>
   <dt>Uitgevoerd</dt><dd class="prose" style="font-weight:400">{{ v.work_done or '–' }}</dd></dl>
-  <p><a href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" target="_blank">Voorbeeld werkbon bekijken</a></p>
+  <p><a href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">Voorbeeld werkbon bekijken</a></p>
 </div>
 <form method="post" class="card form" style="max-width:760px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

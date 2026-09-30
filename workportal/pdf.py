@@ -11,7 +11,7 @@ from reportlab.platypus import (BaseDocTemplate, Frame, PageTemplate, Paragraph,
                                 Image, KeepTogether)
 from PIL import Image as PILImage
 
-from .util import fmt_dt, fmt_date, fmt_num, fmt_eur
+from .util import now_iso, fmt_dt, fmt_date, fmt_num, fmt_eur
 
 BASIC = colors.HexColor("#0A0A96")
 ACCENT = colors.HexColor("#0080FF")
@@ -46,7 +46,8 @@ def esc(s):
 def _doc(buf, title, doc_no):
     doc = BaseDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=30 * mm,
                           bottomMargin=18 * mm, title=title, author="De Vreugd Productietechniek")
-    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f")
+    # geen zijmarge in het frame: tekst en tabellen beginnen allemaal precies op de linkermarge (lijn met het logo)
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f", leftPadding=0, rightPadding=0)
 
     def deco(canvas, d):
         canvas.saveState()
@@ -288,7 +289,7 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
              Paragraph(f"Order {esc(n.get('order_no'))} · {esc(n.get('order_desc'))}", S["h1"]),
              Paragraph(f"ERP-export van {fmt_dt(n['imported_at'])}"
                        + (f" · vergeleken met calculatie {esc(calc['number'])}" if calc else " · zonder calculatie")
-                       + (f" · gedeeld door {fmt_num(n['divide_by'], 0)}" if (n.get('divide_by') or 1) != 1 else ""), S["small"]),
+                       + (" · kosten per item gedeeld door het aantal (seriebouw)" if any((it.get("div") or 1) != 1 for it in items) else ""), S["small"]),
              Spacer(1, 8)]
     pairs = [("Orderbedrag", fmt_eur(summary["order_total"], 2)), ("Werkelijke kostprijs", fmt_eur(summary["cost"], 2)),
              ("Verkoopwaarde (incl. marges)", fmt_eur(summary["sale"], 2)), ("Totale winst op order", fmt_eur(summary["result"], 2)),
@@ -299,7 +300,8 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
     story.append(Paragraph("Per item", S["h2"]))
     data = [["Pos", "Item", "Uren calc.", "Uren werk.", "Gecalculeerd", "Kostprijs", "Verkoopwaarde", "Verschil"]]
     for it in items:
-        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]), S["cell"]),
+        div = it.get("div") or 1
+        data.append([str(it["pos"] or ""), Paragraph(esc(it["desc"]) + (f" <font color='#6B7280'>(÷ {fmt_num(div, 0 if div == int(div) else 2)})</font>" if div != 1 else ""), S["cell"]),
                      fmt_num(it.get("calc_hours"), 1) if it.get("calc_hours") is not None else "–",
                      fmt_num(it["hours"], 1),
                      fmt_eur(it["calc"], 0) if it.get("calc") is not None else "–",
@@ -320,5 +322,14 @@ def nacalc_pdf(n, summary, items, calc, notes=None):
             story.append(Paragraph(f"<b>{esc(fmt_dt(x['created_at']))}{' · ' + esc(x['who']) if x['who'] else ''}</b>", S["small"]))
             story.append(Paragraph(esc(x["body"]).replace("\n", "<br/>"), S["cell"]))
             story.append(Spacer(1, 4))
+    doc.build(story)
+    return buf.getvalue()
+
+
+def test_page_pdf():
+    buf = io.BytesIO()
+    doc = _doc(buf, "Testpagina", "Printix")
+    story = [Paragraph("TESTPAGINA", S["eyebrow"]), Paragraph("Printen vanuit WorkPortal werkt", S["h1"]),
+             Paragraph(f"Verstuurd op {fmt_dt(now_iso())} via Printix Cloud Print.", S["small"])]
     doc.build(story)
     return buf.getvalue()

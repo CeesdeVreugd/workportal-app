@@ -316,3 +316,17 @@ worden gegeven. Een gebruiker met "Beheerder" aangevinkt heeft overal alle recht
 E-mailadres → code van 6 cijfers per mail (10 minuten geldig) → pincode per apparaat.
 Elke 14 dagen opnieuw een e-mailcode (instelbaar). Na 5 foute pincodes is weer een
 e-mailcode nodig. Na 12 uur vergrendelt de app automatisch (instelbaar).
+
+
+## Printen via Printix
+Orderbonnen kunnen automatisch (nieuwe orders uit DC01) of met de hand (Beheer > DC01 of de knop *Printen* bij een
+order/project) naar een A4-printer in Printix. WorkPortal gebruikt de Printix Cloud Print API:
+1. Printix Administrator: maak bij de Cloud Print API een set API-gegevens (client ID en secret). Vereist Printix
+   Premium; Secure Print mag niet op "Alle gebruikers moeten veilig printen" staan (gebruik groepen).
+2. Portainer (stack): `PRINTIX_TENANT_ID`, `PRINTIX_CLIENT_ID`, `PRINTIX_CLIENT_SECRET`. Het secret alleen in Portainer.
+3. WorkPortal > Beheer > Printen: printer kiezen, aantal, dubbelzijdig/kleur, automatisch printen aan, testpagina.
+Bestaande ordermappen worden nooit automatisch geprint; elke orderbon hoogstens één keer automatisch.
+
+## PDF's
+PDF's (rapporten, werkbonnen, orderbonnen, PDF's in de projectmap) openen in een eigen scherm met terug-knop,
+downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app van de telefoon.

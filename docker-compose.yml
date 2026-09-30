@@ -35,6 +35,10 @@ services:
       PA_SHAREPOINT_URL: ${PA_SHAREPOINT_URL:-}
       PA_NACALC_URL: ${PA_NACALC_URL:-}
       PA_SECRET: ${PA_SECRET:-}
+      # Printix Cloud Print API: orderbonnen printen (Printix Administrator > API)
+      PRINTIX_TENANT_ID: ${PRINTIX_TENANT_ID:-}
+      PRINTIX_CLIENT_ID: ${PRINTIX_CLIENT_ID:-}
+      PRINTIX_CLIENT_SECRET: ${PRINTIX_CLIENT_SECRET:-}
       # 3D: grote STEP-bestanden op de server omzetten (0 = uit), en tot welke bestandsgrootte (MB)
       WP3D_CONVERT: ${WP3D_CONVERT:-1}
       WP3D_CONVERT_MAX_MB: ${WP3D_CONVERT_MAX_MB:-150}

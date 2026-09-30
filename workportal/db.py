@@ -465,6 +465,11 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_nacalc_notes_order ON nacalc_notes(order_no);
     """,
+    # 12 - orderbon printen via Printix
+    """
+    ALTER TABLE order_inbox ADD COLUMN printed_at TEXT;
+    ALTER TABLE order_inbox ADD COLUMN print_note TEXT;
+    """,
 ]
 
 

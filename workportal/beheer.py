@@ -254,6 +254,19 @@ def dc01():
         if request.form.get("action") == "opnieuw" and ids:
             execute(f"UPDATE order_inbox SET bon_received_at = NULL, note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
             flash(f"Orderbon wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
+        elif request.form.get("action") == "printen" and ids:
+            from . import printix
+            from .util import file_path
+            if not (printix.configured() and printix.printer(get_db())):
+                flash("Printix is nog niet ingesteld (Beheer > Printen).", "error")
+            else:
+                n = 0
+                for it in query(f"SELECT i.id, i.number, f.stored_name FROM order_inbox i JOIN files f ON f.id = i.bon_file_id"
+                                f" WHERE i.id IN ({','.join('?' * len(ids))})", ids):
+                    with open(file_path(it), "rb") as fh:
+                        printix.print_background(current_app.config["DB_PATH"], fh.read(), f"Orderbon {it['number']}", it["id"])
+                    n += 1
+                flash(f"{n} orderbon(nen) naar de printer gestuurd." if n else "Geen orderbon gevonden bij de selectie.", "ok" if n else "error")
         elif request.form.get("action") == "nacalc" and ids:
             execute(f"UPDATE order_inbox SET nacalc_sig = NULL, nacalc_note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
             flash(f"Na-calculatie wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
@@ -295,6 +308,46 @@ def dc01():
                    " SUM(nacalc_sig IS NOT NULL) AS nacalc, SUM(nacalc_note IS NOT NULL) AS nacalc_fout FROM order_inbox", one=True)
     return render_template("beheer/dc01.html", items=items, counts=counts, flt=flt, q=q, status=komdex.status(),
                            order_dir=sp.setting(get_db(), "komdex_order_dir"))
+
+
+@bp.route("/printen", methods=["GET", "POST"])
+@require("beheer", BEHEER)
+def printen():
+    """Printix: printer kiezen, orderbonnen automatisch printen, testpagina."""
+    from . import printix
+    conn = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "opslaan":
+            pr = request.form.get("printer") or ""
+            if pr:
+                pid, qid, name = (pr.split("|", 2) + ["", ""])[:3]
+                printix.set_setting(conn, "printix_printer", json.dumps({"printer_id": pid, "queue_id": qid, "name": name}))
+            printix.set_setting(conn, "printix_auto_orderbon", "1" if request.form.get("auto") else "0")
+            printix.set_setting(conn, "printix_copies", str(max(1, min(20, to_int(request.form.get("copies")) or 1))))
+            printix.set_setting(conn, "printix_duplex", request.form.get("duplex") if request.form.get("duplex") in ("NONE", "LONG_EDGE", "SHORT_EDGE") else "NONE")
+            printix.set_setting(conn, "printix_color", "1" if request.form.get("color") else "0")
+            audit("printinstellingen", None, None, request.form.get("printer"))
+            flash("Printinstellingen opgeslagen.", "ok")
+        elif action == "test":
+            from .pdf import test_page_pdf
+            try:
+                jid = printix.print_pdf(printix.printer(conn), test_page_pdf(), "WorkPortal testpagina", printix.options(conn))
+                flash(f"Testpagina verstuurd naar Printix (job {jid}).", "ok")
+            except (printix.PrintixError, requests.RequestException, KeyError, ValueError) as exc:
+                flash(f"Testpagina printen mislukt: {exc}", "error")
+        return redirect(url_for("beheer.printen"))
+    printers, error = [], None
+    if printix.configured():
+        try:
+            printers = printix.list_printers()
+        except (printix.PrintixError, requests.RequestException, KeyError, ValueError) as exc:
+            error = str(exc)
+    recent = query("SELECT id, number, printed_at, print_note FROM order_inbox WHERE print_note IS NOT NULL"
+                   " ORDER BY COALESCE(printed_at, last_seen) DESC LIMIT 15")
+    return render_template("beheer/printen.html", configured=printix.configured(), printers=printers, error=error,
+                           current=printix.printer(conn), auto=printix.setting(conn, "printix_auto_orderbon") == "1",
+                           opts=printix.options(conn), recent=recent)
 
 
 @bp.route("/testmail", methods=["POST"])

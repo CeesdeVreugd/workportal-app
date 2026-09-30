@@ -274,4 +274,16 @@
     });
     if (inp.closest("form")) inp.closest("form").addEventListener("reset", function () { setTimeout(function () { n.textContent = "Geen bestand gekozen"; }); });
   });
+
+  // PDF's openen in de WorkPortal-viewer met terug-knop (links met data-pdf)
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[data-pdf]");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+    var href = a.getAttribute("href") || "";
+    if (href.charAt(0) !== "/" || /[?&]download=1/.test(href)) return;
+    e.preventDefault();
+    var title = a.getAttribute("data-pdf") || a.textContent.trim() || "PDF";
+    location.href = "/pdf?src=" + encodeURIComponent(href) + "&terug=" + encodeURIComponent(location.pathname + location.search + location.hash) +
+      "&titel=" + encodeURIComponent(title);
+  });
 })();

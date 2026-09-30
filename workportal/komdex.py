@@ -16,7 +16,7 @@ import os
 import re
 from datetime import timedelta
 
-from flask import Blueprint, request, jsonify
+from flask import current_app, Blueprint, request, jsonify
 
 from . import sharepoint as sp
 from .db import get_db
@@ -361,6 +361,12 @@ def orderbon():
                  (json.dumps(bon, ensure_ascii=False), fid, now, cid, bon.get("description"), it["id"]))
     conn.commit()
     result = auto_process(conn, it["id"])
+    # nieuwe order (geen bestaande map van vóór de koppeling): orderbon automatisch printen via Printix
+    from . import printix
+    if (it["status"] != "bestaand" and not it["printed_at"] and printix.configured()
+            and printix.setting(conn, "printix_auto_orderbon") == "1" and printix.printer(conn)):
+        printix.print_background(current_app.config["DB_PATH"], data, f"Orderbon {it['number']}", it["id"])
+        result = (result or "") + " · wordt geprint"
     return jsonify({"ok": True, "ordertype": bon.get("order_type"), "resultaat": result})
 
 

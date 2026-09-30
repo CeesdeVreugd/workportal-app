@@ -1,0 +1,44 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+<style>
+  .pdf-wrap { flex: 1; min-height: 0; position: relative; background: #525659; }
+  .pdf-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #525659; }
+  .pdf-alt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-align: center; padding: 24px; }
+</style>
+</head>
+<body class="v3d-body">
+<div class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" id="pdf-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b>{{ title }}</b><span>PDF</span></div>
+    <a class="iconbtn light" href="{{ src }}{{ '&' if '?' in src else '?' }}download=1" download aria-label="Downloaden" title="Downloaden">{{ icon('download') }}</a>
+    <a class="iconbtn light" href="{{ src }}" target="_blank" rel="noopener" aria-label="In nieuw venster openen" title="In nieuw venster openen (printen)">{{ icon('external') }}</a>
+  </header>
+  <main class="pdf-wrap" id="pdf-wrap">
+    <iframe id="pdf-frame" src="{{ src }}" title="{{ title }}"></iframe>
+  </main>
+</div>
+<script>
+(function () {
+  // Terug: naar de vorige pagina in WorkPortal als die er is, anders naar de meegegeven pagina
+  var back = document.getElementById("pdf-back");
+  back.addEventListener("click", function (e) {
+    if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+  });
+  // Android kan een PDF niet in de pagina tonen: dan een knop om hem te openen
+  if (/Android/i.test(navigator.userAgent)) {
+    document.getElementById("pdf-wrap").innerHTML = '<div class="pdf-alt"><p>Deze telefoon kan de PDF niet in WorkPortal tonen.</p>' +
+      '<a class="btn primary" href="{{ src }}" target="_blank" rel="noopener">PDF openen</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

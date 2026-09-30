@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Printen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Printen via Printix</p></div></div>
+{% include "beheer/_nav.html" %}
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Printer en instellingen</h2>
+    {% if not configured %}
+    <div class="alertbox"><b>Printix is nog niet gekoppeld.</b> Zet in Portainer bij de stack <code>PRINTIX_TENANT_ID</code>, <code>PRINTIX_CLIENT_ID</code> en <code>PRINTIX_CLIENT_SECRET</code> en deploy opnieuw.</div>
+    {% else %}
+    {% if error %}<div class="alertbox">{{ error }}</div>{% endif %}
+    <form method="post" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="f full">Printer (A4)<select name="printer">
+        {% if not current %}<option value="">Kies een printer…</option>{% endif %}
+        {% for p in printers %}{% set v = p.printer_id ~ '|' ~ p.queue_id ~ '|' ~ p.name %}
+        <option value="{{ v }}" {{ 'selected' if current and current.printer_id == p.printer_id and current.queue_id == p.queue_id }}>{{ p.name }}{{ ' · ' ~ p.location if p.location }}{{ ' · ' ~ p.model if p.model }}{{ ' (' ~ p.status|lower ~ ')' if p.status and p.status|lower not in ['online','connected'] }}</option>
+        {% endfor %}
+        {% if current and not printers %}<option value="{{ current.printer_id }}|{{ current.queue_id }}|{{ current.name }}" selected>{{ current.name }}</option>{% endif %}
+      </select><span class="hint">{{ printers|length }} printer(s) gevonden in Printix.</span></label>
+      <label class="check full"><input type="checkbox" name="auto" value="1" {{ 'checked' if auto }}> <span><b>Orderbonnen van nieuwe orders automatisch printen</b><br><span class="hint">Zodra het script op DC01 een orderbon van een nieuwe ordermap doorgeeft. Bestaande mappen worden niet geprint.</span></span></label>
+      <div class="fgrid">
+        <label class="f">Aantal exemplaren<input type="number" name="copies" min="1" max="20" value="{{ opts.copies }}"></label>
+        <label class="f">Dubbelzijdig<select name="duplex">
+          <option value="NONE" {{ 'selected' if opts.duplex == 'NONE' }}>Nee (enkelzijdig)</option>
+          <option value="LONG_EDGE" {{ 'selected' if opts.duplex == 'LONG_EDGE' }}>Ja, lange zijde</option>
+          <option value="SHORT_EDGE" {{ 'selected' if opts.duplex == 'SHORT_EDGE' }}>Ja, korte zijde</option></select></label>
+      </div>
+      <label class="check"><input type="checkbox" name="color" value="1" {{ 'checked' if opts.color }}> In kleur</label>
+      <div class="actions"><button class="btn primary" name="action" value="opslaan">Opslaan</button>
+        {% if current %}<button class="btn" name="action" value="test">{{ icon('pdf') }}Testpagina printen</button>{% endif %}</div>
+    </form>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Zo werkt het</h2>
+    <ul class="steps-list" style="margin-top:0">
+      <li>WorkPortal stuurt de PDF via de Printix Cloud Print API naar de gekozen printer; die print direct (geen vrijgave bij de printer).</li>
+      <li>Handmatig printen: Beheer &gt; DC01, vink ordermappen aan en kies <i>Orderbon printen</i>, of de knop <i>Orderbon printen</i> bij een order/project.</li>
+      <li>Printix-gegevens maak je in Printix Administrator bij de Cloud Print API (Printix Premium nodig; Secure Print mag niet op "Alle gebruikers moeten veilig printen" staan).</li>
+    </ul>
+    <h3 style="margin-top:14px">Laatst geprint</h3>
+    <div class="rows">{% for r in recent %}<div class="rowitem"><div class="grow"><div class="t">Orderbon {{ r.number }}</div><div class="s">{{ r.printed_at|dt if r.printed_at else '' }} {{ r.print_note }}</div></div></div>{% else %}<div class="empty">Nog niets geprint.</div>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}
