@@ -484,3 +484,50 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .nc-top { margin-bottom: 14px; } .grouprow td { background: #F6F8FC; }
 .show-m { display: none; }
 @media (max-width: 900px) { .show-m { display: block; } }
+
+/* ---------- telefoon: nooit breder dan het scherm ---------- */
+.grid > *, .fgrid > *, .card, label.f, .form > * { min-width: 0; }
+input, select, textarea { max-width: 100%; min-width: 0; }
+select { text-overflow: ellipsis; }
+@media (max-width: 900px) {
+  .content { overflow-x: clip; }
+  .chips { flex-wrap: wrap; }
+  .chip span { white-space: normal; }
+}
+
+/* ---------- telefoon: alles wat compacter ---------- */
+@media (max-width: 600px) {
+  body { font-size: 14px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 16px; margin-bottom: 10px; }
+  h3 { font-size: 15px; }
+  .small, .hint, .rowitem .s { font-size: 12.5px; }
+  .content { padding: 14px 12px 88px; gap: 12px; }
+  .card { padding: 13px; border-radius: 12px; }
+  .pagehead p { font-size: 13.5px; margin-top: 2px; }
+  .kpi .label { font-size: 12.5px; }
+  .kpi .value { font-size: 21px; margin-top: 3px; }
+  .kpi .sub { font-size: 12px; }
+  .btn { height: 40px; padding: 0 14px; font-size: 14px; border-radius: 9px; }
+  .btn.sm { height: 34px; padding: 0 10px; font-size: 13px; }
+  input[type=text], input[type=url], input:not([type]), input[type=email], input[type=number], input[type=date], input[type=datetime-local],
+  input[type=password], input[type=search], input[type=tel], select { height: 42px; font-size: 16px; }
+  label.f { font-size: 12.5px; gap: 4px; }
+  .check { font-size: 14px; }
+  .chip span { height: 38px; padding: 0 12px; font-size: 14px; }
+  .table th { font-size: 12px; }
+  .table th, .table td { padding: 8px 8px; }
+  .dl { grid-template-columns: 105px 1fr; gap: 6px 10px; }
+  .dl dt { font-size: 13px; }
+  .badge { font-size: 11.5px; padding: 2px 8px; }
+  .tabs a, .tabs button { padding: 8px 12px; font-size: 14px; }
+  .flash { font-size: 13.5px; padding: 10px 12px; }
+  .mobile-top { height: calc(52px + env(safe-area-inset-top)); }
+  .mobile-top img { height: 26px; }
+  .mobile-top .iconbtn { width: 36px; height: 36px; }
+  .bottomnav { height: 60px; }
+  .bottomnav a { font-size: 10.5px; gap: 2px; }
+  .bottomnav svg { width: 20px; height: 20px; }
+  .rowitem { padding: 10px 0; }
+  .nav a { padding: 9px 12px; font-size: 14.5px; }
+}

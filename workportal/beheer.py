@@ -137,6 +137,9 @@ def settings():
             v = _f(k)
             if v is not None:
                 set_setting(k, v)
+        if request.form.get("mobile_form") == "1":
+            on = set(request.form.getlist("mobile_on"))
+            set_setting("mobile_off", json.dumps([m for m in PHONE_MODULES if m not in on]))
         audit("instellingen gewijzigd", "settings")
         flash("Instellingen opgeslagen.", "ok")
         return redirect(url_for("beheer.settings"))
@@ -148,7 +151,12 @@ def settings():
         "backups": sorted(os.listdir(current_app.config["BACKUP_DIR"]))[-5:] if os.path.isdir(current_app.config["BACKUP_DIR"]) else [],
         "db_size": os.path.getsize(current_app.config["DB_PATH"]) if os.path.exists(current_app.config["DB_PATH"]) else 0,
     }
-    return render_template("beheer/settings.html", v=values, status=status)
+    from .util import mobile_off
+    return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(),
+                           phone_modules=[(k, dict(MODULES)[k]) for k in PHONE_MODULES])
+
+
+PHONE_MODULES = ["klanten", "projecten", "orders", "service", "druktest", "modellen3d", "calculatie", "nacalculatie", "kennis", "beheer"]
 
 
 @bp.route("/sharepoint", methods=["GET", "POST"])

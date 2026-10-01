@@ -5,19 +5,19 @@
 <h1>Menu</h1>
 <div class="card flush"><div class="nav" style="padding:8px">
   <a href="{{ url_for('main.dashboard') }}">{{ icon('dashboard') }}Dashboard</a>
-  {% if can('klanten') or can('projecten') or can('orders') %}<div class="navhead">Relaties &amp; werk</div>{% endif %}
-  {% if can('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Relaties</a>{% endif %}
-  {% if can('projecten') %}<a href="{{ url_for('projecten.index') }}">{{ icon('project') }}Projecten</a>{% endif %}
-  {% if can('orders') %}<a href="{{ url_for('orders.index') }}">{{ icon('order') }}Orders{% if inbox_count() %}<span class="navbadge">{{ inbox_count() }}</span>{% endif %}</a>{% endif %}
-  {% if can('service') or can('druktest') or can('modellen3d') %}<div class="navhead">Uitvoering</div>{% endif %}
-  {% if can('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
-  {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}
-  {% if can('modellen3d') %}<a href="{{ url_for('modellen.index') }}">{{ icon('cube') }}3D-viewer</a>{% endif %}
-  {% if can('calculatie') or can('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
-  {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
-  {% if can('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
-  {% if can('kennis') %}<div class="navhead">Kennis</div><a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
-  {% if can('beheer') %}<div class="navhead">Systeem</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
+  {% if navok('klanten') or navok('projecten') or navok('orders') %}<div class="navhead">Relaties &amp; werk</div>{% endif %}
+  {% if navok('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Relaties</a>{% endif %}
+  {% if navok('projecten') %}<a href="{{ url_for('projecten.index') }}">{{ icon('project') }}Projecten</a>{% endif %}
+  {% if navok('orders') %}<a href="{{ url_for('orders.index') }}">{{ icon('order') }}Orders{% if inbox_count() %}<span class="navbadge">{{ inbox_count() }}</span>{% endif %}</a>{% endif %}
+  {% if navok('service') or navok('druktest') or navok('modellen3d') %}<div class="navhead">Uitvoering</div>{% endif %}
+  {% if navok('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
+  {% if navok('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}
+  {% if navok('modellen3d') %}<a href="{{ url_for('modellen.index') }}">{{ icon('cube') }}3D-viewer</a>{% endif %}
+  {% if navok('calculatie') or navok('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
+  {% if navok('calculatie') %}<a href="{{ url_for('calculatie.index') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
+  {% if navok('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
+  {% if navok('kennis') %}<div class="navhead">Kennis</div><a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
+  {% if navok('beheer') %}<div class="navhead">Systeem</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
   <div class="navhead">Persoonlijk</div>
   <a href="{{ url_for('main.account') }}">{{ icon('bell') }}Mijn account &amp; meldingen</a>
 </div></div>

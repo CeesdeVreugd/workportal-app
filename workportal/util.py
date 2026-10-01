@@ -173,6 +173,7 @@ def audit(action, entity=None, entity_id=None, details=None):
 
 
 DEFAULT_SETTINGS = {
+    "mobile_off": '["calculatie"]',   # modules die niet op de telefoon beschikbaar zijn (JSON-lijst)
     "verify_days": "14",
     "unlock_hours": "12",
     "pin_min_length": "4",
@@ -335,3 +336,32 @@ def db_tx():
 
 def in_hours(hours):
     return iso(now_utc() + timedelta(hours=hours))
+
+
+# ------------------------------------------------------------------ telefoon
+BP_MODULE = {"klanten": "klanten", "projecten": "projecten", "orders": "orders", "service": "service", "druktest": "druktest",
+             "modellen": "modellen3d", "calculatie": "calculatie", "nacalc": "nacalculatie", "kennis": "kennis", "beheer": "beheer"}
+
+
+def is_phone():
+    """Telefoon (geen tablet): iPhone of Android-telefoon."""
+    from flask import request
+    ua = request.headers.get("User-Agent", "") if request else ""
+    return "iPhone" in ua or ("Android" in ua and "Mobile" in ua) or "iPod" in ua
+
+
+def mobile_off():
+    try:
+        v = json.loads(get_setting("mobile_off") or "[]")
+        return set(v) if isinstance(v, list) else set()
+    except ValueError:
+        return set()
+
+
+def on_phone_ok(module):
+    """Mag deze module op dit apparaat getoond worden? (op pc/tablet altijd)"""
+    if not is_phone():
+        return True
+    if "_phone_off" not in g:
+        g._phone_off = mobile_off()
+    return module not in g._phone_off

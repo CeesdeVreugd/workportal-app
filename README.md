@@ -355,3 +355,9 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   de marge uit de regels (verkoopwaarde − kostprijs), er is geen 'extra bovenop de marge'. Automatisch via de vinkjes
   van de orderbon, of te kiezen bij Soort na-calculatie.
 - Overzicht gesorteerd op ordernummer, nieuwste boven.
+
+## Telefoonweergave
+- Op een telefoon (iPhone of Android-telefoon; een tablet telt niet als telefoon) is alles compacter: kleinere letters, knoppen, invoervelden en kaarten.
+- Onder **Beheer > Instellingen > Modules op de telefoon** kies je welke modules op de telefoon beschikbaar zijn. Standaard staat **Calculatie** uit; Na-calculatie staat aan.
+- Een module die uitstaat verdwijnt op de telefoon uit het menu, de onderbalk en het dashboard. Wie de link toch opent, ziet de melding "niet beschikbaar op de telefoon". Staat Calculatie uit, dan toont de onderbalk **Na-calc.** in plaats van Calculatie.
+- Op de pc en de tablet blijft alles gewoon beschikbaar (volgens de rechten).

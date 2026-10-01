@@ -81,11 +81,12 @@
   </div>
 </div>
 <nav class="bottomnav" aria-label="Snelmenu">
-  <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if ep.startswith('main.') }}">{{ icon('home') }}Start</a>
-  {% if can('service') %}<a href="{{ url_for('service.index') }}" class="{{ 'active' if ep.startswith('service.') }}">{{ icon('service') }}Service</a>{% endif %}
-  {% if can('druktest') %}<a href="{{ url_for('druktest.index') }}" class="{{ 'active' if ep.startswith('druktest.') }}">{{ icon('druktest') }}Druktest</a>{% endif %}
-  {% if can('calculatie') %}<a href="{{ url_for('calculatie.index') }}" class="{{ 'active' if ep.startswith('calculatie.') or ep.startswith('nacalc.') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
-  {% if can('kennis') %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
+  <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if ep.startswith('main.') and ep != 'main.menu' }}">{{ icon('home') }}Start</a>
+  {% if navok('service') %}<a href="{{ url_for('service.index') }}" class="{{ 'active' if ep.startswith('service.') }}">{{ icon('service') }}Service</a>{% endif %}
+  {% if navok('druktest') %}<a href="{{ url_for('druktest.index') }}" class="{{ 'active' if ep.startswith('druktest.') }}">{{ icon('druktest') }}Druktest</a>{% endif %}
+  {% if navok('calculatie') %}<a href="{{ url_for('calculatie.index') }}" class="{{ 'active' if ep.startswith('calculatie.') or ep.startswith('nacalc.') }}">{{ icon('calculatie') }}Calculatie</a>
+  {% elif navok('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}" class="{{ 'active' if ep.startswith('nacalc.') }}">{{ icon('nacalculatie') }}Na-calc.</a>{% endif %}
+  {% if navok('kennis') %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
   <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('projecten.') or ep.startswith('orders.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
 </nav>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>

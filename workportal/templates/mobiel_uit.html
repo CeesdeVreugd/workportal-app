@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Niet op de telefoon{% endblock %}
+{% block content %}
+<div class="card" style="text-align:center;padding:28px 18px">
+  <h2 style="margin-bottom:6px">{{ module }} is niet beschikbaar op de telefoon</h2>
+  <p class="muted" style="margin:0 0 16px">Open {{ module|lower }} op een pc of tablet.</p>
+  <a class="btn primary" href="{{ url_for('main.dashboard') }}">{{ icon('home') }}Naar start</a>
+</div>
+{% endblock %}

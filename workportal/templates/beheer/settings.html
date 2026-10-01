@@ -16,6 +16,10 @@
       <label class="f full">Druktest-timers (minuten, komma-gescheiden)<input type="text" name="pressure_presets" value="{{ v.pressure_presets }}"></label>
       <label class="f full">SharePoint hoofdmap voor projecten<input type="text" name="sharepoint_root" value="{{ v.sharepoint_root }}"><span class="hint">Als een project geen eigen SharePoint-map heeft, wordt &lt;hoofdmap&gt;/&lt;projectnummer&gt; gebruikt.</span></label>
     </div>
+    <h3 style="margin-top:14px">Modules op de telefoon</h3>
+    <p class="hint" style="margin-top:0">Wat uit staat, is op een telefoon niet te zien en niet te openen. Op pc en tablet blijft alles zoals de rechten het toestaan.</p>
+    <input type="hidden" name="mobile_form" value="1">
+    <div class="chips">{% for key, label in phone_modules %}<label class="chip"><input type="checkbox" name="mobile_on" value="{{ key }}" {{ 'checked' if key not in mobile_off }}><span>{{ label.replace(' (gebruikers & rechten)', '').replace(' (gebruiken)', '') }}</span></label>{% endfor %}</div>
     <div><button class="btn primary">Opslaan</button></div>
   </form>
   <section class="card">

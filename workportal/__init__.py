@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.23.2"
+VERSION = "1.24.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -86,6 +86,8 @@ def create_app(test_config=None, start_scheduler=True):
     app.register_blueprint(werk.bp, url_prefix="/projecten", name="projecten")
     app.register_blueprint(werk.bp, url_prefix="/orders", name="orders")
     app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count)
+    from .util import on_phone_ok, is_phone
+    app.jinja_env.globals.update(navok=lambda m: can(m) and on_phone_ok(m), is_phone=is_phone)
 
     @app.before_request
     def _before():
@@ -101,6 +103,14 @@ def create_app(test_config=None, start_scheduler=True):
             if request.path.startswith("/api/"):
                 return {"error": "Niet ingelogd"}, 401
             return redirect(url_for("auth.login", next=request.full_path if request.query_string else request.path))
+        # module uitgezet voor de telefoon (Beheer > Instellingen)
+        from .util import BP_MODULE, on_phone_ok
+        bp_name = request.blueprint or ""
+        mod = BP_MODULE.get(bp_name)
+        if mod and request.method == "GET" and not on_phone_ok(mod) and not request.path.startswith("/api/") \
+                and not request.args.get("download") and request.endpoint not in ("main.file",):
+            from flask import render_template
+            return render_template("mobiel_uit.html", module=dict(MODULES).get(mod, mod)), 200
         return None
 
     @app.after_request
