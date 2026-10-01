@@ -345,7 +345,7 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   Inkopen incl. koopdelen, Werkplaats, Besturing, Transport, Montage) worden automatisch aan de items gekoppeld; de
   koppeling is aan te passen. Geldt voor alle imports van dezelfde order. Een gekozen WorkPortal-calculatie gaat voor.
 - **Standaard machine / productieorder (bijv. PalletRotator):** interne productieorder, alleen om de kostprijs per
-  machine te bepalen. Bovenaan kies je de soort (automatisch bij ordertype met "Standaard Machine") en het aantal
+  machine te bepalen. Bovenaan kies je de soort (automatisch bij ordertype met "Standaard Machine" én klant De Vreugd Productietechniek; een verkooporder Standaard Machine aan een andere klant wordt gewoon vaste prijs of regie) en het aantal
   gebouwde machines; er wordt dan niet met een calculatie vergeleken. Per item: **Basis** (in elke machine, gedeeld
   door het aantal machines), **Versie** (onderdelen voor een type, bijv. K13/EPT; eigen aantal; zit in de
   machineprijs) of **Optie** (bijv. safety / cold storage; eigen aantal; apart boeken). Machines/uitvoeringen = basis

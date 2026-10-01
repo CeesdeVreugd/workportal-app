@@ -155,6 +155,12 @@ def _is_hours(l):
     return (l.get("unit") or "").lower() in HOUR_UNITS or l.get("line_type") == 4
 
 
+def is_intern_klant(name):
+    """True als de klant De Vreugd Productietechniek zelf is (interne order)."""
+    s = " ".join((name or "").lower().replace("-", " ").split())
+    return "vreugd" in s and "productietechniek" in s
+
+
 def nacalc_mode(n, opts=None):
     """'kostprijs' voor een interne productieorder (Standaard Machine, bijv. PalletRotator), anders 'normaal'."""
     if opts is None:
@@ -167,8 +173,8 @@ def nacalc_mode(n, opts=None):
     m = opts.get("mode") or "auto"
     if m in ("normaal", "kostprijs", "regie"):
         return m
-    if "standaard machine" in (n.get("project_order_type") or "").lower():
-        return "kostprijs"
+    if "standaard machine" in (n.get("project_order_type") or "").lower() and is_intern_klant(n.get("customer_name")):
+        return "kostprijs"  # alleen interne productieorders; verkooporders Standaard Machine gaan gewoon mee
     try:  # orderbon zonder vinkje 'Vaste prijs' = regie
         props = json.loads(n.get("project_order_props") or "{}")
     except (ValueError, TypeError):
