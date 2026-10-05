@@ -164,7 +164,9 @@ en de omschrijving; WorkPortal maakt dan de map in de klantmap in SharePoint:
 
 - Project: direct een map `<ordernummer>-<omschrijving>` → Power Automate zet het sjabloon erin en plaatst de Teams-post.
 - Order: géén map, tot iemand op de orderpagina op **Ordermap aanmaken** klikt; dan
-  `<ordernummer> <omschrijving>` (spatie, geen streepje) → Power Automate doet niets.
+  ook `<ordernummer>-<omschrijving>` (sinds V64 altijd met streepje, bijv. `20260148-Ontwerp, levering en aanpassen spuitjes`).
+  Of iets een project of order is, onthoudt WorkPortal zelf; de mapnaam bepaalt dat niet meer. Oude ordermappen met
+  een spatie blijven gewoon werken.
 
 Ordertypes (Leeg, Offerte, Particulier, Handel, Service / onderhoud, Engineering, Speciaal Machinebouw,
 Constructie/Plaatwerk, Leidingwerk, WBSO, Garantie, Intern, Standaard Machine - PalletRotator) staan

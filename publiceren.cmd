@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V63: bezoek bij een ticket verwijderen"
+set "OMSCHRIJVING=WorkPortal V64: map in SharePoint altijd als nummer-omschrijving (ook orders)"
 
 echo.
 echo ============================================

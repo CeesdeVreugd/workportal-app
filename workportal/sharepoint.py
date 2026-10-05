@@ -30,7 +30,7 @@ from .util import now_iso
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 PROJECT_RE = re.compile(r"^\s*(\d{8})\s*-\s*(.+?)\s*$")
-# Ordermap: nummer, spatie, omschrijving, zonder streepje, zodat Power Automate hem niet als project oppakt
+# Oude ordermappen: nummer, spatie, omschrijving (vóór V64). Nieuwe mappen krijgen altijd een streepje.
 ORDER_RE = re.compile(r"^\s*(\d{8})\s+([^\s\-\u2013].*?)\s*$")
 
 
@@ -223,12 +223,11 @@ def norm(s):
 
 
 def folder_name(number, name, kind="project"):
-    """Project: <ordernummer>-<omschrijving> (Power Automate zet het sjabloon erin).
-    Order: <ordernummer> <omschrijving> (zonder streepje, Power Automate doet niets)."""
+    """Project én order: <ordernummer>-<omschrijving>, bijv. 20260148-Ontwerp, levering en aanpassen spuitjes.
+    (kind blijft als parameter voor oude aanroepen; of iets een project of order is, staat in WorkPortal zelf.)"""
     desc = re.sub(r'["*:<>?/\\|#%]+', " ", name or "")
     desc = re.sub(r"\s+", " ", desc).strip().rstrip(".").strip().lstrip("-\u2013 ")
-    sep = " " if kind == "order" else "-"
-    return f"{number}{sep}{desc}"[:200].rstrip(". ")
+    return f"{number}-{desc}"[:200].rstrip(". ")
 
 
 def safe_rel(relpath):
@@ -429,11 +428,12 @@ def _upsert_project(conn, item, parent_id, stats, status):
                 "SELECT 1 FROM projects WHERE number = ? AND id <> ?", (number, row["id"])).fetchone():
             new_number = number
         new_name = desc if (row["sp_name"] is None or row["name"] == row["sp_name"]) else row["name"]
-        changed = (new_number, new_name, parent_id, kind) != (row["number"], row["name"], row["sp_parent_id"], row["kind"]) \
+        # project of order: wat in WorkPortal staat blijft leidend (de mapnaam zegt dat sinds V64 niet meer)
+        changed = (new_number, new_name, parent_id) != (row["number"], row["name"], row["sp_parent_id"]) \
             or row["sp_missing"]
         conn.execute("UPDATE projects SET number = ?, name = ?, sp_name = ?, sp_parent_id = ?, sp_web_url = ?, sp_missing = 0,"
-                     " kind = ?, customer_id = COALESCE(?, customer_id) WHERE id = ?",
-                     (new_number, new_name, desc, parent_id, item.get("webUrl"), kind, cust, row["id"]))
+                     " customer_id = COALESCE(?, customer_id) WHERE id = ?",
+                     (new_number, new_name, desc, parent_id, item.get("webUrl"), cust, row["id"]))
         if changed:
             stats["bijgewerkt"] += 1
         return
