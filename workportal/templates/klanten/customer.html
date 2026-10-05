@@ -67,14 +67,14 @@
   <section class="card" id="locaties">
     <div class="card-head"><h2>Locaties</h2></div>
     <div class="rows">
-      {% for l in locations %}<div class="rowitem"><div class="grow"><div class="t">{{ l.name }}</div><div class="s">{{ l.address or '' }} {{ l.postcode or '' }} {{ l.city or '' }}</div></div>
+      {% for l in locations %}<div class="rowitem"><div class="grow"><div class="t">{{ l.name }}</div><div class="s">{{ l.address or '' }} {{ l.postcode or '' }} {{ l.city or '' }}{% if l.address or l.city %} · <a href="https://www.google.com/maps/search/?api=1&query={{ ((l.address or '') ~ ' ' ~ (l.postcode or '') ~ ' ' ~ (l.city or ''))|urlencode }}" target="_blank" rel="noopener">Op de kaart</a>{% endif %}</div></div>
       {% if edit %}<form method="post" action="{{ url_for('klanten.delete_sub', cid=c.id, kind='locatie', oid=l.id) }}" data-confirm="Locatie verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
       {% else %}<div class="empty">Geen extra locaties.</div>{% endfor %}
     </div>
     {% if edit %}
     <form method="post" action="{{ url_for('klanten.add_location', cid=c.id) }}" class="form" style="margin-top:14px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required placeholder="bijv. Vestiging Noord"></label><label class="f">Adres<input type="text" name="address"></label><label class="f">Postcode<input type="text" name="postcode"></label><label class="f">Plaats<input type="text" name="city"></label></div>
+      <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required placeholder="bijv. Vestiging Noord"></label><div class="full" data-addr-search></div><label class="f">Adres<input type="text" name="address"></label><label class="f">Postcode<input type="text" name="postcode"></label><label class="f">Plaats<input type="text" name="city"></label></div>
       <div><button class="btn sm">{{ icon('plus') }}Locatie toevoegen</button></div>
     </form>
     {% endif %}

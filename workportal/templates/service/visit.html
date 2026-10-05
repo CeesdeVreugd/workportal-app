@@ -29,4 +29,10 @@
     <button class="btn" name="next" value="tekenen">Opslaan &amp; laten tekenen</button>
   </div>
 </form>
+{% if vid %}
+<form method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=vid) }}" data-confirm="Dit bezoek met foto's verwijderen?" style="max-width:900px;margin-top:12px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn danger sm">Bezoek verwijderen</button>
+</form>
+{% endif %}
 {% endblock %}

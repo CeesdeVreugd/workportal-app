@@ -309,11 +309,12 @@
     cfg.fields.forEach(function (f) {
       html += '<label class="f' + (f[0] === "name" ? " full" : "") + '">' + esc(f[1]) + '<input type="' + f[2] + '" name="' + f[0] + '"' + (f[3] ? " required" : "") + '></label>';
     });
-    html += '</div><p class="hint err" hidden></p><div class="actions"><button class="btn primary" value="ok">Toevoegen</button><button class="btn ghost" value="cancel" formnovalidate>Annuleren</button></div></form>';
+    html += '</div>' + (kind === "locatie" ? '<div data-addr-search></div>' : '') + '<p class="hint err" hidden></p><div class="actions"><button class="btn primary" value="ok">Toevoegen</button><button class="btn ghost" value="cancel" formnovalidate>Annuleren</button></div></form>';
     dlg.innerHTML = html;
     document.body.appendChild(dlg);
     var form = dlg.querySelector("form");
     form.elements.name.value = text || "";
+    var ab = dlg.querySelector("[data-addr-search]"); if (ab && WP.addrSearch) WP.addrSearch(ab);
     form.addEventListener("submit", function (ev) {
       if (ev.submitter && ev.submitter.value === "cancel") return;
       ev.preventDefault();
@@ -424,4 +425,49 @@
     syncText();
   }
   document.querySelectorAll("select[data-combo]").forEach(enhance);
+})();
+
+/* Adres zoeken (PDOK Locatieserver, Nederlandse adressen): <div data-addr-search></div> in een formulier
+   met velden address, postcode en city. Typ postcode + huisnummer of straat + plaats en klik Zoek adres. */
+(function () {
+  var BASE = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/";
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  WP.addrSearch = function (box) {
+    if (!box || box.dataset.ready) return; box.dataset.ready = "1";
+    var form = box.closest("form");
+    box.classList.add("addr-search");
+    box.innerHTML = '<label class="f">Adres zoeken<span class="addr-row"><input type="search" placeholder="Postcode + huisnummer, of straat en plaats" autocomplete="off">' +
+      '<button type="button" class="btn sm">Zoek adres</button></span></label><ul class="combo-list" hidden></ul><p class="hint" hidden></p>';
+    var inp = box.querySelector("input"), btn = box.querySelector("button"), list = box.querySelector("ul"), hint = box.querySelector(".hint");
+    var f = function (n) { return form && form.querySelector('[name="' + n + '"]'); };
+    inp.value = [f("address") && f("address").value, f("postcode") && f("postcode").value, f("city") && f("city").value].filter(Boolean).join(" ");
+    function say(t) { hint.hidden = !t; hint.textContent = t || ""; }
+    function search() {
+      var q = inp.value.trim(); if (!q) { say("Typ eerst een postcode en huisnummer, of een straat en plaats."); return; }
+      say("Zoeken…"); list.hidden = true;
+      fetch(BASE + "suggest?rows=8&fq=type:adres&q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (js) {
+        var docs = (js.response && js.response.docs) || [];
+        if (!docs.length) { say("Geen adres gevonden. Probeer postcode + huisnummer."); return; }
+        say("");
+        list.innerHTML = docs.map(function (d) { return '<li data-id="' + esc(d.id) + '">' + esc(d.weergavenaam) + "</li>"; }).join("");
+        list.hidden = false;
+      }).catch(function () { say("Adres zoeken lukt nu niet (geen verbinding met de adressendienst)."); });
+    }
+    btn.addEventListener("click", search);
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); search(); } });
+    list.addEventListener("mousedown", function (e) {
+      var li = e.target.closest("li[data-id]"); if (!li) return; e.preventDefault();
+      fetch(BASE + "lookup?fl=straatnaam,huisnummer,huisletter,huisnummertoevoeging,postcode,woonplaatsnaam&id=" + encodeURIComponent(li.getAttribute("data-id")))
+        .then(function (r) { return r.json(); }).then(function (js) {
+          var d = (js.response && js.response.docs && js.response.docs[0]) || {};
+          var nr = [d.huisnummer, d.huisletter].filter(Boolean).join("") + (d.huisnummertoevoeging ? "-" + d.huisnummertoevoeging : "");
+          if (f("address")) f("address").value = [d.straatnaam, nr].filter(Boolean).join(" ");
+          if (f("postcode")) f("postcode").value = d.postcode || "";
+          if (f("city")) f("city").value = d.woonplaatsnaam || "";
+          inp.value = li.textContent; list.hidden = true; say("Adres ingevuld.");
+        }).catch(function () { say("Adres ophalen mislukt."); });
+    });
+    document.addEventListener("mousedown", function (e) { if (!box.contains(e.target)) list.hidden = true; });
+  };
+  document.querySelectorAll("[data-addr-search]").forEach(WP.addrSearch);
 })();

@@ -26,7 +26,9 @@ def _f(name):
 
 def _ticket(tid):
     t = query(
-        "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location, i.name AS installation,"
+        "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location,"
+        " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.postcode,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.postcode,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
+        " i.name AS installation,"
         " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, p.kind AS project_kind, p.work_description AS project_work, p.bon_file_id AS project_bon,"
         " ct.name AS contact, ct.phone AS contact_phone, ct.email AS contact_email, u.name AS assignee"
         " FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN locations l ON l.id = t.location_id"
@@ -88,9 +90,10 @@ def index():
         where.append("(t.number LIKE ? OR t.title LIKE ? OR IFNULL(c.name,'') LIKE ?)")
         params += [f"%{q}%"] * 3
     sql = ("SELECT t.*, c.name AS customer, i.name AS installation, u.name AS assignee,"
+           " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
            " (IFNULL(i.alert,'') <> '' OR IFNULL(i.bring,'') <> '' OR IFNULL(c.alert,'') <> '') AS has_alert FROM tickets t"
            " LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN installations i ON i.id = t.installation_id"
-           " LEFT JOIN users u ON u.id = t.assigned_to")
+           " LEFT JOIN users u ON u.id = t.assigned_to LEFT JOIN locations l ON l.id = t.location_id")
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY CASE t.priority WHEN 'hoog' THEN 0 WHEN 'normaal' THEN 1 ELSE 2 END, t.updated_at DESC LIMIT 300"
@@ -292,6 +295,23 @@ def visit(tid, vid=None):
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     v = v or {"date": local(now_utc()).strftime("%Y-%m-%d"), "technicians": g.user["name"]}
     return render_template("service/visit.html", t=t, v=v, vid=vid, files=files_for("visit", vid) if vid else [])
+
+
+@bp.route("/<int:tid>/bezoek/<int:vid>/verwijderen", methods=["POST"])
+@require("service", BEWERKEN)
+def visit_delete(tid, vid):
+    t = _ticket(tid)
+    v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
+    if v["signed_at"] and not can("service", BEHEER):
+        flash("Een ondertekend bezoek kan alleen iemand met Beheer-rechten op Service verwijderen.", "error")
+        return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
+    for f in files_for("visit", vid):
+        delete_file(f["id"])
+    execute("DELETE FROM visits WHERE id = ?", (vid,))
+    execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now_iso(), tid))
+    audit("bezoek verwijderd", "ticket", tid, f"{v['date']}{' (was ondertekend door ' + v['signed_name'] + ')' if v['signed_at'] else ''}")
+    flash("Bezoek verwijderd.", "ok")
+    return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
 
 
 @bp.route("/<int:tid>/bezoek/<int:vid>/tekenen", methods=["GET", "POST"])

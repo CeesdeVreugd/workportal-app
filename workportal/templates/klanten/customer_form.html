@@ -13,6 +13,7 @@
     <label class="f">Klantnummer SnelStart<input type="text" name="debtor_no" value="{{ c.debtor_no or '' }}" inputmode="numeric"></label>
     <label class="f">Type<select name="relation_type"><option value="">–</option>{% for k, l in TYPES %}{{ opt(k, l, c.relation_type) }}{% endfor %}</select></label>
     <label class="f">Groep / branche<input type="text" name="relation_group" value="{{ c.relation_group or '' }}" placeholder="bijv. Food, Machines"></label>
+    <div class="full" data-addr-search></div>
     <label class="f full">Adres (straat en huisnummer)<input type="text" name="address" value="{{ c.address or '' }}"></label>
     <label class="f">Postcode<input type="text" name="postcode" value="{{ c.postcode or '' }}"></label>
     <label class="f">Plaats<input type="text" name="city" value="{{ c.city or '' }}"></label>

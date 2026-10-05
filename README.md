@@ -399,3 +399,12 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
 - Staat het er niet tussen? Kies in de lijst **"+ … toevoegen"**: klant, locatie, machine of contactpersoon wordt meteen
   aangemaakt (gekoppeld aan de gekozen klant) en ingevuld. Kan iedereen met Bewerken op Service of Relaties.
 - Bij een ticket kun je naast bezoeken ook **notities** plaatsen (eigen notities bewerken/verwijderen; Beheer kan alles).
+- **Adres zoeken:** bij een nieuwe locatie (ook in het snel-toevoegen-venster) en bij een relatie staat "Adres zoeken":
+  typ postcode + huisnummer of straat en plaats, klik **Zoek adres** en kies; adres, postcode en plaats worden ingevuld
+  (Nederlandse adressen via de PDOK Locatieserver van de overheid, gratis). Bij locaties staat "Op de kaart" en bij een
+  ticket "Route" (Google Maps) naar het adres van de locatie, of anders van de klant.
+- Bovenaan elk ticket staat altijd een **adresbalk** met het adres van de locatie (of anders van de klant) en een knop
+  **Route**. Is er geen adres, dan staat er "Geen adres bekend" met een knop om het bij de klant in te vullen.
+  Het adres staat ook bij Gegevens en in de ticketlijst (op de telefoon onder de omschrijving).
+- Een **bezoek verwijderen** kan met het prullenbakje bij het bezoek of onderaan het bewerkscherm van het bezoek
+  (met foto's). Een ondertekend bezoek kan alleen iemand met Beheer op Service verwijderen; het komt in de historie.

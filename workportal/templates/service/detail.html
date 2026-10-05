@@ -23,11 +23,22 @@
 {% if t.project_work %}<details class="card workdetails"><summary><b>Werkomschrijving {{ 'order' if t.project_kind == 'order' else 'project' }} {{ t.project_no }}</b>{% if t.project_bon %} · <a href="{{ url_for('main.file', fid=t.project_bon) }}" data-pdf="Orderbon {{ t.project_no }}" target="_blank" rel="noopener">orderbon</a>{% endif %}</summary>
   <div class="prose worklist" style="margin-top:10px">{% for line in t.project_work.split('\n') %}<p>{{ line }}</p>{% endfor %}</div></details>{% endif %}
 {{ alert_dialog('ticket-' ~ t.id, t.customer_alert, t.inst_alert, t.inst_bring, 'Let op: ' ~ (t.installation or t.customer or t.title), url_for('service.depart', tid=t.id) if can('service', 2) else None, t.status in ['nieuw','ingepland','in_uitvoering','wacht']) }}
+<div class="addrbar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+  {% if t.visit_address %}
+  <div class="grow"><b>{{ t.visit_address }}</b>{% if t.location or t.customer %}<div class="small muted">{{ t.location or t.customer }}</div>{% endif %}</div>
+  <a class="btn sm primary" href="https://www.google.com/maps/dir/?api=1&destination={{ t.visit_address|urlencode }}" target="_blank" rel="noopener">Route</a>
+  {% else %}
+  <div class="grow"><b>Geen adres bekend</b><div class="small muted">{% if t.customer_id %}Vul het adres in bij de klant of de locatie.{% else %}Er is nog geen klant gekozen.{% endif %}</div></div>
+  {% if t.customer_id and can('klanten', 2) %}<a class="btn sm" href="{{ url_for('klanten.customer', cid=t.customer_id) }}#locaties">Adres invullen</a>{% endif %}
+  {% endif %}
+</div>
 <div class="grid g2 stack">
   <section class="card">
     <h2>Gegevens</h2>
     <dl class="dl">
       <dt>Klant</dt><dd>{% if t.customer_id %}<a href="{{ url_for('klanten.customer', cid=t.customer_id) }}">{{ t.customer }}</a>{% else %}–{% endif %}{% if t.location %}<div class="small muted">{{ t.location }}</div>{% endif %}</dd>
+      <dt>Adres</dt><dd>{% if t.visit_address %}{{ t.visit_address }} · <a href="https://www.google.com/maps/dir/?api=1&destination={{ t.visit_address|urlencode }}" target="_blank" rel="noopener">Route</a>{% else %}<span class="muted">Geen adres bekend</span>{% endif %}</dd>
       <dt>Installatie</dt><dd>{% if t.installation_id %}<a href="{{ url_for('klanten.installation', iid=t.installation_id) }}">{{ t.installation }}</a>{{ (' · SN ' ~ t.serial) if t.serial }}{% else %}–{% endif %}</dd>
       <dt>Contact</dt><dd>{{ t.contact or '–' }}{% if t.contact_phone %} · <a href="tel:{{ t.contact_phone }}">Bellen</a>{% endif %}</dd>
       <dt>{{ 'Order' if t.project_kind == 'order' else 'Project' }}</dt><dd>{% if t.project_id %}<a href="{{ werk_url('detail', t.project_kind or 'project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} · <a href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }} Map</a>{% endif %}{% else %}–{% endif %}</dd>
@@ -81,7 +92,7 @@
   </div>
 </section>
 
-<section class="card">
+<section class="card" id="bezoeken">
   <div class="card-head"><h2>Bezoeken ({{ visits|length }})</h2>{% if edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a>{% endif %}</div>
   <div class="rows">
   {% for v in visits %}
@@ -92,6 +103,7 @@
           {% if v.signed_at %}<span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% if v.sharepoint_status %}<span class="badge">{{ v.sharepoint_status }}</span>{% endif %}
           {% elif edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}">{{ icon('edit') }}Bewerken</a><a class="btn sm primary" href="{{ url_for('service.sign', tid=t.id, vid=v.id) }}">Handtekening &amp; afronden</a>{% endif %}
           <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
+          {% if edit and (not v.signed_at or can('service', 3)) %}<form method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=v.id) }}" data-confirm="{{ 'Dit bezoek is ondertekend door ' ~ v.signed_name ~ '. Toch verwijderen, met werkbon en foto\'s?' if v.signed_at else 'Bezoek van ' ~ (v.date|date) ~ ' met foto\'s verwijderen?' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Bezoek verwijderen">{{ icon('trash') }}</button></form>{% endif %}
         </div>
       </div>
       {% if v.findings %}<div><b class="small muted">Bevindingen</b><div class="prose">{{ v.findings }}</div></div>{% endif %}
