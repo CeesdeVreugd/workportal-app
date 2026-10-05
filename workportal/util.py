@@ -340,7 +340,7 @@ def in_hours(hours):
 
 # ------------------------------------------------------------------ telefoon
 BP_MODULE = {"klanten": "klanten", "projecten": "projecten", "orders": "orders", "service": "service", "druktest": "druktest",
-             "modellen": "modellen3d", "calculatie": "calculatie", "nacalc": "nacalculatie", "kennis": "kennis", "beheer": "beheer"}
+             "modellen": "modellen3d", "calculatie": "calculatie", "nacalc": "nacalculatie", "crediteuren": "crediteuren", "kennis": "kennis", "beheer": "beheer"}
 
 
 def is_phone():

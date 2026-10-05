@@ -481,6 +481,87 @@ MIGRATIONS = [
     ALTER TABLE nacalcs ADD COLUMN xcalc_name TEXT;
     ALTER TABLE nacalcs ADD COLUMN xcalc_file_id INTEGER;
     """,
+    # 15 - inkoopfacturen (crediteuren)
+    """
+    CREATE TABLE invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL DEFAULT 'nieuw',
+        supplier TEXT,
+        invoice_no TEXT,
+        invoice_date TEXT,
+        due_date TEXT,
+        amount_incl REAL,
+        amount_excl REAL,
+        description TEXT,
+        erp_ref TEXT,
+        source TEXT,
+        mail_id TEXT,
+        mail_from TEXT,
+        mail_subject TEXT,
+        received_at TEXT,
+        sha256 TEXT,
+        file_id INTEGER,
+        seen_at TEXT,
+        seen_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        question_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        question_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        question_at TEXT,
+        erp_at TEXT,
+        erp_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        snelstart_at TEXT,
+        snelstart_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        rejected_at TEXT,
+        rejected_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reject_reason TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_invoices_status ON invoices(status, received_at);
+    CREATE INDEX idx_invoices_sha ON invoices(sha256);
+    CREATE INDEX idx_invoices_question ON invoices(question_to);
+    CREATE TABLE invoice_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'opmerking',
+        body TEXT NOT NULL,
+        to_user INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        for_accounting INTEGER NOT NULL DEFAULT 0,
+        handled INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_invoice_notes ON invoice_notes(invoice_id);
+    CREATE TABLE invoice_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        action TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_invoice_log ON invoice_log(invoice_id);
+    CREATE TABLE invoice_mail_seen (
+        message_id TEXT PRIMARY KEY,
+        received_at TEXT
+    );
+    """,
+    # 16 - geen extra rol 'boekhouding': de rollen liggen vast (IT-strategie)
+    """
+    UPDATE users SET role_id = NULL WHERE role_id IN (SELECT id FROM roles WHERE key = 'boekhouding');
+    DELETE FROM roles WHERE key = 'boekhouding';
+    """,
+    # 17 - notities bij een serviceticket
+    """
+    CREATE TABLE ticket_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_ticket_notes ON ticket_notes(ticket_id, created_at);
+    """,
 ]
 
 

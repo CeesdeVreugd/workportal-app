@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Inkoopfacturen{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Inkoopfacturen</h1>
+    <p>{% if mail.on and mail.configured %}Binnengekomen op {{ mail.box }}{% if mail.last %} · laatst opgehaald {{ mail.last|dt('%d-%m %H:%M') }}{% endif %}{% else %}Facturen uploaden, of de mailbox aanzetten onder Beheer › Instellingen{% endif %}</p>
+    {% if mail.on and mail.error %}<p class="small" style="color:var(--bad);margin-top:4px">Ophalen uit de mailbox mislukt: {{ mail.error }}</p>{% endif %}
+  </div>
+  {% if can('crediteuren', 2) %}
+  <div class="actions">
+    <form method="post" action="{{ url_for('crediteuren.upload') }}" enctype="multipart/form-data" id="upform">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="btn">{{ icon('upload') }}PDF uploaden<input type="file" name="files" accept="application/pdf,.pdf" multiple hidden onchange="this.form.submit()"></label>
+    </form>
+    {% if mail.configured %}
+    <form method="post" action="{{ url_for('crediteuren.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn primary">{{ icon('refresh') }}Mailbox nu ophalen</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid g4" style="margin-bottom:16px">
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="text-decoration:none;color:inherit"><div class="label">Nieuw</div><div class="value" style="color:#0059B3">{{ counts.nieuw }}</div><div class="sub">nog in het ERP te zetten</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='vraag') }}" style="text-decoration:none;color:inherit"><div class="label">Vraag open</div><div class="value" style="color:var(--warn)">{{ counts.vraag }}</div><div class="sub">{{ counts.mij }} wacht{{ 'en' if counts.mij != 1 }} op jou</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Verwerkt in ERP</div><div class="value" style="color:#2E268F">{{ counts.erp }}</div><div class="sub">nog naar SnelStart</div></a>
+  <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" {% if counts.verval %}style="color:var(--bad)"{% endif %}>{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
+</div>
+
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('crediteuren.index', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
+<div class="fchips cred-chips" style="margin-bottom:12px">
+  {% for key, label in FILTERS %}{{ fbtn(key, label, counts[key]) }}{% endfor %}
+</div>
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:480px">
+  <input type="hidden" name="filter" value="{{ flt }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek leverancier, factuurnummer, inkooporder" style="flex:1">
+  <button class="btn">{{ icon('search') }}Zoeken</button>
+</form>
+
+<section class="card flush tablewrap">
+  <table class="table">
+    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th class="hide-m">Vervalt</th><th>Status</th><th class="hide-m">Laatste actie</th></tr></thead>
+    <tbody>
+    {% for r in items %}
+    <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">
+      <td class="nowrap small muted hide-m">{{ r.received_at|dt('%d-%m %H:%M') }}</td>
+      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
+        <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div></td>
+      <td class="hide-m">{{ r.invoice_no or '–' }}</td>
+      <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
+      <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
+      <td><span class="badge {{ STATUS_BADGE[r.skey] }}">{{ r.label }}</span></td>
+      <td class="hide-m small muted">{{ r.last_action or '' }}</td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">Geen facturen in deze lijst.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

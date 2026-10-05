@@ -15,6 +15,12 @@
 <a class="actionbar" href="{{ url_for('orders.inbox') }}">{{ icon('bell') }}<span><b>Actie nodig: {{ inbox_count() }} nieuwe ordermap{{ 'pen' if inbox_count() != 1 }} uit Komdex</b> om goed te zetten als project of order.</span><span class="go">Goedzetten →</span></a>
 {% endif %}
 
+{% if can('crediteuren') and navok('crediteuren') %}{% set cc = cred_counts() %}{% if cc.mij %}
+<a class="actionbar" href="{{ url_for('crediteuren.index', filter='mij') }}">{{ icon('invoice') }}<span><b>{{ cc.mij }} vraag{{ 'en' if cc.mij != 1 }} over inkoopfacturen</b> wacht{{ 'en' if cc.mij != 1 }} op jouw antwoord.</span><span class="go">Bekijken →</span></a>
+{% elif cc.nieuw %}
+<a class="actionbar" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="background:var(--accent-soft);color:var(--basic)">{{ icon('invoice') }}<span><b>{{ cc.nieuw }} nieuwe inkoopfactu{{ 'ren' if cc.nieuw != 1 else 'ur' }}</b> binnengekomen.</span><span class="go">Bekijken →</span></a>
+{% endif %}{% endif %}
+
 {% if d.actions %}
 <section class="card"><div class="card-head"><h2>Mijn acties uit gespreksnotities</h2></div>
   <div class="rows">{% for n in d.actions %}<a class="rowitem" href="{{ werk_url('detail', n.kind, pid=n.project_id) }}#n{{ n.id }}"><div class="grow"><div class="t">{{ n.number }} · {{ n.pname }}</div><div class="s">{{ n.body[:110] }}{{ '…' if n.body|length > 110 }}</div></div><span class="badge b-warn">{{ n.follow_up|date }}</span></a>{% endfor %}</div>

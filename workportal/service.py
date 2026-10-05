@@ -5,7 +5,7 @@ from . import sharepoint as sp
 from .integrations import upload_to_sharepoint, sharepoint_configured
 from .mail import send_mail
 from .pdf import visit_pdf
-from .permissions import require, LEZEN, BEWERKEN, BEHEER
+from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
 from .klanten import customer_options, ask_snelstart
 from .util import (now_iso, audit, files_for, save_uploads, save_signature, file_path, to_float, to_int,
                    next_number, get_setting, local, now_utc, delete_file, safe_filename)
@@ -36,6 +36,22 @@ def _ticket(tid):
     if not t:
         abort(404)
     return t
+
+
+def _links():
+    """Locatie, machine, contactpersoon en project alleen bewaren als ze bij de gekozen klant horen."""
+    cid = to_int(request.form.get("customer_id"))
+    out = {}
+    for field, table in (("location_id", "locations"), ("installation_id", "installations"), ("contact_id", "contacts")):
+        v = to_int(request.form.get(field))
+        out[field] = v if v and cid and query(f"SELECT 1 FROM {table} WHERE id = ? AND customer_id = ?", (v, cid), one=True) else None
+    pid = to_int(request.form.get("project_id"))
+    if pid:
+        p = query("SELECT customer_id FROM projects WHERE id = ?", (pid,), one=True)
+        out["project_id"] = pid if p and (not p["customer_id"] or p["customer_id"] == cid) else None
+    else:
+        out["project_id"] = None
+    return cid, out
 
 
 def _lookups(customer_id=None):
@@ -92,6 +108,7 @@ def new():
             flash("Vul een korte omschrijving in.", "error")
             return render_template("service/form.html", t=request.form, **_lookups(to_int(request.form.get("customer_id"))))
         now = now_iso()
+        cid, lk = _links()
         number = next_number("tickets", "T")
         status = _f("status") or ("ingepland" if _f("planned_date") else "nieuw")
         tid = execute(
@@ -99,9 +116,8 @@ def new():
             " project_id, contact_id, reported_by, assigned_to, planned_date, created_by, created_at, updated_at)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (number, _f("type") or "storing", _f("priority") or "normaal", status, _f("title"), _f("description"),
-             to_int(request.form.get("customer_id")), to_int(request.form.get("location_id")),
-             to_int(request.form.get("installation_id")), to_int(request.form.get("project_id")),
-             to_int(request.form.get("contact_id")), _f("reported_by"), to_int(request.form.get("assigned_to")),
+             cid, lk["location_id"], lk["installation_id"], lk["project_id"],
+             lk["contact_id"], _f("reported_by"), to_int(request.form.get("assigned_to")),
              _f("planned_date"), g.user["id"], now, now))
         save_uploads("ticket", tid)
         audit("aangemaakt", "ticket", tid, number)
@@ -120,9 +136,11 @@ def detail(tid):
     visits = query("SELECT v.*, u.name AS author FROM visits v LEFT JOIN users u ON u.id = v.created_by"
                    " WHERE v.ticket_id = ? ORDER BY v.date DESC, v.id DESC", (tid,))
     vfiles = {v["id"]: files_for("visit", v["id"]) for v in visits}
+    notes = query("SELECT n.*, u.name AS author FROM ticket_notes n LEFT JOIN users u ON u.id = n.created_by"
+                  " WHERE n.ticket_id = ? ORDER BY n.created_at DESC, n.id DESC", (tid,))
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'ticket' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 30", (tid,))
-    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, files=files_for("ticket", tid),
+    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, files=files_for("ticket", tid),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
 
@@ -134,6 +152,7 @@ def edit(tid):
         if not _f("title"):
             flash("Vul een korte omschrijving in.", "error")
         else:
+            cid, lk = _links()
             if (_f("planned_date") or None) != (t["planned_date"] or None) or \
                     to_int(request.form.get("assigned_to")) != t["assigned_to"]:
                 execute("UPDATE tickets SET alert_sent_at = NULL WHERE id = ?", (tid,))
@@ -141,9 +160,8 @@ def edit(tid):
                     " installation_id=?, project_id=?, contact_id=?, reported_by=?, assigned_to=?, planned_date=?, updated_at=?"
                     " WHERE id=?",
                     (_f("type") or t["type"], _f("priority") or "normaal", _f("status") or t["status"], _f("title"),
-                     _f("description"), to_int(request.form.get("customer_id")), to_int(request.form.get("location_id")),
-                     to_int(request.form.get("installation_id")), to_int(request.form.get("project_id")),
-                     to_int(request.form.get("contact_id")), _f("reported_by"), to_int(request.form.get("assigned_to")),
+                     _f("description"), cid, lk["location_id"], lk["installation_id"], lk["project_id"],
+                     lk["contact_id"], _f("reported_by"), to_int(request.form.get("assigned_to")),
                      _f("planned_date"), now_iso(), tid))
             save_uploads("ticket", tid)
             audit("gewijzigd", "ticket", tid)
@@ -151,6 +169,39 @@ def edit(tid):
             target = url_for("service.detail", tid=tid)
             return ask_snelstart(to_int(request.form.get("customer_id")), target) or redirect(target)
     return render_template("service/form.html", t=t, edit=True, **_lookups(t["customer_id"]))
+
+
+@bp.route("/<int:tid>/notitie", methods=["POST"])
+@bp.route("/<int:tid>/notitie/<int:nid>", methods=["POST"])
+@require("service", BEWERKEN)
+def note_save(tid, nid=None):
+    t = _ticket(tid)
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        flash("Schrijf eerst een notitie.", "error")
+        return redirect(url_for("service.detail", tid=tid) + "#notities")
+    now = now_iso()
+    if nid:
+        n = query("SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?", (nid, tid), one=True) or abort(404)
+        if n["created_by"] != g.user["id"] and not can("service", BEHEER):
+            abort(403)
+        execute("UPDATE ticket_notes SET body = ?, updated_at = ? WHERE id = ?", (body, now, nid))
+    else:
+        nid = execute("INSERT INTO ticket_notes (ticket_id, body, created_by, created_at) VALUES (?,?,?,?)",
+                      (tid, body, g.user["id"], now))
+        execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
+        audit("notitie toegevoegd", "ticket", tid, body[:80])
+    return redirect(url_for("service.detail", tid=tid) + f"#notitie{nid}")
+
+
+@bp.route("/<int:tid>/notitie/<int:nid>/verwijderen", methods=["POST"])
+@require("service", BEWERKEN)
+def note_delete(tid, nid):
+    n = query("SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?", (nid, tid), one=True) or abort(404)
+    if n["created_by"] != g.user["id"] and not can("service", BEHEER):
+        abort(403)
+    execute("DELETE FROM ticket_notes WHERE id = ?", (nid,))
+    return redirect(url_for("service.detail", tid=tid) + "#notities")
 
 
 @bp.route("/<int:tid>/status", methods=["POST"])

@@ -15,6 +15,7 @@ MODULES = [
     ("modellen3d", "3D-modellen"),
     ("calculatie", "Calculatie"),
     ("nacalculatie", "Na-calculatie"),
+    ("crediteuren", "Inkoopfacturen"),
     ("kennis", "Kenniscentrum (gebruiken)"),
     ("kennis_schrijven", "Kenniscentrum (artikelen schrijven)"),
     ("beheer", "Beheer (gebruikers & rechten)"),
@@ -25,7 +26,7 @@ MODULE_KEYS = [m for m, _ in MODULES]
 MODULE_GROUPS = [
     ("Relaties & werk", ["klanten", "projecten", "orders"]),
     ("Uitvoering", ["service", "druktest", "modellen3d"]),
-    ("Calculatie & financiën", ["calculatie", "nacalculatie"]),
+    ("Calculatie & financiën", ["calculatie", "nacalculatie", "crediteuren"]),
     ("Kennis", ["kennis", "kennis_schrijven"]),
     ("Systeem", ["beheer"]),
 ]
@@ -48,6 +49,7 @@ DEFAULT_MATRIX = {
     "modellen3d":       {"administratie": 1, "directie": 3, "verkoop": 2, "engineering": 3, "werkplaats": 1},
     "calculatie":       {"administratie": 1, "directie": 3, "verkoop": 2, "engineering": 2, "werkplaats": 0},
     "nacalculatie":     {"administratie": 1, "directie": 3, "verkoop": 1, "engineering": 1, "werkplaats": 0},
+    "crediteuren":      {"administratie": 2, "directie": 3, "verkoop": 2, "engineering": 0, "werkplaats": 0},
     "kennis":           {"administratie": 1, "directie": 1, "verkoop": 1, "engineering": 1, "werkplaats": 1},
     "kennis_schrijven": {"administratie": 0, "directie": 2, "verkoop": 0, "engineering": 3, "werkplaats": 2},
     "beheer":           {"administratie": 3, "directie": 3, "verkoop": 0, "engineering": 0, "werkplaats": 0},

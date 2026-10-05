@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}{{ r.supplier or 'Factuur' }} {{ r.invoice_no or '' }}{% endblock %}
+{% block content %}
+{% set edit = can('crediteuren', 2) %}
+{% set pdf_url = url_for('main.file', fid=r.file_id) if r.file_id else None %}
+<div class="pagehead">
+  <div>
+    <div class="crumbs"><a href="{{ back }}">{{ icon('back') }}Inkoopfacturen</a></div>
+    <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}</h1>
+    <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
+  </div>
+  <div class="actions"><span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
+</div>
+
+{% set steps = [('Binnengekomen', True), ('Verwerkt in ERP', r.status in ('erp','snelstart')), ('Verwerkt in SnelStart', r.status == 'snelstart')] %}
+{% if r.status != 'afgewezen' %}
+<div class="card cred-steps">
+  {% for name, done in steps %}
+    {% if not loop.first %}<i class="{{ 'done' if done }}"></i>{% endif %}
+    <span class="{{ 'done' if done }}"><b>{% if done %}{{ icon('check') }}{% else %}{{ loop.index }}{% endif %}</b>{{ name }}</span>
+  {% endfor %}
+</div>
+{% else %}
+<div class="result bad" style="margin-bottom:16px"><b>Afgewezen</b> door {{ r.rejected_name or 'onbekend' }} op {{ r.rejected_at|dt }}: {{ r.reject_reason }}</div>
+{% endif %}
+
+{% if r.question_to %}
+<div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
+  {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}</div>
+{% endif %}
+
+<div class="grid g2 stack cred-grid">
+  <section class="card cred-pdf">
+    <div class="card-head"><h2>Factuur (PDF)</h2>
+      {% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=(r.supplier or 'Factuur') ~ ' ' ~ (r.invoice_no or '')) }}">Openen</a> · <a href="{{ pdf_url }}?download=1">Downloaden</a></div>{% endif %}
+    </div>
+    {% if pdf_url %}<iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
+    <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=r.supplier or 'Factuur') }}">{{ icon('pdf') }}Factuur bekijken</a>
+    {% else %}<div class="empty">Geen PDF.</div>{% endif %}
+  </section>
+
+  <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
+      <fieldset {{ 'disabled' if not edit }} style="border:0;padding:0;margin:0">
+      <div class="fgrid">
+        <label class="f">Leverancier<input type="text" name="supplier" value="{{ r.supplier or '' }}"></label>
+        <label class="f">Factuurnummer<input type="text" name="invoice_no" value="{{ r.invoice_no or '' }}"></label>
+        <label class="f">Factuurdatum<input type="date" name="invoice_date" value="{{ r.invoice_date or '' }}"></label>
+        <label class="f">Vervaldatum<input type="date" name="due_date" value="{{ r.due_date or '' }}"></label>
+        <label class="f">Bedrag incl. btw<input type="text" inputmode="decimal" name="amount_incl" value="{{ r.amount_incl|num(2) if r.amount_incl is not none else '' }}"></label>
+        <label class="f">Bedrag excl. btw<input type="text" inputmode="decimal" name="amount_excl" value="{{ r.amount_excl|num(2) if r.amount_excl is not none else '' }}"></label>
+        <label class="f">Inkooporder ERP<input type="text" name="erp_ref" value="{{ r.erp_ref or '' }}" placeholder="bijv. IO-1825"></label>
+        <label class="f">Omschrijving<input type="text" name="description" value="{{ r.description or '' }}"></label>
+      </div>
+      {% if edit %}<div style="margin-top:12px"><button class="btn">Gegevens opslaan</button></div>{% endif %}
+      </fieldset>
+    </form>
+
+    {% if edit %}
+    <section class="card">
+      <div class="card-head"><h2>Acties</h2></div>
+      <div class="cred-actions">
+        {% if r.status == 'nieuw' %}
+        <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="erp"><button class="btn primary">{{ icon('check') }}Verwerkt in ERP</button>
+          <button class="btn" name="next" value="1" title="Opslaan en de volgende nieuwe factuur openen">en volgende →</button></form>
+        {% elif r.status == 'erp' %}
+        <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="snelstart"><button class="btn primary">{{ icon('check') }}Verwerkt in SnelStart</button>
+          <button class="btn" name="next" value="1" title="Opslaan en de volgende factuur voor SnelStart openen">en volgende →</button></form>
+        {% endif %}
+        {% if r.status in ('nieuw', 'erp') %}
+        <details class="cred-pop"><summary class="btn">Vraag stellen aan…</summary>
+          <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
+            <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
+            <div><button class="btn primary">Vraag versturen</button></div>
+            <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
+          </form></details>
+        <details class="cred-pop"><summary class="btn danger">Afwijzen</summary>
+          <form method="post" action="{{ url_for('crediteuren.reject', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="f">Reden *<textarea name="reason" rows="3" required placeholder="Bijv. uren niet afgesproken, prijs klopt niet met offerte"></textarea></label>
+            <div><button class="btn danger">Factuur afwijzen</button></div>
+          </form></details>
+        {% endif %}
+        {% if r.status in ('erp', 'snelstart', 'afgewezen') %}
+        <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="terug"><button class="btn sm" onclick="return confirm('Status een stap terugzetten?')">{{ 'Afwijzing intrekken' if r.status == 'afgewezen' else 'Status terugzetten' }}</button></form>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="card" id="gesprek">
+      <div class="card-head"><h2>Gesprek</h2></div>
+      <div class="notes">
+        {% for n in notes %}
+        <article class="note {{ 'cred-acc' if n.for_accounting }} {{ 'cred-done' if n.handled }}">
+          <div class="notehead">
+            <b>{{ n.who or 'Onbekend' }}</b><span class="small muted">{{ n.created_at|dt }}</span>
+            {% if n.kind == 'vraag' %}<span class="badge b-warn">vraag aan {{ n.to_name or 'collega' }}</span>
+            {% elif n.kind == 'antwoord' %}<span class="badge b-ok">antwoord</span>
+            {% elif n.kind == 'afwijzing' %}<span class="badge b-bad">afgewezen</span>{% endif %}
+            {% if n.for_accounting %}<span class="badge b-purple">voor de boekhouding</span>
+              {% if edit %}<form method="post" action="{{ url_for('crediteuren.note_done', iid=r.id, nid=n.id) }}" class="followup {{ 'done' if n.handled }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button title="Afvinken als verwerkt door de boekhouding">{{ icon('check') }} {{ 'Afgehandeld' if n.handled else 'Afhandelen' }}</button></form>{% endif %}
+            {% endif %}
+          </div>
+          <div class="notebody">{{ n.body }}</div>
+        </article>
+        {% else %}<div class="empty">Nog geen opmerkingen.</div>{% endfor %}
+      </div>
+      {% if edit or r.question_to == g.user.id %}
+      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:14px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="f">{{ 'Je antwoord' if r.question_to == g.user.id else 'Reactie of opmerking' }}<textarea name="body" rows="3" required></textarea></label>
+        <div class="cred-actions">
+          <label class="check"><input type="checkbox" name="for_accounting" value="1"> Voor de boekhouding</label>
+          {% if r.question_to and r.question_to != g.user.id %}<label class="check"><input type="checkbox" name="close_question" value="1"> Vraag hiermee afsluiten</label>{% endif %}
+          <button class="btn primary" style="margin-left:auto">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
+        </div>
+      </form>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Logboek</h2></div>
+      <div class="cred-log">
+        {% for l in logs %}<span class="small muted nowrap">{{ l.created_at|dt('%d-%m %H:%M') }}</span><span>{{ l.action }}{% if l.who %} · <span class="muted">{{ l.who }}</span>{% endif %}</span>{% endfor %}
+      </div>
+    </section>
+
+    {% if can('crediteuren', 3) %}
+    <form method="post" action="{{ url_for('crediteuren.delete', iid=r.id) }}" style="text-align:right">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn sm danger" onclick="return confirm('Factuurkaart helemaal verwijderen? Gebruik dit alleen voor dubbele of verkeerde PDF\'s.')">{{ icon('trash') }}Factuurkaart verwijderen</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

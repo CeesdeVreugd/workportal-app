@@ -11,7 +11,7 @@ ENTITY_MODULE = {
     "ticket": "service", "visit": "service",
     "pressure_test": "druktest", "pressure_reading": "druktest",
     "customer": "klanten", "installation": "klanten", "project": "klanten",
-    "article": "kennis", "nacalc": "nacalculatie", "calc": "calculatie",
+    "article": "kennis", "nacalc": "nacalculatie", "calc": "calculatie", "invoice": "crediteuren",
 }
 
 

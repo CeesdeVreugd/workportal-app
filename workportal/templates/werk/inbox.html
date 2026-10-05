@@ -39,7 +39,7 @@
   </div>
   <div class="fgrid">
     <label class="f">Ordernummer *<input type="text" name="number" value="{{ it.number or '' }}" required></label>
-    <label class="f">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name ~ (' – ' ~ c.city if c.city else ''), it.customer_id) }}{% endfor %}</select></label>
+    <label class="f">Klant<select name="customer_id" data-combo><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name ~ (' – ' ~ c.city if c.city else ''), it.customer_id) }}{% endfor %}</select></label>
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ it.description or '' }}" required></label>
     {% if sp_on %}<div class="f full"><span class="hint">Project: de projectmap wordt direct aangemaakt. Order: alleen vastleggen; een ordermap maak je later met de knop op de orderpagina.</span></div>{% endif %}
     {% if it.bon and it.bon.order_type and can('orders', 3) %}<label class="check full"><input type="checkbox" name="remember" value="1" checked> <span>Ordertype <b>{{ it.bon.order_type }}</b> voortaan automatisch zo verwerken</span></label>{% endif %}

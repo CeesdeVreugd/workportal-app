@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 
-from . import sharepoint, komdex
+from . import sharepoint, komdex, crediteuren
 from .db import raw_connection, backup
 from .notify import notify_user, vapid_keys
 from .util import now_utc, now_iso, parse_iso, TZ
@@ -110,6 +110,7 @@ def _loop(app):
             _ticket_reminders(conn)
             sharepoint.scheduled_sync(conn, state)
             komdex.notify_pending(conn)
+            crediteuren.scheduled_poll(conn, app, state)
             _nightly_backup(app, state)
             conn.execute("DELETE FROM login_codes WHERE created_at < datetime('now', '-2 days')")
             conn.commit()

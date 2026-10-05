@@ -531,3 +531,43 @@ select { text-overflow: ellipsis; }
   .rowitem { padding: 10px 0; }
   .nav a { padding: 9px 12px; font-size: 14.5px; }
 }
+.b-purple { background: #ECEBFB; color: #2E268F; }
+
+/* Inkoopfacturen */
+.cred-steps { display: flex; align-items: center; gap: 10px; padding: 14px 18px; margin-bottom: 16px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.cred-steps span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.cred-steps span b { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C9CEDF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); }
+.cred-steps span.done { color: var(--ink); }
+.cred-steps span.done b { background: var(--ok); border-color: var(--ok); color: #fff; }
+.cred-steps span b svg { width: 14px; height: 14px; }
+.cred-steps i { flex: 1; min-width: 20px; height: 2px; background: var(--line); }
+.cred-steps i.done { background: var(--ok); }
+.cred-grid { align-items: start; }
+.cred-pdf iframe { width: 100%; height: calc(100vh - 260px); min-height: 560px; border: 1px solid var(--line); border-radius: 10px; background: var(--line-2); }
+.cred-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cred-actions form { display: flex; gap: 8px; flex-wrap: wrap; }
+.cred-pop { position: relative; }
+.cred-pop > summary { list-style: none; cursor: pointer; }
+.cred-pop > summary::-webkit-details-marker { display: none; }
+.cred-pop[open] > form { margin-top: 10px; width: min(420px, 80vw); padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.cred-acc { border-color: #CFCBF5; background: #F8F7FF; }
+.cred-done { opacity: .65; }
+.cred-log { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+@media (max-width: 900px) { .cred-pdf iframe { display: none; } .cred-steps { font-size: 13px; } }
+@media (max-width: 600px) { .cred-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .cred-chips .fchip { flex-shrink: 0; } }
+
+/* Zoekbare keuzelijst */
+.combo { position: relative; }
+.combo-native { position: absolute !important; opacity: 0; pointer-events: none; width: 1px !important; height: 1px !important; left: 0; bottom: 0; }
+.combo-input { width: 100%; padding-right: 34px !important; }
+.combo-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; font-size: 20px; line-height: 1; color: var(--muted); cursor: pointer; padding: 4px 6px; }
+.combo-list { position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(20,22,58,.14); max-height: 280px; overflow-y: auto; }
+.combo-list li { padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+.combo-list li:hover, .combo-list li.act { background: var(--accent-soft); color: var(--basic); }
+.combo-list li.sel { font-weight: 500; }
+.combo-list li.combo-empty { color: var(--muted); cursor: default; background: none; }
+.combo-list li.combo-add { color: var(--basic); font-weight: 500; border-top: 1px solid var(--line-2); margin-top: 2px; }
+.combo-dlg { border: 0; border-radius: 16px; padding: 20px 22px; width: min(520px, 92vw); box-shadow: 0 20px 60px rgba(20,22,58,.25); }
+.combo-dlg::backdrop { background: rgba(20,22,58,.35); }
+.combo-dlg h2 { margin: 0 0 12px; }
+.combo-dlg .err { color: var(--bad); }

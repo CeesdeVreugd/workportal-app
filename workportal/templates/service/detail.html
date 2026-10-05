@@ -14,6 +14,7 @@
     {% if edit %}
     <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>
     {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
+    <a class="btn" href="#notities" onclick="var f=document.getElementById('noteform');f.classList.remove('hidden');setTimeout(function(){f.querySelector('textarea').focus()},50)">{{ icon('edit') }}Notitie</a>
     <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
     {% endif %}
   </div>
@@ -50,6 +51,35 @@
     {% endcall %}
   </section>
 </div>
+
+<section class="card" id="notities">
+  <div class="card-head"><h2>Notities ({{ notes|length }})</h2>{% if edit %}<button class="btn sm" type="button" onclick="var f=document.getElementById('noteform');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Notitie</button>{% endif %}</div>
+  {% if edit %}
+  <form id="noteform" method="post" action="{{ url_for('service.note_save', tid=t.id) }}" class="form noteform {{ 'hidden' if notes }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f">Notitie<textarea name="body" rows="3" required placeholder="Bijv. klant gebeld, onderdeel besteld, monteur komt donderdag"></textarea></label>
+    <div><button class="btn primary">Notitie opslaan</button></div>
+  </form>
+  {% endif %}
+  <div class="notes">
+  {% for n in notes %}
+    <article class="note" id="notitie{{ n.id }}">
+      <div class="notehead"><b>{{ n.author or 'Onbekend' }}</b><span class="small muted">{{ n.created_at|dt }}{% if n.updated_at %} · bewerkt{% endif %}</span></div>
+      <div class="notebody">{{ n.body }}</div>
+      {% if edit and (n.created_by == g.user.id or can('service', 3)) %}
+      <details class="noteedit"><summary>Bewerken</summary>
+        <form method="post" action="{{ url_for('service.note_save', tid=t.id, nid=n.id) }}" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="f"><textarea name="body" rows="3" required>{{ n.body }}</textarea></label>
+          <div class="actions"><button class="btn sm primary">Opslaan</button>
+            <button class="btn danger sm" formaction="{{ url_for('service.note_delete', tid=t.id, nid=n.id) }}" formnovalidate onclick="return confirm('Notitie verwijderen?')">Verwijderen</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </article>
+  {% else %}{% if not edit %}<div class="empty">Nog geen notities.</div>{% endif %}{% endfor %}
+  </div>
+</section>
 
 <section class="card">
   <div class="card-head"><h2>Bezoeken ({{ visits|length }})</h2>{% if edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a>{% endif %}</div>

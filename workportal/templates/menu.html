@@ -13,9 +13,10 @@
   {% if navok('service') %}<a href="{{ url_for('service.index') }}">{{ icon('service') }}Service &amp; onderhoud</a>{% endif %}
   {% if navok('druktest') %}<a href="{{ url_for('druktest.index') }}">{{ icon('druktest') }}Druktesten</a>{% endif %}
   {% if navok('modellen3d') %}<a href="{{ url_for('modellen.index') }}">{{ icon('cube') }}3D-viewer</a>{% endif %}
-  {% if navok('calculatie') or navok('nacalculatie') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
+  {% if navok('calculatie') or navok('nacalculatie') or navok('crediteuren') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
   {% if navok('calculatie') %}<a href="{{ url_for('calculatie.index') }}">{{ icon('calculatie') }}Calculatie</a>{% endif %}
   {% if navok('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
+  {% if navok('crediteuren') %}{% set cc = cred_counts() %}<a href="{{ url_for('crediteuren.index') }}">{{ icon('invoice') }}Inkoopfacturen{% if cc.mij %}<span class="navbadge">{{ cc.mij }}</span>{% elif cc.nieuw %}<span class="navbadge" style="background:var(--accent)">{{ cc.nieuw }}</span>{% endif %}</a>{% endif %}
   {% if navok('kennis') %}<div class="navhead">Kennis</div><a href="{{ url_for('kennis.index') }}">{{ icon('kennis') }}Kenniscentrum</a>{% endif %}
   {% if navok('beheer') %}<div class="navhead">Systeem</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
   <div class="navhead">Persoonlijk</div>

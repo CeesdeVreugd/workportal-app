@@ -49,8 +49,8 @@ def _graph_token():
         return _token["value"]
 
 
-def _send_graph(to, subject, text, html=None, attachments=None):
-    sender = os.environ["MAIL_FROM"]
+def _send_graph(to, subject, text, html=None, attachments=None, sender=None, cc=None):
+    sender = sender or os.environ["MAIL_FROM"]
     recipients = [to] if isinstance(to, str) else list(to)
     atts, total, skipped = [], 0, []
     for name, data, mime in attachments or []:
@@ -71,6 +71,8 @@ def _send_graph(to, subject, text, html=None, attachments=None):
         "body": {"contentType": "HTML" if html else "Text", "content": html or text},
         "toRecipients": [{"emailAddress": {"address": a}} for a in recipients],
     }
+    if cc:
+        message["ccRecipients"] = [{"emailAddress": {"address": a}} for a in ([cc] if isinstance(cc, str) else cc)]
     if atts:
         message["attachments"] = atts
     r = requests.post(f"https://graph.microsoft.com/v1.0/users/{sender}/sendMail",
@@ -83,7 +85,9 @@ def _send_graph(to, subject, text, html=None, attachments=None):
 SIGNERS = {
     "systeem": "Systeembeheer | De Vreugd Productietechniek",
     "werkvoorbereiding": "Werkvoorbereiding | De Vreugd Productietechniek",
+    "administratie": "Administratie | De Vreugd Productietechniek",
 }
+SIGNER_MAIL = {"administratie": "administratie@devreugd-pt.nl"}
 GREETING = "Met vriendelijke groeten / Kind regards / Mit Freundlichen Grüßen,"
 
 
@@ -111,6 +115,7 @@ def signature_html(signer="systeem"):
     img = lambda f, w, h, alt: (f'<img src="{base}/static/img/{f}" alt="{alt}" width="{w}" height="{h}" '
                                 f'style="display:inline-block;border:0;vertical-align:middle">') if base else ""
     who = html_lib.escape(SIGNERS.get(signer, SIGNERS["systeem"]))
+    contact = SIGNER_MAIL.get(signer, "werkvoorbereiding@devreugd-pt.nl")
     link = "color:#0563C1;text-decoration:underline"
     li = img("mail-linkedin.png", 30, 30, "LinkedIn")
     yt = img("mail-youtube.png", 43, 30, "YouTube")
@@ -127,7 +132,7 @@ def signature_html(signer="systeem"):
             f'<p style="margin:0">{html_lib.escape(GREETING)}</p><p style="margin:0">&nbsp;</p>'
             f'<p style="margin:0">{who}</p>{logo}'
             f'<p style="margin:12px 0 0">Edisonring 11, 6669 NA Dodewaard<br>+31 (0)488 41 28 28<br>'
-            f'<a href="mailto:werkvoorbereiding@devreugd-pt.nl" style="{link}">werkvoorbereiding@devreugd-pt.nl</a> | '
+            f'<a href="mailto:{contact}" style="{link}">{contact}</a> | '
             f'<a href="https://www.devreugd-pt.nl" style="{link}">www.devreugd-pt.nl</a></p>'
             f'{social}{banner}'
             f'<div style="font-size:7.5pt;line-height:1.3;margin-top:14px">{disc}</div></div>')
@@ -136,7 +141,7 @@ def signature_html(signer="systeem"):
 def signature_text(signer="systeem"):
     disc = "\n\n".join("\n".join(b) for b in DISCLAIMER)
     return (f"\n\n{GREETING}\n\n{SIGNERS.get(signer, SIGNERS['systeem'])}\n\n"
-            f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\nwerkvoorbereiding@devreugd-pt.nl | www.devreugd-pt.nl\n\n{disc}")
+            f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\n{SIGNER_MAIL.get(signer, 'werkvoorbereiding@devreugd-pt.nl')} | www.devreugd-pt.nl\n\n{disc}")
 
 
 def send_mail(to, subject, text, html=None, attachments=None, signer="systeem"):
@@ -232,3 +237,22 @@ def text_to_html(text):
     body = html_lib.escape(text or "").replace("\r\n", "\n")
     paras = "".join(f'<p style="margin:0 0 11pt">{p.replace(chr(10), "<br>")}</p>' for p in body.split("\n\n") if p.strip())
     return paras
+
+
+def send_customer_mail(sender, to, subject, text, attachments=None, cc=None, signer="administratie"):
+    """Mail aan een klant vanuit een bedrijfsmailbox (bijv. administratie@), zonder WorkPortal-kader, met handtekening.
+    Geeft (True, None) of (False, foutmelding). Zonder Microsoft-koppeling: alleen in het containerlog (testmodus)."""
+    html = (f'<div style="font-family:{FONT};font-size:11pt;color:#000;max-width:680px">'
+            f'{text_to_html(text)}{signature_html(signer)}</div>')
+    full_text = (text or "").rstrip() + signature_text(signer)
+    if not graph_configured():
+        print("=" * 60, flush=True)
+        print(f"[WorkPortal] KLANTMAIL (Microsoft-koppeling niet ingesteld) van {sender} aan {to}: {subject}", flush=True)
+        print(full_text, flush=True)
+        print("=" * 60, flush=True)
+        return True, None
+    try:
+        _send_graph(to, subject, full_text, html, attachments, sender=sender, cc=cc)
+        return True, None
+    except Exception as exc:  # pragma: no cover - netwerk
+        return False, str(exc)[:400]

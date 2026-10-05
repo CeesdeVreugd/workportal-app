@@ -1,7 +1,7 @@
 from urllib.parse import quote
 
 import requests
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, Response, stream_with_context
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, Response, stream_with_context, jsonify, g
 
 from . import relaties
 from . import sharepoint as sp
@@ -204,6 +204,49 @@ def add_installation(cid):
     if request.form.get("back") == "installatie" and iid:
         return redirect(url_for("klanten.installation", iid=iid))
     return redirect(url_for("klanten.customer", cid=cid) + f"#inst{iid or ''}")
+
+
+@bp.route("/api/snel/<kind>", methods=["POST"])
+def quick_add(kind):
+    """Snel toevoegen vanuit een keuzelijst (bijv. bij een nieuw ticket): klant, locatie, machine of contactpersoon."""
+    if not (can("klanten", BEWERKEN) or can("service", BEWERKEN)):
+        return jsonify({"error": "Je hebt geen rechten om dit toe te voegen."}), 403
+    js = request.get_json(silent=True) or {}
+    v = lambda k: (str(js.get(k) or "").strip() or None)
+    name = v("name")
+    if not name:
+        return jsonify({"error": "Vul een naam in."}), 400
+    cid = to_int(js.get("customer_id"))
+    if kind != "klant":
+        if not cid or not query("SELECT 1 FROM customers WHERE id = ?", (cid,), one=True):
+            return jsonify({"error": "Kies eerst een klant."}), 400
+    if kind == "klant":
+        dup = query("SELECT id, name FROM customers WHERE lower(name) = lower(?)", (name,), one=True)
+        if dup:
+            return jsonify({"id": dup["id"], "label": dup["name"], "existing": True})
+        now = now_iso()
+        new_id = execute("INSERT INTO customers (name, city, email, phone, relation_type, active, created_at, updated_at)"
+                         " VALUES (?,?,?,?, 'klant', 1, ?, ?)", (name, v("city"), v("email"), v("phone"), now, now))
+        audit("aangemaakt (snel)", "customer", new_id, name)
+        return jsonify({"id": new_id, "label": name})
+    if kind == "locatie":
+        new_id = execute("INSERT INTO locations (customer_id, name, address, postcode, city) VALUES (?,?,?,?,?)",
+                         (cid, name, v("address"), v("postcode"), v("city")))
+        return jsonify({"id": new_id, "label": name, "customer_id": cid})
+    if kind == "contact":
+        new_id = execute("INSERT INTO contacts (customer_id, name, function, phone, email) VALUES (?,?,?,?,?)",
+                         (cid, name, v("function"), v("phone"), v("email")))
+        return jsonify({"id": new_id, "label": name, "customer_id": cid})
+    if kind == "machine":
+        loc = to_int(js.get("location_id"))
+        if loc and not query("SELECT 1 FROM locations WHERE id = ? AND customer_id = ?", (loc, cid), one=True):
+            loc = None
+        new_id = execute("INSERT INTO installations (customer_id, name, serial, year, location_id) VALUES (?,?,?,?,?)",
+                         (cid, name, v("serial"), v("year"), loc))
+        audit("aangemaakt (snel)", "installation", new_id, name)
+        label = name + (f" · SN {v('serial')}" if v("serial") else "")
+        return jsonify({"id": new_id, "label": label, "customer_id": cid})
+    return jsonify({"error": "Onbekend soort"}), 404
 
 
 @bp.route("/<int:cid>/onderdeel/<kind>/<int:oid>/verwijderen", methods=["POST"])

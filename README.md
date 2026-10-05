@@ -361,3 +361,41 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
 - Onder **Beheer > Instellingen > Modules op de telefoon** kies je welke modules op de telefoon beschikbaar zijn. Standaard staat **Calculatie** uit; Na-calculatie staat aan.
 - Een module die uitstaat verdwijnt op de telefoon uit het menu, de onderbalk en het dashboard. Wie de link toch opent, ziet de melding "niet beschikbaar op de telefoon". Staat Calculatie uit, dan toont de onderbalk **Na-calc.** in plaats van Calculatie.
 - Op de pc en de tablet blijft alles gewoon beschikbaar (volgens de rechten).
+
+## Inkoopfacturen (crediteuren)
+- Eén factuurkaart per inkoopfactuur: de PDF, de uitgelezen gegevens (leverancier, factuurnummer, datums, bedragen,
+  inkooporder ERP, omschrijving), de status, het gesprek en een logboek van wie wat wanneer deed.
+- **Binnenkomst:** WorkPortal haalt elke 5 minuten de PDF-bijlagen op uit **factuur@devreugd-pt.nl** (Microsoft Graph,
+  alleen lezen; in de mailbox verandert niets). Aanzetten onder **Beheer > Instellingen > Inkoopfacturen uit de mailbox**.
+  Daarnaast kun je PDF's uploaden. Dezelfde PDF of hetzelfde factuurnummer van dezelfde leverancier wordt niet dubbel aangemaakt.
+  De leverancier wordt onthouden per afzenderadres.
+- **Statussen:** Nieuw → Verwerkt in ERP (administratie) → Verwerkt in SnelStart (boekhouding). Afwijzen kan iedereen met
+  het recht Bewerken (directie, administratie, werkvoorbereiding), altijd met een reden. Status terugzetten kan ook.
+- **Vraag stellen aan…** een collega: die krijgt een melding (push en mail) en antwoordt in WorkPortal; de vraagsteller krijgt het antwoord terug.
+- **Voor de boekhouding:** een opmerking met dat vinkje komt in het filter "Voor de boekhouding" en kan worden afgehandeld.
+- Filters: Alles open, Nieuw, Naar SnelStart, Vraag open, Wacht op mij, Voor de boekhouding, Afgewezen, Afgerond, Alle.
+- Rechten (module "Inkoopfacturen"): standaard administratie Bewerken, directie Beheer, Verkoop-Inkoop-WVB Bewerken;
+  engineering en werkplaats geen toegang. Aan te passen onder Beheer > Rechten. Wie in SnelStart boekt (boekhouding)
+  krijgt toegang via zijn bestaande rol of een extra recht per gebruiker; er komen geen rollen bij.
+- **Rollen liggen vast** (IT-strategie): Administratie, Directie, Verkoop-Inkoop-WVB, Engineering, Werkplaats-Service.
+  Nieuwe modules krijgen rechten binnen deze rollen; voeg geen rollen toe.
+- **Mailbox-recht instellen (eenmalig):** de bestaande app-registratie (GRAPH_CLIENT_ID) krijgt in Entra de
+  toepassingsmachtiging **Mail.Read** (met beheerderstoestemming). Beperk dat tot alleen de factuurmailbox met een
+  ApplicationAccessPolicy in Exchange Online (zie hieronder), zodat WorkPortal geen andere mailboxen kan lezen.
+  ```powershell
+  Connect-ExchangeOnline
+  New-DistributionGroup -Name "WorkPortal mailboxen" -Type Security -PrimarySmtpAddress workportal-mailboxen@devreugd-pt.nl
+  Add-DistributionGroupMember -Identity "WorkPortal mailboxen" -Member factuur@devreugd-pt.nl
+  New-ApplicationAccessPolicy -AppId <GRAPH_CLIENT_ID> -PolicyScopeGroupId workportal-mailboxen@devreugd-pt.nl -AccessRight RestrictAccess -Description "WorkPortal: alleen factuurmailbox"
+  Test-ApplicationAccessPolicy -Identity factuur@devreugd-pt.nl -AppId <GRAPH_CLIENT_ID>
+  ```
+  Let op: de afzender van WorkPortal-mails (MAIL_FROM) moet dan ook in die groep, anders werkt mailen niet meer.
+
+## Tickets: zoekvelden, snel toevoegen en notities
+- Klant, locatie, machine, contactpersoon, project en "toegewezen aan" zijn **zoekvelden**: typ een deel van de naam
+  (ook serienummer of plaats). Ook bij Projecten/Orders, de Komdex-inbox en een nieuwe calculatie is de klant een zoekveld.
+- Locatie, machine en contactpersoon tonen **alleen wat bij de gekozen klant hoort**; zonder klant staat er "Kies eerst een klant".
+  Bij opslaan controleert WorkPortal dit ook (een machine van een andere klant wordt niet gekoppeld).
+- Staat het er niet tussen? Kies in de lijst **"+ … toevoegen"**: klant, locatie, machine of contactpersoon wordt meteen
+  aangemaakt (gekoppeld aan de gekozen klant) en ingevuld. Kan iedereen met Bewerken op Service of Relaties.
+- Bij een ticket kun je naast bezoeken ook **notities** plaatsen (eigen notities bewerken/verwijderen; Beheer kan alles).

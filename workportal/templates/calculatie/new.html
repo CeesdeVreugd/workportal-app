@@ -12,9 +12,9 @@
     <h2>1 · Klant en omschrijving</h2>
     <div class="fgrid">
       <label class="f full">Omschrijving *<input type="text" name="title" value="{{ form.title or '' }}" required placeholder="bijv. Aangepaste leiding voor Foodjet"></label>
-      <label class="f">Klant<select name="customer_id"><option value="">– kies of typ hiernaast –</option>{% for c in customers %}{{ opt(c.id, c.name, form.customer_id) }}{% endfor %}</select></label>
+      <label class="f">Klant<select name="customer_id" data-combo><option value="">– kies of typ hiernaast –</option>{% for c in customers %}{{ opt(c.id, c.name, form.customer_id) }}{% endfor %}</select></label>
       <label class="f">Of klantnaam (nog niet in klantenbestand)<input type="text" name="customer_text" value="{{ form.customer_text or '' }}"></label>
-      <label class="f">Project (optioneel)<select name="project_id" data-filter-by="customer_id"><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}" data-c="{{ p.customer_id or '' }}" {{ 'selected' if form.project_id|string == p.id|string }}>{{ p.number }} · {{ p.name }}</option>{% endfor %}</select></label>
+      <label class="f">Project (optioneel)<select name="project_id" data-filter-by="customer_id" data-combo><option value="">–</option>{% for p in projects %}<option value="{{ p.id }}" data-c="{{ p.customer_id or '' }}" {{ 'selected' if form.project_id|string == p.id|string }}>{{ p.number }} · {{ p.name }}</option>{% endfor %}</select></label>
       <label class="f">Verwachte prijsafspraak (€)<input type="text" inputmode="decimal" name="expected" value="{{ form.expected or '' }}"></label>
     </div>
   </section>

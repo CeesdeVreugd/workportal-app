@@ -20,6 +20,19 @@
     <p class="hint" style="margin-top:0">Wat uit staat, is op een telefoon niet te zien en niet te openen. Op pc en tablet blijft alles zoals de rechten het toestaan.</p>
     <input type="hidden" name="mobile_form" value="1">
     <div class="chips">{% for key, label in phone_modules %}<label class="chip"><input type="checkbox" name="mobile_on" value="{{ key }}" {{ 'checked' if key not in mobile_off }}><span>{{ label.replace(' (gebruikers & rechten)', '').replace(' (gebruiken)', '') }}</span></label>{% endfor %}</div>
+    <h3 style="margin-top:14px">Inkoopfacturen uit de mailbox</h3>
+    <p class="hint" style="margin-top:0">WorkPortal leest elke 5 minuten de PDF-bijlagen uit deze mailbox en maakt er factuurkaarten van. In de mailbox wordt niets gewijzigd.</p>
+    <input type="hidden" name="cred_form" value="1">
+    <div class="fgrid">
+      <label class="f">Mailbox<input type="email" name="cred_mailbox" value="{{ cred.box }}"></label>
+      <label class="f">Mails ophalen vanaf<input type="date" name="cred_since" value="{{ cred.since }}"><span class="hint">Leeg = vanaf 7 dagen voor de eerste keer ophalen.</span></label>
+      <label class="check full"><input type="checkbox" name="cred_mail_on" value="1" {{ 'checked' if cred.on }}> Mailbox automatisch ophalen</label>
+    </div>
+    <p class="small muted" style="margin:0">
+      {% if not cred.graph %}<span class="badge b-warn">Microsoft-koppeling niet ingesteld</span>
+      {% elif cred.error %}<span class="badge b-bad">Laatste keer mislukt</span> {{ cred.error }}
+      {% elif cred.last %}<span class="badge b-ok">Laatst opgehaald {{ cred.last|dt }}</span>{% else %}Nog niet opgehaald.{% endif %}
+    </p>
     <div><button class="btn primary">Opslaan</button></div>
   </form>
   <section class="card">

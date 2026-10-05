@@ -287,3 +287,141 @@
       "&titel=" + encodeURIComponent(title);
   });
 })();
+
+/* Zoekbare keuzelijst: <select data-combo [data-filter-by="customer_id"] [data-add="machine"]>
+   - typen om te zoeken; alleen opties van de gekozen klant (data-c) als data-filter-by gezet is
+   - "+ nieuw toevoegen" opent een klein venster en maakt het item direct aan (data-add) */
+(function () {
+  var ADD = {
+    klant: { title: "Nieuwe klant", label: "klant", fields: [["name", "Naam *", "text", true], ["city", "Plaats", "text"], ["email", "E-mail", "email"], ["phone", "Telefoon", "tel"]] },
+    locatie: { title: "Nieuwe locatie", label: "locatie", fields: [["name", "Naam *", "text", true], ["address", "Adres", "text"], ["postcode", "Postcode", "text"], ["city", "Plaats", "text"]] },
+    machine: { title: "Nieuwe machine / installatie", label: "machine", fields: [["name", "Naam *", "text", true], ["serial", "Serienummer", "text"], ["year", "Bouwjaar", "text"]] },
+    contact: { title: "Nieuwe contactpersoon", label: "contactpersoon", fields: [["name", "Naam *", "text", true], ["function", "Functie", "text"], ["phone", "Telefoon", "tel"], ["email", "E-mail", "email"]] }
+  };
+  function norm(s) { return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function openAdd(kind, text, sel, parentVal, done) {
+    var cfg = ADD[kind]; if (!cfg) return;
+    var dlg = document.createElement("dialog");
+    dlg.className = "combo-dlg";
+    var html = '<form method="dialog" class="form"><h2>' + esc(cfg.title) + '</h2><div class="fgrid">';
+    cfg.fields.forEach(function (f) {
+      html += '<label class="f' + (f[0] === "name" ? " full" : "") + '">' + esc(f[1]) + '<input type="' + f[2] + '" name="' + f[0] + '"' + (f[3] ? " required" : "") + '></label>';
+    });
+    html += '</div><p class="hint err" hidden></p><div class="actions"><button class="btn primary" value="ok">Toevoegen</button><button class="btn ghost" value="cancel" formnovalidate>Annuleren</button></div></form>';
+    dlg.innerHTML = html;
+    document.body.appendChild(dlg);
+    var form = dlg.querySelector("form");
+    form.elements.name.value = text || "";
+    form.addEventListener("submit", function (ev) {
+      if (ev.submitter && ev.submitter.value === "cancel") return;
+      ev.preventDefault();
+      var data = { customer_id: parentVal || null };
+      var loc = document.querySelector('[name="location_id"]');
+      if (kind === "machine" && loc && loc.value) data.location_id = loc.value;
+      cfg.fields.forEach(function (f) { data[f[0]] = form.elements[f[0]].value; });
+      var btn = form.querySelector('button[value="ok"]'); btn.disabled = true;
+      WP.api("/klanten/api/snel/" + kind, data).then(function (js) {
+        dlg.close(); dlg.remove(); done(js);
+      }).catch(function (e) {
+        btn.disabled = false; var p = form.querySelector(".err"); p.hidden = false; p.textContent = e.message;
+      });
+    });
+    dlg.addEventListener("close", function () { setTimeout(function () { if (dlg.parentNode) dlg.remove(); }, 0); });
+    dlg.showModal();
+    setTimeout(function () { form.elements.name.focus(); }, 30);
+  }
+
+  function enhance(sel) {
+    if (sel.dataset.comboReady) return; sel.dataset.comboReady = "1";
+    var parentName = sel.getAttribute("data-filter-by");
+    var src = parentName ? document.querySelector('[name="' + parentName + '"]') : null;
+    var kind = sel.getAttribute("data-add");
+    var wrap = document.createElement("div"); wrap.className = "combo";
+    var inp = document.createElement("input"); inp.type = "text"; inp.autocomplete = "off"; inp.className = "combo-input";
+    inp.setAttribute("role", "combobox"); inp.setAttribute("aria-expanded", "false");
+    var clear = document.createElement("button"); clear.type = "button"; clear.className = "combo-clear"; clear.setAttribute("aria-label", "Leegmaken"); clear.innerHTML = "&times;";
+    var list = document.createElement("ul"); list.className = "combo-list"; list.setAttribute("role", "listbox"); list.hidden = true;
+    sel.parentNode.insertBefore(wrap, sel); wrap.appendChild(sel); wrap.appendChild(inp); wrap.appendChild(clear); wrap.appendChild(list);
+    sel.classList.add("combo-native"); sel.tabIndex = -1;
+    var active = -1, items = [];
+
+    function parentVal() { return src ? src.value : ""; }
+    function selectable() {
+      var pv = parentVal();
+      return Array.prototype.filter.call(sel.options, function (o) {
+        if (!o.value) return false;
+        var c = o.getAttribute("data-c");
+        if (!src) return true;
+        if (!pv) return !sel.hasAttribute("data-need");
+        return !c || c === pv;
+      });
+    }
+    function syncText() {
+      var o = sel.selectedOptions[0];
+      inp.value = o && o.value ? o.textContent.trim() : "";
+      clear.hidden = !inp.value;
+      var need = src && sel.hasAttribute("data-need") && !parentVal();
+      inp.disabled = !!need || sel.disabled;
+      inp.placeholder = need ? "Kies eerst een klant" : (sel.getAttribute("data-placeholder") || "Typ om te zoeken…");
+    }
+    function render(q) {
+      var words = norm(q).split(/\s+/).filter(Boolean);
+      items = selectable().filter(function (o) {
+        var t = norm(o.textContent + " " + (o.getAttribute("data-s") || ""));
+        return words.every(function (w) { return t.indexOf(w) >= 0; });
+      }).slice(0, 60);
+      var html = items.map(function (o, i) {
+        return '<li role="option" data-i="' + i + '" class="' + (o.selected ? "sel" : "") + '">' + esc(o.textContent.trim()) + "</li>";
+      }).join("");
+      if (!items.length) html = '<li class="combo-empty">Niets gevonden</li>';
+      if (kind && ADD[kind]) html += '<li class="combo-add" data-add="1">+ ' + (q ? "“" + esc(q) + "” toevoegen als nieuwe " : "Nieuwe ") + esc(ADD[kind].label) + (q ? "" : " toevoegen") + "</li>";
+      list.innerHTML = html; active = -1; list.hidden = false; inp.setAttribute("aria-expanded", "true");
+    }
+    function close() { list.hidden = true; inp.setAttribute("aria-expanded", "false"); syncText(); }
+    function choose(o) {
+      sel.value = o ? o.value : "";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      close();
+    }
+    function add(q) {
+      list.hidden = true;
+      openAdd(kind, q, sel, parentVal(), function (js) {
+        var o = document.createElement("option");
+        o.value = js.id; o.textContent = js.label;
+        if (src && js.customer_id) o.setAttribute("data-c", js.customer_id);
+        sel.appendChild(o);
+        choose(o);
+      });
+    }
+    inp.addEventListener("focus", function () { inp.select(); render(""); });
+    inp.addEventListener("input", function () { render(inp.value); });
+    inp.addEventListener("keydown", function (e) {
+      var lis = list.querySelectorAll("li[data-i], li.combo-add");
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault(); if (list.hidden) render(inp.value);
+        active = Math.max(0, Math.min(lis.length - 1, active + (e.key === "ArrowDown" ? 1 : -1)));
+        lis.forEach(function (li, i) { li.classList.toggle("act", i === active); });
+        if (lis[active]) lis[active].scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        if (!list.hidden) { e.preventDefault(); var li = lis[active] || (items.length && inp.value.trim() ? lis[0] : null); if (li) li.dispatchEvent(new Event("mousedown", { bubbles: true })); }
+      } else if (e.key === "Escape") { close(); }
+    });
+    inp.addEventListener("blur", function () { setTimeout(close, 150); });
+    list.addEventListener("mousedown", function (e) {
+      var li = e.target.closest("li"); if (!li) return; e.preventDefault();
+      if (li.getAttribute("data-add")) { add(inp.value.trim() && !items.some(function (o) { return norm(o.textContent.trim()) === norm(inp.value.trim()); }) ? inp.value.trim() : ""); return; }
+      if (li.hasAttribute("data-i")) choose(items[+li.getAttribute("data-i")]);
+    });
+    clear.addEventListener("click", function () { choose(null); inp.focus(); });
+    sel.addEventListener("change", syncText);
+    if (src) src.addEventListener("change", function () {
+      var o = sel.selectedOptions[0], c = o && o.getAttribute("data-c");
+      if (o && o.value && c && c !== src.value) { sel.value = ""; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      syncText();
+    });
+    syncText();
+  }
+  document.querySelectorAll("select[data-combo]").forEach(enhance);
+})();

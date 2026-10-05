@@ -11,7 +11,7 @@
     <label class="f">Ordernummer (Komdex) *<input type="text" name="number" value="{{ p.number or '' }}" required autofocus placeholder="bijv. 20260102"></label>
     <label class="f">Status<select name="status">{{ opt('actief','Actief',p.status) }}{{ opt('afgerond','Afgerond',p.status) }}{{ opt('gearchiveerd','Gearchiveerd',p.status) }}</select></label>
     <label class="f full">Omschrijving *<input type="text" name="name" value="{{ p.name or '' }}" required></label>
-    <label class="f full">Klant<select name="customer_id"><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
+    <label class="f full">Klant<select name="customer_id" data-combo><option value="">–</option>{% for c in customers %}{{ opt(c.id, c.name, p.customer_id) }}{% endfor %}</select></label>
     {% if sp_on and not p.sp_item_id %}
     <div class="f full"><span class="hint">{% if K.kind == 'project' %}Bij opslaan wordt direct de projectmap <code>&lt;ordernummer&gt;-&lt;omschrijving&gt;</code> aangemaakt in de klantmap. Power Automate zet daarna de sjabloonmappen erin en plaatst de Teams-post.{% else %}Een order krijgt pas een map in SharePoint als je op de orderpagina op <b>Ordermap aanmaken</b> klikt.{% endif %}</span></div>
     {% elif sp_on and p.sp_item_id %}

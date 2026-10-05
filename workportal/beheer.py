@@ -140,6 +140,12 @@ def settings():
         if request.form.get("mobile_form") == "1":
             on = set(request.form.getlist("mobile_on"))
             set_setting("mobile_off", json.dumps([m for m in PHONE_MODULES if m not in on]))
+        if request.form.get("cred_form") == "1":
+            set_setting("cred_mail_on", "1" if request.form.get("cred_mail_on") else "0")
+            set_setting("cred_mailbox", (request.form.get("cred_mailbox") or "").strip().lower() or "factuur@devreugd-pt.nl")
+            since = (request.form.get("cred_since") or "").strip()
+            if since and since != (get_setting("cred_since") or "")[:10]:
+                set_setting("cred_since", since + "T00:00:00Z")
         audit("instellingen gewijzigd", "settings")
         flash("Instellingen opgeslagen.", "ok")
         return redirect(url_for("beheer.settings"))
@@ -152,11 +158,15 @@ def settings():
         "db_size": os.path.getsize(current_app.config["DB_PATH"]) if os.path.exists(current_app.config["DB_PATH"]) else 0,
     }
     from .util import mobile_off
-    return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(),
+    from .crediteuren import mail_configured
+    cred = {"on": get_setting("cred_mail_on") == "1", "box": get_setting("cred_mailbox") or "factuur@devreugd-pt.nl",
+            "since": (get_setting("cred_since") or "")[:10], "last": get_setting("cred_last_poll"),
+            "error": get_setting("cred_last_error"), "graph": mail_configured()}
+    return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(), cred=cred,
                            phone_modules=[(k, dict(MODULES)[k]) for k in PHONE_MODULES])
 
 
-PHONE_MODULES = ["klanten", "projecten", "orders", "service", "druktest", "modellen3d", "calculatie", "nacalculatie", "kennis", "beheer"]
+PHONE_MODULES = ["klanten", "projecten", "orders", "service", "druktest", "modellen3d", "calculatie", "nacalculatie", "crediteuren", "kennis", "beheer"]
 
 
 @bp.route("/sharepoint", methods=["GET", "POST"])
