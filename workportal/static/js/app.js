@@ -471,3 +471,70 @@
   };
   document.querySelectorAll("[data-addr-search]").forEach(WP.addrSearch);
 })();
+
+/* Slepen en neerzetten in een SharePoint-map (projectmap/ordermap) */
+(function () {
+  var zone = document.getElementById("dropzone");
+  if (!zone) return;
+  var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+  var url = zone.getAttribute("data-url"), pad = zone.getAttribute("data-pad") || "", listUrl = zone.getAttribute("data-list");
+  var queue = document.getElementById("dropqueue"), where = document.getElementById("dropwhere"), depth = 0;
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function target(el) { var r = el && el.closest && el.closest("[data-droppath]"); return r; }
+  function hasFiles(e) { return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0; }
+  function clearRows() { zone.querySelectorAll(".droptarget").forEach(function (r) { r.classList.remove("droptarget"); }); }
+  zone.addEventListener("dragenter", function (e) { if (!hasFiles(e)) return; e.preventDefault(); depth++; zone.classList.add("over"); });
+  zone.addEventListener("dragleave", function (e) { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) { zone.classList.remove("over"); clearRows(); } });
+  zone.addEventListener("dragover", function (e) {
+    if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+    var r = target(e.target); clearRows();
+    if (r) { r.classList.add("droptarget"); where.textContent = "in map " + r.getAttribute("data-dropname"); }
+    else where.textContent = "in deze map";
+  });
+  zone.addEventListener("drop", function (e) {
+    if (!hasFiles(e)) return; e.preventDefault(); depth = 0; zone.classList.remove("over");
+    var r = target(e.target); clearRows();
+    send(Array.prototype.slice.call(e.dataTransfer.files), r ? r.getAttribute("data-droppath") : pad, r ? r.getAttribute("data-dropname") : null);
+  });
+  var inp = document.getElementById("dropinput");
+  if (inp) inp.addEventListener("change", function () { send(Array.prototype.slice.call(inp.files), pad, null); inp.value = ""; });
+  // voorkom dat de browser een losgelaten bestand buiten het vak opent
+  window.addEventListener("dragover", function (e) { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener("drop", function (e) { if (hasFiles(e) && !zone.contains(e.target)) e.preventDefault(); });
+
+  function send(files, dest, destName) {
+    files = files.filter(function (f) { return f.size > 0 || f.type; });
+    if (!files.length) { queue.hidden = false; queue.innerHTML = '<div class="dq-done">Mappen kun je niet slepen, alleen bestanden.</div>'; return; }
+    queue.hidden = false;
+    var i = 0, ok = 0, failed = 0;
+    function next() {
+      if (i >= files.length) {
+        var msg = ok + " bestand" + (ok === 1 ? "" : "en") + " toegevoegd" + (destName ? " aan " + destName : "") + (failed ? ", " + failed + " mislukt" : "") + ".";
+        queue.insertAdjacentHTML("beforeend", '<div class="dq-done">' + esc(msg) + "</div>");
+        refresh(); setTimeout(function () { if (!failed) { queue.hidden = true; queue.innerHTML = ""; } }, 4000);
+        return;
+      }
+      var f = files[i++];
+      var row = document.createElement("div"); row.className = "dq-row";
+      row.innerHTML = '<span class="dq-name">' + esc(f.name) + '</span><span class="dq-bar"><i></i></span><span class="dq-st">0%</span>';
+      queue.appendChild(row);
+      var fd = new FormData(); fd.append("files", f, f.name); fd.append("pad", dest || ""); fd.append("csrf_token", CSRF);
+      var xhr = new XMLHttpRequest(); xhr.open("POST", url); xhr.setRequestHeader("X-CSRF-Token", CSRF);
+      xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) { var p = Math.round(ev.loaded / ev.total * 95); row.querySelector("i").style.width = p + "%"; row.querySelector(".dq-st").textContent = p + "%"; } };
+      xhr.onload = function () {
+        var js = {}; try { js = JSON.parse(xhr.responseText); } catch (e) {}
+        if (xhr.status === 200 && js.ok) { ok++; row.classList.add("ok"); row.querySelector("i").style.width = "100%"; row.querySelector(".dq-st").textContent = js.saved && js.saved[0] !== f.name ? "opgeslagen als " + js.saved[0] : "klaar"; }
+        else { failed++; row.classList.add("err"); row.querySelector(".dq-st").textContent = xhr.status === 413 ? "te groot" : (js.error || "mislukt"); }
+        next();
+      };
+      xhr.onerror = function () { failed++; row.classList.add("err"); row.querySelector(".dq-st").textContent = "geen verbinding"; next(); };
+      xhr.send(fd);
+    }
+    next();
+  }
+  function refresh() {
+    fetch(listUrl, { credentials: "same-origin" }).then(function (r) { return r.text(); }).then(function (h) {
+      document.getElementById("droplist").innerHTML = h;
+    }).catch(function () {});
+  }
+})();

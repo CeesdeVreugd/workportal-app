@@ -4,16 +4,18 @@ De blueprint wordt twee keer geregistreerd: als 'projecten' (/projecten) en als 
 Een ordernummer dat geen project is, is een order. Nieuwe ordermappen uit Komdex komen binnen in
 het actievenster (/orders/inbox) en worden daar als project of order goedgezet.
 """
+import os
+import re
 from urllib.parse import quote
 
 import requests
 from flask import (Blueprint, render_template, request, redirect, url_for, flash, abort, Response,
-                   stream_with_context, g)
+                   stream_with_context, g, jsonify)
 
 from . import sharepoint as sp
 from .db import query, execute, get_db
 from .permissions import can, LEZEN, BEWERKEN, BEHEER
-from .util import now_iso, audit, to_int
+from .util import now_iso, audit, to_int, get_setting
 
 bp = Blueprint("werk", __name__)
 
@@ -433,7 +435,139 @@ def project_folder(pid):
     k = KINDS[BP_OF_KIND[p["kind"]]]
     tpl = "werk/_folder_list.html" if request.args.get("partial") else "werk/folder.html"
     return render_template(tpl, K=k, B=BP_OF_KIND[p["kind"]], p=p, items=items, rel=rel, crumbs=crumbs, error=error,
-                           folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"], p["kind"]))
+                           folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"], p["kind"]),
+                           can_upload=_can_upload(p), cert_root=_cert_root(rel))
+
+
+def _can_upload(p):
+    return can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEWERKEN) or can("service", BEWERKEN) or can("druktest", BEWERKEN)
+
+
+@bp.route("/<int:pid>/map/uploaden", methods=["POST"])
+def project_folder_upload(pid):
+    """Bestanden in de SharePoint-map zetten (slepen of kiezen). Eén of meer bestanden per verzoek."""
+    p = _project_sp(pid)
+    if not _can_upload(p):
+        return jsonify({"error": "Je hebt geen rechten om hier bestanden toe te voegen."}), 403
+    try:
+        rel = sp.safe_rel(request.form.get("pad", ""))
+    except ValueError:
+        return jsonify({"error": "Ongeldige map"}), 400
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+    if not files:
+        return jsonify({"error": "Geen bestand ontvangen"}), 400
+    saved = []
+    try:
+        for f in files:
+            saved.append(sp.upload_to_folder(get_db(), pid, rel, f.filename, f.read()))
+    except sp.GraphError as exc:
+        return jsonify({"error": f"SharePoint gaf een fout: {exc.message}", "saved": saved}), 502
+    except (requests.RequestException, RuntimeError):
+        return jsonify({"error": "SharePoint is op dit moment niet bereikbaar.", "saved": saved}), 502
+    audit("bestand in map gezet", "project", pid, ", ".join(saved)[:300])
+    return jsonify({"ok": True, "saved": saved})
+
+
+CERT_RE = re.compile(r"certifica", re.I)
+
+
+def _cert_root(rel):
+    """De map met certificaten (bijv. '7 Certificaten') als rel daarin ligt, anders None."""
+    parts = [x for x in (rel or "").split("/") if x]
+    for i, part in enumerate(parts):
+        if CERT_RE.search(part):
+            return "/".join(parts[:i + 1])
+    return None
+
+
+def _contact_email(p):
+    """E-mailadres van de contactpersoon van het project/de order (T.a.v.), anders van de klant."""
+    if p["customer_id"]:
+        if p["contact_name"]:
+            r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND lower(name) = lower(?)",
+                      (p["customer_id"], p["contact_name"].strip()), one=True)
+            if not r:
+                r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND"
+                          " (lower(name) LIKE lower(?) OR lower(?) LIKE '%' || lower(name) || '%') LIMIT 1",
+                          (p["customer_id"], f"%{p['contact_name'].strip()}%", p["contact_name"].strip()), one=True)
+            if r:
+                return r["email"]
+        c = query("SELECT email FROM customers WHERE id = ?", (p["customer_id"],), one=True)
+        if c and c["email"]:
+            return c["email"]
+    return ""
+
+
+@bp.route("/<int:pid>/map/certificaten", methods=["GET", "POST"])
+def certificates_mail(pid):
+    """Certificaten uit de projectmap mailen: aanvinken, tekst aanpassen, naar de contactpersoon."""
+    p = _project_sp(pid)
+    if not _can_upload(p):
+        abort(403)
+    k = KINDS[BP_OF_KIND[p["kind"]]]
+    B = BP_OF_KIND[p["kind"]]
+    try:
+        rel = sp.safe_rel(request.values.get("pad", ""))
+    except ValueError:
+        abort(400)
+    root = _cert_root(rel) or rel
+    conn = get_db()
+    try:
+        files = sp.list_files_deep(conn, pid, root)
+    except sp.GraphError as exc:
+        flash("Deze map bestaat niet (meer) in SharePoint." if exc.status == 404 else f"SharePoint gaf een fout ({exc.status}).", "error")
+        return redirect(url_for(B + ".project_folder", pid=pid, pad=rel or None))
+    except (requests.RequestException, RuntimeError):
+        flash("SharePoint is op dit moment niet bereikbaar.", "error")
+        return redirect(url_for(B + ".project_folder", pid=pid, pad=rel or None))
+    sender = get_setting("cert_sender") or os.environ.get("CERT_MAIL_FROM") or os.environ.get("MAIL_FROM") or ""
+    label = "order" if p["kind"] == "order" else "project"
+    cust = query("SELECT name FROM customers WHERE id = ?", (p["customer_id"],), one=True) if p["customer_id"] else None
+    contacts = query("SELECT name, email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' ORDER BY name",
+                     (p["customer_id"] or 0,))
+    if request.method == "POST":
+        chosen = [x for x in request.form.getlist("files") if any(f["path"] == x for f in files)]
+        to = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
+        cc = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("cc") or "") if a.strip()]
+        if request.form.get("cc_me") and g.user["email"] and g.user["email"] not in cc:
+            cc.append(g.user["email"])
+        subject = (request.form.get("subject") or "").strip()
+        body = (request.form.get("body") or "").strip()
+        bad = [a for a in to + cc if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
+        if not chosen or not to or bad or not subject:
+            flash("Vink minstens één certificaat aan en vul een geldig e-mailadres en onderwerp in."
+                  + (f" Ongeldig: {', '.join(bad)}" if bad else ""), "error")
+            return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
+                                   chosen=set(chosen), sender=sender, contacts=contacts)
+        atts, total = [], 0
+        for path in chosen:
+            meta, r = sp.open_file(conn, pid, path)
+            data = b"".join(r.iter_content(256 * 1024))
+            total += len(data)
+            atts.append((meta.get("name") or path.rpartition("/")[2], data, (meta.get("file") or {}).get("mimeType") or "application/octet-stream"))
+        if total > 30 * 1024 * 1024:
+            flash(f"De bijlagen zijn samen {total / 1048576:.0f} MB; dat is te groot voor één mail (max. ±30 MB). Verstuur ze in delen.", "error")
+            return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
+                                   chosen=set(chosen), sender=sender, contacts=contacts)
+        from .mail import send_mail_with_files
+        ok, err = send_mail_with_files(sender, to, subject, body, atts, cc=cc or None, signer="werkvoorbereiding")
+        if not ok:
+            flash(f"Versturen mislukt: {err}", "error")
+            return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
+                                   chosen=set(chosen), sender=sender, contacts=contacts)
+        names = [a[0] for a in atts]
+        execute("INSERT INTO project_notes (date, kind, contact, body, project_id, created_by, created_at) VALUES (?,?,?,?,?,?,?)",
+                (now_iso()[:10], "mail", ", ".join(to), f"Certificaten gemaild: {', '.join(names)}" + (f"\n\n{body}" if body else ""),
+                 pid, g.user["id"], now_iso()))
+        audit("certificaten gemaild", "project", pid, f"aan {', '.join(to)}: {', '.join(names)}"[:300])
+        flash(f"{len(names)} certificaat/certificaten gemaild aan {', '.join(to)}.", "ok")
+        return redirect(url_for(B + ".project_folder", pid=pid, pad=rel or None))
+    form = {"to": _contact_email(p), "cc_me": "1",
+            "subject": f"Certificaten {label} {p['number']} – {p['name']}",
+            "body": (f"Beste {p['contact_name'] or 'relatie'},\n\nBijgaand ontvangt u de certificaten voor {label} {p['number']}"
+                     f" ({p['name']}).\n\nHeeft u vragen, neem dan gerust contact met ons op.")}
+    return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=form,
+                           chosen={f["path"] for f in files}, sender=sender, contacts=contacts)
 
 
 @bp.route("/<int:pid>/bestand")

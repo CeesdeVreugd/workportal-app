@@ -131,12 +131,14 @@ def rights():
 @bp.route("/instellingen", methods=["GET", "POST"])
 @require("beheer", BEHEER)
 def settings():
-    keys = ["verify_days", "unlock_hours", "pin_min_length", "extra_margin_pct", "pressure_presets", "sharepoint_root"]
+    keys = ["verify_days", "unlock_hours", "pin_min_length", "extra_margin_pct", "pressure_presets", "sharepoint_root", "cert_sender"]
     if request.method == "POST":
         for k in keys:
             v = _f(k)
             if v is not None:
                 set_setting(k, v)
+            elif k == "cert_sender" and k in request.form:
+                set_setting(k, "")
         if request.form.get("mobile_form") == "1":
             on = set(request.form.getlist("mobile_on"))
             set_setting("mobile_off", json.dumps([m for m in PHONE_MODULES if m not in on]))

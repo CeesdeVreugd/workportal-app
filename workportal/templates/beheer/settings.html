@@ -14,6 +14,7 @@
       <label class="f">Minimale lengte pincode<input type="number" min="4" max="8" name="pin_min_length" value="{{ v.pin_min_length }}"></label>
       <label class="f">Doel extra marge boven minimum (%)<input type="text" inputmode="decimal" name="extra_margin_pct" value="{{ v.extra_margin_pct }}"></label>
       <label class="f full">Druktest-timers (minuten, komma-gescheiden)<input type="text" name="pressure_presets" value="{{ v.pressure_presets }}"></label>
+      <label class="f full">Afzender bij certificaten mailen<input type="email" name="cert_sender" value="{{ v.cert_sender or '' }}" placeholder="bijv. werkvoorbereiding@devreugd-pt.nl"><span class="hint">Leeg = het algemene WorkPortal-adres (MAIL_FROM). Het adres moet een mailbox in Microsoft 365 zijn waaruit WorkPortal mag versturen.</span></label>
       <label class="f full">SharePoint hoofdmap voor projecten<input type="text" name="sharepoint_root" value="{{ v.sharepoint_root }}"><span class="hint">Als een project geen eigen SharePoint-map heeft, wordt &lt;hoofdmap&gt;/&lt;projectnummer&gt; gebruikt.</span></label>
     </div>
     <h3 style="margin-top:14px">Modules op de telefoon</h3>

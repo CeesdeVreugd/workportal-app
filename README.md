@@ -410,3 +410,19 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   Het adres staat ook bij Gegevens en in de ticketlijst (op de telefoon onder de omschrijving).
 - Een **bezoek verwijderen** kan met het prullenbakje bij het bezoek of onderaan het bewerkscherm van het bezoek
   (met foto's). Een ondertekend bezoek kan alleen iemand met Beheer op Service verwijderen; het komt in de historie.
+
+## Bestanden slepen naar de project-/ordermap
+- In de map van een project of order (knop Projectmap/Ordermap) sleep je bestanden in het vak; laat los op een submap
+  om ze daarin te zetten. Of klik **Bestanden toevoegen**. Bestaat de naam al, dan maakt SharePoint er "naam 1.pdf" van
+  (er wordt niets overschreven). Max. 65 MB per bestand (MAX_UPLOAD_MB). Kan iedereen met Bewerken op Projecten/Orders,
+  Service of Druktesten. Mappen zelf slepen kan niet, alleen bestanden.
+
+## Certificaten mailen
+- In de map **7 Certificaten** (elke map met "certificaten" in de naam) staat **Certificaten mailen**; in de projectmap
+  ook een knop **Mailen** bij die map. Je vinkt de certificaten aan (ook uit submappen), past de tekst aan en verstuurt.
+- Het adres komt van de contactpersoon van de order/het project (T.a.v. op de orderbon, gezocht bij de contactpersonen
+  van de klant); anders het algemene e-mailadres van de klant. Kopie aan jezelf staat standaard aan.
+- Afzender: Beheer › Instellingen › "Afzender bij certificaten mailen" (leeg = MAIL_FROM), met de handtekening van
+  Werkvoorbereiding. De mail komt in de gespreksnotities (soort E-mail) en de historie.
+- Bijlagen samen tot 3 MB gaan direct. Groter (tot ±30 MB) vraagt in Entra het extra toepassingsrecht **Mail.ReadWrite**
+  voor de app-registratie (WorkPortal maakt dan een concept met de bijlagen en verstuurt dat).

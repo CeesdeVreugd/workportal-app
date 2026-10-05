@@ -256,3 +256,68 @@ def send_customer_mail(sender, to, subject, text, attachments=None, cc=None, sig
         return True, None
     except Exception as exc:  # pragma: no cover - netwerk
         return False, str(exc)[:400]
+
+
+def send_mail_with_files(sender, to, subject, text, attachments, cc=None, signer="werkvoorbereiding"):
+    """Mail aan een klant met (mogelijk grote) bijlagen, zonder WorkPortal-kader, met handtekening.
+    Tot ~3 MB in één keer (sendMail); groter via een concept met uploadsessies (vereist Mail.ReadWrite).
+    Geeft (True, None) of (False, foutmelding)."""
+    html = (f'<div style="font-family:{FONT};font-size:11pt;color:#000;max-width:680px">'
+            f'{text_to_html(text)}{signature_html(signer)}</div>')
+    full_text = (text or "").rstrip() + signature_text(signer)
+    total = sum(len(d) for _, d, _ in attachments or [])
+    if not graph_configured():
+        print("=" * 60, flush=True)
+        print(f"[WorkPortal] MAIL MET BIJLAGEN (Microsoft-koppeling niet ingesteld) van {sender} aan {to} cc {cc}: {subject}", flush=True)
+        print(full_text, flush=True)
+        print("Bijlagen: " + ", ".join(f"{n} ({len(d)} bytes)" for n, d, _ in attachments or []), flush=True)
+        print("=" * 60, flush=True)
+        return True, None
+    try:
+        if total <= GRAPH_MAX_ATTACH:
+            _send_graph(to, subject, full_text, html, attachments, sender=sender, cc=cc)
+            return True, None
+        return _send_graph_large(sender, to, cc, subject, html, attachments)
+    except Exception as exc:  # pragma: no cover - netwerk
+        return False, str(exc)[:400]
+
+
+def _send_graph_large(sender, to, cc, subject, html, attachments):
+    base = f"https://graph.microsoft.com/v1.0/users/{sender}"
+    hdr = lambda: {"Authorization": f"Bearer {_graph_token()}"}
+    rcpt = lambda x: [{"emailAddress": {"address": a}} for a in ([x] if isinstance(x, str) else list(x or []))]
+    msg = {"subject": subject, "body": {"contentType": "HTML", "content": html}, "toRecipients": rcpt(to)}
+    if cc:
+        msg["ccRecipients"] = rcpt(cc)
+    r = requests.post(f"{base}/messages", json=msg, headers=hdr(), timeout=60)
+    if r.status_code == 403:
+        return False, ("De bijlagen zijn samen groter dan 3 MB. Daarvoor heeft de app-registratie in Microsoft 365 "
+                       "het recht Mail.ReadWrite nodig. Verstuur minder certificaten tegelijk of vraag de beheerder dit recht toe te voegen.")
+    if r.status_code >= 400:
+        return False, f"Concept maken mislukt ({r.status_code}): {r.text[:200]}"
+    mid = r.json()["id"]
+    for name, data, mime in attachments:
+        if len(data) < 3 * 1024 * 1024:
+            a = requests.post(f"{base}/messages/{mid}/attachments", headers=hdr(), timeout=120, json={
+                "@odata.type": "#microsoft.graph.fileAttachment", "name": name,
+                "contentType": mime or "application/octet-stream", "contentBytes": base64.b64encode(data).decode()})
+            if a.status_code >= 400:
+                return False, f"Bijlage {name} toevoegen mislukt ({a.status_code})"
+            continue
+        s = requests.post(f"{base}/messages/{mid}/attachments/createUploadSession", headers=hdr(), timeout=60,
+                          json={"AttachmentItem": {"attachmentType": "file", "name": name, "size": len(data)}})
+        if s.status_code >= 400:
+            return False, f"Uploaden van {name} starten mislukt ({s.status_code})"
+        url, pos, step = s.json()["uploadUrl"], 0, 3 * 1024 * 1024
+        while pos < len(data):
+            chunk = data[pos:pos + step]
+            u = requests.put(url, data=chunk, timeout=120, headers={
+                "Content-Type": "application/octet-stream",
+                "Content-Range": f"bytes {pos}-{pos + len(chunk) - 1}/{len(data)}"})
+            if u.status_code >= 400:
+                return False, f"Uploaden van {name} mislukt ({u.status_code})"
+            pos += len(chunk)
+    sres = requests.post(f"{base}/messages/{mid}/send", headers=hdr(), timeout=60)
+    if sres.status_code not in (200, 202):
+        return False, f"Versturen mislukt ({sres.status_code}): {sres.text[:200]}"
+    return True, None

@@ -161,13 +161,13 @@ class Graph:
             raise GraphError(r.status_code, "Download mislukt")
         return meta, r
 
-    def upload(self, drive, parent_id, name, data):
+    def upload(self, drive, parent_id, name, data, conflict="replace"):
         target = f"/drives/{drive}/items/{parent_id}:/{quote(name, safe='')}:"
         if len(data) <= SMALL_UPLOAD:
-            return self._json("PUT", target + "/content", params={"@microsoft.graph.conflictBehavior": "replace"},
+            return self._json("PUT", target + "/content", params={"@microsoft.graph.conflictBehavior": conflict},
                               data=data, timeout=120)
         sess = self._json("POST", target + "/createUploadSession",
-                          json={"item": {"@microsoft.graph.conflictBehavior": "replace"}})
+                          json={"item": {"@microsoft.graph.conflictBehavior": conflict}})
         url, total, pos, res = sess["uploadUrl"], len(data), 0, {}
         while pos < total:
             chunk = data[pos:pos + CHUNK]
@@ -782,6 +782,37 @@ def list_folder(conn, pid, relpath="", g=None):
                     "modified": i.get("lastModifiedDateTime"), "mime": (i.get("file") or {}).get("mimeType"),
                     "web_url": i.get("webUrl")})
     out.sort(key=lambda x: (not x["folder"], x["name"].lower()))
+    return out
+
+
+def upload_to_folder(conn, pid, relpath, filename, data, g=None):
+    """Bestand (gesleept of gekozen) in <projectmap>/<relpath> zetten. Bestaat de naam al, dan maakt SharePoint
+    er 'naam 1.ext' van (niets wordt overschreven). Geeft de naam zoals hij in SharePoint staat."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    rel = safe_rel(relpath)
+    parent = g.item_by_path(drive, rel, p["sp_item_id"])["id"] if rel else p["sp_item_id"]
+    name = re.sub(r'[\x00-\x1f"*:<>?/\\|]+', "_", filename or "bestand").strip().strip(".") or "bestand"
+    res = g.upload(drive, parent, name[:200], data, conflict="rename")
+    return (res or {}).get("name") or name
+
+
+def list_files_deep(conn, pid, relpath, depth=2, g=None, limit=300):
+    """Alle bestanden in een map en (tot depth niveaus) de submappen, met hun pad t.o.v. de projectmap."""
+    g = g or client()
+    out = []
+
+    def walk(rel, d):
+        for i in list_folder(conn, pid, rel, g):
+            path = f"{rel}/{i['name']}" if rel else i["name"]
+            if i["folder"]:
+                if d > 0:
+                    walk(path, d - 1)
+            elif len(out) < limit:
+                out.append(dict(i, path=path, sub=path[len(relpath):].lstrip("/").rpartition("/")[0]))
+    walk(safe_rel(relpath), depth)
+    out.sort(key=lambda f: (f["sub"] != "", f["sub"].lower(), f["name"].lower()))
     return out
 
 

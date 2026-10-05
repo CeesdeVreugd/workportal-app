@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Certificaten mailen · {{ p.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=rel or None) }}">{{ K.label }}map</a> / Certificaten mailen</div>
+<div class="pagehead"><div><div class="eyebrow">{{ root }}</div><h1>Certificaten mailen</h1><p>{{ p.number }} · {{ p.name }}</p></div></div>
+<form method="post" class="grid g2 stack" style="align-items:start">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="pad" value="{{ rel }}">
+  <section class="card">
+    <div class="card-head"><h2>Welke certificaten?</h2>
+      {% if files %}<span class="small"><a href="#" onclick="document.querySelectorAll('.certlist input').forEach(function(c){c.checked=true});return false">Alles</a> · <a href="#" onclick="document.querySelectorAll('.certlist input').forEach(function(c){c.checked=false});return false">Niets</a></span>{% endif %}</div>
+    <div class="certlist">
+      {% set ns = namespace(sub=None) %}
+      {% for f in files %}
+        {% if f.sub != ns.sub %}{% set ns.sub = f.sub %}{% if f.sub %}<div class="certsub">{{ f.sub }}</div>{% endif %}{% endif %}
+        <label><input type="checkbox" name="files" value="{{ f.path }}" {{ 'checked' if f.path in chosen }}>
+          <span class="ficon">{{ icon('pdf' if f.mime == 'application/pdf' else 'image' if (f.mime or '').startswith('image/') else 'file') }}</span>
+          <span class="grow"><span class="t">{{ f.name }}</span><br><span class="s">{{ (f.size / 1024 / 1024)|num(1) ~ ' MB' if f.size >= 1048576 else ((f.size / 1024)|round|int ~ ' kB') }} · {{ f.modified|date }}</span></span>
+          <a class="iconbtn" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=f.path) }}" target="_blank" rel="noopener" title="Bekijken" {% if f.name.lower().endswith('.pdf') %}data-pdf="{{ f.name }}"{% endif %}>{{ icon('external') }}</a>
+        </label>
+      {% else %}<div class="empty">Er staan nog geen bestanden in {{ root }}.</div>{% endfor %}
+    </div>
+  </section>
+  <section class="card form">
+    <h2>Mail</h2>
+    <label class="f">Aan *<input type="text" name="to" value="{{ form.to or '' }}" list="certcontacts" placeholder="naam@klant.nl" required>
+      <span class="hint">{% if form.to %}Van de contactpersoon{% if p.contact_name %} ({{ p.contact_name }}){% endif %}.{% else %}Geen e-mailadres gevonden bij de contactpersoon{% if p.contact_name %} {{ p.contact_name }}{% endif %}; kies of typ er een.{% endif %} Meerdere adressen scheiden met een komma.</span></label>
+    <datalist id="certcontacts">{% for c in contacts %}<option value="{{ c.email }}">{{ c.name }}</option>{% endfor %}</datalist>
+    <label class="f">CC<input type="text" name="cc" value="{{ form.cc or '' }}" list="certcontacts"></label>
+    <label class="check"><input type="checkbox" name="cc_me" value="1" {{ 'checked' if form.cc_me }}> Kopie aan mij ({{ g.user.email }})</label>
+    <label class="f">Onderwerp *<input type="text" name="subject" value="{{ form.subject or '' }}" required></label>
+    <label class="f">Tekst<textarea name="body" rows="8">{{ form.body or '' }}</textarea></label>
+    <p class="hint" style="margin:0">Verstuurd vanuit {{ sender or 'het WorkPortal-adres' }} met de handtekening van Werkvoorbereiding; de aangevinkte bestanden gaan als bijlage mee. De mail wordt vastgelegd bij de gespreksnotities.</p>
+    <div class="actions"><button class="btn primary"{% if not files %} disabled{% endif %}>{{ icon('mail') }}Versturen</button><a class="btn ghost" href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=rel or None) }}">Annuleren</a></div>
+  </section>
+</form>
+{% endblock %}

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V64: map in SharePoint altijd als nummer-omschrijving (ook orders)"
+set "OMSCHRIJVING=WorkPortal V65: bestanden slepen naar de SharePoint-map, certificaten mailen vanuit 7 Certificaten"
 
 echo.
 echo ============================================
