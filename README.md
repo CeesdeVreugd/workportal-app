@@ -426,3 +426,5 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   Werkvoorbereiding. De mail komt in de gespreksnotities (soort E-mail) en de historie.
 - Bijlagen samen tot 3 MB gaan direct. Groter (tot ±30 MB) vraagt in Entra het extra toepassingsrecht **Mail.ReadWrite**
   voor de app-registratie (WorkPortal maakt dan een concept met de bijlagen en verstuurt dat).
+- In de adresbalk van een ticket staat naast Route een knop **Delen**: op telefoon/tablet opent het deelmenu (WhatsApp,
+  mail, berichten …) met klant, locatie, adres en een kaartlink; op de pc wordt het adres met kaartlink gekopieerd.

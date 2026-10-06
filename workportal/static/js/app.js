@@ -538,3 +538,24 @@
     }).catch(function () {});
   }
 })();
+
+/* Delen-knop: <button data-share-title data-share-text data-share-url> – deelmenu van de telefoon, anders kopiëren */
+(function () {
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-share-text]"); if (!b) return;
+    e.preventDefault();
+    var title = b.getAttribute("data-share-title") || "", text = b.getAttribute("data-share-text") || "", url = b.getAttribute("data-share-url") || "";
+    var label = b.lastChild && b.lastChild.nodeType === 3 ? b.lastChild : null, orig = label ? label.nodeValue : "";
+    function done(msg) { if (label) { label.nodeValue = msg; setTimeout(function () { label.nodeValue = orig; }, 2000); } }
+    if (navigator.share) {
+      navigator.share({ title: title, text: text, url: url }).catch(function () {});
+      return;
+    }
+    var all = text + (url ? "\n" + url : "");
+    (navigator.clipboard ? navigator.clipboard.writeText(all) : Promise.reject()).then(function () { done("Gekopieerd"); }).catch(function () {
+      var ta = document.createElement("textarea"); ta.value = all; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done("Gekopieerd"); } catch (x) { window.prompt("Kopieer het adres:", all); }
+      ta.remove();
+    });
+  });
+})();

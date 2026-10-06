@@ -27,6 +27,7 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
   {% if t.visit_address %}
   <div class="grow"><b>{{ t.visit_address }}</b>{% if t.location or t.customer %}<div class="small muted">{{ t.location or t.customer }}</div>{% endif %}</div>
+  <button type="button" class="btn sm" data-share-title="{{ (t.location or t.customer or 'Adres') }}" data-share-text="{{ ((t.customer ~ (' – ' ~ t.location if t.location else '') ~ '\n') if t.customer else '') ~ t.visit_address }}" data-share-url="https://www.google.com/maps/search/?api=1&query={{ t.visit_address|urlencode }}">{{ icon('share') }}Delen</button>
   <a class="btn sm primary" href="https://www.google.com/maps/dir/?api=1&destination={{ t.visit_address|urlencode }}" target="_blank" rel="noopener">Route</a>
   {% else %}
   <div class="grow"><b>Geen adres bekend</b><div class="small muted">{% if t.customer_id %}Vul het adres in bij de klant of de locatie.{% else %}Er is nog geen klant gekozen.{% endif %}</div></div>
