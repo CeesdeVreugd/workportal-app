@@ -12,6 +12,11 @@
   .pdf-wrap { flex: 1; min-height: 0; position: relative; background: #525659; }
   .pdf-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #525659; }
   .pdf-alt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-align: center; padding: 24px; }
+  .pdf-pages { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; padding: 12px 0 24px; }
+  .pdf-pages canvas { display: block; margin: 0 auto 12px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .pdf-zoom { position: absolute; right: 14px; bottom: 18px; display: flex; gap: 6px; z-index: 3; }
+  .pdf-zoom button { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(20,22,58,.85); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+  .pdf-count { position: absolute; left: 14px; bottom: 22px; z-index: 3; color: #fff; background: rgba(20,22,58,.75); padding: 4px 10px; border-radius: 999px; font-size: 13px; }
 </style>
 </head>
 <body class="v3d-body">
@@ -23,7 +28,9 @@
     <a class="iconbtn light" href="{{ src }}" target="_blank" rel="noopener" aria-label="In nieuw venster openen" title="In nieuw venster openen (printen)">{{ icon('external') }}</a>
   </header>
   <main class="pdf-wrap" id="pdf-wrap">
-    <iframe id="pdf-frame" src="{{ src }}" title="{{ title }}"></iframe>
+    <div class="pdf-pages" id="pdf-pages" aria-label="{{ title }}"></div>
+    <div class="pdf-count" id="pdf-count" hidden></div>
+    <div class="pdf-zoom"><button type="button" id="zoom-out" aria-label="Kleiner">−</button><button type="button" id="zoom-in" aria-label="Groter">+</button></div>
   </main>
 </div>
 <script>
@@ -33,12 +40,46 @@
   back.addEventListener("click", function (e) {
     if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
   });
-  // Android kan een PDF niet in de pagina tonen: dan een knop om hem te openen
-  if (/Android/i.test(navigator.userAgent)) {
-    document.getElementById("pdf-wrap").innerHTML = '<div class="pdf-alt"><p>Deze telefoon kan de PDF niet in WorkPortal tonen.</p>' +
-      '<a class="btn primary" href="{{ src }}" target="_blank" rel="noopener">PDF openen</a></div>';
-  }
 })();
+</script>
+<script type="module">
+// Alle pagina's tonen met PDF.js (een iPhone/iPad toont in een gewoon venster alleen de eerste pagina)
+const SRC = {{ src|tojson }};
+const wrap = document.getElementById("pdf-pages"), count = document.getElementById("pdf-count");
+function fail() {
+  document.getElementById("pdf-wrap").innerHTML = '<div class="pdf-alt"><p>De PDF kan hier niet getoond worden.</p>' +
+    '<a class="btn primary" href="' + SRC + '" target="_blank" rel="noopener">PDF openen</a></div>';
+}
+try {
+  const pdfjs = await import("{{ url_for('static', filename='pdfjs/pdf.js') }}?v={{ VERSION }}");
+  pdfjs.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='pdfjs/pdf.worker.js') }}?v={{ VERSION }}";
+  const doc = await pdfjs.getDocument({ url: SRC, withCredentials: true }).promise;
+  let zoom = 1, rendering = 0;
+  count.hidden = doc.numPages < 2; count.textContent = doc.numPages + " pagina's";
+  async function render() {
+    const my = ++rendering;
+    const width = Math.min(wrap.clientWidth - 16, 1100) * zoom;
+    const ratio = window.devicePixelRatio || 1;
+    const canvases = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      if (my !== rendering) return;
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: width / base.width });
+      const c = document.createElement("canvas");
+      c.width = Math.floor(vp.width * ratio); c.height = Math.floor(vp.height * ratio);
+      c.style.width = Math.floor(vp.width) + "px"; c.style.height = Math.floor(vp.height) + "px";
+      await page.render({ canvasContext: c.getContext("2d"), viewport: vp, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : null }).promise;
+      canvases.push(c);
+      if (n === 1) { wrap.innerHTML = ""; }
+      wrap.appendChild(c);
+    }
+  }
+  await render();
+  document.getElementById("zoom-in").onclick = () => { zoom = Math.min(3, zoom * 1.25); render(); };
+  document.getElementById("zoom-out").onclick = () => { zoom = Math.max(0.5, zoom / 1.25); render(); };
+  let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 250); });
+} catch (e) { console.error(e); fail(); }
 </script>
 </body>
 </html>

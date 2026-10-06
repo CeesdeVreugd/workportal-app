@@ -436,3 +436,8 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   "Niet ondertekend – afgerond op …". Een ticket zonder bezoek sluit je met **Ticket afsluiten** bovenaan.
 - **Foto's:** naast "Foto maken" (camera) staat overal **Uit galerij** (bezoek en druktesten).
 - De status **Gefactureerd** is vervallen; bestaande tickets met die status staan nu op Afgerond. Het lijstfilter heet "Afgerond".
+
+## PDF-viewer (V68)
+- De PDF-viewer in WorkPortal toont alle pagina's onder elkaar (met PDF.js, meegeleverd in static/pdfjs, Apache-2.0).
+  Een iPhone/iPad liet in het oude venster alleen de eerste pagina zien, waardoor bijv. de handtekening op pagina 2
+  van een werkbon ontbrak. Met + en − zoom je in en uit; downloaden en openen in een nieuw venster blijven bovenin.

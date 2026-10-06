@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, g, send_file, abort, jsonify
+from flask import Blueprint, render_template, request, g, send_file, abort, jsonify, url_for
 
 from .db import query, execute, get_db
 from .notify import vapid_keys, push_user
@@ -122,7 +122,7 @@ def pdfview():
         abort(400)
     back = request.args.get("terug") or ""
     if not back.startswith("/") or back.startswith("//"):
-        back = url_for("main.index")
+        back = url_for("main.dashboard")
     title = (request.args.get("titel") or "PDF")[:150]
     return render_template("pdfview.html", src=src, back=back, title=title)
 

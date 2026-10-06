@@ -252,7 +252,7 @@ def visit_pdf(ticket, visit, photos, signature_path):
     story = [Paragraph("WERKBON SERVICE & ONDERHOUD", S["eyebrow"]),
              Paragraph(esc(ticket["title"]), S["h1"])]
     pairs = [
-        ("Ticket", ticket["number"]), ("Type", (ticket.get("type") or "").capitalize()),
+        ("Ticket", ticket["number"]), ("Type", {"onderhoud": "Service & onderhoud"}.get(ticket.get("type") or "", (ticket.get("type") or "").capitalize())),
         ("Klant", ticket.get("customer") or "–"), ("Locatie", ticket.get("location") or "–"),
         ("Installatie", ticket.get("installation") or "–"), ("Serienummer", ticket.get("serial") or "–"),
         ("Datum bezoek", fmt_date(visit["date"])), ("Monteur(s)", visit.get("technicians") or "–"),
