@@ -126,6 +126,7 @@
 </section>
 
 {% with entity='ticket', eid=t.id, to_sp=False, kind='ticket' %}{% include "modellen/_section.html" %}{% endwith %}
+{% include "partials/toolcalcs.html" %}
 <section class="card"><h2>Historie</h2><div class="rows">
 {% for h in history %}<div class="rowitem"><div class="grow"><div class="s">{{ h.created_at|dt }} · {{ h.who or 'Systeem' }}</div><div>{{ h.action|capitalize }}{% if h.details %}: {{ h.details }}{% endif %}</div></div></div>{% endfor %}
 </div></section>

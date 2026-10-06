@@ -408,3 +408,32 @@ def test_page_pdf():
              Paragraph(f"Verstuurd op {fmt_dt(now_iso())} via Printix Cloud Print.", S["small"])]
     doc.build(story)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- rekentools
+
+def calc_pdf(r, kind_label, data, link_label=None):
+    buf = io.BytesIO()
+    doc = _doc(buf, "Berekening", kind_label)
+    W = doc.width
+    story = [Paragraph("BEREKENING · " + esc(kind_label).upper(), S["eyebrow"]), Paragraph(esc(r.get("title") or kind_label), S["h1"]),
+             Paragraph(f"{esc(r.get('who') or '')} · {fmt_dt(r.get('updated_at') or r.get('created_at'))}"
+                       + (f" · {esc(link_label)}" if link_label else ""), S["small"])]
+    if data.get("inputs_text"):
+        story += [Paragraph("Uitgangspunten", S["h2"]), _kv_table([(a, b) for a, b in data["inputs_text"]], W)]
+    if data.get("lines"):
+        rows = [[Paragraph("<b>Buis</b>", S["cell"]), Paragraph("<b>Lengte</b>", S["cell"]), Paragraph("<b>Inhoud</b>", S["cell"])]]
+        rows += [[Paragraph(esc(a), S["cell"]), Paragraph(esc(b), S["cell"]), Paragraph(esc(c), S["cell"])] for a, b, c in data["lines"]]
+        t = Table(rows, colWidths=[W * 0.6, W * 0.2, W * 0.2])
+        t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        story += [Paragraph("Leidingdelen", S["h2"]), t]
+    if data.get("results"):
+        rows = [[Paragraph(esc(a), S["cell"]), Paragraph("<b>" + esc(b) + "</b>", S["cell"])] for a, b in data["results"]]
+        t = Table(rows, colWidths=[W * 0.5, W * 0.5])
+        t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                               ("BACKGROUND", (0, 0), (-1, -1), LIGHT)]))
+        story += [Paragraph("Uitkomst", S["h2"]), t]
+    story += [Spacer(1, 10), Paragraph("Berekend met WorkPortal (Kenniscentrum). Richtwaarden voor dichtheid, viscositeit en weerstand zijn "
+                                      "indicatief; controleer bij twijfel met de pomp- of chemieleverancier.", S["small"])]
+    doc.build(story)
+    return buf.getvalue()

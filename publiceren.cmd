@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V68: PDF-viewer toont alle pagina’s (ook op iPhone), werkbon met handtekening op pagina 2 weer zichtbaar"
+set "OMSCHRIJVING=WorkPortal V69: rekentools leidingen, pompen en CIP in het Kenniscentrum, opslaan bij project of ticket en PDF"
 
 echo.
 echo ============================================

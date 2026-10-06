@@ -569,6 +569,23 @@ MIGRATIONS = [
     ALTER TABLE visits ADD COLUMN closed_note TEXT;
     UPDATE tickets SET status = 'afgerond' WHERE status = 'gefactureerd';
     """,
+    # 19 - opgeslagen berekeningen (rekentools: leidingen, pompen, CIP)
+    """
+    CREATE TABLE calc_saves (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        title TEXT,
+        inputs TEXT,
+        results TEXT,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_calc_saves_project ON calc_saves(project_id);
+    CREATE INDEX idx_calc_saves_ticket ON calc_saves(ticket_id);
+    """,
 ]
 
 

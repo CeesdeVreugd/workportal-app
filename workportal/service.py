@@ -144,7 +144,9 @@ def detail(tid):
                   " WHERE n.ticket_id = ? ORDER BY n.created_at DESC, n.id DESC", (tid,))
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'ticket' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 30", (tid,))
+    from .kennis import calcs_for
     return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, files=files_for("ticket", tid),
+                           toolcalcs=calcs_for(ticket_id=tid),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
 

@@ -441,3 +441,19 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
 - De PDF-viewer in WorkPortal toont alle pagina's onder elkaar (met PDF.js, meegeleverd in static/pdfjs, Apache-2.0).
   Een iPhone/iPad liet in het oude venster alleen de eerste pagina zien, waardoor bijv. de handtekening op pagina 2
   van een werkbon ontbrak. Met + en − zoom je in en uit; downloaden en openen in een nieuw venster blijven bovenin.
+
+## Kenniscentrum: Leidingen, pompen & CIP (V69)
+Kenniscentrum › **Leidingen, pompen & CIP** (rekent direct in de browser, ook op de telefoon):
+- **Leidinginhoud:** regels met buis (DIN 11850 reeks 2: 13 t/m 204, inch-OD of eigen binnendiameter) en lengte,
+  plus overige inhoud (tank, wisselaar) → liters; met debiet ook de vul-/rondgangtijd.
+- **Snelheid & debiet:** debiet → snelheid of gewenste snelheid → debiet, met Reynoldsgetal en een kleur per toepassing
+  (CIP ≥ 1,5 m/s; water/sap/melk 1–2,5; concentraat 0,5–1,5; beslag/viskeus 0,2–1; zuigleiding ≤ 1). Tabel met de
+  snelheid in alle DIN-maten bij hetzelfde debiet. Media met richtwaarden (water, CIP-loog/-zuur, sap, melk,
+  concentraat, beslag, eigen) – dichtheid en viscositeit aan te passen.
+- **Pomp & drukverlies:** Darcy-Weisbach (RVS 0,002 mm), bochten/T-stukken/kleppen, hoogteverschil en extra drukverlies
+  (wisselaar, filter, sproeibol) → opvoerhoogte, hydraulisch en asvermogen en een motorvoorstel.
+- **CIP / reinigen:** minimaal pompdebiet voor de gewenste snelheid in de grootste leiding, sproeibol (l/min per m
+  tankomtrek), rondgangtijd, liters voorraadloog/-zuur voor de gewenste concentratie en spoelwater.
+- **Verpompen:** tijd bij een debiet of benodigd debiet voor een tijd, met snelheidscontrole.
+- **Opslaan & PDF:** geef een naam en koppel aan een project/order of ticket; daar staat de berekening onder
+  "Berekeningen" (openen en verder rekenen, of PDF).

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Leidingen, pompen &amp; CIP{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('kennis.index') }}">Kenniscentrum</a> / leidingen, pompen &amp; CIP</div>
+<div class="pagehead"><div><h1>Leidingen, pompen &amp; CIP</h1><p>Leidinginhoud, snelheden, pompkeuze en reinigen. Rekent direct terwijl je typt.</p></div></div>
+<div id="rt" data-start="{{ tab }}">
+  <div class="tabs" style="margin-bottom:16px">
+    <button type="button" data-tab="i">Leidinginhoud</button>
+    <button type="button" data-tab="s">Snelheid &amp; debiet</button>
+    <button type="button" data-tab="p">Pomp &amp; drukverlies</button>
+    <button type="button" data-tab="c">CIP / reinigen</button>
+    <button type="button" data-tab="v">Verpompen</button>
+  </div>
+
+  <!-- 1. leidinginhoud -->
+  <div class="grid g2 stack rt-pane" id="pane-i">
+    <section class="card form">
+      <h2>Leidingdelen</h2>
+      <div class="tablewrap"><table class="table rt-rows"><thead><tr><th>Buis</th><th style="width:90px">Lengte (m)</th><th class="num" style="width:90px">Inhoud</th><th style="width:40px"></th></tr></thead><tbody id="i-rows"></tbody></table></div>
+      <div><button type="button" class="btn sm" id="i-add">{{ icon('plus') }}Regel</button></div>
+      <div class="fgrid">
+        <label class="f">Overige inhoud (liter)<input id="i-extra" type="text" inputmode="decimal" placeholder="tank, warmtewisselaar, filter"></label>
+        <label class="f">Debiet voor vul-/rondgangtijd (m³/h)<input id="i-q" type="text" inputmode="decimal" placeholder="optioneel"></label>
+      </div>
+      <p class="hint">Binnendiameter DIN 11850 reeks 2 = buitendiameter − 2 × wanddikte (bijv. 53 × 1,5 → 50 mm).</p>
+    </section>
+    <section class="card"><h2>Uitkomst</h2><div id="i-res" class="rt-results"></div></section>
+  </div>
+
+  <!-- 2. snelheid & debiet -->
+  <div class="grid g2 stack rt-pane" id="pane-s" hidden>
+    <section class="card form">
+      <div class="chips"><label class="chip"><input type="radio" name="s-mode" value="q" checked><span>Debiet bekend → snelheid</span></label>
+        <label class="chip"><input type="radio" name="s-mode" value="v"><span>Gewenste snelheid → debiet</span></label></div>
+      <div class="fgrid">
+        <label class="f">Toepassing<select id="s-app" data-apps></select></label>
+        <label class="f">Buis<select id="s-pipe" data-pipes data-default="d53"></select></label>
+        <label class="f" hidden>Eigen binnendiameter (mm)<input id="s-pipe-own" type="text" inputmode="decimal"></label>
+        <label class="f">Debiet (m³/h)<input id="s-q" type="text" inputmode="decimal" placeholder="bijv. 15"></label>
+        <label class="f">Gewenste snelheid (m/s)<input id="s-v" type="text" inputmode="decimal" placeholder="bijv. 1,5"></label>
+        <label class="f">Medium<select id="s-med" data-media></select></label>
+        <label class="f">Dichtheid (kg/m³)<input id="s-rho" type="text" inputmode="decimal"></label>
+        <label class="f">Viscositeit (mPa·s)<input id="s-mu" type="text" inputmode="decimal"></label>
+      </div>
+      <p class="hint">Dichtheid en viscositeit zijn richtwaarden; pas ze aan voor jouw product en temperatuur.</p>
+    </section>
+    <section class="card"><h2>Uitkomst</h2><div id="s-res" class="rt-results"></div><div id="s-table" style="margin-top:12px"></div></section>
+  </div>
+
+  <!-- 3. pomp & drukverlies -->
+  <div class="grid g2 stack rt-pane" id="pane-p" hidden>
+    <section class="card form">
+      <div class="fgrid">
+        <label class="f">Buis<select id="p-pipe" data-pipes data-default="d53"></select></label>
+        <label class="f" hidden>Eigen binnendiameter (mm)<input id="p-pipe-own" type="text" inputmode="decimal"></label>
+        <label class="f">Debiet (m³/h)<input id="p-q" type="text" inputmode="decimal" placeholder="bijv. 15"></label>
+        <label class="f">Lengte leiding (m)<input id="p-len" type="text" inputmode="decimal" placeholder="heen + terug"></label>
+        <label class="f">Hoogteverschil (m)<input id="p-dz" type="text" inputmode="decimal" placeholder="0"></label>
+        <label class="f">Medium<select id="p-med" data-media></select></label>
+        <label class="f">Dichtheid (kg/m³)<input id="p-rho" type="text" inputmode="decimal"></label>
+        <label class="f">Viscositeit (mPa·s)<input id="p-mu" type="text" inputmode="decimal"></label>
+        <label class="f">Bochten 90°<input id="p-bocht" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">T-stuk doorgaand<input id="p-tdoor" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">T-stuk aftakking<input id="p-taf" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">Vlinderkleppen<input id="p-vlinder" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">Zit-/mengkleppen<input id="p-zit" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">Terugslagkleppen<input id="p-terug" type="text" inputmode="numeric" placeholder="0"></label>
+        <label class="f">Extra drukverlies (bar)<input id="p-extra" type="text" inputmode="decimal" placeholder="wisselaar, filter, sproeibol"></label>
+        <label class="f">Pomprendement (%)<input id="p-eta" type="text" inputmode="decimal" value="60"></label>
+      </div>
+      <p class="hint">Darcy-Weisbach met ruwheid RVS 0,002 mm; weerstandsgetallen: bocht 0,4 · T doorgaand 0,4 · T aftak 1,3 · vlinderklep 0,3 · zit-/mengklep 2,5 · terugslagklep 2,0. Sproeibol: vaak 1,5–2,5 bar.</p>
+    </section>
+    <section class="card"><h2>Uitkomst</h2><div id="p-res" class="rt-results"></div></section>
+  </div>
+
+  <!-- 4. CIP -->
+  <div class="grid g2 stack rt-pane" id="pane-c" hidden>
+    <section class="card form">
+      <div class="fgrid">
+        <label class="f">Inhoud CIP-circuit (liter)<input id="c-vol" type="text" inputmode="decimal"></label>
+        <div style="align-self:end"><button type="button" class="btn sm" id="c-take">Neem over uit Leidinginhoud</button></div>
+        <label class="f">Buffer / minimum in CIP-tank (liter)<input id="c-buffer" type="text" inputmode="decimal" placeholder="0"></label>
+        <label class="f">Grootste leiding in het circuit<select id="c-pipe" data-pipes data-default="d53"></select></label>
+        <label class="f" hidden>Eigen binnendiameter (mm)<input id="c-pipe-own" type="text" inputmode="decimal"></label>
+        <label class="f">Minimale snelheid (m/s)<input id="c-vmin" type="text" inputmode="decimal" value="1,5"></label>
+        <label class="f">Tankdiameter voor sproeibol (m)<input id="c-tank" type="text" inputmode="decimal" placeholder="optioneel"></label>
+        <label class="f">Sproeibol (l/min per m omtrek)<input id="c-lpm" type="text" inputmode="decimal" value="30"></label>
+        <label class="f">Gewenste concentratie (%)<input id="c-conc" type="text" inputmode="decimal" value="1,5"></label>
+        <label class="f">Voorraad<select id="c-stock">
+          <option value="50|1.52">Natronloog 50 %</option><option value="33|1.36">Natronloog 33 %</option>
+          <option value="53|1.33">Salpeterzuur 53 %</option><option value="75|1.58">Fosforzuur 75 %</option><option value="eigen">Eigen…</option></select></label>
+        <div id="c-own-stock" class="full fgrid" hidden style="grid-column:1/-1">
+          <label class="f">Concentratie voorraad (%)<input id="c-sconc" type="text" inputmode="decimal"></label>
+          <label class="f">Dichtheid voorraad (kg/l)<input id="c-srho" type="text" inputmode="decimal"></label>
+        </div>
+        <label class="f">Spoelen: aantal × circuitinhoud<input id="c-rinse" type="text" inputmode="decimal" value="3"></label>
+      </div>
+    </section>
+    <section class="card"><h2>Uitkomst</h2><div id="c-res" class="rt-results"></div></section>
+  </div>
+
+  <!-- 5. verpompen -->
+  <div class="grid g2 stack rt-pane" id="pane-v" hidden>
+    <section class="card form">
+      <div class="chips"><label class="chip"><input type="radio" name="v-mode" value="q" checked><span>Debiet bekend → tijd</span></label>
+        <label class="chip"><input type="radio" name="v-mode" value="t"><span>Gewenste tijd → debiet</span></label></div>
+      <div class="fgrid">
+        <label class="f">Hoeveelheid (liter)<input id="v-vol" type="text" inputmode="decimal" placeholder="bijv. 5000"></label>
+        <label class="f">Debiet (m³/h)<input id="v-q" type="text" inputmode="decimal"></label>
+        <label class="f">Gewenste tijd (min)<input id="v-t" type="text" inputmode="decimal"></label>
+        <label class="f">Toepassing<select id="v-app" data-apps data-default="dun"></select></label>
+        <label class="f">Buis<select id="v-pipe" data-pipes data-default="d53"></select></label>
+        <label class="f" hidden>Eigen binnendiameter (mm)<input id="v-pipe-own" type="text" inputmode="decimal"></label>
+      </div>
+    </section>
+    <section class="card"><h2>Uitkomst</h2><div id="v-res" class="rt-results"></div></section>
+  </div>
+
+  <!-- opslaan -->
+  <form id="rt-save" class="card form" action="{{ url_for('kennis.calc_save') }}" style="margin-top:16px">
+    <input type="hidden" name="id" value="">
+    <input type="hidden" id="rt-kind" name="kind" value="">
+    <h2>Opslaan &amp; PDF</h2>
+    <div class="fgrid">
+      <label class="f">Naam van de berekening<input type="text" name="title" placeholder="bijv. CIP-circuit lijn 2"></label>
+      <label class="f">Koppelen aan<select name="link" data-combo>
+        <option value="">Niet koppelen</option>
+        {% for p in projects %}<option value="p{{ p.id }}">{{ 'Order' if p.kind == 'order' else 'Project' }} {{ p.number }} · {{ p.name }}</option>{% endfor %}
+        {% for t in tickets %}<option value="t{{ t.id }}">Ticket {{ t.number }} · {{ t.title }}</option>{% endfor %}
+      </select></label>
+    </div>
+    <div class="actions" style="align-items:center"><button class="btn primary">Opslaan</button><button type="button" class="btn ghost" id="rt-new">Als nieuwe opslaan</button><span class="small" id="rt-status"></span></div>
+  </form>
+
+  {% if recent %}
+  <section class="card"><div class="card-head"><h2>Recente berekeningen</h2></div>
+    <div class="rows">{% for r in recent %}<div class="rowitem"><a class="grow" href="{{ url_for('kennis.tools', laad=r.id) }}" style="text-decoration:none;color:inherit"><div class="t">{{ r.title or KINDS[r.kind] }}</div><div class="s">{{ KINDS[r.kind] }} · {{ r.who or '' }} · {{ r.created_at|dt }}{% if r.link_label %} · {{ r.link_label }}{% endif %}</div></a>
+      <a class="btn sm" href="{{ url_for('kennis.calc_pdf', cid=r.id) }}" data-pdf="{{ r.title or 'Berekening' }}">{{ icon('pdf') }}PDF</a></div>{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.RT_SAVED = {{ saved|tojson }};</script>
+<script src="{{ url_for('static', filename='js/rekentools.js') }}?v={{ VERSION }}"></script>
+{% endblock %}

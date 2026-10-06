@@ -180,7 +180,9 @@ def detail(pid):
     notes = query("SELECT n.*, u.name AS who FROM project_notes n LEFT JOIN users u ON u.id = n.created_by"
                   " WHERE n.project_id = ? ORDER BY n.date DESC, n.id DESC", (pid,))
     contacts = query("SELECT name FROM contacts WHERE customer_id = ? ORDER BY name", (p["customer_id"] or 0,))
+    from .kennis import calcs_for
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
+                           toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),

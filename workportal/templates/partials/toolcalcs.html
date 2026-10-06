@@ -1,0 +1,11 @@
+{% from "partials/icons.html" import icon %}
+{% if toolcalcs or can('kennis') %}
+<section class="card" id="berekeningen">
+  <div class="card-head"><h2>Berekeningen ({{ toolcalcs|length }})</h2>{% if can('kennis') %}<a class="btn sm" href="{{ url_for('kennis.tools') }}">{{ icon('plus') }}Berekening maken</a>{% endif %}</div>
+  <div class="rows">
+  {% for r in toolcalcs %}<div class="rowitem"><a class="grow" href="{{ url_for('kennis.tools', laad=r.id) }}" style="text-decoration:none;color:inherit"><div class="t">{{ r.title }}</div><div class="s">{{ {'i':'Leidinginhoud','s':'Snelheid & debiet','p':'Pomp & drukverlies','c':'CIP / reinigen','v':'Verpompen'}[r.kind] }} · {{ (r.updated_at or r.created_at)|dt }}</div></a>
+    <a class="btn sm" href="{{ url_for('kennis.calc_pdf', cid=r.id) }}" data-pdf="{{ r.title }}">{{ icon('pdf') }}PDF</a></div>
+  {% else %}<div class="empty">Nog geen berekeningen. Maak er een in het Kenniscentrum en koppel hem hier.</div>{% endfor %}
+  </div>
+</section>
+{% endif %}
