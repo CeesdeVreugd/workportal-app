@@ -16,6 +16,7 @@
     {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
     <a class="btn" href="#notities" onclick="var f=document.getElementById('noteform');f.classList.remove('hidden');setTimeout(function(){f.querySelector('textarea').focus()},50)">{{ icon('edit') }}Notitie</a>
     <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
+    {% if t.status != 'afgerond' %}<form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" data-confirm="Ticket {{ t.number }} afsluiten?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" name="status" value="afgerond">{{ icon('check') }}Ticket afsluiten</button></form>{% endif %}
     {% endif %}
   </div>
 </div>
@@ -102,11 +103,19 @@
         <div><div class="t">Bezoek {{ v.date|date }} · {{ v.technicians or '' }}</div><div class="s">{{ v.hours|num(2) }} uur · reistijd {{ v.travel_hours|num(2) }} uur · {{ v.km|num(0) }} km</div></div>
         <div class="actions">
           {% if v.signed_at %}<span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% if v.sharepoint_status %}<span class="badge">{{ v.sharepoint_status }}</span>{% endif %}
-          {% elif edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}">{{ icon('edit') }}Bewerken</a><a class="btn sm primary" href="{{ url_for('service.sign', tid=t.id, vid=v.id) }}">Handtekening &amp; afronden</a>{% endif %}
+          {% elif v.closed_at %}<span class="badge b-ok" title="{{ v.closed_note or '' }}">Afgerond zonder handtekening</span>
+          {% elif edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}">{{ icon('edit') }}Bewerken</a><a class="btn sm primary" href="{{ url_for('service.sign', tid=t.id, vid=v.id) }}">Handtekening &amp; afronden</a>
+            <details class="cred-pop"><summary class="btn sm">Afronden zonder handtekening</summary>
+              <form method="post" action="{{ url_for('service.visit_close', tid=t.id, vid=v.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="f">Reden / opmerking (optioneel)<input type="text" name="note" placeholder="bijv. klant niet aanwezig"></label>
+                <label class="check"><input type="checkbox" name="close_ticket" value="1" checked> Ticket ook afsluiten</label>
+                <div><button class="btn primary sm">Afronden</button></div>
+              </form></details>{% endif %}
           <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
           {% if edit and (not v.signed_at or can('service', 3)) %}<form method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=v.id) }}" data-confirm="{{ 'Dit bezoek is ondertekend door ' ~ v.signed_name ~ '. Toch verwijderen, met werkbon en foto\'s?' if v.signed_at else 'Bezoek van ' ~ (v.date|date) ~ ' met foto\'s verwijderen?' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Bezoek verwijderen">{{ icon('trash') }}</button></form>{% endif %}
         </div>
       </div>
+      {% if v.closed_at and v.closed_note %}<div class="small muted">Afgerond zonder handtekening: {{ v.closed_note }}</div>{% endif %}
       {% if v.findings %}<div><b class="small muted">Bevindingen</b><div class="prose">{{ v.findings }}</div></div>{% endif %}
       {% if v.work_done %}<div><b class="small muted">Uitgevoerd</b><div class="prose">{{ v.work_done }}</div></div>{% endif %}
       {% if v.materials %}<div><b class="small muted">Materialen</b><div class="prose">{{ v.materials }}</div></div>{% endif %}

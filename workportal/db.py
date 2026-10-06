@@ -562,6 +562,13 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_ticket_notes ON ticket_notes(ticket_id, created_at);
     """,
+    # 18 - bezoek afronden zonder handtekening; status 'gefactureerd' vervalt
+    """
+    ALTER TABLE visits ADD COLUMN closed_at TEXT;
+    ALTER TABLE visits ADD COLUMN closed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE visits ADD COLUMN closed_note TEXT;
+    UPDATE tickets SET status = 'afgerond' WHERE status = 'gefactureerd';
+    """,
 ]
 
 

@@ -40,7 +40,7 @@
       <label class="f full">Opmerking<input type="text" name="start_note" value="{{ t.start_note or '' }}"></label>
     </div>
     <div><label class="f">Startfoto manometer * (en eventueel overzicht leiding)</label>
-      <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" required></label></div>
+      <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" data-req-photo></label><label class="addphoto">{{ icon('image') }}Uit galerij<input type="file" name="photos" accept="image/*" multiple data-preview="prev" data-req-photo></label></div>
       <div class="photos" id="prev" style="margin-top:10px"></div></div>
     <label class="f">Timer starten (terug naar de leiding na)</label>
     <div class="chips"><label class="chip"><input type="radio" name="timer" value="" checked><span>Nog niet</span></label>{% for m, l in presets %}<label class="chip"><input type="radio" name="timer" value="{{ m }}"><span>{{ l }}</span></label>{% endfor %}</div>

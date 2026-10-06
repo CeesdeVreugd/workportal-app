@@ -8,7 +8,7 @@
 <form method="post" enctype="multipart/form-data" class="card form" style="max-width:640px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div><label class="f">Foto manometer *</label>
-    <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" required></label></div>
+    <div class="photos"><label class="addphoto">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="prev" data-req-photo></label><label class="addphoto">{{ icon('image') }}Uit galerij<input type="file" name="photos" accept="image/*" multiple data-preview="prev" data-req-photo></label></div>
     <div class="photos" id="prev" style="margin-top:10px"></div></div>
   <div class="fgrid">
     <label class="f">Afgelezen druk (bar) *<input type="text" inputmode="decimal" name="pressure" required autofocus></label>

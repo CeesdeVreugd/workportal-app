@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V66: Delen-knop voor het adres bij een ticket"
+set "OMSCHRIJVING=WorkPortal V67: tickettypes (o.a. garantie), afsluiten zonder handtekening, foto uit galerij, status gefactureerd weg"
 
 echo.
 echo ============================================

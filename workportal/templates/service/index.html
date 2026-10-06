@@ -8,7 +8,7 @@
   <div class="actions">{% if can('service', 2) %}<a class="btn primary" href="{{ url_for('service.new') }}">{{ icon('plus') }}Nieuw ticket</a>{% endif %}</div>
 </div>
 <div class="tabs">
-  {% for key, label in [('open','Open'),('mijn','Mijn tickets'),('factureren','Nog te factureren'),('alle','Alle')] %}
+  {% for key, label in [('open','Open'),('mijn','Mijn tickets'),('afgerond','Afgerond'),('alle','Alle')] %}
   <a href="?view={{ key }}&type={{ typ }}" class="{{ 'active' if view == key }}">{{ label }}</a>
   {% endfor %}
 </div>
@@ -22,7 +22,7 @@
   <tbody>
   {% for t in tickets %}
   <tr class="link" data-href="{{ url_for('service.detail', tid=t.id) }}">
-    <td class="nowrap"><b>{{ t.number }}</b><div class="small muted">{{ t.type|capitalize }}</div></td>
+    <td class="nowrap"><b>{{ t.number }}</b><div class="small muted">{{ TYPE_LABELS.get(t.type, t.type|capitalize) }}</div></td>
     <td>{{ t.title }} {{ prio(t.priority) }}{% if t.has_alert %} <span class="badge badge-alert" title="Meldingen / meenemen">Let op</span>{% endif %}<div class="small muted">bijgewerkt {{ t.updated_at|dt }}</div>{% if t.customer or t.visit_address %}<div class="small muted show-m">{{ t.customer or '' }}{% if t.customer and t.visit_address %} · {% endif %}{{ t.visit_address or '' }}</div>{% endif %}</td>
     <td class="hide-m">{{ t.customer or '–' }}{% if t.installation %}<div class="small muted">{{ t.installation }}</div>{% endif %}{% if t.visit_address %}<div class="small muted">{{ t.visit_address }}</div>{% endif %}</td>
     <td class="hide-m">{{ t.assignee or '–' }}</td>

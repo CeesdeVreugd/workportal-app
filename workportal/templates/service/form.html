@@ -6,7 +6,7 @@
 <h1>{{ 'Ticket bewerken' if edit else 'Nieuw ticket' }}</h1>
 <form method="post" enctype="multipart/form-data" class="card form" style="max-width:900px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label class="f">Type</label>
+  <label class="f">Type ticket</label>
   <div class="chips">{% for k, l in TYPES %}<label class="chip"><input type="radio" name="type" value="{{ k }}" {{ 'checked' if (t.type or 'storing') == k }}><span>{{ l }}</span></label>{% endfor %}</div>
   <div class="fgrid">
     <label class="f full">Korte omschrijving *<input type="text" name="title" value="{{ t.title or '' }}" required placeholder="bijv. Pasteurisator schakelt uit op temperatuur"></label>

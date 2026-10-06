@@ -428,3 +428,11 @@ downloaden en "in nieuw venster" (om te printen). Op Android opent de PDF-app va
   voor de app-registratie (WorkPortal maakt dan een concept met de bijlagen en verstuurt dat).
 - In de adresbalk van een ticket staat naast Route een knop **Delen**: op telefoon/tablet opent het deelmenu (WhatsApp,
   mail, berichten …) met klant, locatie, adres en een kaartlink; op de pc wordt het adres met kaartlink gekopieerd.
+
+## Tickets (V67)
+- **Type ticket:** Storing, Service & onderhoud, Garantie, Inspectie, Overig (bovenaan het ticketformulier; ook filter in de lijst).
+- **Afsluiten zonder handtekening:** bij een bezoek "Afronden zonder handtekening" (met optionele reden, ticket meteen
+  afsluiten aangevinkt), of in het bezoekformulier de knop "Afronden zonder handtekening". De werkbon vermeldt dan
+  "Niet ondertekend – afgerond op …". Een ticket zonder bezoek sluit je met **Ticket afsluiten** bovenaan.
+- **Foto's:** naast "Foto maken" (camera) staat overal **Uit galerij** (bezoek en druktesten).
+- De status **Gefactureerd** is vervallen; bestaande tickets met die status staan nu op Afgerond. Het lijstfilter heet "Afgerond".

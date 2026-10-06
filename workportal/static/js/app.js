@@ -57,11 +57,12 @@
   });
   document.querySelectorAll("input[type=file][data-preview]").forEach(function (inp) {
     var box = document.getElementById(inp.getAttribute("data-preview"));
+    var tag = "p" + Math.random().toString(36).slice(2);
     inp.addEventListener("change", function () {
       if (!box) return;
-      box.innerHTML = "";
+      box.querySelectorAll('[data-from="' + tag + '"]').forEach(function (x) { x.remove(); });
       Array.prototype.forEach.call(inp.files, function (f) {
-        var d = document.createElement("div"); d.className = "photo";
+        var d = document.createElement("div"); d.className = "photo"; d.setAttribute("data-from", tag);
         if (f.type.indexOf("image/") === 0) {
           var img = document.createElement("img"); img.src = URL.createObjectURL(f); d.appendChild(img);
         } else { d.textContent = f.name; d.style.padding = "8px"; d.style.fontSize = "12px"; }
@@ -557,5 +558,18 @@
       try { document.execCommand("copy"); done("Gekopieerd"); } catch (x) { window.prompt("Kopieer het adres:", all); }
       ta.remove();
     });
+  });
+})();
+
+
+/* Verplichte foto: met camera óf uit de galerij (data-req-photo op beide invoervelden) */
+(function () {
+  document.querySelectorAll("form").forEach(function (form) {
+    var reqs = form.querySelectorAll("input[data-req-photo]");
+    if (!reqs.length) return;
+    form.addEventListener("submit", function (e) {
+      var any = Array.prototype.some.call(reqs, function (i) { return i.files && i.files.length; });
+      if (!any) { e.preventDefault(); e.stopImmediatePropagation(); alert("Maak eerst een foto of kies er een uit de galerij."); }
+    }, true);
   });
 })();

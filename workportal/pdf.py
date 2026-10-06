@@ -268,8 +268,13 @@ def visit_pdf(ticket, visit, photos, signature_path):
     grid = _photo_grid(photos, W)
     if grid:
         story += [KeepTogether([Paragraph("Foto's", S["h2"]), grid])]
-    sig = [Paragraph("Voor akkoord klant", S["h2"]),
-           Paragraph(f"Naam: <b>{esc(visit.get('signed_name') or '')}</b> · {fmt_dt(visit.get('signed_at'))}", S["body"])]
+    if not visit.get("signed_at") and visit.get("closed_at"):
+        sig = [Paragraph("Voor akkoord klant", S["h2"]),
+               Paragraph(f"Niet ondertekend – afgerond op {fmt_dt(visit.get('closed_at'))}"
+                         + (f": {esc(visit.get('closed_note'))}" if visit.get("closed_note") else ""), S["body"])]
+    else:
+        sig = [Paragraph("Voor akkoord klant", S["h2"]),
+               Paragraph(f"Naam: <b>{esc(visit.get('signed_name') or '')}</b> · {fmt_dt(visit.get('signed_at'))}", S["body"])]
     if signature_path:
         img = _img(signature_path, 70 * mm, 28 * mm)
         if img:

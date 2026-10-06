@@ -12,9 +12,10 @@ from .util import (now_iso, audit, files_for, save_uploads, save_signature, file
 
 bp = Blueprint("service", __name__, url_prefix="/service")
 
-TYPES = [("onderhoud", "Onderhoud"), ("storing", "Storing"), ("inspectie", "Inspectie"), ("overig", "Overig")]
+TYPES = [("storing", "Storing"), ("onderhoud", "Service & onderhoud"), ("garantie", "Garantie"),
+         ("inspectie", "Inspectie"), ("overig", "Overig")]
 STATUSES = [("nieuw", "Nieuw"), ("ingepland", "Ingepland"), ("in_uitvoering", "In uitvoering"),
-            ("wacht", "Wacht op onderdelen"), ("afgerond", "Afgerond"), ("gefactureerd", "Gefactureerd")]
+            ("wacht", "Wacht op onderdelen"), ("afgerond", "Afgerond")]
 PRIOS = [("laag", "Laag"), ("normaal", "Normaal"), ("hoog", "Hoog")]
 OPEN = ("nieuw", "ingepland", "in_uitvoering", "wacht")
 
@@ -81,7 +82,7 @@ def index():
     elif view == "mijn":
         where.append("t.assigned_to = ? AND t.status IN ('nieuw','ingepland','in_uitvoering','wacht')")
         params.append(g.user["id"])
-    elif view == "factureren":
+    elif view in ("factureren", "afgerond"):
         where.append("t.status = 'afgerond'")
     if typ:
         where.append("t.type = ?")
@@ -100,7 +101,7 @@ def index():
     tickets = query(sql, params)
     due = query("SELECT i.*, c.name AS customer FROM installations i JOIN customers c ON c.id = i.customer_id"
                 " WHERE i.next_service IS NOT NULL AND i.next_service <= date('now', '+30 days') ORDER BY i.next_service LIMIT 20")
-    return render_template("service/index.html", tickets=tickets, view=view, typ=typ, q=q, TYPES=TYPES, due=due)
+    return render_template("service/index.html", tickets=tickets, view=view, typ=typ, q=q, TYPES=TYPES, TYPE_LABELS=dict(TYPES), due=due)
 
 
 @bp.route("/nieuw", methods=["GET", "POST"])
@@ -214,7 +215,7 @@ def set_status(tid):
     status = request.form.get("status")
     if status not in dict(STATUSES):
         abort(400)
-    closed = now_iso() if status in ("afgerond", "gefactureerd") and not t["closed_at"] else t["closed_at"]
+    closed = now_iso() if status == "afgerond" and not t["closed_at"] else t["closed_at"]
     if status in OPEN:
         closed = None
     execute("UPDATE tickets SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?", (status, closed, now_iso(), tid))
@@ -270,8 +271,8 @@ def visit(tid, vid=None):
     v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) if vid else None
     if vid and not v:
         abort(404)
-    if v and v["signed_at"]:
-        flash("Dit bezoek is ondertekend en kan niet meer worden gewijzigd.", "info")
+    if v and (v["signed_at"] or v["closed_at"]):
+        flash("Dit bezoek is afgerond en kan niet meer worden gewijzigd.", "info")
         return redirect(url_for("service.detail", tid=tid))
     if request.method == "POST":
         vals = (_f("date") or local(now_utc()).strftime("%Y-%m-%d"), _f("technicians"),
@@ -291,10 +292,37 @@ def visit(tid, vid=None):
         audit("bezoek opgeslagen", "ticket", tid, vals[0])
         if request.form.get("next") == "tekenen":
             return redirect(url_for("service.sign", tid=tid, vid=vid))
+        if request.form.get("next") == "afronden":
+            _close_visit(tid, vid, None, True)
+            flash("Bezoek afgerond zonder handtekening en ticket afgesloten.", "ok")
+            return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
         flash("Bezoek opgeslagen.", "ok")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     v = v or {"date": local(now_utc()).strftime("%Y-%m-%d"), "technicians": g.user["name"]}
     return render_template("service/visit.html", t=t, v=v, vid=vid, files=files_for("visit", vid) if vid else [])
+
+
+def _close_visit(tid, vid, note, close_ticket):
+    now = now_iso()
+    execute("UPDATE visits SET closed_at = ?, closed_by = ?, closed_note = ? WHERE id = ? AND ticket_id = ?",
+            (now, g.user["id"], note, vid, tid))
+    if close_ticket:
+        execute("UPDATE tickets SET status = 'afgerond', closed_at = COALESCE(closed_at, ?), updated_at = ? WHERE id = ?", (now, now, tid))
+    audit("bezoek afgerond zonder handtekening", "ticket", tid, note)
+
+
+@bp.route("/<int:tid>/bezoek/<int:vid>/afronden", methods=["POST"])
+@require("service", BEWERKEN)
+def visit_close(tid, vid):
+    _ticket(tid)
+    v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
+    if v["signed_at"] or v["closed_at"]:
+        flash("Dit bezoek is al afgerond.", "info")
+    else:
+        close = bool(request.form.get("close_ticket"))
+        _close_visit(tid, vid, _f("note"), close)
+        flash("Bezoek afgerond zonder handtekening" + (" en ticket afgesloten." if close else "."), "ok")
+    return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
 
 
 @bp.route("/<int:tid>/bezoek/<int:vid>/verwijderen", methods=["POST"])
@@ -302,8 +330,8 @@ def visit(tid, vid=None):
 def visit_delete(tid, vid):
     t = _ticket(tid)
     v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
-    if v["signed_at"] and not can("service", BEHEER):
-        flash("Een ondertekend bezoek kan alleen iemand met Beheer-rechten op Service verwijderen.", "error")
+    if (v["signed_at"] or v["closed_at"]) and not can("service", BEHEER):
+        flash("Een afgerond bezoek kan alleen iemand met Beheer-rechten op Service verwijderen.", "error")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     for f in files_for("visit", vid):
         delete_file(f["id"])

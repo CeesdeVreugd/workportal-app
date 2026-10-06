@@ -88,7 +88,7 @@
 <section class="card">
   <h2>Overige foto's</h2>
   {% call photos(files|rejectattr('kind','in',['signature','pdf'])|list) %}
-    {% if edit %}<form method="post" action="{{ url_for('druktest.add_photos', tid=t.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" capture="environment" multiple data-autosubmit></label></form>{% endif %}
+    {% if edit %}<form method="post" action="{{ url_for('druktest.add_photos', tid=t.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" capture="environment" multiple data-autosubmit></label><label class="addphoto">{{ icon('image') }}Uit galerij<input type="file" name="photos" accept="image/*" multiple data-autosubmit></label></form>{% endif %}
   {% endcall %}
 </section>
 <section class="card"><h2>Logboek</h2><div class="rows">{% for h in history %}<div class="rowitem"><div class="grow"><div class="s">{{ h.created_at|dt }} · {{ h.who or 'Systeem' }}</div><div>{{ h.action|capitalize }}{% if h.details %}: {{ h.details }}{% endif %}</div></div></div>{% endfor %}</div></section>
