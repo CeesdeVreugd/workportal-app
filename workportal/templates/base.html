@@ -56,6 +56,7 @@
   </nav>
   <div class="main">
     <header class="topbar">
+      {% if ep != 'main.dashboard' %}<a class="iconbtn backbtn" href="{{ url_for('main.dashboard') }}" data-back aria-label="Terug" title="Terug">{{ icon('back') }}<span>Terug</span></a>{% endif %}
       <form class="search" action="{{ url_for('main.search') }}" method="get" role="search">
         {{ icon('search') }}<input type="search" name="q" value="{{ request.args.get('q','') if ep == 'main.search' }}" placeholder="Zoek klant, project, ticket of tekeningnummer" aria-label="Zoeken">
       </form>
@@ -66,7 +67,8 @@
       </div>
     </header>
     <header class="mobile-top">
-      <a href="{{ url_for('main.dashboard') }}"><img src="{{ url_for('static', filename='img/logo-wit.png') }}" alt="De Vreugd Productietechniek"></a>
+      {% if ep != 'main.dashboard' %}<a class="iconbtn mback" href="{{ url_for('main.dashboard') }}" data-back aria-label="Terug">{{ icon('back') }}</a>{% endif %}
+      <a href="{{ url_for('main.dashboard') }}" class="mlogo"><img src="{{ url_for('static', filename='img/logo-wit.png') }}" alt="De Vreugd Productietechniek"></a>
       <div class="actions" style="gap:8px">
         <a class="iconbtn" href="{{ url_for('main.search') }}" aria-label="Zoeken">{{ icon('search') }}</a>
         <a class="iconbtn" href="{{ url_for('main.account') }}" aria-label="Mijn account">{{ icon('bell') }}</a>

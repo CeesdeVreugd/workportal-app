@@ -12,7 +12,7 @@
     {% if can_edit %}<a class="btn primary" href="{{ url_for(B ~ '.annot_edit', pid=p.id, aid=a.id) }}">Bewerken</a>{% endif %}</div></div>
 <div class="grid g2 stack" style="align-items:start">
   <section class="card">
-    {% if a.image_file_id %}<a href="{{ url_for('main.file', fid=a.image_file_id) }}" target="_blank" rel="noopener"><img class="annimg" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="Aantekening {{ a.number }}"></a>{% endif %}
+    {% if a.image_file_id %}<div data-gallery><a href="{{ url_for('main.file', fid=a.image_file_id) }}" data-full="{{ url_for('main.file', fid=a.image_file_id) }}" data-orig="{{ url_for('main.file', fid=a.image_file_id) }}" data-dl="{{ url_for('main.file', fid=a.image_file_id, download=1) }}" data-name="Aantekening {{ a.number }} · {{ a.title }}" target="_blank" rel="noopener"><img class="annimg" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="Aantekening {{ a.number }}"></a></div><p class="small muted" style="margin:6px 0 0">Tik op de afbeelding voor groot beeld; tik nog eens om in te zoomen.</p>{% endif %}
     {% if a.body %}<div class="prose" style="margin-top:12px">{{ a.body }}</div>{% elif not a.image_file_id %}<div class="empty">Geen afbeelding of tekst.</div>{% endif %}
   </section>
   <div>

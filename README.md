@@ -476,3 +476,8 @@ In submappen van de projectmap waarvan de naam met 4, 5, 6, 7 of 8 begint (en al
 
 - foto's staan als raster met miniaturen (SharePoint maakt die zelf); tik voor groot beeld, vegen of pijltjes voor de volgende, *Origineel* en downloaden;
 - knoppen **Foto maken** (camera, naam wordt `Foto <datum tijd>.jpg`) en **Uit galerij** (meerdere tegelijk) zetten de foto's direct in die map.
+
+### V71
+- **Foto's verwijderen** in de fotomappen (4 t/m 8): open de foto in groot beeld en tik op het prullenbakje. De foto gaat naar de prullenbak van SharePoint (daar 93 dagen terug te halen). Wie foto's mag toevoegen, mag ze ook weghalen; mappen kunnen hier niet verwijderd worden.
+- **Groot beeld** ook voor de afbeelding van een aantekening; tik nog eens om in te zoomen (ook in de fotomappen).
+- **Terugknop** op elk scherm (links boven, ook op de telefoon): terug naar het vorige scherm; kwam je van een formulier, dan één niveau omhoog.

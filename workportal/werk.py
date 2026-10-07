@@ -467,6 +467,30 @@ def project_thumb(pid):
     return Response(data, mimetype=mime, headers={"Cache-Control": "private, max-age=86400"})
 
 
+@bp.route("/<int:pid>/map/verwijderen", methods=["POST"])
+def project_folder_delete(pid):
+    """Foto verwijderen uit een fotomap (4 t/m 8). Gaat in SharePoint naar de prullenbak."""
+    p = _project_sp(pid)
+    if not _can_upload(p):
+        return jsonify({"error": "Je hebt geen rechten om hier iets te verwijderen."}), 403
+    try:
+        rel = sp.safe_rel(request.form.get("pad", ""))
+    except ValueError:
+        return jsonify({"error": "Ongeldig pad"}), 400
+    if not rel or not PHOTO_RE.match(rel.split("/")[0]) or "/" not in rel:
+        return jsonify({"error": "Verwijderen kan alleen in de fotomappen (4 t/m 8)."}), 400
+    try:
+        name = sp.delete_file(get_db(), pid, rel)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except sp.GraphError as exc:
+        return jsonify({"error": "Dit bestand bestaat niet meer." if exc.status == 404 else f"SharePoint gaf een fout: {exc.message}"}), 502
+    except (requests.RequestException, RuntimeError):
+        return jsonify({"error": "SharePoint is op dit moment niet bereikbaar."}), 502
+    audit("bestand verwijderd uit map", "project", pid, rel[:300])
+    return jsonify({"ok": True, "deleted": name})
+
+
 def _can_upload(p):
     return can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEWERKEN) or can("service", BEWERKEN) or can("druktest", BEWERKEN)
 

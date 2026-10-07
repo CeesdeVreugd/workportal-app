@@ -161,6 +161,10 @@ class Graph:
             raise GraphError(r.status_code, "Download mislukt")
         return meta, r
 
+    def delete_path(self, drive, base_item, relpath):
+        """Bestand verwijderen (gaat in SharePoint naar de prullenbak)."""
+        self._req("DELETE", f"/drives/{drive}/items/{base_item}:/{self._p(relpath)}")
+
     def thumbnail(self, drive, base_item, relpath, size):
         r = self._req("GET", f"/drives/{drive}/items/{base_item}:/{self._p(relpath)}:/thumbnails/0/{size}/content",
                       allow_redirects=True, timeout=60)
@@ -841,6 +845,21 @@ def thumbnail(conn, pid, relpath, size="c400x400", g=None):
         return g.thumbnail(drive, p["sp_item_id"], rel, size)
     except GraphError:
         return g.thumbnail(drive, p["sp_item_id"], rel, "medium" if size == "c400x400" else "large")
+
+
+def delete_file(conn, pid, relpath, g=None):
+    """Een bestand (geen map) uit de projectmap verwijderen. Geeft de naam."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    rel = safe_rel(relpath)
+    if not rel:
+        raise ValueError("geen bestand")
+    meta = g.item_by_path(drive, rel, p["sp_item_id"])
+    if "folder" in meta:
+        raise ValueError("mappen verwijderen kan hier niet")
+    g.delete_path(drive, p["sp_item_id"], rel)
+    return meta.get("name") or rel.rpartition("/")[2]
 
 
 def item_version(item):

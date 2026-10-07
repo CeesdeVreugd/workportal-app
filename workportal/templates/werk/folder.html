@@ -1,13 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
-{% block title %}{{ K.label }}map {{ p.number }}{% if photo_mode %}
-<div class="lightbox" id="lightbox" hidden>
-  <div class="lb-top"><div class="grow"><b id="lb-name"></b> <span id="lb-info" class="small" style="opacity:.7"></span></div>
-    <span id="lb-pos" class="small" style="opacity:.7"></span><a id="lb-orig" href="#" target="_blank" rel="noopener">Origineel</a><a id="lb-dl" href="#">{{ icon('download') }}</a><button type="button" id="lb-close" aria-label="Sluiten">✕</button></div>
-  <div class="lb-img"><span class="lb-wait">Laden…</span><img id="lb-img" alt=""><button type="button" class="lb-nav prev" id="lb-prev" aria-label="Vorige">‹</button><button type="button" class="lb-nav next" id="lb-next" aria-label="Volgende">›</button></div>
-</div>
-{% endif %}
-{% endblock %}
+{% block title %}{{ K.label }}map {{ p.number }}{% endblock %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / {{ K.label }}map</div>
 <div class="pagehead"><div><div class="eyebrow">{{ K.label }}map{% if not can_upload %} · alleen lezen{% endif %}</div><h1>{{ p.name }}</h1><p>{{ folder_name }}</p></div>

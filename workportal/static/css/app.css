@@ -676,3 +676,16 @@ select { text-overflow: ellipsis; }
 .lb-wait { position: absolute; color: #fff; opacity: .7; }
 .ann-grp { flex-wrap: wrap; }
 @media (max-width: 520px) { .ann-tools .tb { min-width: 44px; padding: 6px 4px 4px; } .ann-tools .sw { width: 26px; height: 26px; } }
+
+/* Terugknop op elk scherm */
+.topbar .backbtn { width: auto; padding: 0 14px 0 10px; gap: 6px; display: inline-flex; align-items: center; font: inherit; font-size: 14px; font-weight: 500; color: var(--basic); text-decoration: none; flex: none; }
+.topbar .search { margin-right: auto; }
+@media (max-width: 900px) {
+  .mobile-top .mback { flex: none; width: 40px; height: 40px; }
+  .mobile-top .mlogo { margin-right: auto; }
+}
+/* groot beeld: inzoomen */
+.lb-img.zoom { overflow: auto; display: block; touch-action: auto; }
+.lb-img.zoom img { max-width: none; max-height: none; cursor: zoom-out; }
+.lb-img img { cursor: zoom-in; }
+.lb-top .lb-del { background: rgba(220,60,50,.35); }

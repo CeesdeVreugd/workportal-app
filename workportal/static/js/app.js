@@ -551,46 +551,93 @@
   }
 })();
 
-/* Fotomappen: groot beeld met vorige/volgende (vegen of pijltjestoetsen) */
+/* Groot beeld voor foto's (fotomappen, aantekening): <div data-gallery [data-delete-url]> met <a data-full data-orig data-dl data-name data-path>.
+   Vorige/volgende met vegen of pijltjes, tikken om in te zoomen, verwijderen als data-delete-url er is. */
 (function () {
-  var lb = document.getElementById("lightbox");
-  if (!lb) return;
-  var img = document.getElementById("lb-img"), list = [], idx = 0, x0 = null;
-  function items() { return Array.prototype.slice.call(document.querySelectorAll("[data-gallery] a")); }
+  var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+  var lb = document.createElement("div"); lb.className = "lightbox"; lb.hidden = true;
+  lb.innerHTML = '<div class="lb-top"><div class="grow"><b class="lb-name"></b> <span class="lb-info small" style="opacity:.7"></span></div>' +
+    '<span class="lb-pos small" style="opacity:.7"></span><a class="lb-orig" href="#" target="_blank" rel="noopener">Origineel</a>' +
+    '<a class="lb-dl" href="#" aria-label="Downloaden" title="Downloaden">⬇</a><button type="button" class="lb-del" hidden title="Verwijderen" aria-label="Verwijderen">🗑</button>' +
+    '<button type="button" class="lb-close" aria-label="Sluiten">✕</button></div>' +
+    '<div class="lb-img"><span class="lb-wait">Laden…</span><img alt=""><button type="button" class="lb-nav prev" aria-label="Vorige">‹</button><button type="button" class="lb-nav next" aria-label="Volgende">›</button></div>';
+  document.body.appendChild(lb);
+  var img = lb.querySelector("img"), box = lb.querySelector(".lb-img"), wait = lb.querySelector(".lb-wait");
+  var gal = null, list = [], idx = 0, x0 = null;
+  function q(c) { return lb.querySelector(c); }
+  function items() { return gal ? Array.prototype.slice.call(gal.querySelectorAll("a[data-full]")) : []; }
   function show(i) {
     list = items(); if (!list.length) return close();
     idx = (i + list.length) % list.length;
     var a = list[idx];
-    var wait = lb.querySelector(".lb-wait");
+    box.classList.remove("zoom");
     img.style.opacity = ".25"; wait.hidden = false;
     img.onload = function () { img.style.opacity = "1"; wait.hidden = true; };
-    img.onerror = function () { if (img.src.indexOf(a.getAttribute("data-orig")) < 0) img.src = a.getAttribute("data-orig"); };
+    img.onerror = function () { var o = a.getAttribute("data-orig"); if (o && img.getAttribute("src") !== o) img.src = o; else wait.textContent = "Kan deze foto niet tonen"; };
+    wait.textContent = "Laden…";
     img.src = a.getAttribute("data-full");
-    document.getElementById("lb-name").textContent = a.getAttribute("data-name");
-    document.getElementById("lb-info").textContent = a.getAttribute("data-info") || "";
-    document.getElementById("lb-pos").textContent = (idx + 1) + " / " + list.length;
-    document.getElementById("lb-orig").href = a.getAttribute("data-orig");
-    document.getElementById("lb-dl").href = a.getAttribute("data-dl");
+    q(".lb-name").textContent = a.getAttribute("data-name") || "";
+    q(".lb-info").textContent = a.getAttribute("data-info") || "";
+    q(".lb-pos").textContent = list.length > 1 ? (idx + 1) + " / " + list.length : "";
+    q(".lb-orig").href = a.getAttribute("data-orig") || a.getAttribute("data-full");
+    q(".lb-dl").href = a.getAttribute("data-dl") || q(".lb-orig").href;
+    q(".lb-del").hidden = !gal.getAttribute("data-delete-url");
+    q(".lb-nav.prev").hidden = q(".lb-nav.next").hidden = list.length < 2;
     lb.hidden = false; document.body.style.overflow = "hidden";
   }
   function close() { lb.hidden = true; img.removeAttribute("src"); document.body.style.overflow = ""; }
   document.addEventListener("click", function (e) {
-    var a = e.target.closest && e.target.closest("[data-gallery] a");
+    var a = e.target.closest && e.target.closest("[data-gallery] a[data-full]");
     if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    e.preventDefault(); show(items().indexOf(a));
+    e.preventDefault(); gal = a.closest("[data-gallery]"); show(items().indexOf(a));
   });
-  document.getElementById("lb-close").addEventListener("click", close);
-  document.getElementById("lb-prev").addEventListener("click", function () { show(idx - 1); });
-  document.getElementById("lb-next").addEventListener("click", function () { show(idx + 1); });
-  lb.querySelector(".lb-img").addEventListener("click", function (e) { if (e.target === this) close(); });
+  q(".lb-close").addEventListener("click", close);
+  q(".lb-nav.prev").addEventListener("click", function (e) { e.stopPropagation(); show(idx - 1); });
+  q(".lb-nav.next").addEventListener("click", function (e) { e.stopPropagation(); show(idx + 1); });
+  img.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var zoomed = box.classList.toggle("zoom");
+    if (zoomed) { var r = img.getBoundingClientRect(); box.scrollLeft = (img.scrollWidth - box.clientWidth) / 2; box.scrollTop = (img.scrollHeight - box.clientHeight) / 2; }
+  });
+  box.addEventListener("click", function (e) { if (e.target === box) close(); });
   document.addEventListener("keydown", function (e) {
     if (lb.hidden) return;
     if (e.key === "Escape") close(); else if (e.key === "ArrowLeft") show(idx - 1); else if (e.key === "ArrowRight") show(idx + 1);
   });
-  lb.addEventListener("touchstart", function (e) { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  lb.addEventListener("touchstart", function (e) { x0 = e.touches.length === 1 && !box.classList.contains("zoom") ? e.touches[0].clientX : null; }, { passive: true });
   lb.addEventListener("touchend", function (e) {
     if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
-    if (Math.abs(dx) > 60) show(idx + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 60 && list.length > 1) show(idx + (dx < 0 ? 1 : -1));
+  });
+  q(".lb-del").addEventListener("click", function () {
+    var a = list[idx], url = gal.getAttribute("data-delete-url"), name = a.getAttribute("data-name");
+    if (!url || !confirm("‘" + name + "’ verwijderen?\nHij gaat naar de prullenbak van SharePoint.")) return;
+    var fd = new FormData(); fd.append("pad", a.getAttribute("data-path") || ""); fd.append("csrf_token", CSRF);
+    fetch(url, { method: "POST", body: fd, credentials: "same-origin", headers: { "X-CSRF-Token": CSRF } })
+      .then(function (r) { return r.json().then(function (js) { return { ok: r.ok, js: js }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.js.ok) { alert(res.js.error || "Verwijderen is mislukt."); return; }
+        a.remove();
+        if (items().length) show(idx); else { close(); location.reload(); }
+      }).catch(function () { alert("Geen verbinding; de foto is niet verwijderd."); });
+  });
+})();
+
+/* Terugknop: terug naar het vorige scherm; kwam je van een formulier of van dezelfde pagina, dan één niveau omhoog */
+(function () {
+  function parent() {
+    var c = document.querySelectorAll(".crumbs a");
+    return c.length ? c[c.length - 1].href : null;
+  }
+  document.querySelectorAll("[data-back]").forEach(function (b) {
+    var up = parent(); if (up) b.href = up;
+    b.addEventListener("click", function (e) {
+      var ref = document.referrer, u = null;
+      try { u = ref ? new URL(ref) : null; } catch (x) {}
+      if (!u || u.origin !== location.origin || history.length < 2) return; // gewoon de link volgen
+      if (u.pathname === location.pathname || /\/(nieuw|bewerken|login|pin)(\/|$)/.test(u.pathname)) return;
+      e.preventDefault(); history.back();
+    });
   });
 })();
 

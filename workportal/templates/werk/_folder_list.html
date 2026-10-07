@@ -3,9 +3,9 @@
 {% else %}
 {% set photos = items|selectattr('is_image')|list if photo_mode else [] %}
 {% if photos %}
-<div class="photogrid" data-gallery>
+<div class="photogrid" data-gallery{% if can_upload %} data-delete-url="{{ url_for(B ~ '.project_folder_delete', pid=p.id) }}"{% endif %}>
 {% for i in photos %}{% set path = (rel ~ '/' ~ i.name) if rel else i.name %}
-  <a href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-full="{{ url_for(B ~ '.project_thumb', pid=p.id, pad=path, groot=1) }}" data-orig="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-dl="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" data-name="{{ i.name }}" data-info="{{ i.modified|dt }}" target="_blank" rel="noopener">
+  <a href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-full="{{ url_for(B ~ '.project_thumb', pid=p.id, pad=path, groot=1) }}" data-orig="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-dl="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" data-name="{{ i.name }}" data-path="{{ path }}" data-info="{{ i.modified|dt }}" target="_blank" rel="noopener">
     <img src="{{ url_for(B ~ '.project_thumb', pid=p.id, pad=path) }}" alt="{{ i.name }}" loading="lazy"><span>{{ i.name }}</span></a>
 {% endfor %}
 </div>
