@@ -556,11 +556,11 @@
 (function () {
   var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
   var lb = document.createElement("div"); lb.className = "lightbox"; lb.hidden = true;
-  lb.innerHTML = '<div class="lb-top"><div class="grow"><b class="lb-name"></b> <span class="lb-info small" style="opacity:.7"></span></div>' +
-    '<span class="lb-pos small" style="opacity:.7"></span><a class="lb-orig" href="#" target="_blank" rel="noopener">Origineel</a>' +
-    '<a class="lb-dl" href="#" aria-label="Downloaden" title="Downloaden">⬇</a><button type="button" class="lb-del" hidden title="Verwijderen" aria-label="Verwijderen">🗑</button>' +
+  lb.innerHTML = '<div class="lb-top"><div class="grow"><b class="lb-name"></b><span class="lb-info"></span></div>' +
     '<button type="button" class="lb-close" aria-label="Sluiten">✕</button></div>' +
-    '<div class="lb-img"><span class="lb-wait">Laden…</span><img alt=""><button type="button" class="lb-nav prev" aria-label="Vorige">‹</button><button type="button" class="lb-nav next" aria-label="Volgende">›</button></div>';
+    '<div class="lb-img"><span class="lb-wait">Laden…</span><img alt=""><button type="button" class="lb-nav prev" aria-label="Vorige">‹</button><button type="button" class="lb-nav next" aria-label="Volgende">›</button></div>' +
+    '<div class="lb-bar"><span class="lb-pos"></span><a class="lb-orig" href="#" target="_blank" rel="noopener">Origineel</a>' +
+    '<a class="lb-dl" href="#">Downloaden</a><button type="button" class="lb-del" hidden>Verwijderen</button></div>';
   document.body.appendChild(lb);
   var img = lb.querySelector("img"), box = lb.querySelector(".lb-img"), wait = lb.querySelector(".lb-wait");
   var gal = null, list = [], idx = 0, x0 = null;
