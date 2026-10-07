@@ -98,9 +98,7 @@ def remove_device(did):
     return render_template("redirect.html", url="/account")
 
 
-@bp.route("/bestanden/<int:fid>")
-@bp.route("/bestanden/<int:fid>/<path:name>")
-def file(fid, name=None):
+def _file_row(fid):
     row = query("SELECT * FROM files WHERE id = ?", (fid,), one=True)
     if not row:
         abort(404)
@@ -111,12 +109,76 @@ def file(fid, name=None):
         module = ENTITY_MODULE.get(row["entity"])
         if module and not can(module):
             abort(403)
+    return row
+
+
+@bp.route("/bestanden/<int:fid>")
+@bp.route("/bestanden/<int:fid>/<path:name>")
+def file(fid, name=None):
+    row = _file_row(fid)
     download = request.args.get("download") == "1"
     return send_file(file_path(row), mimetype=row["mime"] or None, download_name=row["filename"],
                      as_attachment=download, max_age=3600)
 
 
 # ---------------------------------------------------------------- push
+
+@bp.route("/excel")
+def xlsview():
+    """Excel (of CSV) bekijken binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""
+    from urllib.parse import urlsplit, parse_qs
+    from flask import current_app
+    import requests
+    from werkzeug.exceptions import HTTPException
+    from . import sharepoint as sp
+    from .xlsview import render, MAX_ROWS, MAX_COLS
+    src = request.args.get("src") or ""
+    if not src.startswith("/") or src.startswith("//") or "\\" in src:
+        abort(400)
+    back = request.args.get("terug") or ""
+    if not back.startswith("/") or back.startswith("//"):
+        back = url_for("main.dashboard")
+    u = urlsplit(src)
+    try:
+        endpoint, args = current_app.url_map.bind("localhost").match(u.path, "GET")
+    except HTTPException:
+        abort(404)
+    qs = parse_qs(u.query)
+    error, sheets, name, data = None, [], "", None
+    if endpoint in ("projecten.project_file", "orders.project_file"):
+        from .werk import _project_sp
+        _project_sp(args["pid"])
+        rel = (qs.get("pad") or [""])[0]
+        name = rel.rpartition("/")[2]
+        try:
+            meta, r = sp.open_file(get_db(), args["pid"], rel)
+            if (meta.get("size") or 0) > 20 * 1048576:
+                error = "Dit bestand is te groot om hier te bekijken (meer dan 20 MB). Download het bestand."
+            else:
+                data = b"".join(r.iter_content(256 * 1024))
+        except ValueError:
+            abort(400)
+        except sp.GraphError as exc:
+            error = "Dit bestand bestaat niet (meer)." if exc.status == 404 else f"SharePoint gaf een fout ({exc.status})."
+        except (requests.RequestException, RuntimeError):
+            error = "SharePoint is op dit moment niet bereikbaar."
+    elif endpoint == "main.file":
+        row = _file_row(args["fid"])
+        name = row["filename"]
+        with open(file_path(row), "rb") as fh:
+            data = fh.read()
+    else:
+        abort(400)
+    if data is not None:
+        try:
+            sheets = render(data, name)
+        except ValueError as exc:
+            error = str(exc)
+    title = (request.args.get("titel") or name or "Excel")[:150]
+    dl = src + ("&" if "?" in src else "?") + "download=1"
+    return render_template("xlsview.html", sheets=sheets, error=error, back=back, title=title, dl=dl,
+                           max_rows=MAX_ROWS, max_cols=MAX_COLS)
+
 
 @bp.route("/pdf")
 def pdfview():

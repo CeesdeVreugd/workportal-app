@@ -481,3 +481,6 @@ In submappen van de projectmap waarvan de naam met 4, 5, 6, 7 of 8 begint (en al
 - **Foto's verwijderen** in de fotomappen (4 t/m 8): open de foto in groot beeld en tik op het prullenbakje. De foto gaat naar de prullenbak van SharePoint (daar 93 dagen terug te halen). Wie foto's mag toevoegen, mag ze ook weghalen; mappen kunnen hier niet verwijderd worden.
 - **Groot beeld** ook voor de afbeelding van een aantekening; tik nog eens om in te zoomen (ook in de fotomappen).
 - **Terugknop** op elk scherm (links boven, ook op de telefoon): terug naar het vorige scherm; kwam je van een formulier, dan één niveau omhoog.
+
+## Excel bekijken (V74)
+Excel-bestanden (`.xlsx`, `.xlsm`, `.xltx`, `.csv`) in de project-/ordermap openen in een eigen viewer binnen WorkPortal, met terugknop, tabbladen onderin, zoomknoppen en vaste kolom-/rijkoppen. Alleen lezen; de waarden zijn zoals Excel ze het laatst heeft berekend (formules worden niet opnieuw gerekend). Opmaak die meekomt: kolombreedtes, samengevoegde cellen, vet/cursief, tekst- en vulkleuren, getal-, procent- en euronotatie. Verborgen tabbladen, rijen en kolommen worden niet getoond. Grote tabbladen: eerste 2000 rijen × 80 kolommen. Het oude `.xls`-formaat kan niet in de viewer (downloadknop). De downloadknop opent op de telefoon het deelmenu (bijv. openen in de Excel-app), zodat je de app niet verlaat.

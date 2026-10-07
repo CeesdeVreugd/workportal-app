@@ -1,0 +1,87 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+<style>
+  .xv-wrap { flex: 1; min-height: 0; position: relative; background: #E9ECF3; }
+  .xv-pane { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .xv-pane[hidden] { display: none; }
+  .xv-t { border-collapse: separate; border-spacing: 0; table-layout: fixed; background: #fff; font: 13px/1.3 Calibri, "Segoe UI", Ubuntu, Arial, sans-serif; color: #14163A; }
+  .xv-t td { border-right: 1px solid #E1E4EC; border-bottom: 1px solid #E1E4EC; padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; height: 22px; }
+  .xv-t th { background: #F3F5FA; color: #5A5F80; font-weight: 500; font-size: 12px; border-right: 1px solid #D5DAE8; border-bottom: 1px solid #D5DAE8; padding: 2px 4px; text-align: center; }
+  .xv-t thead th { position: sticky; top: 0; z-index: 2; height: 24px; }
+  .xv-t tbody th { position: sticky; left: 0; z-index: 1; }
+  .xv-t thead th.xv-corner { left: 0; z-index: 3; }
+  .xv-empty { padding: 40px 20px; text-align: center; color: #5A5F80; }
+  .xv-note { position: sticky; left: 0; padding: 8px 12px; font-size: 12px; color: #8A4B08; background: #FEF3E2; }
+  .xv-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #D5DAE8; -webkit-overflow-scrolling: touch; }
+  .xv-tabs button { flex: none; border: 1px solid #D5DAE8; background: #F3F5FA; color: #14163A; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .xv-tabs button.on { background: #0A0A96; border-color: #0A0A96; color: #fff; font-weight: 500; }
+  .xv-zoom { position: absolute; right: 14px; bottom: 16px; display: flex; gap: 6px; z-index: 5; }
+  .xv-zoom button { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(20,22,58,.85); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+  .xv-err { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px; color: #14163A; }
+</style>
+</head>
+<body class="v3d-body">
+<div class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" id="xv-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b>{{ title }}</b><span>Excel · alleen lezen{% if sheets|length > 1 %} · {{ sheets|length }} tabbladen{% endif %}</span></div>
+    <button type="button" class="iconbtn light" id="xv-dl" data-src="{{ dl }}" data-name="{{ title }}" aria-label="Opslaan of delen" title="Downloaden / openen in Excel">{{ icon('download') }}</button>
+  </header>
+  <main class="xv-wrap">
+    {% if error %}
+      <div class="xv-err"><p>{{ error }}</p><button type="button" class="btn primary" onclick="document.getElementById('xv-dl').click()">{{ icon('download') }}Bestand downloaden</button></div>
+    {% else %}
+      {% for s in sheets %}<div class="xv-pane" data-sheet="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}>
+        {% if s.truncated %}<div class="xv-note">Groot tabblad: alleen de eerste {{ max_rows }} rijen en {{ max_cols }} kolommen worden getoond. Download het bestand voor alles.</div>{% endif %}
+        {{ s.html|safe }}</div>{% endfor %}
+      <div class="xv-zoom"><button type="button" id="xv-out" aria-label="Kleiner">−</button><button type="button" id="xv-in" aria-label="Groter">+</button></div>
+    {% endif %}
+  </main>
+  {% if sheets|length > 1 %}<nav class="xv-tabs" aria-label="Tabbladen">{% for s in sheets %}<button type="button" data-tab="{{ loop.index0 }}" class="{{ 'on' if loop.first }}">{{ s.name }}</button>{% endfor %}</nav>{% endif %}
+</div>
+<script>
+(function () {
+  var back = document.getElementById("xv-back");
+  back.addEventListener("click", function (e) {
+    if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+  });
+  // tabbladen
+  document.querySelectorAll("[data-tab]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-tab]").forEach(function (x) { x.classList.toggle("on", x === b); });
+      document.querySelectorAll("[data-sheet]").forEach(function (p) { p.hidden = p.getAttribute("data-sheet") !== b.getAttribute("data-tab"); });
+    });
+  });
+  // zoomen
+  var z = window.innerWidth < 700 ? 0.85 : 1;
+  function setZoom() { document.querySelectorAll(".xv-t").forEach(function (t) { t.style.zoom = z; }); }
+  setZoom();
+  var zi = document.getElementById("xv-in"), zo = document.getElementById("xv-out");
+  if (zi) zi.addEventListener("click", function () { z = Math.min(2.5, z * 1.2); setZoom(); });
+  if (zo) zo.addEventListener("click", function () { z = Math.max(0.4, z / 1.2); setZoom(); });
+  // downloaden zonder de app te verlaten: telefoon -> deelmenu (openen in Excel, bewaren), computer -> downloaden
+  var dl = document.getElementById("xv-dl");
+  dl.addEventListener("click", function () {
+    var name = dl.getAttribute("data-name") || "bestand.xlsx";
+    dl.disabled = true;
+    fetch(dl.getAttribute("data-src"), { credentials: "same-origin" }).then(function (r) { if (!r.ok) throw new Error(); return r.blob(); }).then(function (blob) {
+      var file = null;
+      try { file = new File([blob], name.replace(/[\\/:*?"<>|]+/g, "_"), { type: blob.type || "application/octet-stream" }); } catch (x) {}
+      if (file && navigator.canShare && /Android|iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 0 && navigator.canShare({ files: [file] }))
+        return navigator.share({ files: [file] }).catch(function () {});
+      var u = URL.createObjectURL(blob), l = document.createElement("a"); l.href = u; l.download = file ? file.name : name;
+      document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    }).catch(function () { alert("Downloaden lukte niet."); }).then(function () { dl.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>

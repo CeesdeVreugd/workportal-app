@@ -276,6 +276,25 @@
     if (inp.closest("form")) inp.closest("form").addEventListener("reset", function () { setTimeout(function () { n.textContent = "Geen bestand gekozen"; }); });
   });
 
+  // Excel/CSV openen in de WorkPortal-viewer (links met data-xls, of een bestandslink die op .xlsx/.xlsm/.csv eindigt)
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+    var href = a.getAttribute("href") || "";
+    if (href.charAt(0) !== "/" || /[?&]download=1/.test(href) || href.indexOf("/excel?") === 0) return;
+    var name = a.getAttribute("data-xls");
+    if (name === null) {
+      var m = href.match(/\/bestand\?pad=([^&#]+)/);
+      var path = href.split(/[?#]/)[0];
+      var p = m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : (/^\/bestanden\/\d+\//.test(path) ? decodeURIComponent(path) : "");
+      if (!/\.(xlsx|xlsm|xltx|xltm|csv)$/i.test(p)) return;
+      name = p.split("/").pop();
+    }
+    e.preventDefault();
+    location.href = "/excel?src=" + encodeURIComponent(href) + "&terug=" + encodeURIComponent(location.pathname + location.search + location.hash) +
+      "&titel=" + encodeURIComponent(name || a.textContent.trim() || "Excel");
+  });
+
   // PDF's openen in de WorkPortal-viewer met terug-knop (links met data-pdf)
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("a[data-pdf]");
@@ -559,8 +578,7 @@
   lb.innerHTML = '<div class="lb-top"><div class="grow"><b class="lb-name"></b><span class="lb-info"></span></div>' +
     '<button type="button" class="lb-close" aria-label="Sluiten">✕</button></div>' +
     '<div class="lb-img"><span class="lb-wait">Laden…</span><img alt=""><button type="button" class="lb-nav prev" aria-label="Vorige">‹</button><button type="button" class="lb-nav next" aria-label="Volgende">›</button></div>' +
-    '<div class="lb-bar"><span class="lb-pos"></span><a class="lb-orig" href="#" target="_blank" rel="noopener">Origineel</a>' +
-    '<a class="lb-dl" href="#">Downloaden</a><button type="button" class="lb-del" hidden>Verwijderen</button></div>';
+    '<div class="lb-bar"><span class="lb-pos"></span><button type="button" class="lb-dl">' + (navigator.canShare ? "Opslaan / delen" : "Downloaden") + '</button><button type="button" class="lb-del" hidden>Verwijderen</button></div>';
   document.body.appendChild(lb);
   var img = lb.querySelector("img"), box = lb.querySelector(".lb-img"), wait = lb.querySelector(".lb-wait");
   var gal = null, list = [], idx = 0, x0 = null;
@@ -579,8 +597,6 @@
     q(".lb-name").textContent = a.getAttribute("data-name") || "";
     q(".lb-info").textContent = a.getAttribute("data-info") || "";
     q(".lb-pos").textContent = list.length > 1 ? (idx + 1) + " / " + list.length : "";
-    q(".lb-orig").href = a.getAttribute("data-orig") || a.getAttribute("data-full");
-    q(".lb-dl").href = a.getAttribute("data-dl") || q(".lb-orig").href;
     q(".lb-del").hidden = !gal.getAttribute("data-delete-url");
     q(".lb-nav.prev").hidden = q(".lb-nav.next").hidden = list.length < 2;
     lb.hidden = false; document.body.style.overflow = "hidden";
@@ -608,6 +624,19 @@
   lb.addEventListener("touchend", function (e) {
     if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
     if (Math.abs(dx) > 60 && list.length > 1) show(idx + (dx < 0 ? 1 : -1));
+  });
+  // Opslaan zonder de app te verlassen: telefoon -> deelmenu (Bewaar afbeelding), computer -> downloaden
+  q(".lb-dl").addEventListener("click", function () {
+    var a = list[idx], url = a.getAttribute("data-dl") || a.getAttribute("data-orig"), name = a.getAttribute("data-name") || "foto.jpg", btn = this, label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Bezig…";
+    fetch(url, { credentials: "same-origin" }).then(function (r) { if (!r.ok) throw new Error(); return r.blob(); }).then(function (blob) {
+      if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += (blob.type === "image/png" ? ".png" : ".jpg");
+      var file = null;
+      try { file = new File([blob], name.replace(/[\\/:*?"<>|]+/g, "_"), { type: blob.type || "image/jpeg" }); } catch (x) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) return navigator.share({ files: [file] }).catch(function () {});
+      var u = URL.createObjectURL(blob), l = document.createElement("a"); l.href = u; l.download = file ? file.name : name;
+      document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    }).catch(function () { alert("Opslaan lukte niet."); }).then(function () { btn.disabled = false; btn.textContent = label; });
   });
   q(".lb-del").addEventListener("click", function () {
     var a = list[idx], url = gal.getAttribute("data-delete-url"), name = a.getAttribute("data-name");

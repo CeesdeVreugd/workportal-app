@@ -18,7 +18,7 @@
     {% if can_upload and 'certifica' in i.name.lower() %}<a class="btn sm" href="{{ url_for(B ~ '.certificates_mail', pid=p.id, pad=path) }}">{{ icon('mail') }}Mailen</a>{% endif %}</div>
   {% else %}
   <div class="rowitem"><span class="ficon">{{ icon('pdf' if i.mime == 'application/pdf' else 'image' if (i.mime or '').startswith('image/') else 'file') }}</span>
-    <a class="grow" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}"{% if i.name.lower().endswith('.pdf') %} data-pdf="{{ i.name }}"{% endif %} target="_blank" rel="noopener"><div class="t">{{ i.name }}</div><div class="s">{{ (i.size / 1024 / 1024)|num(1) ~ ' MB' if i.size >= 1048576 else ((i.size / 1024)|round|int ~ ' kB') }} · {{ i.modified|date }}</div></a>
+    {% set xls = i.name.lower().endswith(('.xlsx', '.xlsm', '.xltx', '.xltm', '.csv')) %}<a class="grow" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}"{% if i.name.lower().endswith('.pdf') %} data-pdf="{{ i.name }}"{% endif %}{% if xls %} data-xls="{{ i.name }}"{% else %} target="_blank" rel="noopener"{% endif %}><div class="t">{{ i.name }}</div><div class="s">{{ (i.size / 1024 / 1024)|num(1) ~ ' MB' if i.size >= 1048576 else ((i.size / 1024)|round|int ~ ' kB') }} · {{ i.modified|date }}</div></a>
     <a class="iconbtn" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" title="Downloaden">{{ icon('download') }}</a></div>
   {% endif %}
 {% else %}{% if not photos %}<div class="empty">Deze map is leeg.{% if photo_mode and can_upload %} Maak een foto of kies er een uit de galerij.{% endif %}</div>{% endif %}{% endfor %}
