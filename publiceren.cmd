@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V77: afdrukken via Printix vanuit de projectmap en de PDF-viewer, met printlogboek (wie, wanneer, wat)"
+set "OMSCHRIJVING=WorkPortal V78: printer kiezen bij afdrukken (laatste keuze wordt onthouden, beheer bepaalt welke printers)"
 
 echo.
 echo ============================================

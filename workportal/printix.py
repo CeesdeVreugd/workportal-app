@@ -114,6 +114,46 @@ def list_printers():
     return out
 
 
+_CACHE = {"at": 0, "list": None}
+
+
+def cached_printers(max_age=600):
+    """Printerlijst uit Printix, 10 minuten bewaard (zodat het afdrukvenster snel opent)."""
+    import time as _time
+    if _CACHE["list"] is None or _time.time() - _CACHE["at"] > max_age:
+        _CACHE["list"] = list_printers()
+        _CACHE["at"] = _time.time()
+    return _CACHE["list"]
+
+
+def allowed_printers(conn):
+    """Printers die gebruikers bij Afdrukken kunnen kiezen (Beheer > Printen); niets aangevinkt = alle.
+    De standaardprinter staat altijd in de lijst, ook als Printix even niet bereikbaar is."""
+    try:
+        keep = set(json.loads(setting(conn, "printix_allowed") or "[]"))
+    except ValueError:
+        keep = set()
+    try:
+        items = cached_printers()
+    except (PrintixError, requests.RequestException, KeyError, ValueError):
+        items = []
+    out = [p for p in items if not keep or f"{p['printer_id']}|{p['queue_id']}" in keep]
+    cur = printer(conn)
+    if cur and cur.get("printer_id") and not any(p["printer_id"] == cur["printer_id"] and p["queue_id"] == cur["queue_id"] for p in out):
+        out.insert(0, {"printer_id": cur["printer_id"], "queue_id": cur["queue_id"], "name": cur.get("name") or "Standaardprinter",
+                       "location": "", "model": "", "status": ""})
+    return out
+
+
+def pick(conn, key):
+    """Printer uit de keuze van de gebruiker ('printer_id|queue_id'), alleen als die is toegestaan; anders de standaard."""
+    if key:
+        for p in allowed_printers(conn):
+            if f"{p['printer_id']}|{p['queue_id']}" == key:
+                return p
+    return printer(conn)
+
+
 def print_pdf(pr, data, title, opts=None):
     """Stuurt een PDF naar de printer. pr = {"printer_id", "queue_id"}. Geeft het job-id terug."""
     if not configured():

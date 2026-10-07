@@ -123,6 +123,21 @@ def file(fid, name=None):
 
 # ---------------------------------------------------------------- push
 
+@bp.route("/api/printers")
+def api_printers():
+    """Printers voor het afdrukvenster: de toegestane printers en de standaardprinter."""
+    from . import printix
+    conn = get_db()
+    if not (printix.configured() and printix.printer(conn)):
+        return jsonify({"printers": [], "default": ""})
+    cur = printix.printer(conn)
+    return jsonify({"default": f"{cur['printer_id']}|{cur['queue_id']}",
+                    "printers": [{"id": f"{p['printer_id']}|{p['queue_id']}", "name": p["name"],
+                                  "location": p.get("location") or "",
+                                  "offline": bool(p.get("status")) and p["status"].lower() not in ("online", "connected")}
+                                 for p in printix.allowed_printers(conn)]})
+
+
 @bp.route("/excel")
 def xlsview():
     """Excel (of CSV) bekijken binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""

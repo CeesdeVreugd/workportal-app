@@ -734,3 +734,6 @@ select { text-overflow: ellipsis; }
 .pdlg-msg[hidden] { display: none; }
 .pdlg-btns { display: flex; gap: 10px; justify-content: flex-end; }
 @media (max-width: 600px) { .pdlg { align-items: flex-end; padding: 0; } .pdlg-box { max-width: none; border-radius: 18px 18px 0 0; } .pdlg-btns .btn { flex: 1; justify-content: center; min-height: 46px; } }
+.checklist { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; max-height: 220px; overflow: auto; }
+.pdlg-row.pdlg-printer { flex-direction: column; align-items: stretch; gap: 6px; }
+.pdlg-row.pdlg-printer select { width: 100%; }

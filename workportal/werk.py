@@ -517,12 +517,12 @@ def project_folder_print(pid):
             data = buf.getvalue()
         except Exception:
             return jsonify({"error": "Deze foto kan niet worden omgezet om af te drukken."}), 400
+    pr = printix.pick(get_db(), request.form.get("printer")) or {}
     try:
-        jid = printix.print_pdf(printix.printer(get_db()), data, f"{p['number']} {name}", opts)
+        jid = printix.print_pdf(pr, data, f"{p['number']} {name}", opts)
     except (printix.PrintixError, requests.RequestException, KeyError, ValueError) as exc:
         audit("afdrukken mislukt", "project", pid, f"{p['number']} · {rel} · {exc}"[:500])
         return jsonify({"error": f"Afdrukken mislukt: {exc}"}), 502
-    pr = printix.printer(get_db()) or {}
     audit("afgedrukt", "project", pid, f"{p['number']} · {rel} · {opts['copies']}× · "
           f"{ {'NONE': 'enkelzijdig', 'LONG_EDGE': 'dubbelzijdig', 'SHORT_EDGE': 'dubbelzijdig (korte zijde)'}[opts['duplex']] } · "
           f"{'kleur' if opts['color'] else 'zwart-wit'} · {pr.get('name') or 'printer'} · job {jid}"[:500])

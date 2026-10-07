@@ -348,6 +348,8 @@ def printen():
             printix.set_setting(conn, "printix_copies", str(max(1, min(20, to_int(request.form.get("copies")) or 1))))
             printix.set_setting(conn, "printix_duplex", request.form.get("duplex") if request.form.get("duplex") in ("NONE", "LONG_EDGE", "SHORT_EDGE") else "NONE")
             printix.set_setting(conn, "printix_color", "1" if request.form.get("color") else "0")
+            printix.set_setting(conn, "printix_allowed", json.dumps([x for x in request.form.getlist("allowed") if "|" in x]))
+            printix._CACHE["list"] = None
             audit("printinstellingen", None, None, request.form.get("printer"))
             flash("Printinstellingen opgeslagen.", "ok")
         elif action == "test":
@@ -368,7 +370,7 @@ def printen():
                    " ORDER BY COALESCE(printed_at, last_seen) DESC LIMIT 15")
     return render_template("beheer/printen.html", configured=printix.configured(), printers=printers, error=error,
                            current=printix.printer(conn), auto=printix.setting(conn, "printix_auto_orderbon") == "1",
-                           opts=printix.options(conn), recent=recent,
+                           opts=printix.options(conn), recent=recent, allowed=set(json.loads(printix.setting(conn, "printix_allowed") or "[]")),
                            printlog=query("SELECT a.*, u.name AS who, p.kind AS pkind FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                                           " LEFT JOIN projects p ON a.entity = 'project' AND p.id = a.entity_id"
                                           " WHERE a.action IN ('afgedrukt', 'afdrukken mislukt', 'orderbon geprint')"

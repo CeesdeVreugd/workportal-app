@@ -13,13 +13,17 @@
     {% if error %}<div class="alertbox">{{ error }}</div>{% endif %}
     <form method="post" class="form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="f full">Printer (A4)<select name="printer">
+      <label class="f full">Standaardprinter (A4)<select name="printer">
         {% if not current %}<option value="">Kies een printer…</option>{% endif %}
         {% for p in printers %}{% set v = p.printer_id ~ '|' ~ p.queue_id ~ '|' ~ p.name %}
         <option value="{{ v }}" {{ 'selected' if current and current.printer_id == p.printer_id and current.queue_id == p.queue_id }}>{{ p.name }}{{ ' · ' ~ p.location if p.location }}{{ ' · ' ~ p.model if p.model }}{{ ' (' ~ p.status|lower ~ ')' if p.status and p.status|lower not in ['online','connected'] }}</option>
         {% endfor %}
         {% if current and not printers %}<option value="{{ current.printer_id }}|{{ current.queue_id }}|{{ current.name }}" selected>{{ current.name }}</option>{% endif %}
       </select><span class="hint">{{ printers|length }} printer(s) gevonden in Printix.</span></label>
+      {% if printers %}<div class="f full"><span>Printers om uit te kiezen bij <i>Afdrukken</i></span>
+        <div class="checklist">{% for p in printers %}{% set k = p.printer_id ~ '|' ~ p.queue_id %}
+          <label class="check"><input type="checkbox" name="allowed" value="{{ k }}" {{ 'checked' if k in allowed }}> {{ p.name }}{{ ' · ' ~ p.location if p.location }}</label>{% endfor %}</div>
+        <span class="hint">Niets aangevinkt = alle printers. De printer hierboven is de standaard (en voor orderbonnen).</span></div>{% endif %}
       <label class="check full"><input type="checkbox" name="auto" value="1" {{ 'checked' if auto }}> <span><b>Orderbonnen van nieuwe orders automatisch printen</b><br><span class="hint">Zodra het script op DC01 een orderbon van een nieuwe ordermap doorgeeft. Bestaande mappen worden niet geprint.</span></span></label>
       <div class="fgrid">
         <label class="f">Aantal exemplaren<input type="number" name="copies" min="1" max="20" value="{{ opts.copies }}"></label>
