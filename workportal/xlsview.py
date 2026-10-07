@@ -81,6 +81,57 @@ def _color(c):
     return None
 
 
+EMU_PX = 9525
+
+
+def _pictures(ws, max_px=1400, budget=None):
+    """Afbeeldingen op een tabblad (logo's, productfoto's) met hun ankerpunt. Grote foto's worden verkleind."""
+    import base64
+    from PIL import Image as PILImage
+    out = []
+    for img in getattr(ws, "_images", []) or []:
+        try:
+            raw = img._data()
+            anchor = img.anchor
+            fr = anchor._from
+            item = {"r1": fr.row + 1, "c1": fr.col + 1, "dx": int(fr.colOff / EMU_PX), "dy": int(fr.rowOff / EMU_PX),
+                    "w": None, "h": None, "r2": fr.row + 1, "c2": fr.col + 1, "dx2": 0, "dy2": 0}
+            ext = getattr(anchor, "ext", None)
+            to = getattr(anchor, "to", None)
+            if to is not None:
+                item.update(r2=to.row + 1, c2=to.col + 1, dx2=int(to.colOff / EMU_PX), dy2=int(to.rowOff / EMU_PX))
+            elif ext is not None and getattr(ext, "width", None):
+                item.update(w=int(ext.width / EMU_PX), h=int(ext.height / EMU_PX))
+            else:
+                item.update(w=int(img.width or 0), h=int(img.height or 0))
+            if item["w"] is not None:  # ruwe schatting van de cel waar hij eindigt (voor het zichtbare bereik)
+                item["c2"] = item["c1"] + max(0, int((item["dx"] + item["w"]) / 70))
+                item["r2"] = item["r1"] + max(0, int((item["dy"] + item["h"]) / 22))
+            mime = "image/png"
+            try:
+                with PILImage.open(io.BytesIO(raw)) as im:
+                    fmt = (im.format or "PNG").upper()
+                    if max(im.size) > max_px or fmt not in ("PNG", "JPEG", "GIF"):
+                        im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
+                        im.thumbnail((max_px, max_px))
+                        b = io.BytesIO()
+                        if im.mode == "RGBA":
+                            im.save(b, "PNG", optimize=True)
+                        else:
+                            im.save(b, "JPEG", quality=82)
+                            mime = "image/jpeg"
+                        raw = b.getvalue()
+                    else:
+                        mime = "image/jpeg" if fmt == "JPEG" else "image/gif" if fmt == "GIF" else "image/png"
+            except Exception:
+                continue  # EMF/WMF e.d. kan een browser niet tonen
+            item["src"] = f"data:{mime};base64," + base64.b64encode(raw).decode()
+            out.append(item)
+        except Exception:
+            continue
+    return out
+
+
 def _sheet_html(ws):
     from openpyxl.utils import get_column_letter
     max_r, max_c = ws.max_row or 0, ws.max_column or 0
@@ -94,6 +145,9 @@ def _sheet_html(ws):
     for mr in ws.merged_cells.ranges:
         if mr.min_row <= last_r and mr.min_col <= last_c:
             last_r, last_c = max(last_r, mr.max_row), max(last_c, mr.max_col)
+    pics = _pictures(ws)
+    for pic in pics:
+        last_r, last_c = max(last_r, pic["r2"]), max(last_c, pic["c2"])
     truncated = last_r > MAX_ROWS or last_c > MAX_COLS
     last_r, last_c = min(last_r, MAX_ROWS), min(last_c, MAX_COLS)
     if not last_r:
@@ -117,6 +171,37 @@ def _sheet_html(ws):
         w = d.width if d is not None and d.width else 9.5
         cols.append((c, letter, max(28, min(int(w * 7.2 + 6), 600))))
     visible = {c for c, _, _ in cols}
+    colw = {c: w for c, _, w in cols}
+
+    def row_px(r):
+        rd = ws.row_dimensions.get(r)
+        if rd is not None and rd.hidden:
+            return 0
+        return max(22, int(rd.height * 4 / 3)) if rd is not None and rd.height else 22
+
+    host = {}  # (r, c) -> html van afbeeldingen die in deze cel beginnen
+    for pic in pics:
+        r, c, dx, dy = pic["r1"], pic["c1"], pic["dx"], pic["dy"]
+        if r > last_r or c > last_c:
+            continue
+        while c not in visible and c <= last_c:  # verborgen kolom: naar de volgende
+            c += 1; dx = 0
+        while (r, c) in skip:  # in een samengevoegde cel: naar de cel linksboven
+            for (mr, mc), (rs, cs) in span.items():
+                if mr <= r < mr + rs and mc <= c < mc + cs:
+                    dx += sum(colw.get(x, 0) for x in range(mc, c)); dy += sum(row_px(y) for y in range(mr, r))
+                    r, c = mr, mc
+                    break
+            else:
+                break
+        w, h = pic["w"], pic["h"]
+        if w is None:  # tot-cel bekend: breedte/hoogte uit de kolommen en rijen
+            w = sum(colw.get(x, 0) for x in range(pic["c1"], pic["c2"])) + pic["dx2"] - pic["dx"]
+            h = sum(row_px(y) for y in range(pic["r1"], pic["r2"])) + pic["dy2"] - pic["dy"]
+        if w < 4 or h < 4:
+            continue
+        host.setdefault((r, c), []).append(
+            f'<img class="xv-pic" src="{pic["src"]}" alt="" style="left:{dx}px;top:{dy}px;width:{w}px;height:{h}px">')
     out = ['<table class="xv-t"><colgroup><col style="width:44px">']
     out += [f'<col style="width:{w}px">' for _, _, w in cols]
     out.append('</colgroup><thead><tr><th class="xv-corner"></th>')
@@ -126,7 +211,7 @@ def _sheet_html(ws):
         rd = ws.row_dimensions.get(r)
         if rd is not None and rd.hidden:
             continue
-        h = f' style="height:{int(rd.height * 1.33)}px"' if rd is not None and rd.height and rd.height > 18 else ""
+        h = f' style="height:{row_px(r)}px"'
         out.append(f'<tr{h}><th>{r}</th>')
         for c, _, _ in cols:
             if (r, c) in skip:
@@ -165,8 +250,11 @@ def _sheet_html(ws):
                 style.append("text-align:right")
             if al is not None and al.wrap_text:
                 style.append("white-space:pre-wrap")
+            pics_here = host.get((r, c))
+            if pics_here:
+                attrs += ' class="xv-host"'
             st = f' style="{";".join(style)}"' if style else ""
-            out.append(f"<td{attrs}{st}>{escape(text)}</td>")
+            out.append(f"<td{attrs}{st}>{''.join(pics_here or [])}{escape(text)}</td>")
         out.append("</tr>")
     out.append("</tbody></table>")
     return "".join(out), truncated

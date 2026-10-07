@@ -13,11 +13,13 @@
   .xv-pane { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
   .xv-pane[hidden] { display: none; }
   .xv-t { border-collapse: separate; border-spacing: 0; table-layout: fixed; background: #fff; font: 13px/1.3 Calibri, "Segoe UI", Ubuntu, Arial, sans-serif; color: #14163A; }
-  .xv-t td { border-right: 1px solid #E1E4EC; border-bottom: 1px solid #E1E4EC; padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; height: 22px; }
+  .xv-t td { border-right: 1px solid #E1E4EC; border-bottom: 1px solid #E1E4EC; padding: 1px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  .xv-t td.xv-host { position: relative; overflow: visible; }
+  .xv-pic { position: absolute; z-index: 1; max-width: none; pointer-events: none; }
   .xv-t th { background: #F3F5FA; color: #5A5F80; font-weight: 500; font-size: 12px; border-right: 1px solid #D5DAE8; border-bottom: 1px solid #D5DAE8; padding: 2px 4px; text-align: center; }
-  .xv-t thead th { position: sticky; top: 0; z-index: 2; height: 24px; }
-  .xv-t tbody th { position: sticky; left: 0; z-index: 1; }
-  .xv-t thead th.xv-corner { left: 0; z-index: 3; }
+  .xv-t thead th { position: sticky; top: 0; z-index: 3; height: 24px; }
+  .xv-t tbody th { position: sticky; left: 0; z-index: 2; }
+  .xv-t thead th.xv-corner { left: 0; z-index: 4; }
   .xv-empty { padding: 40px 20px; text-align: center; color: #5A5F80; }
   .xv-note { position: sticky; left: 0; padding: 8px 12px; font-size: 12px; color: #8A4B08; background: #FEF3E2; }
   .xv-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #D5DAE8; -webkit-overflow-scrolling: touch; }
