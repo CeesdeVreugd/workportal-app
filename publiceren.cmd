@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V75: Excel-viewer toont ook afbeeldingen (logos, productfotos)"
+set "OMSCHRIJVING=WorkPortal V76: betere uitlijning van de aantekeningpagina (telefoon en pc)"
 
 echo.
 echo ============================================

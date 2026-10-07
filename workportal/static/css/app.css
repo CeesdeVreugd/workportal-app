@@ -696,3 +696,21 @@ select { text-overflow: ellipsis; }
 .lb-img.zoom img { max-width: none; max-height: none; cursor: zoom-out; }
 .lb-img img { cursor: zoom-in; }
 .lb-pos:empty { display: none; }
+
+/* Aantekening bekijken: uitlijning */
+.annview { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+.annside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.annside .card, .annview .card { margin: 0; }
+.annview .card h2 { margin: 0 0 12px; }
+.annview .dl { margin: 0; }
+.annform-done { display: flex; flex-direction: column; gap: 14px; }
+.annform-done .f { margin: 0; }
+.annbtns { display: flex; flex-wrap: wrap; gap: 10px; }
+.annbtns .btn { justify-content: center; }
+.anndel { display: flex; }
+.annmain .prose { margin-top: 14px; }
+@media (max-width: 900px) {
+  .annview { grid-template-columns: 1fr; }
+  .annbtns .btn { flex: 1 1 140px; min-height: 48px; }
+  .anndel .btn { flex: 1; justify-content: center; min-height: 46px; }
+}
