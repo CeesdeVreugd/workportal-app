@@ -1,0 +1,12 @@
+{% from "partials/icons.html" import icon %}
+{% set open_n = annots|rejectattr('status', 'equalto', 'afgerond')|list|length %}
+<section class="card" id="aantekeningen">
+  <div class="card-head"><h2>Aantekeningen{% if annots %} ({{ open_n }} open{% if annots|length != open_n %} · {{ annots|length }} totaal{% endif %}){% endif %}</h2>
+    <div class="actions">{% if annots %}<a class="btn sm ghost" href="{{ url_for(B ~ '.annot_pdf', pid=p.id) }}" data-pdf="Productie-opmerkingen {{ p.number }}">{{ icon('pdf') }}PDF</a><a class="btn sm" href="{{ url_for(B ~ '.annot_index', pid=p.id) }}">Alles</a>{% endif %}
+      {% if can(K.module, 2) %}<a class="btn sm primary" href="{{ url_for(B ~ '.annot_edit', pid=p.id) }}">{{ icon('plus') }}Aantekening</a>{% endif %}</div></div>
+  <div class="rows">
+  {% for a in annots[:6] %}{% include "werk/_annot_row.html" %}
+  {% else %}<div class="empty">Nog geen aantekeningen. Maak een screenshot (3D, tekening of foto), zet er een pijl en tekst bij en wijs de actie toe.</div>{% endfor %}
+  {% if annots|length > 6 %}<a class="rowitem" href="{{ url_for(B ~ '.annot_index', pid=p.id) }}"><div class="grow muted">Nog {{ annots|length - 6 }} meer…</div></a>{% endif %}
+  </div>
+</section>

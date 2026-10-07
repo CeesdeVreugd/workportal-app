@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V69: rekentools leidingen, pompen en CIP in het Kenniscentrum, opslaan bij project of ticket en PDF"
+set "OMSCHRIJVING=WorkPortal V70: aantekeningen (productie-opmerkingen) bij projecten met screenshot, pijlen en status; fotos bekijken en maken in mappen 4 t/m 8"
 
 echo.
 echo ============================================

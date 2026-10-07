@@ -33,6 +33,7 @@
     <div class="grp"><button type="button" class="tb" id="v3d-edges" title="Randen tonen">{{ icon('edges') }}<span>Randen</span></button>
       <button type="button" class="tb" id="v3d-ortho" title="Orthografisch (zonder perspectief)">{{ icon('cube') }}<span>Ortho</span></button>
       <button type="button" class="tb" id="v3d-full" title="Volledig scherm">{{ icon('fullscreen') }}<span>Scherm</span></button></div>
+    {% if annot_url %}<div class="grp"><button type="button" class="tb" id="v3d-annot" title="Momentopname van dit beeld als aantekening bij het project: pijl en tekst erbij zetten">{{ icon('edit') }}<span>Aantekening</span></button></div>{% endif %}
   </div>
   <main class="v3d-main">
     <div class="v3d-stage">
@@ -70,5 +71,19 @@
 <script>window.WP3D = {{ {"url": url, "title": title, "occt": occt, "occtBase": url_for('static', filename='3d/occt/'), "maxMb": max_mb, "sizeMb": ((size or 0) / 1048576), "cacheKey": cache_key or none, "cacheMb": cache_mb or 0, "conv": conv or none, "tooBig": too_big or false, "stepMax": step_max or 0, "fromStep": from_step or false}|tojson }};</script>
 <script src="{{ url_for('static', filename='3d/o3dv.min.js') }}?v={{ VERSION }}"></script>
 <script src="{{ url_for('static', filename='js/viewer3d.js') }}?v={{ VERSION }}"></script>
+{% if annot_url %}<script>
+(function () {
+  var b = document.getElementById("v3d-annot"); if (!b) return;
+  b.addEventListener("click", function () {
+    var img = window.V3D_SNAP && window.V3D_SNAP();
+    if (!img) { alert("Wacht tot het model geladen is."); return; }
+    var f = document.createElement("form"); f.method = "post"; f.action = {{ annot_url|tojson }};
+    [["csrf_token", {{ csrf_token()|tojson }}], ["seed", img], ["seed_title", {{ title|tojson }}]].forEach(function (kv) {
+      var i = document.createElement("input"); i.type = "hidden"; i.name = kv[0]; i.value = kv[1]; f.appendChild(i);
+    });
+    document.body.appendChild(f); f.submit();
+  });
+})();
+</script>{% endif %}
 </body>
 </html>

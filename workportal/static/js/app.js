@@ -497,8 +497,19 @@
     var r = target(e.target); clearRows();
     send(Array.prototype.slice.call(e.dataTransfer.files), r ? r.getAttribute("data-droppath") : pad, r ? r.getAttribute("data-dropname") : null);
   });
-  var inp = document.getElementById("dropinput");
-  if (inp) inp.addEventListener("change", function () { send(Array.prototype.slice.call(inp.files), pad, null); inp.value = ""; });
+  function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()) + " " + z(d.getHours()) + "." + z(d.getMinutes()) + "." + z(d.getSeconds()); }
+  document.querySelectorAll("[data-dropinput]").forEach(function (inp) {
+    inp.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(inp.files);
+      // camera: telefoon noemt elke foto 'image.jpg'; geef hem datum en tijd als naam
+      if (inp.hasAttribute("data-camera")) files = files.map(function (f, n) {
+        var ext = (f.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0];
+        try { return new File([f], "Foto " + stamp() + (n ? " " + (n + 1) : "") + ext, { type: f.type || "image/jpeg" }); } catch (x) { return f; }
+      });
+      send(files, pad, null); inp.value = "";
+    });
+  });
   // voorkom dat de browser een losgelaten bestand buiten het vak opent
   window.addEventListener("dragover", function (e) { if (hasFiles(e)) e.preventDefault(); });
   window.addEventListener("drop", function (e) { if (hasFiles(e) && !zone.contains(e.target)) e.preventDefault(); });
@@ -538,6 +549,49 @@
       document.getElementById("droplist").innerHTML = h;
     }).catch(function () {});
   }
+})();
+
+/* Fotomappen: groot beeld met vorige/volgende (vegen of pijltjestoetsen) */
+(function () {
+  var lb = document.getElementById("lightbox");
+  if (!lb) return;
+  var img = document.getElementById("lb-img"), list = [], idx = 0, x0 = null;
+  function items() { return Array.prototype.slice.call(document.querySelectorAll("[data-gallery] a")); }
+  function show(i) {
+    list = items(); if (!list.length) return close();
+    idx = (i + list.length) % list.length;
+    var a = list[idx];
+    var wait = lb.querySelector(".lb-wait");
+    img.style.opacity = ".25"; wait.hidden = false;
+    img.onload = function () { img.style.opacity = "1"; wait.hidden = true; };
+    img.onerror = function () { if (img.src.indexOf(a.getAttribute("data-orig")) < 0) img.src = a.getAttribute("data-orig"); };
+    img.src = a.getAttribute("data-full");
+    document.getElementById("lb-name").textContent = a.getAttribute("data-name");
+    document.getElementById("lb-info").textContent = a.getAttribute("data-info") || "";
+    document.getElementById("lb-pos").textContent = (idx + 1) + " / " + list.length;
+    document.getElementById("lb-orig").href = a.getAttribute("data-orig");
+    document.getElementById("lb-dl").href = a.getAttribute("data-dl");
+    lb.hidden = false; document.body.style.overflow = "hidden";
+  }
+  function close() { lb.hidden = true; img.removeAttribute("src"); document.body.style.overflow = ""; }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("[data-gallery] a");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault(); show(items().indexOf(a));
+  });
+  document.getElementById("lb-close").addEventListener("click", close);
+  document.getElementById("lb-prev").addEventListener("click", function () { show(idx - 1); });
+  document.getElementById("lb-next").addEventListener("click", function () { show(idx + 1); });
+  lb.querySelector(".lb-img").addEventListener("click", function (e) { if (e.target === this) close(); });
+  document.addEventListener("keydown", function (e) {
+    if (lb.hidden) return;
+    if (e.key === "Escape") close(); else if (e.key === "ArrowLeft") show(idx - 1); else if (e.key === "ArrowRight") show(idx + 1);
+  });
+  lb.addEventListener("touchstart", function (e) { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  lb.addEventListener("touchend", function (e) {
+    if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 60) show(idx + (dx < 0 ? 1 : -1));
+  });
 })();
 
 /* Delen-knop: <button data-share-title data-share-text data-share-url> – deelmenu van de telefoon, anders kopiëren */

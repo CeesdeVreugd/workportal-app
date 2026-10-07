@@ -586,6 +586,28 @@ MIGRATIONS = [
     CREATE INDEX idx_calc_saves_project ON calc_saves(project_id);
     CREATE INDEX idx_calc_saves_ticket ON calc_saves(ticket_id);
     """,
+    # 20 - aantekeningen (productie-opmerkingen) bij projecten en orders: afbeelding met markering, status en actie
+    """
+    CREATE TABLE project_annotations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        number INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        image_file_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'nieuw',
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        due_date TEXT,
+        done_note TEXT,
+        done_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        done_at TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_annot_project ON project_annotations(project_id, number);
+    CREATE INDEX idx_annot_assigned ON project_annotations(assigned_to, status);
+    """,
 ]
 
 

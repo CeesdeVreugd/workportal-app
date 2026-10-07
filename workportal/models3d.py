@@ -225,11 +225,20 @@ def delete(fid):
 
 # ---------------------------------------------------------------- viewer + bestanden leveren
 
+def _annot_url(pid):
+    """Knop 'Aantekening' in de viewer: alleen als je aantekeningen bij dit project/deze order mag maken."""
+    p = query("SELECT id, kind FROM projects WHERE id = ?", (pid,), one=True)
+    if not p or not can("orders" if p["kind"] == "order" else "projecten", BEWERKEN):
+        return None
+    return url_for(("orders" if p["kind"] == "order" else "projecten") + ".annot_edit", pid=pid)
+
+
 @bp.route("/bekijk/lokaal/<int:fid>")
 @require("modellen3d", LEZEN)
 def view_local(fid):
     f = query("SELECT * FROM files WHERE id = ? AND kind = 'model3d'", (fid,), one=True) or abort(404)
     return render_template("modellen/viewer.html", url=url_for("modellen.local_file", fid=fid, name=f["filename"]),
+                           annot_url=_annot_url(f["entity_id"]) if f["entity"] == "project" else None,
                            title=f["filename"], size=f["size"], back=_back(f["entity"], f["entity_id"]),
                            occt=occt_installed(), max_mb=MAX_MB,
                            cache_key=f"lokaal/{fid}/{f['size']}", cache_mb=cache_mb(), conv=_conv_local(f))
@@ -267,7 +276,7 @@ def view_sp(pid):
                 alt_rel = (rel.rsplit("/", 1)[0] + "/" if "/" in rel else "") + alt["name"]
                 return redirect(url_for("modellen.view_sp", pid=pid, pad=alt_rel, terug=back, van="step"))
     too_big = bool(convert3d.is_step(rel) and (size or 0) > STEP_MAX_MB * 1048576)
-    return render_template("modellen/viewer.html", url=url_for("modellen.sp_file", pid=pid, rel=rel),
+    return render_template("modellen/viewer.html", url=url_for("modellen.sp_file", pid=pid, rel=rel), annot_url=_annot_url(pid),
                            title=rel.split("/")[-1], subtitle=f"{p['number']} · {rel}", back=back,
                            occt=occt_installed(), max_mb=MAX_MB, size=size, cache_key=cache_key, cache_mb=cache_mb(),
                            conv=None if too_big else (_conv_sp(pid, rel, version, size) if cache_key else None),

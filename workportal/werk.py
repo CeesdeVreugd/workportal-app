@@ -181,7 +181,9 @@ def detail(pid):
                   " WHERE n.project_id = ? ORDER BY n.date DESC, n.id DESC", (pid,))
     contacts = query("SELECT name FROM contacts WHERE customer_id = ? ORDER BY name", (p["customer_id"] or 0,))
     from .kennis import calcs_for
+    from .aantekeningen import annotations_for, STATUS_LABEL
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
+                           annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
@@ -436,9 +438,33 @@ def project_folder(pid):
     crumbs = [("/".join(parts[:i + 1]), parts[i]) for i in range(len(parts))]
     k = KINDS[BP_OF_KIND[p["kind"]]]
     tpl = "werk/_folder_list.html" if request.args.get("partial") else "werk/folder.html"
+    photo_mode = bool(parts and PHOTO_RE.match(parts[0]))
+    for i in items:
+        i["is_image"] = not i["folder"] and ((i["mime"] or "").startswith("image/") or i["name"].lower().endswith(IMAGE_EXT))
     return render_template(tpl, K=k, B=BP_OF_KIND[p["kind"]], p=p, items=items, rel=rel, crumbs=crumbs, error=error,
+                           photo_mode=photo_mode,
                            folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"], p["kind"]),
                            can_upload=_can_upload(p), cert_root=_cert_root(rel))
+
+
+# Fotomappen: '4 ...' t/m '8 ...' in de projectmap. Foto's als raster met groot beeld, en direct een foto maken.
+PHOTO_RE = re.compile(r"^\s*[4-8](\D|$)")
+IMAGE_EXT = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp", ".tif", ".tiff")
+
+
+@bp.route("/<int:pid>/map/miniatuur")
+def project_thumb(pid):
+    _project_sp(pid)
+    size = "c1600x1600" if request.args.get("groot") else "c400x400"
+    try:
+        data, mime = sp.thumbnail(get_db(), pid, request.args.get("pad", ""), size)
+    except ValueError:
+        abort(400)
+    except sp.GraphError as exc:
+        abort(404 if exc.status == 404 else 502)
+    except (requests.RequestException, RuntimeError):
+        abort(502)
+    return Response(data, mimetype=mime, headers={"Cache-Control": "private, max-age=86400"})
 
 
 def _can_upload(p):
@@ -686,3 +712,7 @@ def inbox_handle(iid):
         if r:
             return r
     return redirect(back)
+
+
+# Aantekeningen (productie-opmerkingen) hangen aan dezelfde blueprint
+from . import aantekeningen  # noqa: E402,F401

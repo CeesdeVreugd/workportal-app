@@ -21,6 +21,11 @@
 <a class="actionbar" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="background:var(--accent-soft);color:var(--basic)">{{ icon('invoice') }}<span><b>{{ cc.nieuw }} nieuwe inkoopfactu{{ 'ren' if cc.nieuw != 1 else 'ur' }}</b> binnengekomen.</span><span class="go">Bekijken →</span></a>
 {% endif %}{% endif %}
 
+{% if d.annots %}
+<section class="card"><div class="card-head"><h2>Aantekeningen met een actie voor mij</h2></div>
+  <div class="rows">{% for a in d.annots %}<a class="rowitem" href="{{ werk_url('annot_view', a.pkind, pid=a.project_id, aid=a.id) }}">{% if a.image_file_id %}<img class="annthumb" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="" loading="lazy">{% endif %}<div class="grow"><div class="t">{{ a.pnumber }} · {{ a.number }}. {{ a.title }}</div><div class="s">{{ a.pname }}</div></div>{% if a.due_date %}<span class="badge {{ 'b-bad' if a.due_date < d.today else 'b-warn' }}">{{ a.due_date|date }}</span>{% else %}<span class="badge b-blue">{{ 'In behandeling' if a.status == 'in_behandeling' else 'Nieuw' }}</span>{% endif %}</a>{% endfor %}</div>
+</section>
+{% endif %}
 {% if d.actions %}
 <section class="card"><div class="card-head"><h2>Mijn acties uit gespreksnotities</h2></div>
   <div class="rows">{% for n in d.actions %}<a class="rowitem" href="{{ werk_url('detail', n.kind, pid=n.project_id) }}#n{{ n.id }}"><div class="grow"><div class="t">{{ n.number }} · {{ n.pname }}</div><div class="s">{{ n.body[:110] }}{{ '…' if n.body|length > 110 }}</div></div><span class="badge b-warn">{{ n.follow_up|date }}</span></a>{% endfor %}</div>

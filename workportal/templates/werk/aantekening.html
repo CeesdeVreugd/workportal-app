@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Aantekening {{ a.number }} · {{ p.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.annot_index', pid=p.id) }}">Aantekeningen</a> / {{ a.number }}</div>
+<div class="pagehead"><div><div class="eyebrow">Aantekening {{ a.number }} van {{ count }}</div><h1>{{ a.title }}</h1>
+  <p><span class="badge {{ 'b-ok' if a.status == 'afgerond' else 'b-warn' if a.status == 'in_behandeling' else 'b-blue' }}">{{ STATUS_LABEL[a.status] }}</span> {{ a.who or '' }} · {{ a.created_at|dt }}</p></div>
+  <div class="actions">
+    {% if prev_id %}<a class="iconbtn" href="{{ url_for(B ~ '.annot_view', pid=p.id, aid=prev_id) }}" title="Vorige">{{ icon('back') }}</a>{% endif %}
+    {% if next_id %}<a class="iconbtn" href="{{ url_for(B ~ '.annot_view', pid=p.id, aid=next_id) }}" title="Volgende" style="transform:scaleX(-1)">{{ icon('back') }}</a>{% endif %}
+    <a class="btn" href="{{ url_for(B ~ '.annot_pdf', pid=p.id, id=a.id) }}" data-pdf="Aantekening {{ a.number }}">{{ icon('pdf') }}PDF</a>
+    {% if can_edit %}<a class="btn primary" href="{{ url_for(B ~ '.annot_edit', pid=p.id, aid=a.id) }}">Bewerken</a>{% endif %}</div></div>
+<div class="grid g2 stack" style="align-items:start">
+  <section class="card">
+    {% if a.image_file_id %}<a href="{{ url_for('main.file', fid=a.image_file_id) }}" target="_blank" rel="noopener"><img class="annimg" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="Aantekening {{ a.number }}"></a>{% endif %}
+    {% if a.body %}<div class="prose" style="margin-top:12px">{{ a.body }}</div>{% elif not a.image_file_id %}<div class="empty">Geen afbeelding of tekst.</div>{% endif %}
+  </section>
+  <div>
+    <section class="card">
+      <h2>Actie</h2>
+      <dl class="dl compact">
+        <dt>Actie bij</dt><dd>{{ a.assignee or '—' }}</dd>
+        <dt>Gereed vóór</dt><dd>{{ a.due_date|date if a.due_date else '—' }}</dd>
+        <dt>Status</dt><dd>{{ STATUS_LABEL[a.status] }}</dd>
+        {% if a.updated_at %}<dt>Laatst gewijzigd</dt><dd>{{ a.updated_at|dt }}</dd>{% endif %}
+      </dl>
+      {% if a.status == 'afgerond' %}
+        <div class="okbox" style="margin-top:12px"><b>Afgerond door {{ a.done_name or '—' }}{% if a.done_at %} op {{ a.done_at|dt }}{% endif %}</b><div class="prose" style="margin-top:6px">{{ a.done_note }}</div></div>
+      {% endif %}
+    </section>
+    {% if can_status %}
+    <section class="card form" id="afronden">
+      {% if a.status != 'afgerond' %}
+        <h2>Afronden</h2>
+        <form method="post" action="{{ url_for(B ~ '.annot_status', pid=p.id, aid=a.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="afgerond">
+          <label class="f">Wat is er gedaan? *<textarea name="done_note" rows="4" required placeholder="bijv. Steun 20 mm verplaatst, opnieuw gelast en gecontroleerd"></textarea></label>
+          <div class="actions"><button class="btn primary">{{ icon('check') }}Afronden</button></div>
+        </form>
+        {% if a.status == 'nieuw' %}<form method="post" action="{{ url_for(B ~ '.annot_status', pid=p.id, aid=a.id) }}" style="margin-top:8px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="in_behandeling"><button class="btn sm">Zet op ‘In behandeling’</button></form>{% endif %}
+      {% else %}
+        <form method="post" action="{{ url_for(B ~ '.annot_status', pid=p.id, aid=a.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="in_behandeling"><button class="btn sm">Heropenen</button></form>
+      {% endif %}
+    </section>
+    {% endif %}
+    {% if can_edit and (a.created_by == g.user.id or can(K.module, 3)) %}
+    <form method="post" action="{{ url_for(B ~ '.annot_delete', pid=p.id, aid=a.id) }}" onsubmit="return confirm('Aantekening {{ a.number }} verwijderen?')" style="margin-top:8px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost danger">Verwijderen</button></form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

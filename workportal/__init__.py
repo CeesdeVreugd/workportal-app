@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.29.0"
+VERSION = "1.30.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -42,6 +42,7 @@ def create_app(test_config=None, start_scheduler=True):
         BACKUP_DIR=os.path.join(data_dir, "backups"),
         SECRET_KEY=_secret_key(data_dir),
         MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "65")) * 1024 * 1024,
+        MAX_FORM_MEMORY_SIZE=30 * 1024 * 1024,  # afbeelding van een aantekening komt als tekstveld (data-URL) mee
         SESSION_COOKIE_NAME="wp_session",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",

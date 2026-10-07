@@ -161,6 +161,11 @@ class Graph:
             raise GraphError(r.status_code, "Download mislukt")
         return meta, r
 
+    def thumbnail(self, drive, base_item, relpath, size):
+        r = self._req("GET", f"/drives/{drive}/items/{base_item}:/{self._p(relpath)}:/thumbnails/0/{size}/content",
+                      allow_redirects=True, timeout=60)
+        return r.content, r.headers.get("Content-Type") or "image/jpeg"
+
     def upload(self, drive, parent_id, name, data, conflict="replace"):
         target = f"/drives/{drive}/items/{parent_id}:/{quote(name, safe='')}:"
         if len(data) <= SMALL_UPLOAD:
@@ -824,6 +829,18 @@ def open_file(conn, pid, relpath, g=None):
     if not rel:
         raise ValueError("Geen bestand")
     return g.download(drive, p["sp_item_id"], rel)
+
+
+def thumbnail(conn, pid, relpath, size="c400x400", g=None):
+    """Miniatuur van een foto in de projectmap (SharePoint maakt die zelf). Geeft (bytes, mimetype)."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    rel = safe_rel(relpath)
+    try:
+        return g.thumbnail(drive, p["sp_item_id"], rel, size)
+    except GraphError:
+        return g.thumbnail(drive, p["sp_item_id"], rel, "medium" if size == "c400x400" else "large")
 
 
 def item_version(item):

@@ -1,0 +1,6 @@
+<a class="rowitem annrow" href="{{ url_for(B ~ '.annot_view', pid=p.id, aid=a.id) }}">
+  {% if a.image_file_id %}<img class="annthumb" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="" loading="lazy">{% else %}<span class="annthumb none">{{ a.number }}</span>{% endif %}
+  <div class="grow"><div class="t">{{ a.number }}. {{ a.title }}</div>
+    <div class="s">{% if a.assignee %}Actie: {{ a.assignee }}{% if a.due_date %} · vóór {{ a.due_date|date }}{% endif %} · {% endif %}{{ a.who or '' }} · {{ a.created_at|date }}</div></div>
+  <span class="badge {{ 'b-ok' if a.status == 'afgerond' else 'b-warn' if a.status == 'in_behandeling' else 'b-blue' }}">{{ ANNOT_STATUS[a.status] }}</span>
+</a>

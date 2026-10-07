@@ -265,6 +265,10 @@
     applyUp(false);
     var origRender = viewer.Render.bind(viewer);
     viewer.Render = function () { origRender(); drawOverlay(); };
+    // Momentopname voor een aantekening: direct na het tekenen uitlezen (de buffer is dan nog gevuld)
+    window.V3D_SNAP = function () {
+      try { origRender(); return viewer.renderer.domElement.toDataURL("image/png"); } catch (e) { return null; }
+    };
     viewer.SetMouseClickHandler(onClick);
     hidden.clear(); measures = []; shown = -1; pending = null; selected = null;
     buildTree();

@@ -629,3 +629,50 @@ select { text-overflow: ellipsis; }
 .rt-rows .i-own { margin-top: 6px; }
 @media (max-width: 600px) { .rt-res { flex-direction: column; gap: 2px; } .rt-res b { text-align: left; } }
 #rt [hidden], .rt-pane[hidden] { display: none !important; }
+
+/* Aantekeningen (productie-opmerkingen) */
+.annlayout [hidden], .lightbox [hidden] { display: none !important; }
+.annlayout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .annlayout { grid-template-columns: 1fr; } }
+.annedit { overflow: hidden; }
+.ann-src { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+.ann-stage { position: relative; background: repeating-conic-gradient(#EEF0F6 0 25%, #F7F8FB 0 50%) 0 0 / 20px 20px; min-height: 260px; display: flex; align-items: center; justify-content: center; }
+.ann-stage.over { outline: 3px dashed var(--accent); outline-offset: -6px; }
+.ann-stage canvas { display: block; max-width: 100%; max-height: 72vh; width: auto; height: auto; touch-action: none; cursor: crosshair; background: #fff; }
+.ann-empty { display: flex; flex-direction: column; gap: 8px; text-align: center; max-width: 440px; padding: 30px 18px; color: var(--muted); font-size: 14px; }
+.ann-empty b { color: var(--basic); font-size: 16px; }
+.ann-empty kbd { font: inherit; font-size: 12px; background: #fff; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; }
+.ann-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 96px; font-weight: 700; color: #fff; background: rgba(10,10,40,.55); }
+.ann-cropbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; background: var(--accent-soft); color: var(--basic); font-size: 14px; }
+.ann-cropbar span { flex: 1 1 200px; }
+.ann-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.ann-grp { display: flex; gap: 4px; align-items: center; }
+.ann-tools .tb { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 50px; padding: 6px 6px 4px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-size: 18px; line-height: 1; color: var(--ink); cursor: pointer; }
+.ann-tools .tb span { font-size: 10.5px; color: var(--muted); }
+.ann-tools .tb.sm { min-width: 34px; font-size: 13px; font-weight: 700; padding: 8px 6px; }
+.ann-tools .tb.on { border-color: var(--basic); background: var(--accent-soft); color: var(--basic); }
+.ann-tools .sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.ann-tools .sw.on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--basic); }
+.annrow { align-items: center; }
+.annthumb { width: 64px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); flex: none; background: #fff; }
+.annthumb.none { display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--basic); background: var(--accent-soft); }
+.annimg { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+.okbox { background: var(--ok-bg); border: 1px solid #BFE3CF; color: var(--okplus); border-radius: 12px; padding: 12px 14px; }
+
+/* Fotomappen (4 t/m 8) in de projectmap */
+.photogrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; padding: 12px; }
+.photogrid a { position: relative; display: block; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: var(--line-2); border: 1px solid var(--line); }
+.photogrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photogrid span { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 4px; font-size: 11px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lightbox { position: fixed; inset: 0; z-index: 200; background: rgba(8,8,24,.94); display: flex; flex-direction: column; }
+.lightbox[hidden] { display: none; }
+.lb-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #fff; font-size: 14px; }
+.lb-top .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-top a, .lb-top button { color: #fff; background: rgba(255,255,255,.12); border: 0; border-radius: 10px; padding: 8px 12px; font: inherit; font-size: 14px; text-decoration: none; cursor: pointer; }
+.lb-img { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; touch-action: pan-y pinch-zoom; }
+.lb-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; border: 0; border-radius: 12px; background: rgba(255,255,255,.14); color: #fff; font-size: 30px; cursor: pointer; }
+.lb-nav.prev { left: 8px; } .lb-nav.next { right: 8px; }
+.lb-wait { position: absolute; color: #fff; opacity: .7; }
+.ann-grp { flex-wrap: wrap; }
+@media (max-width: 520px) { .ann-tools .tb { min-width: 44px; padding: 6px 4px 4px; } .ann-tools .sw { width: 26px; height: 26px; } }

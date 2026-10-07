@@ -43,6 +43,10 @@ def dashboard():
             "SELECT n.*, p.number, p.name AS pname, p.kind FROM project_notes n JOIN projects p ON p.id = n.project_id"
             " WHERE n.created_by = ? AND n.follow_up IS NOT NULL AND n.follow_done = 0 AND n.follow_up <= date('now', '+7 days')"
             " ORDER BY n.follow_up LIMIT 10", (g.user["id"],))
+    if can("projecten") or can("orders"):
+        from .aantekeningen import open_for_user
+        data["annots"] = open_for_user(g.user["id"])
+        data["today"] = now_iso()[:10]
     return render_template("dashboard.html", d=data)
 
 

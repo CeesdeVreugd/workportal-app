@@ -437,3 +437,61 @@ def calc_pdf(r, kind_label, data, link_label=None):
                                       "indicatief; controleer bij twijfel met de pomp- of chemieleverancier.", S["small"])]
     doc.build(story)
     return buf.getvalue()
+
+
+def _img_sharp(path, max_w, max_h, max_px=1600):
+    """Als _img, maar met meer pixels: tekst en pijlen op een aantekening moeten leesbaar blijven."""
+    try:
+        with PILImage.open(path) as im:
+            w, h = im.size
+            src = path
+            if max(w, h) > max_px:
+                im = im.convert("RGB")
+                im.thumbnail((max_px, max_px))
+                src = io.BytesIO()
+                im.save(src, "JPEG", quality=84, optimize=True)
+                src.seek(0)
+    except Exception:
+        return None
+    ratio = min(max_w / w, max_h / h)
+    return Image(src, width=w * ratio, height=h * ratio)
+
+
+def annotations_pdf(p, items, labels):
+    """Productie-opmerkingen: per aantekening de afbeelding, de tekst, de actie en de afronding."""
+    buf = io.BytesIO()
+    doc = _doc(buf, "Productie-opmerkingen", p.get("number") or "")
+    W = doc.width
+    open_n = sum(1 for a, _ in items if a["status"] != "afgerond")
+    story = [Paragraph("PRODUCTIE-OPMERKINGEN", S["eyebrow"]),
+             Paragraph(esc(f"{p.get('number')} · {p.get('name') or ''}"), S["h1"]),
+             Paragraph(esc(f"{p.get('customer') or ''}{' · ' if p.get('customer') else ''}{len(items)} aantekening(en), "
+                           f"{open_n} open · bijgewerkt {fmt_dt(now_iso())}"), S["small"]), Spacer(1, 6)]
+    if not items:
+        story.append(Paragraph("Er zijn nog geen aantekeningen.", S["body"]))
+    for a, img in items:
+        st = a["status"]
+        col = "#1A6B43" if st == "afgerond" else "#8A4B08" if st == "in_behandeling" else "#0059B3"
+        block = [Paragraph(f"{a['number']}. {esc(a['title'])} &nbsp;<font size='9' color='{col}'>● {esc(labels.get(st, st))}</font>", S["h2"])]
+        if img and os.path.exists(img):
+            im = _img_sharp(img, W, 140 * mm)
+            if im:
+                im.hAlign = "LEFT"
+                block += [im, Spacer(1, 5)]
+        if a.get("body"):
+            block.append(Paragraph(esc(a["body"]), S["body"]))
+        pairs = [("Actie bij", a.get("assignee") or "–"), ("Gereed vóór", fmt_date(a["due_date"]) if a.get("due_date") else "–"),
+                 ("Gemaakt door", a.get("who") or "–"), ("Datum", fmt_date(a["created_at"]))]
+        block += [Spacer(1, 4), _kv_table(pairs, W)]
+        if st == "afgerond":
+            t = Table([[Paragraph(f"<b>Afgerond</b> door {esc(a.get('done_name') or '–')}"
+                                  f"{' op ' + fmt_dt(a['done_at']) if a.get('done_at') else ''}", S["cell"])],
+                       [Paragraph(esc(a.get("done_note") or ""), S["cell"])]], colWidths=[W])
+            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#E7F5EE")),
+                                   ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 4),
+                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+            block += [Spacer(1, 4), t]
+        block.append(Spacer(1, 12))
+        story.append(KeepTogether(block))
+    doc.build(story)
+    return buf.getvalue()

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}{{ 'Aantekening ' ~ a.number ~ ' bewerken' if a else 'Nieuwe aantekening' }} · {{ p.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.annot_index', pid=p.id) }}">Aantekeningen</a> / {{ a.number if a else 'Nieuw' }}</div>
+<div class="pagehead"><div><div class="eyebrow">{{ p.number }} · {{ p.name }}</div><h1>{{ 'Aantekening ' ~ a.number if a else 'Nieuwe aantekening' }}</h1></div></div>
+<form method="post" id="annform" class="annlayout" action="{{ url_for(B ~ '.annot_edit', pid=p.id, aid=a.id) if a else url_for(B ~ '.annot_edit', pid=p.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="image" id="ann-image" value="">
+  <input type="hidden" name="image_changed" id="ann-changed" value="0">
+  <section class="card flush annedit" id="ann-edit" data-seed="{{ seed }}">
+    <div class="ann-src">
+      <button type="button" class="btn sm" id="ann-screen" hidden title="Kies een venster (bijv. SolidWorks) of een scherm; daarna sleep je een kader zoals bij het Knipprogramma">{{ icon('fullscreen') }}Screenshot maken</button>
+      <label class="btn sm">{{ icon('camera') }}Foto maken<input type="file" accept="image/*" capture="environment" hidden id="ann-cam"></label>
+      <label class="btn sm">{{ icon('image') }}Uit galerij / bestand<input type="file" accept="image/*" hidden id="ann-file"></label>
+      <button type="button" class="btn sm ghost" id="ann-blank">Leeg vel</button>
+      <button type="button" class="btn sm ghost danger" id="ann-remove" hidden>Afbeelding weghalen</button>
+    </div>
+    <div class="ann-stage" id="ann-stage">
+      <div class="ann-empty" id="ann-empty">
+        <b>Zet hier een afbeelding neer</b>
+        <span class="ann-screen-hint" hidden>Klik op <b>Screenshot maken</b> en kies het venster van je 3D-programma; daarna sleep je een kader om het stuk dat je wilt.</span>
+        <span>Of plak met <kbd>Ctrl</kbd>+<kbd>V</kbd> (bijv. na <kbd>Windows</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>), sleep een afbeelding hierheen, of maak een foto.</span>
+        <span>In de 3D-viewer van het project zit ook een knop <b>Aantekening</b>.</span>
+      </div>
+      <canvas id="ann-canvas" hidden></canvas>
+      <div class="ann-count" id="ann-count" hidden></div>
+    </div>
+    <div class="ann-cropbar" id="ann-cropbar" hidden>
+      <span>Sleep een kader om het stuk dat je wilt houden.</span>
+      <button type="button" class="btn sm primary" id="ann-crop-ok" disabled>Uitsnijden</button>
+      <button type="button" class="btn sm" id="ann-crop-all">Hele beeld</button>
+      <button type="button" class="btn sm ghost" id="ann-crop-cancel">Annuleren</button>
+    </div>
+    <div class="ann-tools" id="ann-tools" hidden>
+      <div class="ann-grp">
+        <button type="button" class="tb on" data-tool="arrow" title="Pijl">➜<span>Pijl</span></button>
+        <button type="button" class="tb" data-tool="text" title="Tekst: tik waar de tekst moet komen">T<span>Tekst</span></button>
+        <button type="button" class="tb" data-tool="rect" title="Kader">▭<span>Kader</span></button>
+        <button type="button" class="tb" data-tool="ellipse" title="Cirkel">◯<span>Cirkel</span></button>
+        <button type="button" class="tb" data-tool="line" title="Lijn">╱<span>Lijn</span></button>
+        <button type="button" class="tb" data-tool="pen" title="Vrij tekenen">✎<span>Pen</span></button>
+        <button type="button" class="tb" data-tool="num" title="Genummerd punt (1, 2, 3 …)">①<span>Nummer</span></button>
+      </div>
+      <div class="ann-grp ann-colors">
+        <button type="button" class="sw on" data-color="#E53935" style="background:#E53935" title="Rood"></button>
+        <button type="button" class="sw" data-color="#FFC400" style="background:#FFC400" title="Geel"></button>
+        <button type="button" class="sw" data-color="#0080FF" style="background:#0080FF" title="Blauw"></button>
+        <button type="button" class="sw" data-color="#1E9E50" style="background:#1E9E50" title="Groen"></button>
+        <button type="button" class="sw" data-color="#14163A" style="background:#14163A" title="Zwart"></button>
+        <button type="button" class="sw" data-color="#FFFFFF" style="background:#FFFFFF" title="Wit"></button>
+      </div>
+      <div class="ann-grp">
+        <button type="button" class="tb sm" data-size="0.6" title="Dun">S</button>
+        <button type="button" class="tb sm on" data-size="1" title="Normaal">M</button>
+        <button type="button" class="tb sm" data-size="1.7" title="Dik">L</button>
+      </div>
+      <div class="ann-grp">
+        <button type="button" class="tb" id="ann-undo" title="Ongedaan maken (Ctrl+Z)">↶<span>Terug</span></button>
+        <button type="button" class="tb" id="ann-crop" title="Bijsnijden">⌗<span>Bijsnijden</span></button>
+        <button type="button" class="tb" id="ann-clear" title="Alle pijlen en tekst weghalen">✕<span>Wissen</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card form">
+    <label class="f">Titel *<input type="text" name="title" value="{{ form.title or '' }}" required maxlength="200" placeholder="bijv. Steun verplaatsen bij pomp P2"></label>
+    <label class="f">Toelichting<textarea name="body" rows="6" placeholder="Wat moet er gebeuren? Maten, onderdelen, afspraken …">{{ form.body or '' }}</textarea></label>
+    <div class="fgrid">
+      <label class="f">Actie bij<select name="assigned_to" data-combo>
+        <option value="">Nog niemand</option>
+        {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if form.assigned_to == u.id }}>{{ u.name }}</option>{% endfor %}
+      </select></label>
+      <label class="f">Gereed vóór<input type="date" name="due_date" value="{{ form.due_date or '' }}"></label>
+      <label class="f">Status<select name="status" id="ann-status">
+        {% for k, v in STATUSES %}<option value="{{ k }}" {{ 'selected' if (form.status or 'nieuw') == k }}>{{ v }}</option>{% endfor %}
+      </select></label>
+    </div>
+    <label class="f" id="ann-done" {% if (form.status or 'nieuw') != 'afgerond' %}hidden{% endif %}>Wat is er gedaan? *<textarea name="done_note" rows="3">{{ form.done_note or '' }}</textarea></label>
+    <p class="hint" style="margin:0">Wie de actie krijgt, ontvangt een melding. Alle aantekeningen komen samen als PDF in de projectmap (3 Documenten / 2 …).</p>
+    <div class="actions"><button class="btn primary" id="ann-save">Opslaan</button>
+      <a class="btn ghost" href="{{ url_for(B ~ '.annot_view', pid=p.id, aid=a.id) if a else url_for(B ~ '.detail', pid=p.id) ~ '#aantekeningen' }}">Annuleren</a></div>
+  </section>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/markup.js') }}?v={{ VERSION }}"></script>
+{% endblock %}

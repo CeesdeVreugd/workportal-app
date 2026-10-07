@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% set ANNOT_STATUS = STATUS_LABEL %}
+{% block title %}Aantekeningen {{ p.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / Aantekeningen</div>
+<div class="pagehead"><div><div class="eyebrow">Productie-opmerkingen</div><h1>Aantekeningen</h1><p>{{ p.number }} · {{ p.name }}</p></div>
+  <div class="actions">{% if rows %}<a class="btn" href="{{ url_for(B ~ '.annot_pdf', pid=p.id) }}" data-pdf="{{ pdf_name }}">{{ icon('pdf') }}PDF van alles</a>{% endif %}
+    {% if can_edit %}<a class="btn primary" href="{{ url_for(B ~ '.annot_edit', pid=p.id) }}">{{ icon('plus') }}Nieuwe aantekening</a>{% endif %}</div></div>
+{% set open_rows = rows|rejectattr('status', 'equalto', 'afgerond')|list %}
+{% set done_rows = rows|selectattr('status', 'equalto', 'afgerond')|list %}
+<section class="card"><div class="card-head"><h2>Open ({{ open_rows|length }})</h2></div>
+  <div class="rows">{% for a in open_rows %}{% include "werk/_annot_row.html" %}{% else %}<div class="empty">Geen open aantekeningen.</div>{% endfor %}</div></section>
+{% if done_rows %}<section class="card"><div class="card-head"><h2>Afgerond ({{ done_rows|length }})</h2></div>
+  <div class="rows">{% for a in done_rows %}{% include "werk/_annot_row.html" %}{% endfor %}</div></section>{% endif %}
+{% if sp_ok %}<section class="card"><p class="small muted" style="margin:0">Bij elke wijziging wordt <b>{{ pdf_name }}</b> bijgewerkt in de projectmap onder <b>3 Documenten / 2 …</b>.</p>
+  {% if can_edit and rows %}<form method="post" action="{{ url_for(B ~ '.annot_sp', pid=p.id) }}" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Nu opnieuw in SharePoint zetten</button></form>{% endif %}</section>{% endif %}
+{% endblock %}

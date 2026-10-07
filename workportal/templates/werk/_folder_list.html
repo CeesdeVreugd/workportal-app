@@ -1,8 +1,17 @@
 {% from "partials/icons.html" import icon %}
 {% if error %}<div class="empty">{{ error }}</div>
 {% else %}
+{% set photos = items|selectattr('is_image')|list if photo_mode else [] %}
+{% if photos %}
+<div class="photogrid" data-gallery>
+{% for i in photos %}{% set path = (rel ~ '/' ~ i.name) if rel else i.name %}
+  <a href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-full="{{ url_for(B ~ '.project_thumb', pid=p.id, pad=path, groot=1) }}" data-orig="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}" data-dl="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" data-name="{{ i.name }}" data-info="{{ i.modified|dt }}" target="_blank" rel="noopener">
+    <img src="{{ url_for(B ~ '.project_thumb', pid=p.id, pad=path) }}" alt="{{ i.name }}" loading="lazy"><span>{{ i.name }}</span></a>
+{% endfor %}
+</div>
+{% endif %}
 <div class="rows files">
-{% for i in items %}
+{% for i in items if not (photo_mode and i.is_image) %}
   {% set path = (rel ~ '/' ~ i.name) if rel else i.name %}
   {% if i.folder %}
   <div class="rowitem rowlink" data-droppath="{{ path }}" data-dropname="{{ i.name }}"><a class="grow rowmain" href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=path) }}"><span class="ficon dir">{{ icon('folder') }}</span><div class="grow"><div class="t">{{ i.name }}</div><div class="s">{{ i.count if i.count is not none else '' }}{{ ' items' if i.count is not none }}</div></div></a>
@@ -12,6 +21,6 @@
     <a class="grow" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}"{% if i.name.lower().endswith('.pdf') %} data-pdf="{{ i.name }}"{% endif %} target="_blank" rel="noopener"><div class="t">{{ i.name }}</div><div class="s">{{ (i.size / 1024 / 1024)|num(1) ~ ' MB' if i.size >= 1048576 else ((i.size / 1024)|round|int ~ ' kB') }} · {{ i.modified|date }}</div></a>
     <a class="iconbtn" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" title="Downloaden">{{ icon('download') }}</a></div>
   {% endif %}
-{% else %}<div class="empty">Deze map is leeg.</div>{% endfor %}
+{% else %}{% if not photos %}<div class="empty">Deze map is leeg.{% if photo_mode and can_upload %} Maak een foto of kies er een uit de galerij.{% endif %}</div>{% endif %}{% endfor %}
 </div>
 {% endif %}

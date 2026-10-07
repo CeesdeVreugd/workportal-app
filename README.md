@@ -457,3 +457,22 @@ Kenniscentrum › **Leidingen, pompen & CIP** (rekent direct in de browser, ook 
 - **Verpompen:** tijd bij een debiet of benodigd debiet voor een tijd, met snelheidscontrole.
 - **Opslaan & PDF:** geef een naam en koppel aan een project/order of ticket; daar staat de berekening onder
   "Berekeningen" (openen en verder rekenen, of PDF).
+
+## Aantekeningen (productie-opmerkingen) bij projecten en orders (V70)
+
+Vervangt het losse Word-bestand met screenshots. Op het project/de order staat de kaart **Aantekeningen**.
+
+- **Afbeelding**: *Screenshot maken* (Chrome/Edge op de computer: kies het venster van bijvoorbeeld SolidWorks of een heel scherm, daarna sleep je een kader zoals bij het Knipprogramma), *Foto maken*, *Uit galerij / bestand*, plakken met Ctrl+V (bijv. na Windows+Shift+S), slepen, of *Leeg vel*. In de 3D-viewer van een project zit een knop **Aantekening** die het huidige beeld meeneemt.
+  - Kies bij Screenshot liefst een **venster**; WorkPortal blijft dan in beeld en het venster wordt op de achtergrond vastgelegd (een geminimaliseerd venster kan niet). Bij een heel scherm krijg je 3 seconden om naar het programma te gaan.
+  - Op telefoon/tablet bestaat schermopname in de browser niet; daar foto of galerij gebruiken.
+- **Markeren**: pijl, tekst, kader, cirkel, lijn, pen en genummerde punten; zes kleuren, drie diktes, terug (Ctrl+Z), bijsnijden, wissen.
+- **Tekst eronder**, **actie bij** (krijgt push + mail), **gereed vóór**, **status** Nieuw / In behandeling / Afgerond. Afronden kan alleen met een stukje tekst "wat is er gedaan".
+- Rechten: aanmaken/bewerken met bewerkrecht op Projecten/Orders. Degene bij wie de actie ligt (ook de werkplaats) mag afronden. Open acties staan op het dashboard onder *Aantekeningen met een actie voor mij*.
+- **SharePoint**: bij elke wijziging wordt `Productie-opmerkingen <nummer>.pdf` bijgewerkt in de projectmap onder `3 …` / `2 …` (de eerste map die met 3 begint, daarin de eerste die met 2 begint; bestaan ze niet, dan worden `3 Documenten` / `2 Productie opmerkingen` aangemaakt).
+
+## Foto's in mappen 4 t/m 8 (V70)
+
+In submappen van de projectmap waarvan de naam met 4, 5, 6, 7 of 8 begint (en alles daaronder):
+
+- foto's staan als raster met miniaturen (SharePoint maakt die zelf); tik voor groot beeld, vegen of pijltjes voor de volgende, *Origineel* en downloaden;
+- knoppen **Foto maken** (camera, naam wordt `Foto <datum tijd>.jpg`) en **Uit galerij** (meerdere tegelijk) zetten de foto's direct in die map.
