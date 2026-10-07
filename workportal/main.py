@@ -190,7 +190,21 @@ def pdfview():
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("main.dashboard")
     title = (request.args.get("titel") or "PDF")[:150]
-    return render_template("pdfview.html", src=src, back=back, title=title)
+    pr = None  # afdrukknop als het een bestand uit een project-/ordermap is en Printix is ingesteld
+    try:
+        from urllib.parse import urlsplit, parse_qs
+        from flask import current_app
+        u = urlsplit(src)
+        endpoint, args = current_app.url_map.bind("localhost").match(u.path, "GET")
+        if endpoint in ("projecten.project_file", "orders.project_file"):
+            from .werk import _print_opts
+            opts = _print_opts()
+            if opts:
+                pr = {"url": url_for(endpoint.split(".")[0] + ".project_folder_print", pid=args["pid"]),
+                      "pad": (parse_qs(u.query).get("pad") or [""])[0], "opts": opts}
+    except Exception:
+        pr = None
+    return render_template("pdfview.html", src=src, back=back, title=title, pr=pr)
 
 
 @bp.route("/api/push/key")

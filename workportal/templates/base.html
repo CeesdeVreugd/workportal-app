@@ -93,6 +93,7 @@
   <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('projecten.') or ep.startswith('orders.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
 </nav>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>
+<script src="{{ url_for('static', filename='js/print.js') }}?v={{ VERSION }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

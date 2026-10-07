@@ -714,3 +714,23 @@ select { text-overflow: ellipsis; }
   .annbtns .btn { flex: 1 1 140px; min-height: 48px; }
   .anndel .btn { flex: 1; justify-content: center; min-height: 46px; }
 }
+
+/* Afdrukken-venster (Printix) */
+.pdlg { position: fixed; inset: 0; z-index: 1100; background: rgba(10,10,40,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pdlg-box { width: 100%; max-width: 380px; background: #fff; color: var(--ink); border-radius: 16px; padding: 18px 18px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 20px 60px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 12px; font-family: var(--font); }
+.pdlg-head { display: flex; align-items: center; justify-content: space-between; font-size: 18px; color: var(--basic); }
+.pdlg-x { border: 0; background: var(--bg); width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; color: var(--ink); }
+.pdlg-file { font-size: 14px; font-weight: 500; word-break: break-word; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
+.pdlg-file span { font-weight: 400; font-size: 12px; color: var(--muted); }
+.pdlg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; }
+.pdlg-row select { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid #D5DAE8; border-radius: 10px; background: #fff; color: var(--ink); }
+.pdlg-num { display: flex; align-items: center; gap: 6px; }
+.pdlg-num button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid #D5DAE8; background: #fff; font-size: 20px; cursor: pointer; color: var(--basic); }
+.pdlg-num input { width: 60px; height: 40px; text-align: center; font: inherit; font-size: 16px; border: 1px solid #D5DAE8; border-radius: 10px; }
+.pdlg-check input { width: 22px; height: 22px; }
+.pdlg-msg { font-size: 14px; padding: 10px 12px; border-radius: 10px; }
+.pdlg-msg.ok { background: var(--ok-bg); color: var(--ok); }
+.pdlg-msg.err { background: var(--bad-bg); color: var(--bad); }
+.pdlg-msg[hidden] { display: none; }
+.pdlg-btns { display: flex; gap: 10px; justify-content: flex-end; }
+@media (max-width: 600px) { .pdlg { align-items: flex-end; padding: 0; } .pdlg-box { max-width: none; border-radius: 18px 18px 0 0; } .pdlg-btns .btn { flex: 1; justify-content: center; min-height: 46px; } }

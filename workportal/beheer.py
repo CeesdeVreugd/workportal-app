@@ -285,6 +285,7 @@ def dc01():
                                 f" WHERE i.id IN ({','.join('?' * len(ids))})", ids):
                     with open(file_path(it), "rb") as fh:
                         printix.print_background(current_app.config["DB_PATH"], fh.read(), f"Orderbon {it['number']}", it["id"])
+                    audit("afgedrukt", "order_inbox", it["id"], f"{it['number']} · Orderbon · via Beheer > DC01")
                     n += 1
                 flash(f"{n} orderbon(nen) naar de printer gestuurd." if n else "Geen orderbon gevonden bij de selectie.", "ok" if n else "error")
         elif request.form.get("action") == "nacalc" and ids:
@@ -367,7 +368,11 @@ def printen():
                    " ORDER BY COALESCE(printed_at, last_seen) DESC LIMIT 15")
     return render_template("beheer/printen.html", configured=printix.configured(), printers=printers, error=error,
                            current=printix.printer(conn), auto=printix.setting(conn, "printix_auto_orderbon") == "1",
-                           opts=printix.options(conn), recent=recent)
+                           opts=printix.options(conn), recent=recent,
+                           printlog=query("SELECT a.*, u.name AS who, p.kind AS pkind FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
+                                          " LEFT JOIN projects p ON a.entity = 'project' AND p.id = a.entity_id"
+                                          " WHERE a.action IN ('afgedrukt', 'afdrukken mislukt', 'orderbon geprint')"
+                                          " ORDER BY a.id DESC LIMIT 100"))
 
 
 @bp.route("/testmail", methods=["POST"])

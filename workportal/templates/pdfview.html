@@ -24,6 +24,7 @@
   <header class="v3d-head">
     <a class="iconbtn light" id="pdf-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
     <div class="v3d-titles"><b>{{ title }}</b><span>PDF</span></div>
+    {% if pr %}<button type="button" class="iconbtn light" title="Afdrukken via Printix" aria-label="Afdrukken" data-print="{{ pr.url }}" data-print-pad="{{ pr.pad }}" data-print-name="{{ title }}" data-print-opts="{{ pr.opts|tojson|forceescape }}">{{ icon('printer') }}</button>{% endif %}
     <a class="iconbtn light" href="{{ src }}{{ '&' if '?' in src else '?' }}download=1" download aria-label="Downloaden" title="Downloaden">{{ icon('download') }}</a>
     <a class="iconbtn light" href="{{ src }}" target="_blank" rel="noopener" aria-label="In nieuw venster openen" title="In nieuw venster openen (printen)">{{ icon('external') }}</a>
   </header>
@@ -81,5 +82,6 @@ try {
   let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 250); });
 } catch (e) { console.error(e); fail(); }
 </script>
+{% if pr %}<script>window.WP_CSRF = {{ csrf_token()|tojson }};</script><script src="{{ url_for('static', filename='js/print.js') }}?v={{ VERSION }}"></script>{% endif %}
 </body>
 </html>

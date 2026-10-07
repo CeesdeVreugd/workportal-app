@@ -38,6 +38,7 @@
     <h2>Zo werkt het</h2>
     <ul class="steps-list" style="margin-top:0">
       <li>WorkPortal stuurt de PDF via de Printix Cloud Print API naar de gekozen printer; die print direct (geen vrijgave bij de printer).</li>
+      <li>Bestanden uit een project-/ordermap (PDF of foto): knop <i>Afdrukken</i> achter het bestand of in de PDF-viewer; je kiest aantal, dubbelzijdig en kleur.</li>
       <li>Handmatig printen: Beheer &gt; DC01, vink ordermappen aan en kies <i>Orderbon printen</i>, of de knop <i>Orderbon printen</i> bij een order/project.</li>
       <li>Printix-gegevens maak je in Printix Administrator bij de Cloud Print API (Printix Premium nodig; Secure Print mag niet op "Alle gebruikers moeten veilig printen" staan).</li>
     </ul>
@@ -45,4 +46,15 @@
     <div class="rows">{% for r in recent %}<div class="rowitem"><div class="grow"><div class="t">Orderbon {{ r.number }}</div><div class="s">{{ r.printed_at|dt if r.printed_at else '' }} {{ r.print_note }}</div></div></div>{% else %}<div class="empty">Nog niets geprint.</div>{% endfor %}</div>
   </section>
 </div>
+<section class="card" id="printlog" style="margin-top:16px">
+  <div class="card-head"><h2>Printlogboek</h2><span class="small muted">wie, wanneer, wat · laatste 100</span></div>
+  <div class="tablewrap"><table class="table">
+    <thead><tr><th>Wanneer</th><th>Wie</th><th>Wat</th><th></th></tr></thead>
+    <tbody>{% for r in printlog %}<tr>
+      <td style="white-space:nowrap">{{ r.created_at|dt }}</td><td>{{ r.who or 'Automatisch' }}</td>
+      <td>{% if r.entity == 'project' and r.entity_id and r.pkind %}<a href="{{ werk_url('detail', r.pkind, pid=r.entity_id) }}">{{ r.details or r.action }}</a>{% else %}{{ r.details or r.action }}{% endif %}</td>
+      <td>{% if r.action == 'afdrukken mislukt' %}<span class="badge b-bad">Mislukt</span>{% else %}<span class="badge b-ok">Geprint</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">Nog niets afgedrukt via WorkPortal.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
 {% endblock %}

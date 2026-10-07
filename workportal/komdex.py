@@ -395,6 +395,11 @@ def orderbon():
             and printix.setting(conn, "printix_auto_orderbon") == "1" and printix.printer(conn)):
         printix.print_background(current_app.config["DB_PATH"], data, f"Orderbon {it['number']}", it["id"])
         result = (result or "") + " · wordt geprint"
+        try:
+            from .util import audit
+            audit("afgedrukt", "order_inbox", it["id"], f"{it['number']} · Orderbon · automatisch bij binnenkomst")
+        except Exception:
+            pass
     return jsonify({"ok": True, "ordertype": bon.get("order_type"), "resultaat": result})
 
 

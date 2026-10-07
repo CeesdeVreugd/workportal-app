@@ -366,6 +366,16 @@ def make_project_folder(pid):
     return make_folder(pid, target) or redirect(target)
 
 
+def _print_opts():
+    """Standaardinstellingen voor de afdrukknop (aantal, dubbelzijdig, kleur, printernaam)."""
+    from . import printix
+    if not _can_print():
+        return None
+    o = printix.options(get_db())
+    o["printer"] = (printix.printer(get_db()) or {}).get("name") or ""
+    return o
+
+
 def _can_print():
     from . import printix
     return printix.configured() and bool(printix.printer(get_db()))
@@ -389,7 +399,7 @@ def print_bon(pid):
         with open(file_path(f), "rb") as fh:
             printix.print_background(current_app.config["DB_PATH"], fh.read(), f"Orderbon {p['number']}",
                                      inbox["id"] if inbox else None)
-        audit("orderbon geprint", "project", pid)
+        audit("afgedrukt", "project", pid, f"{p['number']} · Orderbon · via Printix")
         flash("Orderbon naar de printer gestuurd.", "ok")
     return redirect(target)
 
@@ -442,7 +452,7 @@ def project_folder(pid):
     for i in items:
         i["is_image"] = not i["folder"] and ((i["mime"] or "").startswith("image/") or i["name"].lower().endswith(IMAGE_EXT))
     return render_template(tpl, K=k, B=BP_OF_KIND[p["kind"]], p=p, items=items, rel=rel, crumbs=crumbs, error=error,
-                           photo_mode=photo_mode,
+                           photo_mode=photo_mode, can_print=_can_print(), print_opts=_print_opts(),
                            folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"], p["kind"]),
                            can_upload=_can_upload(p), cert_root=_cert_root(rel))
 
@@ -465,6 +475,58 @@ def project_thumb(pid):
     except (requests.RequestException, RuntimeError):
         abort(502)
     return Response(data, mimetype=mime, headers={"Cache-Control": "private, max-age=86400"})
+
+
+PRINTABLE_EXT = (".pdf", ".jpg", ".jpeg", ".png")
+
+
+@bp.route("/<int:pid>/map/afdrukken", methods=["POST"])
+def project_folder_print(pid):
+    """PDF (of foto) uit de projectmap afdrukken via Printix."""
+    from . import printix
+    p = _project_sp(pid)
+    if not (printix.configured() and printix.printer(get_db())):
+        return jsonify({"error": "Printen is nog niet ingesteld (Beheer > Printen)."}), 400
+    try:
+        rel = sp.safe_rel(request.form.get("pad", ""))
+    except ValueError:
+        return jsonify({"error": "Ongeldig pad"}), 400
+    if not rel.lower().endswith(PRINTABLE_EXT):
+        return jsonify({"error": "Alleen PDF's en foto's kunnen worden afgedrukt."}), 400
+    opts = printix.options(get_db())
+    opts["copies"] = max(1, min(50, to_int(request.form.get("copies"), opts["copies"]) or 1))
+    if request.form.get("duplex") in ("NONE", "LONG_EDGE", "SHORT_EDGE"):
+        opts["duplex"] = request.form.get("duplex")
+    if "color" in request.form:
+        opts["color"] = request.form.get("color") == "1"
+    try:
+        meta, r = sp.open_file(get_db(), pid, rel)
+        data = b"".join(r.iter_content(256 * 1024))
+    except sp.GraphError as exc:
+        return jsonify({"error": "Dit bestand bestaat niet meer." if exc.status == 404 else f"SharePoint gaf een fout: {exc.message}"}), 502
+    except (requests.RequestException, RuntimeError):
+        return jsonify({"error": "SharePoint is op dit moment niet bereikbaar."}), 502
+    name = meta.get("name") or rel.rpartition("/")[2]
+    if not name.lower().endswith(".pdf"):  # foto -> PDF van één pagina
+        import io
+        from PIL import Image, ImageOps
+        try:
+            im = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+            buf = io.BytesIO()
+            im.save(buf, "PDF", resolution=150.0)
+            data = buf.getvalue()
+        except Exception:
+            return jsonify({"error": "Deze foto kan niet worden omgezet om af te drukken."}), 400
+    try:
+        jid = printix.print_pdf(printix.printer(get_db()), data, f"{p['number']} {name}", opts)
+    except (printix.PrintixError, requests.RequestException, KeyError, ValueError) as exc:
+        audit("afdrukken mislukt", "project", pid, f"{p['number']} · {rel} · {exc}"[:500])
+        return jsonify({"error": f"Afdrukken mislukt: {exc}"}), 502
+    pr = printix.printer(get_db()) or {}
+    audit("afgedrukt", "project", pid, f"{p['number']} · {rel} · {opts['copies']}× · "
+          f"{ {'NONE': 'enkelzijdig', 'LONG_EDGE': 'dubbelzijdig', 'SHORT_EDGE': 'dubbelzijdig (korte zijde)'}[opts['duplex']] } · "
+          f"{'kleur' if opts['color'] else 'zwart-wit'} · {pr.get('name') or 'printer'} · job {jid}"[:500])
+    return jsonify({"ok": True, "job": jid, "copies": opts["copies"]})
 
 
 @bp.route("/<int:pid>/map/verwijderen", methods=["POST"])
