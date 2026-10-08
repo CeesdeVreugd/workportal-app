@@ -18,6 +18,8 @@
     var o = {};
     try { o = JSON.parse(btn.getAttribute("data-print-opts") || "{}") || {}; } catch (x) {}
     var name = btn.getAttribute("data-print-name") || "bestand";
+    var isPdf = /\.pdf$/i.test(btn.getAttribute("data-print-pad") || name);
+    var curPage = typeof window.wpPdfCurrentPage === "function" ? window.wpPdfCurrentPage() : 0;
     dlg = document.createElement("div");
     dlg.className = "pdlg";
     dlg.innerHTML = '<div class="pdlg-box" role="dialog" aria-modal="true" aria-label="Afdrukken">' +
@@ -28,11 +30,25 @@
       '<input type="number" min="1" max="50" value="' + (parseInt(o.copies, 10) || 1) + '" inputmode="numeric"><button type="button" data-d="1" aria-label="Meer">+</button></span></label>' +
       '<label class="pdlg-row"><span>Dubbelzijdig</span><select>' +
       '<option value="NONE">Nee</option><option value="LONG_EDGE">Ja, lange zijde</option><option value="SHORT_EDGE">Ja, korte zijde</option></select></label>' +
+      (isPdf ? '<div class="pdlg-row pdlg-pages"><span>Pagina\'s</span><span class="pdlg-pgsel">' +
+        '<label><input type="radio" name="pdlg-pg" value="all" checked> Alle</label>' +
+        (curPage ? '<label><input type="radio" name="pdlg-pg" value="cur"> Deze (' + curPage + ')</label>' : '') +
+        '<label><input type="radio" name="pdlg-pg" value="sel"> Kiezen</label></span></div>' +
+        '<input type="text" class="pdlg-pgtxt" placeholder="bijv. 1-3, 5" inputmode="numeric" hidden>' : '') +
       '<label class="pdlg-row pdlg-check"><span>Kleur</span><input type="checkbox"' + (o.color ? " checked" : "") + '></label>' +
       '<div class="pdlg-msg" hidden></div>' +
       '<div class="pdlg-btns"><button type="button" class="btn ghost pdlg-cancel">Annuleren</button><button type="button" class="btn primary pdlg-go">Afdrukken</button></div></div>';
     document.body.appendChild(dlg);
-    var prSel = dlg.querySelector(".pdlg-pr");
+    var prSel = dlg.querySelector(".pdlg-pr"), pgTxt = dlg.querySelector(".pdlg-pgtxt");
+    dlg.querySelectorAll("input[name=pdlg-pg]").forEach(function (r) {
+      r.addEventListener("change", function () { pgTxt.hidden = r.value !== "sel" || !r.checked; if (!pgTxt.hidden) pgTxt.focus(); });
+    });
+    function pagesValue() {
+      var r = dlg.querySelector("input[name=pdlg-pg]:checked");
+      if (!r || r.value === "all") return "";
+      if (r.value === "cur") return String(curPage);
+      return pgTxt.value.trim();
+    }
     getPrinters().then(function (js) {
       if (!dlg || !js.printers || !js.printers.length) return;
       var want = remembered(), ids = js.printers.map(function (p) { return p.id; });
@@ -53,6 +69,9 @@
     dlg.addEventListener("click", function (e) { if (e.target === dlg) close(); });
     go.addEventListener("click", function () {
       var fd = new FormData();
+      var pg = pagesValue();
+      if (dlg.querySelector("input[name=pdlg-pg][value=sel]:checked") && !pg) { msg.className = "pdlg-msg err"; msg.textContent = "Vul in welke pagina's, bijv. 1-3, 5"; msg.hidden = false; pgTxt.focus(); return; }
+      fd.append("pages", pg);
       fd.append("pad", btn.getAttribute("data-print-pad") || ""); fd.append("copies", num.value);
       fd.append("duplex", sel.value); fd.append("printer", prSel.value); if (prSel.value) remember(prSel.value); fd.append("color", col.checked ? "1" : "0"); fd.append("csrf_token", CSRF);
       go.disabled = true; go.textContent = "Versturen…"; msg.hidden = true;

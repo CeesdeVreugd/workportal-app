@@ -737,3 +737,8 @@ select { text-overflow: ellipsis; }
 .checklist { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; max-height: 220px; overflow: auto; }
 .pdlg-row.pdlg-printer { flex-direction: column; align-items: stretch; gap: 6px; }
 .pdlg-row.pdlg-printer select { width: 100%; }
+.pdlg-pgsel { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; font-size: 14px; }
+.pdlg-pgsel label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.pdlg-pgsel input { width: 18px; height: 18px; }
+.pdlg-pgtxt { font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid #D5DAE8; border-radius: 10px; }
+.pdlg-pgtxt[hidden] { display: none; }

@@ -480,6 +480,54 @@ def project_thumb(pid):
 PRINTABLE_EXT = (".pdf", ".jpg", ".jpeg", ".png")
 
 
+def parse_pages(text, n):
+    """'1-3, 5, 8-' -> [0, 1, 2, 4, 7, ...] (0-based, in de opgegeven volgorde, zonder dubbele)."""
+    out = []
+    for part in re.split(r"[,;\s]+", (text or "").strip()):
+        if not part:
+            continue
+        m = re.fullmatch(r"(\d*)\s*-\s*(\d*)", part)
+        if m and (m.group(1) or m.group(2)):
+            a = int(m.group(1) or 1)
+            b = int(m.group(2) or n)
+        elif part.isdigit():
+            a = b = int(part)
+        else:
+            raise ValueError(f"‘{part}’ is geen geldige pagina. Gebruik bijv. 1-3, 5")
+        if a < 1 or b < a:
+            raise ValueError(f"‘{part}’ is geen geldig bereik.")
+        if a > n:
+            raise ValueError(f"Pagina {a} bestaat niet; deze PDF heeft {n} pagina{'' if n == 1 else '’s'}.")
+        for i in range(a, min(b, n) + 1):
+            if i - 1 not in out:
+                out.append(i - 1)
+    if not out:
+        raise ValueError("Geef aan welke pagina's, bijv. 1-3, 5")
+    return out
+
+
+def _pdf_pages(data, text):
+    """Alleen de gekozen pagina's van een PDF. Geeft (nieuwe pdf, nette omschrijving)."""
+    import io
+    from pypdf import PdfReader, PdfWriter
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        if reader.is_encrypted:
+            reader.decrypt("")
+        n = len(reader.pages)
+    except Exception:
+        raise ValueError("Deze PDF kan niet worden opgesplitst (beveiligd of beschadigd); druk alle pagina's af.")
+    idx = parse_pages(text, n)
+    if len(idx) == n and idx == list(range(n)):
+        return data, ""
+    w = PdfWriter()
+    for i in idx:
+        w.add_page(reader.pages[i])
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue(), re.sub(r"\s+", " ", text.strip())[:60]
+
+
 @bp.route("/<int:pid>/map/afdrukken", methods=["POST"])
 def project_folder_print(pid):
     """PDF (of foto) uit de projectmap afdrukken via Printix."""
@@ -507,6 +555,14 @@ def project_folder_print(pid):
     except (requests.RequestException, RuntimeError):
         return jsonify({"error": "SharePoint is op dit moment niet bereikbaar."}), 502
     name = meta.get("name") or rel.rpartition("/")[2]
+    pages_txt = (request.form.get("pages") or "").strip()
+    if pages_txt and name.lower().endswith(".pdf"):
+        try:
+            data, pages_txt = _pdf_pages(data, pages_txt)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    else:
+        pages_txt = ""
     if not name.lower().endswith(".pdf"):  # foto -> PDF van één pagina
         import io
         from PIL import Image, ImageOps
@@ -525,7 +581,8 @@ def project_folder_print(pid):
         return jsonify({"error": f"Afdrukken mislukt: {exc}"}), 502
     audit("afgedrukt", "project", pid, f"{p['number']} · {rel} · {opts['copies']}× · "
           f"{ {'NONE': 'enkelzijdig', 'LONG_EDGE': 'dubbelzijdig', 'SHORT_EDGE': 'dubbelzijdig (korte zijde)'}[opts['duplex']] } · "
-          f"{'kleur' if opts['color'] else 'zwart-wit'} · {pr.get('name') or 'printer'} · job {jid}"[:500])
+          f"{'kleur' if opts['color'] else 'zwart-wit'} · {('pagina ' + pages_txt + ' · ') if pages_txt else ''}"
+          f"{pr.get('name') or 'printer'} · job {jid}"[:500])
     return jsonify({"ok": True, "job": jid, "copies": opts["copies"]})
 
 

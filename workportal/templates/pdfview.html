@@ -82,6 +82,14 @@ try {
   let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 250); });
 } catch (e) { console.error(e); fail(); }
 </script>
-{% if pr %}<script>window.WP_CSRF = {{ csrf_token()|tojson }};</script><script src="{{ url_for('static', filename='js/print.js') }}?v={{ VERSION }}"></script>{% endif %}
+{% if pr %}<script>window.WP_CSRF = {{ csrf_token()|tojson }};
+// pagina die nu in beeld is (voor "Deze pagina" bij afdrukken)
+window.wpPdfCurrentPage = function () {
+  var box = document.getElementById("pdf-pages"), cs = box ? box.querySelectorAll("canvas") : [];
+  if (cs.length < 2) return 0;
+  var top = box.getBoundingClientRect().top, mid = top + box.clientHeight / 3, best = 1;
+  for (var i = 0; i < cs.length; i++) { if (cs[i].getBoundingClientRect().top <= mid) best = i + 1; }
+  return best;
+};</script><script src="{{ url_for('static', filename='js/print.js') }}?v={{ VERSION }}"></script>{% endif %}
 </body>
 </html>
