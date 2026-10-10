@@ -703,3 +703,26 @@
     }, true);
   });
 })();
+
+
+/* Automatisch vergrendelen na x minuten zonder activiteit (Beheer > Instellingen). Ook als de app op de achtergrond stond. */
+(function () {
+  var min = parseInt(document.body.getAttribute("data-idle") || "0", 10);
+  if (!min) return;
+  var KEY = "wp_last_active", limit = min * 60000;
+  function now() { return Date.now(); }
+  function mark() { try { localStorage.setItem(KEY, String(now())); } catch (e) {} last = now(); }
+  function lastActive() { var v = last; try { v = Math.max(v, parseInt(localStorage.getItem(KEY) || "0", 10) || 0); } catch (e) {} return v; }
+  var last = now(); mark();
+  var throttle = 0;
+  ["pointerdown", "keydown", "touchstart", "wheel", "scroll", "mousemove"].forEach(function (ev) {
+    window.addEventListener(ev, function () { if (now() - throttle > 5000) { throttle = now(); mark(); } }, { passive: true, capture: true });
+  });
+  var locking = false;
+  function check() {
+    if (!locking && now() - lastActive() > limit && (locking = true)) location.replace("/vergrendel?reden=inactief&next=" + encodeURIComponent(location.pathname + location.search));
+  }
+  setInterval(check, 15000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+  window.addEventListener("pageshow", function (e) { if (e.persisted) check(); });
+})();

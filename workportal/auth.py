@@ -25,6 +25,11 @@ def _unlock_hours():
     return to_int(get_setting("unlock_hours"), 12)
 
 
+def idle_minutes():
+    """Na zoveel minuten zonder activiteit vergrendelen (0 = uit)."""
+    return max(0, to_int(get_setting("idle_minutes"), 30))
+
+
 def _pin_len():
     return max(4, to_int(get_setting("pin_min_length"), 4))
 
@@ -95,6 +100,10 @@ def load_logged_in_user():
     device = current_device()
     ok = device is not None and device["id"] == did and device["user_id"] == uid and device_verified(device)
     unlocked = parse_iso(session.get("unlocked_at"))
+    seen = parse_iso(session.get("seen"))
+    idle = idle_minutes()
+    if idle and seen and now_utc() - seen > timedelta(minutes=idle):
+        ok = False  # te lang niets gedaan: opnieuw pincode
     if ok and unlocked and now_utc() - unlocked < timedelta(hours=_unlock_hours()):
         user = query("SELECT u.*, (SELECT group_concat(name, ', ') FROM (SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id ORDER BY r.sort)) AS role_name FROM users u"
                      " WHERE u.id = ? AND u.active = 1", (uid,), one=True)
@@ -102,8 +111,9 @@ def load_logged_in_user():
             g.user = user
             g.perms = load_permissions(user)
             g.device = device
+            session["seen"] = now_iso()
             return
-    for k in ("uid", "did", "unlocked_at"):
+    for k in ("uid", "did", "unlocked_at", "seen"):
         session.pop(k, None)
 
 
@@ -118,6 +128,8 @@ def _unlock(user_id, device_id):
     session["uid"] = user_id
     session["did"] = device_id
     session["unlocked_at"] = now_iso()
+    session["seen"] = now_iso()
+    session["fresh"] = 1   # de eerste pagina markeert dit venster als ontgrendeld (zie base.html)
     execute("UPDATE users SET last_login = ? WHERE id = ?", (now_iso(), user_id))
     execute("UPDATE devices SET last_used = ?, pin_attempts = 0 WHERE id = ?", (now_iso(), device_id))
 
@@ -285,24 +297,39 @@ def switch_user():
                 return _switch_cookies(make_response(redirect(url_for("auth.pin", next=request.form.get("next") or None))), t)
         flash("Deze gebruiker is niet (meer) bekend op dit apparaat.", "error")
         return redirect(url_for("auth.switch_user"))
+    _lock()
     device = current_device()
     me = query("SELECT d.id, d.user_id, u.name, u.email FROM devices d JOIN users u ON u.id = d.user_id WHERE d.id = ?",
                (device["id"],), one=True) if device else None
-    return render_template("auth/switch.html", me=me, others=known_devices(), next=request.args.get("next", ""),
-                           logged_in=bool(g.user), back=_safe_next(request.args.get("next")))
+    return render_template("auth/switch.html", me=me, others=known_devices(), next=request.args.get("next", ""))
 
 
 @bp.route("/wissel/nieuw")
 def switch_new():
-    """Andere gebruiker toevoegen: naar het e-mailscherm (de huidige gebruiker blijft ingelogd tot de nieuwe binnen is)."""
+    """Andere gebruiker toevoegen: vergrendelen en naar het e-mailscherm."""
+    _lock()
     return redirect(url_for("auth.login", ander=1, nieuw=1))
+
+
+def _lock():
+    for k in ("uid", "did", "unlocked_at", "seen", "fresh"):
+        session.pop(k, None)
+    g.user = None
 
 
 @bp.route("/uitloggen", methods=["POST"])
 def logout():
-    for k in ("uid", "did", "unlocked_at"):
-        session.pop(k, None)
+    _lock()
     return redirect(url_for("auth.pin"))
+
+
+@bp.route("/vergrendel")
+def lock():
+    """Vergrendelen zonder formulier: venster/app gesloten en opnieuw geopend, of te lang niets gedaan."""
+    _lock()
+    if request.args.get("reden") == "inactief":
+        flash("Vergrendeld omdat er een tijd niets is gedaan. Voer je pincode in.", "info")
+    return redirect(url_for("auth.pin", next=request.args.get("next") or None))
 
 
 @bp.route("/apparaat-vergeten", methods=["POST"])

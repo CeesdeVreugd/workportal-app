@@ -176,6 +176,7 @@ DEFAULT_SETTINGS = {
     "mobile_off": '["calculatie"]',   # modules die niet op de telefoon beschikbaar zijn (JSON-lijst)
     "verify_days": "14",
     "unlock_hours": "12",
+    "idle_minutes": "30",
     "pin_min_length": "4",
     "extra_margin_pct": "5",
     "pressure_presets": "15,30,60,120,240,1440",

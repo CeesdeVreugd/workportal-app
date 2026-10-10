@@ -19,8 +19,22 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
 {% block head %}{% endblock %}
+{% set fresh = session.pop('fresh', None) %}
+<script>
+/* Venster/app gesloten en opnieuw geopend? Dan opnieuw de pincode (de markering leeft zolang dit venster open is). */
+(function () {
+  try {
+    var k = "wp_alive";
+    if ({{ 'true' if fresh else 'false' }}) { sessionStorage.setItem(k, "1"); return; }
+    if (!sessionStorage.getItem(k)) {
+      document.documentElement.style.visibility = "hidden";
+      location.replace("/vergrendel?next=" + encodeURIComponent(location.pathname + location.search));
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
-<body>
+<body data-idle="{{ idle_minutes() }}">
 {% set ep = request.endpoint or '' %}
 {% macro navlink(endpoint, label, ico, prefix) -%}
 <a href="{{ url_for(endpoint) }}" class="{{ 'active' if ep.startswith(prefix) }}">{{ icon(ico) }}<span>{{ label }}</span></a>

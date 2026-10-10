@@ -492,3 +492,8 @@ Achter elke PDF (en foto: jpg/png, wordt automatisch een PDF van één pagina) i
 
 ## Wisselen van gebruiker op een gedeeld apparaat (V81)
 Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebruiker** (op het pincodescherm, in de bovenbalk op de pc en onder *Meer* op de telefoon). Je kiest je naam en voert je eigen pincode in. Een nieuwe gebruiker voeg je toe met *Andere gebruiker toevoegen*: eenmalig een code per e-mail en een eigen pincode; daarna staat hij in de lijst. Iedere gebruiker heeft op het apparaat zijn eigen pincode en verificatie (elke 14 dagen opnieuw een e-mailcode). *Mij van dit apparaat halen* verwijdert alleen jezelf; de anderen blijven staan. Er worden maximaal 8 gebruikers per apparaat onthouden.
+
+### Vergrendelen (V83)
+- **Andere gebruiker / slotje**: vergrendelt altijd; terug kan alleen met je pincode.
+- **App of venster sluiten** (kruisje rechtsboven, of de app wegvegen op de telefoon): bij het opnieuw openen is de pincode nodig. Let op: een nieuw tabblad of venster dat je zelf opent geldt ook als "opnieuw openen".
+- **Geen activiteit**: na het ingestelde aantal minuten (Beheer > Instellingen, standaard 30, 0 = uit) wordt WorkPortal vergrendeld, ook als de app op de achtergrond stond. Daarnaast blijft "Altijd opnieuw pincode na (uren)" gelden.

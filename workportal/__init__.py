@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.35.1"
+VERSION = "1.36.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -90,6 +90,8 @@ def create_app(test_config=None, start_scheduler=True):
     app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count, cred_counts=cred_counts)
     from .util import on_phone_ok, is_phone
     app.jinja_env.globals.update(navok=lambda m: can(m) and on_phone_ok(m), is_phone=is_phone)
+    from .auth import idle_minutes
+    app.jinja_env.globals.update(idle_minutes=idle_minutes)
 
     @app.before_request
     def _before():

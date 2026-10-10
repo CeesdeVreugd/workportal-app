@@ -10,7 +10,8 @@
     <h2>Instellingen</h2>
     <div class="fgrid">
       <label class="f">Opnieuw verifiëren met e-mailcode (dagen)<input type="number" min="1" name="verify_days" value="{{ v.verify_days }}"></label>
-      <label class="f">Automatisch vergrendelen na (uren)<input type="number" min="1" name="unlock_hours" value="{{ v.unlock_hours }}"></label>
+      <label class="f">Automatisch vergrendelen bij geen activiteit (minuten)<input type="number" min="0" max="1440" name="idle_minutes" value="{{ v.idle_minutes }}"><span class="hint">0 = uit. Daarna is de pincode weer nodig.</span></label>
+      <label class="f">Altijd opnieuw pincode na (uren)<input type="number" min="1" name="unlock_hours" value="{{ v.unlock_hours }}"><span class="hint">Ook als er wel iets gedaan wordt.</span></label>
       <label class="f">Minimale lengte pincode<input type="number" min="4" max="8" name="pin_min_length" value="{{ v.pin_min_length }}"></label>
       <label class="f">Doel extra marge boven minimum (%)<input type="text" inputmode="decimal" name="extra_margin_pct" value="{{ v.extra_margin_pct }}"></label>
       <label class="f full">Druktest-timers (minuten, komma-gescheiden)<input type="text" name="pressure_presets" value="{{ v.pressure_presets }}"></label>

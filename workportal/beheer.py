@@ -131,7 +131,7 @@ def rights():
 @bp.route("/instellingen", methods=["GET", "POST"])
 @require("beheer", BEHEER)
 def settings():
-    keys = ["verify_days", "unlock_hours", "pin_min_length", "extra_margin_pct", "pressure_presets", "sharepoint_root", "cert_sender"]
+    keys = ["verify_days", "unlock_hours", "idle_minutes", "pin_min_length", "extra_margin_pct", "pressure_presets", "sharepoint_root", "cert_sender"]
     if request.method == "POST":
         for k in keys:
             v = _f(k)
