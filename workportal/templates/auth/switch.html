@@ -1,14 +1,15 @@
 {% extends "auth/base.html" %}
 {% block title %}Andere gebruiker{% endblock %}
 {% block content %}
+<a class="auth-back" href="{{ back if logged_in else url_for('auth.pin', next=next or None) }}">‹ Terug</a>
 <h1>Wie ben je?</h1>
 <p>Kies je naam en voer daarna je pincode in.</p>
 <div class="userpick">
-  {% if me %}<a class="userpick-btn" href="{{ url_for('auth.pin', next=next or None) }}"><span class="avatar">{{ me.name[:1]|upper }}{{ (me.name.split(' ')[-1][:1]|upper) if ' ' in me.name }}</span><span class="grow"><b>{{ me.name }}</b><small>{{ me.email }}</small></span><span class="chev">›</span></a>{% endif %}
+  {% if me %}<a class="userpick-btn" href="{{ back if logged_in else url_for('auth.pin', next=next or None) }}"><span class="avatar">{{ me.name[:1]|upper }}{{ (me.name.split(' ')[-1][:1]|upper) if ' ' in me.name }}</span><span class="grow"><b>{{ me.name }}</b><small>{{ 'nu ingelogd · terug zonder pincode' if logged_in else me.email }}</small></span><span class="chev">›</span></a>{% endif %}
   {% for d in others %}
   <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="device" value="{{ d.id }}"><input type="hidden" name="next" value="{{ next }}">
     <button class="userpick-btn" type="submit"><span class="avatar">{{ d.name[:1]|upper }}{{ (d.name.split(' ')[-1][:1]|upper) if ' ' in d.name }}</span><span class="grow"><b>{{ d.name }}</b><small>{{ d.email }}</small></span><span class="chev">›</span></button></form>
   {% endfor %}
-  <a class="userpick-btn add" href="{{ url_for('auth.login', ander=1) }}"><span class="avatar">+</span><span class="grow"><b>Andere gebruiker toevoegen</b><small>Eenmalig met een code per e-mail, daarna eigen pincode</small></span><span class="chev">›</span></a>
+  <a class="userpick-btn add" href="{{ url_for('auth.switch_new') }}"><span class="avatar">+</span><span class="grow"><b>Andere gebruiker toevoegen</b><small>Eenmalig met een code per e-mail, daarna eigen pincode</small></span><span class="chev">›</span></a>
 </div>
 {% endblock %}

@@ -1,5 +1,6 @@
 {% extends "auth/base.html" %}
 {% block content %}
+{% if can_back %}<a class="auth-back" href="{{ url_for('auth.switch_user') }}">‹ Terug</a>{% endif %}
 <h1>Inloggen</h1>
 <p>Vul je e-mailadres in. Je ontvangt een code van 6 cijfers per e-mail.</p>
 <form method="post" class="form">

@@ -124,7 +124,7 @@ def _unlock(user_id, device_id):
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    if g.user:
+    if g.user and request.method == "GET" and not request.args.get("nieuw"):
         return redirect(_safe_next(request.args.get("next")))
     device = current_device()
     if request.method == "GET" and device and device["pin_hash"] and device_verified(device) \
@@ -152,8 +152,8 @@ def login():
                       code_mail_html(user["name"], code, CODE_MINUTES))
         # Altijd dezelfde melding, zodat niet te zien is welke adressen bestaan
         return redirect(url_for("auth.code"))
-    return render_template("auth/login.html", email=session.get("login_email", ""),
-                           next=request.args.get("next", ""))
+    return render_template("auth/login.html", email="" if request.args.get("nieuw") else session.get("login_email", ""),
+                           next=request.args.get("next", ""), can_back=bool(device or known_tokens()))
 
 
 def _mask(email):
@@ -217,7 +217,8 @@ def code():
         if token:
             _switch_cookies(resp, token)
         return resp
-    return render_template("auth/code.html", masked=_mask(email), dev_mode=not smtp_configured())
+    return render_template("auth/code.html", masked=_mask(email), dev_mode=not smtp_configured(),
+                           can_back=bool(current_device() or known_tokens()))
 
 
 @bp.route("/pin/instellen", methods=["GET", "POST"])
@@ -284,12 +285,17 @@ def switch_user():
                 return _switch_cookies(make_response(redirect(url_for("auth.pin", next=request.form.get("next") or None))), t)
         flash("Deze gebruiker is niet (meer) bekend op dit apparaat.", "error")
         return redirect(url_for("auth.switch_user"))
-    for k in ("uid", "did", "unlocked_at"):
-        session.pop(k, None)
     device = current_device()
     me = query("SELECT d.id, d.user_id, u.name, u.email FROM devices d JOIN users u ON u.id = d.user_id WHERE d.id = ?",
                (device["id"],), one=True) if device else None
-    return render_template("auth/switch.html", me=me, others=known_devices(), next=request.args.get("next", ""))
+    return render_template("auth/switch.html", me=me, others=known_devices(), next=request.args.get("next", ""),
+                           logged_in=bool(g.user), back=_safe_next(request.args.get("next")))
+
+
+@bp.route("/wissel/nieuw")
+def switch_new():
+    """Andere gebruiker toevoegen: naar het e-mailscherm (de huidige gebruiker blijft ingelogd tot de nieuwe binnen is)."""
+    return redirect(url_for("auth.login", ander=1, nieuw=1))
 
 
 @bp.route("/uitloggen", methods=["POST"])

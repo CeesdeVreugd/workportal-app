@@ -1,6 +1,7 @@
 {% extends "auth/base.html" %}
 {% block title %}Code invoeren{% endblock %}
 {% block content %}
+{% if can_back %}<a class="auth-back" href="{{ url_for('auth.switch_user') }}">‹ Terug</a>{% endif %}
 <h1>Voer je inlogcode in</h1>
 <p>Als {{ masked }} bekend is, is er een code van 6 cijfers naartoe gestuurd. De code is 10 minuten geldig.</p>
 {% if dev_mode %}<div class="flash info">Testmodus: e-mail is nog niet ingesteld. De code staat in het containerlog (Portainer → container → Logs).</div>{% endif %}

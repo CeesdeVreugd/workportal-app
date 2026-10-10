@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V81: wisselen van gebruiker op een gedeeld apparaat (kies je naam, dan je pincode)"
+set "OMSCHRIJVING=WorkPortal V82: terugknoppen bij andere gebruiker en inloggen; wisselscherm logt niet meer uit"
 
 echo.
 echo ============================================
