@@ -756,3 +756,45 @@ select { text-overflow: ellipsis; }
 .userpick-btn small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .userpick-btn .chev { font-size: 24px; color: var(--muted); }
 .auth-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px 8px 10px; margin-bottom: 2px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-decoration: none; font-weight: 500; font-size: 15px; color: var(--basic); }
+
+/* DC01-lijst: op de telefoon als kaartjes in plaats van een brede tabel */
+.dctable td.td-main { min-width: 180px; }
+.dctable td.td-nacalc .small { max-width: 220px !important; }
+.dctable td.td-nacalc { white-space: normal; }
+.dctable .td-path { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dctable td.td-klant { min-width: 100px; }
+.dctable td.td-wp { min-width: 80px; }
+.dctable td.td-st { min-width: 100px; }
+.dctable td.td-st .small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 200px; }
+@media (min-width: 761px) { .dctable td.td-nacalc .badge { white-space: normal; } }
+.dctable .td-bon a.iconlink { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; vertical-align: bottom; }
+@media (max-width: 760px) {
+  .dctable { display: block; min-width: 0 !important; width: 100%; }
+  .dctable thead { display: block; border-bottom: 1px solid var(--line); }
+  .dctable thead tr { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+  .dctable thead th { display: none; border: 0; padding: 0; }
+  .dctable thead th.chk { display: block; }
+  .dctable thead th.chk::after { content: "Alles selecteren"; font-weight: 500; margin-left: 10px; color: var(--muted); }
+  .dctable thead th.chk { display: flex; align-items: center; }
+  .dctable tbody { display: block; }
+  .dctable tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; position: relative; padding: 12px 14px 12px 54px; border-bottom: 1px solid var(--line); }
+  .dctable tbody td { display: block; padding: 0; border: 0; white-space: normal; min-width: 0; }
+  .dctable td.td-chk { position: absolute; left: 14px; top: 12px; }
+  .dctable td.td-main { flex-basis: 100%; font-size: 15px; line-height: 1.35; }
+  .dctable td.td-main b { margin-right: 4px; }
+  .dctable .td-path { display: none; }
+  .dctable td.td-bon { flex-basis: 100%; font-size: 14px; }
+  .dctable td.td-bon a.iconlink { max-width: 100%; }
+  .dctable td.td-bon .small { margin-top: 2px; }
+  .dctable td.hide-m { display: block; }
+  .dctable td.td-nacalc:has(.dash) { display: none; }
+  .dctable td.td-nacalc { flex-basis: 100%; font-size: 14px; }
+  .dctable td.td-nacalc .small { max-width: none !important; }
+  .dctable td.td-klant { font-size: 13px; color: var(--muted); }
+  .dctable td.td-klant:empty { display: none; }
+  .dctable td.td-wp, .dctable td.td-st { font-size: 13px; }
+  .dctable td.td-wp:has(.dash) { display: none; }
+  .dctable td.td-bon:has(> .dash:only-child) { display: none; }
+  .dctable td.td-st .small { display: none; }
+  .dctable tbody tr td.empty { padding: 20px 0; flex-basis: 100%; }
+}

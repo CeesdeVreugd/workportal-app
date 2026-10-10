@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V83: vergrendelen bij wisselen, bij sluiten van de app en na instelbare tijd zonder activiteit"
+set "OMSCHRIJVING=WorkPortal V84: DC01-lijst netjes op de telefoon (kaartjes) en compacter op de pc"
 
 echo.
 echo ============================================
