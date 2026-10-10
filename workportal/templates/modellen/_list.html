@@ -5,11 +5,12 @@
 <div class="small muted" style="margin:0 0 6px">SharePoint · {{ (prow.number ~ ' / ' ~ sub) if sub else prow.number ~ ' (hele map)' }}</div>
 <div class="rows files">
 {% for m in remote %}
-  <div class="rowitem"><span class="ficon cube">{{ icon('cube') }}</span>
+  <div class="rowitem{{ ' m3d-extra' if loop.index > 3 }}"{{ ' hidden' if loop.index > 3 }}><span class="ficon cube">{{ icon('cube') }}</span>
     <div class="grow"><div class="t">{{ m.name }}</div><div class="s">{{ m.path.rsplit('/', 1)[0] if '/' in m.path else '' }}{{ ' · ' if '/' in m.path }}{{ size(m.size) }} · {{ m.modified|date }}</div></div>
     <a class="btn sm primary" href="{{ url_for('modellen.view_sp', pid=pid, pad=m.path) }}">{{ icon('cube') }}Bekijk 3D</a></div>
 {% endfor %}
 </div>
+{% if remote|length > 3 %}<button type="button" class="btn sm ghost m3d-more" onclick="var l=this.previousElementSibling,o=this.getAttribute('aria-expanded')==='true';l.querySelectorAll('.m3d-extra').forEach(function(r){r.hidden=o});this.setAttribute('aria-expanded',!o);this.textContent=o?this.dataset.more:'Minder tonen'" data-more="Toon alle {{ remote|length }} (nog {{ remote|length - 3 }})" aria-expanded="false">Toon alle {{ remote|length }} (nog {{ remote|length - 3 }})</button>{% endif %}
 {% elif prow and prow.sp_item_id and not error %}
 <div class="empty">Geen 3D-bestanden in {{ sub or 'de projectmap' }} in SharePoint.</div>
 {% endif %}
@@ -18,12 +19,13 @@
 <div class="small muted" style="margin:{{ '14px' if remote else '0' }} 0 6px">In WorkPortal opgeslagen</div>
 <div class="rows files">
 {% for f in all_local %}
-  <div class="rowitem"><span class="ficon cube">{{ icon('cube') }}</span>
+  <div class="rowitem{{ ' m3d-extra' if loop.index > 3 }}"{{ ' hidden' if loop.index > 3 }}><span class="ficon cube">{{ icon('cube') }}</span>
     <div class="grow"><div class="t">{{ f.filename }}</div><div class="s">{{ size(f.size) }} · {{ f.created_at|date }}{{ ' · bij project' if f.entity == 'project' and entity == 'ticket' }}</div></div>
     <a class="btn sm primary" href="{{ url_for('modellen.view_local', fid=f.id) }}">{{ icon('cube') }}Bekijk 3D</a>
     {% if can('modellen3d', 3) and f.entity == entity %}<form method="post" action="{{ url_for('modellen.delete', fid=f.id) }}" onsubmit="return confirm('{{ f.filename }} verwijderen?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
 {% endfor %}
 </div>
+{% if all_local|length > 3 %}<button type="button" class="btn sm ghost m3d-more" onclick="var l=this.previousElementSibling,o=this.getAttribute('aria-expanded')==='true';l.querySelectorAll('.m3d-extra').forEach(function(r){r.hidden=o});this.setAttribute('aria-expanded',!o);this.textContent=o?this.dataset.more:'Minder tonen'" data-more="Toon alle {{ all_local|length }} (nog {{ all_local|length - 3 }})" aria-expanded="false">Toon alle {{ all_local|length }} (nog {{ all_local|length - 3 }})</button>{% endif %}
 {% elif not remote and not (prow and prow.sp_item_id) and not error %}
 <div class="empty">Nog geen 3D-modellen.</div>
 {% endif %}

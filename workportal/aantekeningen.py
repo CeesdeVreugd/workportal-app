@@ -61,7 +61,7 @@ def open_for_user(user_id, limit=10):
     """Open aantekeningen waar deze gebruiker de actie van heeft (voor het dashboard)."""
     return query("SELECT a.*, p.number AS pnumber, p.name AS pname, p.kind AS pkind FROM project_annotations a"
                  " JOIN projects p ON p.id = a.project_id WHERE a.assigned_to = ? AND a.status <> 'afgerond'"
-                 " ORDER BY IFNULL(a.due_date, '9999'), a.created_at LIMIT ?", (user_id, limit))
+                 " ORDER BY a.created_at LIMIT ?", (user_id, limit))
 
 
 def _users():
@@ -148,7 +148,7 @@ def _notify(user_id, p, a, title, body):
         return
     try:
         from .notify import notify_user
-        notify_user(get_db(), user_id, title, body, url=werk_url("annot_view", p, pid=p["id"], aid=a["id"]))
+        notify_user(get_db(), user_id, title, body, url=werk_url("annot_view", p, pid=p["id"], aid=a["id"]), email=False)
     except Exception:
         pass
 
@@ -216,7 +216,7 @@ def annot_edit(pid, aid=None):
                 ((a["done_at"], a["done_by"]) if v["status"] == "afgerond" else (None, None))
             execute("UPDATE project_annotations SET title=?, body=?, image_file_id=?, status=?, assigned_to=?, due_date=?,"
                     " done_note=?, done_at=?, done_by=?, updated_at=? WHERE id=?",
-                    (v["title"], v["body"], image_id, v["status"], v["assigned_to"], v["due_date"],
+                    (v["title"], v["body"], image_id, v["status"], v["assigned_to"], a["due_date"],
                      v["done_note"] if v["status"] == "afgerond" else a["done_note"], done[0], done[1], now, aid))
             new_id = aid
             if v["assigned_to"] and v["assigned_to"] != a["assigned_to"]:

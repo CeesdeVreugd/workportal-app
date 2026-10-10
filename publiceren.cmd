@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V79: paginas kiezen bij het afdrukken van PDFs (alle, deze pagina of bijv. 1-3, 5)"
+set "OMSCHRIJVING=WorkPortal V80: 3D-modellen eerst 3 tonen (toon alle), aantekeningen zonder gereed-voor en zonder e-mail"
 
 echo.
 echo ============================================

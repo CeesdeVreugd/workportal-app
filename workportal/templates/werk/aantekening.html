@@ -20,7 +20,6 @@
       <h2>Actie</h2>
       <dl class="dl compact">
         <dt>Actie bij</dt><dd>{{ a.assignee or '—' }}</dd>
-        <dt>Gereed vóór</dt><dd>{{ a.due_date|date if a.due_date else '—' }}</dd>
         <dt>Status</dt><dd>{{ STATUS_LABEL[a.status] }}</dd>
         {% if a.updated_at %}<dt>Laatst gewijzigd</dt><dd>{{ a.updated_at|dt }}</dd>{% endif %}
       </dl>

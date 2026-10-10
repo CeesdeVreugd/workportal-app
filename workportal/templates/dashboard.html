@@ -23,7 +23,7 @@
 
 {% if d.annots %}
 <section class="card"><div class="card-head"><h2>Aantekeningen met een actie voor mij</h2></div>
-  <div class="rows">{% for a in d.annots %}<a class="rowitem" href="{{ werk_url('annot_view', a.pkind, pid=a.project_id, aid=a.id) }}">{% if a.image_file_id %}<img class="annthumb" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="" loading="lazy">{% endif %}<div class="grow"><div class="t">{{ a.pnumber }} · {{ a.number }}. {{ a.title }}</div><div class="s">{{ a.pname }}</div></div>{% if a.due_date %}<span class="badge {{ 'b-bad' if a.due_date < d.today else 'b-warn' }}">{{ a.due_date|date }}</span>{% else %}<span class="badge b-blue">{{ 'In behandeling' if a.status == 'in_behandeling' else 'Nieuw' }}</span>{% endif %}</a>{% endfor %}</div>
+  <div class="rows">{% for a in d.annots %}<a class="rowitem" href="{{ werk_url('annot_view', a.pkind, pid=a.project_id, aid=a.id) }}">{% if a.image_file_id %}<img class="annthumb" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="" loading="lazy">{% endif %}<div class="grow"><div class="t">{{ a.pnumber }} · {{ a.number }}. {{ a.title }}</div><div class="s">{{ a.pname }}</div></div><span class="badge {{ 'b-warn' if a.status == 'in_behandeling' else 'b-blue' }}">{{ 'In behandeling' if a.status == 'in_behandeling' else 'Nieuw' }}</span></a>{% endfor %}</div>
 </section>
 {% endif %}
 {% if d.actions %}

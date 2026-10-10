@@ -71,13 +71,12 @@
         <option value="">Nog niemand</option>
         {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if form.assigned_to == u.id }}>{{ u.name }}</option>{% endfor %}
       </select></label>
-      <label class="f">Gereed vóór<input type="date" name="due_date" value="{{ form.due_date or '' }}"></label>
       <label class="f">Status<select name="status" id="ann-status">
         {% for k, v in STATUSES %}<option value="{{ k }}" {{ 'selected' if (form.status or 'nieuw') == k }}>{{ v }}</option>{% endfor %}
       </select></label>
     </div>
     <label class="f" id="ann-done" {% if (form.status or 'nieuw') != 'afgerond' %}hidden{% endif %}>Wat is er gedaan? *<textarea name="done_note" rows="3">{{ form.done_note or '' }}</textarea></label>
-    <p class="hint" style="margin:0">Wie de actie krijgt, ontvangt een melding. Alle aantekeningen komen samen als PDF in de projectmap (3 Documenten / 2 …).</p>
+    <p class="hint" style="margin:0">Wie de actie krijgt, ontvangt een pushmelding (geen e-mail). Alle aantekeningen komen samen als PDF in de projectmap (3 Documenten / 2 …).</p>
     <div class="actions"><button class="btn primary" id="ann-save">Opslaan</button>
       <a class="btn ghost" href="{{ url_for(B ~ '.annot_view', pid=p.id, aid=a.id) if a else url_for(B ~ '.detail', pid=p.id) ~ '#aantekeningen' }}">Annuleren</a></div>
   </section>

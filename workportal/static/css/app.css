@@ -742,3 +742,5 @@ select { text-overflow: ellipsis; }
 .pdlg-pgsel input { width: 18px; height: 18px; }
 .pdlg-pgtxt { font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid #D5DAE8; border-radius: 10px; }
 .pdlg-pgtxt[hidden] { display: none; }
+.m3d-more { margin-top: 8px; width: 100%; justify-content: center; }
+.rowitem[hidden] { display: none !important; }

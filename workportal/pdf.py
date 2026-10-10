@@ -480,7 +480,7 @@ def annotations_pdf(p, items, labels):
                 block += [im, Spacer(1, 5)]
         if a.get("body"):
             block.append(Paragraph(esc(a["body"]), S["body"]))
-        pairs = [("Actie bij", a.get("assignee") or "–"), ("Gereed vóór", fmt_date(a["due_date"]) if a.get("due_date") else "–"),
+        pairs = [("Actie bij", a.get("assignee") or "–"), ("Status", labels.get(st, st)),
                  ("Gemaakt door", a.get("who") or "–"), ("Datum", fmt_date(a["created_at"]))]
         block += [Spacer(1, 4), _kv_table(pairs, W)]
         if st == "afgerond":

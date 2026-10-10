@@ -466,7 +466,7 @@ Vervangt het losse Word-bestand met screenshots. Op het project/de order staat d
   - Kies bij Screenshot liefst een **venster**; WorkPortal blijft dan in beeld en het venster wordt op de achtergrond vastgelegd (een geminimaliseerd venster kan niet). Bij een heel scherm krijg je 3 seconden om naar het programma te gaan.
   - Op telefoon/tablet bestaat schermopname in de browser niet; daar foto of galerij gebruiken.
 - **Markeren**: pijl, tekst, kader, cirkel, lijn, pen en genummerde punten; zes kleuren, drie diktes, terug (Ctrl+Z), bijsnijden, wissen.
-- **Tekst eronder**, **actie bij** (krijgt push + mail), **gereed vóór**, **status** Nieuw / In behandeling / Afgerond. Afronden kan alleen met een stukje tekst "wat is er gedaan".
+- **Tekst eronder**, **actie bij** (krijgt alleen een pushmelding, geen e-mail), **status** Nieuw / In behandeling / Afgerond. Afronden kan alleen met een stukje tekst "wat is er gedaan".
 - Rechten: aanmaken/bewerken met bewerkrecht op Projecten/Orders. Degene bij wie de actie ligt (ook de werkplaats) mag afronden. Open acties staan op het dashboard onder *Aantekeningen met een actie voor mij*.
 - **SharePoint**: bij elke wijziging wordt `Productie-opmerkingen <nummer>.pdf` bijgewerkt in de projectmap onder `3 …` / `2 …` (de eerste map die met 3 begint, daarin de eerste die met 2 begint; bestaan ze niet, dan worden `3 Documenten` / `2 Productie opmerkingen` aangemaakt).
 
