@@ -29,6 +29,51 @@ def _pin_len():
     return max(4, to_int(get_setting("pin_min_length"), 4))
 
 
+KNOWN_COOKIE = "wp_known"   # andere gebruikers die op dit apparaat zijn ingelogd (hun apparaat-tokens)
+MAX_KNOWN = 8
+
+
+def _cookie_opts():
+    return dict(max_age=400 * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure)
+
+
+def known_tokens():
+    return [t for t in (request.cookies.get(KNOWN_COOKIE) or "").split() if t][:MAX_KNOWN]
+
+
+def known_devices():
+    """Andere gebruikers op dit apparaat (met pincode), zonder de huidige."""
+    cur = request.cookies.get(DEVICE_COOKIE)
+    out, seen = [], set()
+    for t in known_tokens():
+        if t == cur:
+            continue
+        d = query("SELECT d.id, d.user_id, d.pin_hash, d.verified_at, u.name, u.email FROM devices d JOIN users u ON u.id = d.user_id"
+                  " WHERE d.token_hash = ? AND u.active = 1", (hash_secret(t),), one=True)
+        if d and d["user_id"] not in seen:
+            seen.add(d["user_id"])
+            out.append(d)
+    return out
+
+
+def _switch_cookies(resp, new_token, keep_current=True, drop=None):
+    """Maak new_token het actieve apparaat-token; het huidige gaat naar de lijst met bekende gebruikers."""
+    cur = request.cookies.get(DEVICE_COOKIE)
+    known = known_tokens()
+    if keep_current and cur and cur != new_token:
+        known = [cur] + known
+    known = [t for i, t in enumerate(known) if t and t != new_token and t != drop and t not in known[:i]][:MAX_KNOWN]
+    if new_token:
+        resp.set_cookie(DEVICE_COOKIE, new_token, **_cookie_opts())
+    else:
+        resp.delete_cookie(DEVICE_COOKIE)
+    if known:
+        resp.set_cookie(KNOWN_COOKIE, " ".join(known), **_cookie_opts())
+    else:
+        resp.delete_cookie(KNOWN_COOKIE)
+    return resp
+
+
 def current_device():
     tok = request.cookies.get(DEVICE_COOKIE)
     if not tok:
@@ -142,6 +187,12 @@ def code():
 
         device = current_device()
         token = None
+        if not (device and device["user_id"] == user["id"]):
+            for t in known_tokens():  # deze gebruiker was al eens ingelogd op dit apparaat
+                d = query("SELECT * FROM devices WHERE token_hash = ?", (hash_secret(t),), one=True)
+                if d and d["user_id"] == user["id"]:
+                    device, token = d, t
+                    break
         if device and device["user_id"] == user["id"]:
             execute("UPDATE devices SET verified_at = ?, pin_attempts = 0 WHERE id = ?", (now_iso(), device["id"]))
             did = device["id"]
@@ -164,8 +215,7 @@ def code():
             session["login_next"] = nxt
             resp = make_response(redirect(url_for("auth.pin_set")))
         if token:
-            resp.set_cookie(DEVICE_COOKIE, token, max_age=400 * 24 * 3600, httponly=True, samesite="Lax",
-                            secure=request.is_secure)
+            _switch_cookies(resp, token)
         return resp
     return render_template("auth/code.html", masked=_mask(email), dev_mode=not smtp_configured())
 
@@ -218,7 +268,28 @@ def pin():
             return redirect(url_for("auth.login", ander=1))
         execute("UPDATE devices SET pin_attempts = ? WHERE id = ?", (attempts, device["id"]))
         flash(f"Onjuiste pincode. Nog {MAX_PIN_ATTEMPTS - attempts} poging(en).", "error")
-    return render_template("auth/pin.html", user=user, next=request.args.get("next", ""))
+    return render_template("auth/pin.html", user=user, next=request.args.get("next", ""), others=known_devices())
+
+
+@bp.route("/wissel", methods=["GET", "POST"])
+def switch_user():
+    """Andere gebruiker op dit apparaat: kies wie, daarna diens pincode."""
+    if request.method == "POST":
+        did = to_int(request.form.get("device"))
+        for t in known_tokens():
+            d = query("SELECT * FROM devices WHERE token_hash = ?", (hash_secret(t),), one=True)
+            if d and d["id"] == did:
+                for k in ("uid", "did", "unlocked_at"):
+                    session.pop(k, None)
+                return _switch_cookies(make_response(redirect(url_for("auth.pin", next=request.form.get("next") or None))), t)
+        flash("Deze gebruiker is niet (meer) bekend op dit apparaat.", "error")
+        return redirect(url_for("auth.switch_user"))
+    for k in ("uid", "did", "unlocked_at"):
+        session.pop(k, None)
+    device = current_device()
+    me = query("SELECT d.id, d.user_id, u.name, u.email FROM devices d JOIN users u ON u.id = d.user_id WHERE d.id = ?",
+               (device["id"],), one=True) if device else None
+    return render_template("auth/switch.html", me=me, others=known_devices(), next=request.args.get("next", ""))
 
 
 @bp.route("/uitloggen", methods=["POST"])
@@ -230,10 +301,15 @@ def logout():
 
 @bp.route("/apparaat-vergeten", methods=["POST"])
 def forget_device():
+    """Deze gebruiker van dit apparaat halen; zijn er andere gebruikers op dit apparaat, dan naar de keuzelijst."""
     device = current_device()
+    cur = request.cookies.get(DEVICE_COOKIE)
     if device:
         execute("DELETE FROM devices WHERE id = ?", (device["id"],))
     session.clear()
+    others = known_devices()
+    if others:
+        nxt = next(t for t in known_tokens() if query("SELECT 1 FROM devices WHERE token_hash = ?", (hash_secret(t),), one=True))
+        return _switch_cookies(make_response(redirect(url_for("auth.switch_user"))), nxt, keep_current=False, drop=cur)
     resp = make_response(redirect(url_for("auth.login", ander=1)))
-    resp.delete_cookie(DEVICE_COOKIE)
-    return resp
+    return _switch_cookies(resp, None, keep_current=False, drop=cur)

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V80: 3D-modellen eerst 3 tonen (toon alle), aantekeningen zonder gereed-voor en zonder e-mail"
+set "OMSCHRIJVING=WorkPortal V81: wisselen van gebruiker op een gedeeld apparaat (kies je naam, dan je pincode)"
 
 echo.
 echo ============================================

@@ -744,3 +744,14 @@ select { text-overflow: ellipsis; }
 .pdlg-pgtxt[hidden] { display: none; }
 .m3d-more { margin-top: 8px; width: 100%; justify-content: center; }
 .rowitem[hidden] { display: none !important; }
+
+/* Wisselen van gebruiker op een gedeeld apparaat */
+.userpick { display: flex; flex-direction: column; gap: 10px; }
+.userpick form { margin: 0; }
+.userpick-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; font: inherit; color: var(--ink); text-align: left; text-decoration: none; cursor: pointer; }
+.userpick-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.userpick-btn .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--basic); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.userpick-btn.add .avatar { background: var(--accent-soft); color: var(--basic); font-size: 22px; }
+.userpick-btn .grow { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.userpick-btn small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.userpick-btn .chev { font-size: 24px; color: var(--muted); }

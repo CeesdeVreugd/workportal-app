@@ -63,6 +63,7 @@
       <div class="userbox">
         <div class="who"><b>{{ g.user.name }}</b><span>{{ 'Beheerder · ' if g.user.is_admin }}{{ g.user.role_name or '' }}</span></div>
         <a class="avatar" href="{{ url_for('main.account') }}" style="text-decoration:none;color:#fff" aria-label="Mijn account">{{ g.user.name[:1]|upper }}{{ (g.user.name.split(' ')[-1][:1]|upper) if ' ' in g.user.name }}</a>
+        <a class="iconbtn" href="{{ url_for('auth.switch_user') }}" title="Andere gebruiker" aria-label="Andere gebruiker">{{ icon('klanten') }}</a>
         <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Vergrendelen" aria-label="Vergrendelen">{{ icon('lock') }}</button></form>
       </div>
     </header>

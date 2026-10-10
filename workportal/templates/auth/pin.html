@@ -11,8 +11,9 @@
   </label>
   <button class="btn primary block" type="submit">Openen</button>
 </form>
-<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+<a class="btn block" href="{{ url_for('auth.switch_user', next=next or None) }}" style="justify-content:center">{{ 'Andere gebruiker (' ~ (others|length) ~ ' op dit apparaat)' if others else 'Andere gebruiker' }}</a>
+<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:4px">
   <a href="{{ url_for('auth.login', ander=1) }}" style="padding:8px 0">Pincode vergeten?</a>
-  <form method="post" action="{{ url_for('auth.forget_device') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn ghost sm" type="submit">Ander account</button></form>
+  <form method="post" action="{{ url_for('auth.forget_device') }}" onsubmit="return confirm('{{ user.name.split(' ')[0] }} van dit apparaat halen? Daarna is weer een code per e-mail nodig.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn ghost sm" type="submit">Mij van dit apparaat halen</button></form>
 </div>
 {% endblock %}

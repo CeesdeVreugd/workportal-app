@@ -21,6 +21,7 @@
   {% if navok('beheer') %}<div class="navhead">Systeem</div><a href="{{ url_for('beheer.users') }}">{{ icon('beheer') }}Beheer</a>{% endif %}
   <div class="navhead">Persoonlijk</div>
   <a href="{{ url_for('main.account') }}">{{ icon('bell') }}Mijn account &amp; meldingen</a>
+  <a href="{{ url_for('auth.switch_user') }}">{{ icon('klanten') }}Andere gebruiker</a>
 </div></div>
 <img class="side-payoff" src="{{ url_for('static', filename='img/payoff.png') }}" alt="Als performance telt">
 <p class="small muted">WorkPortal v{{ VERSION }} · {{ g.user.name }} · {{ g.user.role_name or '' }}</p>
