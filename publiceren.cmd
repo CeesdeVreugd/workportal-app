@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V85: gespreksnotities met aanwezigen (klant en De Vreugd) en reacties; datumvelden netjes op de telefoon"
+set "OMSCHRIJVING=WorkPortal V86: afvinkpunten in gespreksnotities en annuleerknop"
 
 echo.
 echo ============================================

@@ -58,7 +58,8 @@
     <label class="f full">Aanwezig van de klant<input type="text" name="contact" list="notecontacts" value="{{ (n.contact or '') if n else (p.contact_name or '') }}" placeholder="{{ p.contact_name or 'Naam contactpersoon' }}"><span class="hint">Meerdere namen scheiden met een komma.</span></label>
     <div class="f full"><span>Aanwezig van De Vreugd</span>
       <div class="pchips">{% for u in staff %}<label class="pchip"><input type="checkbox" name="our_people" value="{{ u.name }}" {{ 'checked' if u.name in ours }}><span>{{ u.name }}</span></label>{% endfor %}</div></div>
-    <label class="f full">{{ 'Notitie' if n else 'Wat is er besproken? *' }}<textarea name="body" rows="4" required placeholder="Afspraken, wensen van de klant, aanpassingen, prijsafspraken…">{{ n.body if n else '' }}</textarea></label>
+    <div class="f full"><span class="notelabel">{{ 'Notitie' if n else 'Wat is er besproken? *' }}<button type="button" class="btn sm ghost" data-checkline title="Afvinkpunt toevoegen op de huidige regel">☐ Afvinkpunt</button></span>
+      <textarea name="body" rows="5" required placeholder="Afspraken, wensen van de klant, aanpassingen, prijsafspraken…&#10;[ ] begin een regel met [ ] voor een afvinkpunt">{{ n.body if n else '' }}</textarea></div>
     <label class="f">Actie / terugkomen op<input type="date" name="follow_up" value="{{ (n.follow_up or '') if n else '' }}"></label>
   </div>
 {% endmacro %}
@@ -68,7 +69,7 @@
   <form id="noteform" method="post" action="{{ url_for(B ~ '.note_save', pid=p.id) }}" class="form noteform hidden">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {{ notefields() }}
-    <div class="actions"><button class="btn primary">Opslaan</button></div>
+    <div class="actions"><button class="btn primary">Opslaan</button><button type="button" class="btn ghost" onclick="var f=document.getElementById('noteform');f.reset();f.classList.add('hidden')">Annuleren</button></div>
   </form>
   {% endif %}
   <datalist id="notecontacts">{% for c in contacts %}<option value="{{ c.name }}">{% endfor %}</datalist>
@@ -83,7 +84,7 @@
       {% if n.contact or n.our_people %}<div class="notepeople">
         {% if n.contact %}<div><span>Klant</span>{{ n.contact }}</div>{% endif %}
         {% if n.our_people %}<div><span>De Vreugd</span>{{ n.our_people }}</div>{% endif %}</div>{% endif %}
-      <div class="notebody">{{ n.body }}</div>
+      <div class="notebody">{% for l in note_lines(n.body) %}{% if l.check %}<label class="notecheck {{ 'done' if l.done }}"><input type="checkbox" data-notecheck="{{ url_for(B ~ '.note_check', pid=p.id, nid=n.id) }}" data-idx="{{ l.idx }}" {{ 'checked' if l.done }}><span>{{ l.text }}</span></label>{% else %}<div class="noteline">{{ l.text }}{% if not l.text %}&nbsp;{% endif %}</div>{% endif %}{% endfor %}</div>
       {% set rs = replies.get(n.id, []) %}
       {% if rs %}<div class="replies">{% for r in rs %}
         <div class="reply" id="r{{ r.id }}"><div class="replyhead"><b>{{ r.who or 'onbekend' }}</b><span class="muted small">{{ r.created_at|dt }}</span>
@@ -102,6 +103,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {{ notefields(n) }}
             <div class="actions"><button class="btn primary sm">Opslaan</button>
+              <button type="button" class="btn ghost sm" onclick="var d=this.closest('details');d.querySelector('form').reset();d.open=false">Annuleren</button>
               <button class="btn danger sm" formaction="{{ url_for(B ~ '.note_delete', pid=p.id, nid=n.id) }}" formnovalidate onclick="return confirm('Notitie verwijderen?')">Verwijderen</button></div>
           </form></details>
         {% endif %}

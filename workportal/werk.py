@@ -191,6 +191,7 @@ def detail(pid):
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
+                           note_lines=note_lines,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),
                            oprops=__import__("workportal.komdex", fromlist=["order_props"]).order_props(p))
@@ -253,7 +254,7 @@ def note_save(pid, nid=None):
     if not _can_note(p):
         abort(403)
     target = werk_url("detail", p, pid=pid) + "#notities"
-    body = (request.form.get("body") or "").strip()
+    body = (request.form.get("body") or "").replace("\r\n", "\n").strip()
     if not body:
         flash("Schrijf eerst wat er besproken is.", "error")
         return redirect(target)
@@ -308,6 +309,48 @@ def note_reply_delete(pid, nid, rid):
     if r["created_by"] != g.user["id"] and not can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER):
         abort(403)
     execute("DELETE FROM project_note_replies WHERE id = ?", (rid,))
+    return redirect(werk_url("detail", p, pid=pid) + f"#n{nid}")
+
+
+CHECK_RE = re.compile(r"^(\s*)\[( |x|X)\]\s?(.*)$")
+
+
+def note_lines(body):
+    """Notitie in regels; regels die met [ ] of [x] beginnen worden afvinkpunten."""
+    out, i = [], 0
+    for line in (body or "").split("\n"):
+        m = CHECK_RE.match(line)
+        if m:
+            out.append({"check": True, "idx": i, "done": m.group(2) != " ", "text": m.group(3)})
+            i += 1
+        else:
+            out.append({"check": False, "text": line})
+    return out
+
+
+@bp.route("/<int:pid>/notitie/<int:nid>/vink", methods=["POST"])
+def note_check(pid, nid):
+    """Afvinkpunt in een notitie aan/uit zetten (iedereen die het project/de order mag zien)."""
+    p = _row(pid)
+    _need(LEZEN, KINDS[BP_OF_KIND[p["kind"]]]["module"])
+    n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
+    idx = to_int(request.form.get("idx"), -1)
+    lines, i, hit = (n["body"] or "").split("\n"), 0, None
+    for k, line in enumerate(lines):
+        m = CHECK_RE.match(line)
+        if m:
+            if i == idx:
+                done = m.group(2) == " "
+                lines[k] = f"{m.group(1)}[{'x' if done else ' '}] {m.group(3)}"
+                hit = (done, m.group(3))
+                break
+            i += 1
+    if hit is None:
+        return (jsonify({"error": "Afvinkpunt niet gevonden"}), 404) if request.headers.get("X-Requested-With") else redirect(werk_url("detail", p, pid=pid) + f"#n{nid}")
+    execute("UPDATE project_notes SET body = ? WHERE id = ?", ("\n".join(lines), nid))
+    audit("afvinkpunt " + ("afgevinkt" if hit[0] else "weer open"), "project", pid, hit[1][:120])
+    if request.headers.get("X-Requested-With"):
+        return jsonify({"ok": True, "done": hit[0]})
     return redirect(werk_url("detail", p, pid=pid) + f"#n{nid}")
 
 

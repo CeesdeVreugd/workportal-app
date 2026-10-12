@@ -829,3 +829,11 @@ select { text-overflow: ellipsis; }
 input[type="date"], input[type="time"], input[type="datetime-local"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; text-align: left; min-height: 44px; }
 input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
+.notebody { white-space: normal; }
+.noteline { white-space: pre-wrap; min-height: 1.5em; }
+.notecheck { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; cursor: pointer; line-height: 1.45; }
+.notecheck input { flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--ok); cursor: pointer; }
+.notecheck span { white-space: pre-wrap; }
+.notecheck.done span { text-decoration: line-through; color: var(--muted); }
+.notelabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.notelabel .btn { min-height: 32px; padding: 0 10px; font-size: 13px; }

@@ -726,3 +726,47 @@
   document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
   window.addEventListener("pageshow", function (e) { if (e.persisted) check(); });
 })();
+
+
+/* Gespreksnotities: afvinkpunten aan/uit en "☐ Afvinkpunt" in het tekstvak */
+(function () {
+  var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+  document.addEventListener("change", function (e) {
+    var cb = e.target.closest && e.target.closest("input[data-notecheck]");
+    if (!cb) return;
+    var lab = cb.closest(".notecheck"), fd = new FormData();
+    fd.append("idx", cb.getAttribute("data-idx")); fd.append("csrf_token", CSRF);
+    lab.classList.toggle("done", cb.checked); cb.disabled = true;
+    fetch(cb.getAttribute("data-notecheck"), { method: "POST", body: fd, credentials: "same-origin", headers: { "X-CSRF-Token": CSRF, "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.json().then(function (js) { if (!r.ok || !js.ok) throw new Error(js.error || "mislukt"); cb.checked = js.done; lab.classList.toggle("done", js.done); }); })
+      .catch(function () { cb.checked = !cb.checked; lab.classList.toggle("done", cb.checked); alert("Afvinken is niet opgeslagen. Probeer het opnieuw."); })
+      .then(function () { cb.disabled = false; });
+  });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-checkline]");
+    if (!b) return;
+    e.preventDefault();
+    var ta = b.closest(".f").querySelector("textarea"), v = ta.value, pos = ta.selectionStart || 0;
+    var start = v.lastIndexOf("\n", pos - 1) + 1, line = v.slice(start).split("\n")[0];
+    if (/^\s*\[( |x|X)\]\s?/.test(line)) { ta.focus(); return; }
+    if (line.trim() !== "" || start !== pos) {
+      // regel met tekst: vinkje ervoor zetten
+      ta.value = v.slice(0, start) + "[ ] " + v.slice(start); ta.selectionStart = ta.selectionEnd = pos + 4;
+    } else {
+      ta.value = v.slice(0, pos) + "[ ] " + v.slice(pos); ta.selectionStart = ta.selectionEnd = pos + 4;
+    }
+    ta.focus();
+  });
+  // Enter na een afvinkpunt: volgende regel begint ook met [ ]; Enter op een leeg afvinkpunt haalt het weg
+  document.addEventListener("keydown", function (e) {
+    var ta = e.target;
+    if (e.key !== "Enter" || e.shiftKey || !ta.matches || !ta.matches("#notities textarea[name=body]")) return;
+    var v = ta.value, pos = ta.selectionStart, start = v.lastIndexOf("\n", pos - 1) + 1, line = v.slice(start, pos);
+    var m = line.match(/^(\s*)\[( |x|X)\]\s?(.*)$/);
+    if (!m) return;
+    e.preventDefault();
+    if (!m[3].trim()) { ta.value = v.slice(0, start) + v.slice(pos); ta.selectionStart = ta.selectionEnd = start; return; }
+    var ins = "\n" + m[1] + "[ ] ";
+    ta.value = v.slice(0, pos) + ins + v.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = pos + ins.length;
+  });
+})();
