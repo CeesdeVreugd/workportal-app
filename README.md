@@ -497,3 +497,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Andere gebruiker / slotje**: vergrendelt altijd; terug kan alleen met je pincode.
 - **App of venster sluiten** (kruisje rechtsboven, of de app wegvegen op de telefoon): bij het opnieuw openen is de pincode nodig. Let op: een nieuw tabblad of venster dat je zelf opent geldt ook als "opnieuw openen".
 - **Geen activiteit**: na het ingestelde aantal minuten (Beheer > Instellingen, standaard 30, 0 = uit) wordt WorkPortal vergrendeld, ook als de app op de achtergrond stond. Daarnaast blijft "Altijd opnieuw pincode na (uren)" gelden.
+
+## Gespreksnotities (V85)
+- **Aanwezig van de klant** (vrije tekst, meerdere namen met komma's; suggesties uit de contactpersonen) en **Aanwezig van De Vreugd** (aanvinken; standaard staat de maker aangevinkt).
+- **Reageren** onder elke notitie: iedereen die het project/de order mag zien (ook de werkplaats) kan reageren. De maker van de notitie krijgt een pushmelding (geen e-mail). Eigen reacties kun je verwijderen.
+- Datumvelden staan op de iPhone nu even breed en links uitgelijnd zoals de andere velden.

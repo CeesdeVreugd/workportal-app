@@ -608,6 +608,18 @@ MIGRATIONS = [
     CREATE INDEX idx_annot_project ON project_annotations(project_id, number);
     CREATE INDEX idx_annot_assigned ON project_annotations(assigned_to, status);
     """,
+    # 21 - gespreksnotities: wie er van De Vreugd bij was, en reacties op een notitie
+    """
+    ALTER TABLE project_notes ADD COLUMN our_people TEXT;
+    CREATE TABLE project_note_replies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER NOT NULL REFERENCES project_notes(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_note_replies ON project_note_replies(note_id, id);
+    """,
 ]
 
 

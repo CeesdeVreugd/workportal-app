@@ -180,12 +180,17 @@ def detail(pid):
     notes = query("SELECT n.*, u.name AS who FROM project_notes n LEFT JOIN users u ON u.id = n.created_by"
                   " WHERE n.project_id = ? ORDER BY n.date DESC, n.id DESC", (pid,))
     contacts = query("SELECT name FROM contacts WHERE customer_id = ? ORDER BY name", (p["customer_id"] or 0,))
+    replies = {}
+    for r in query("SELECT r.*, u.name AS who FROM project_note_replies r JOIN project_notes n ON n.id = r.note_id"
+                   " LEFT JOIN users u ON u.id = r.created_by WHERE n.project_id = ? ORDER BY r.id", (pid,)):
+        replies.setdefault(r["note_id"], []).append(r)
+    staff = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
     from .kennis import calcs_for
     from .aantekeningen import annotations_for, STATUS_LABEL
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
-                           nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts,
+                           nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),
                            oprops=__import__("workportal.komdex", fromlist=["order_props"]).order_props(p))
@@ -254,20 +259,56 @@ def note_save(pid, nid=None):
         return redirect(target)
     kind = request.form.get("kind") if request.form.get("kind") in dict(NOTE_KINDS) else "anders"
     date = _f("date") or now_iso()[:10]
-    vals = (date, kind, _f("contact"), body, _f("follow_up"))
+    ours = ", ".join(x.strip() for x in request.form.getlist("our_people") if x.strip())[:500] or None
+    vals = (date, kind, _f("contact"), body, _f("follow_up"), ours)
     if nid:
         n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
         if n["created_by"] != g.user["id"] and not can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER):
             abort(403)
-        execute("UPDATE project_notes SET date = ?, kind = ?, contact = ?, body = ?, follow_up = ?, updated_at = ? WHERE id = ?",
-                vals + (now_iso(), nid))
+        execute("UPDATE project_notes SET date = ?, kind = ?, contact = ?, body = ?, follow_up = ?, our_people = ?, updated_at = ?"
+                " WHERE id = ?", vals + (now_iso(), nid))
         flash("Gespreksnotitie bijgewerkt.", "ok")
     else:
-        execute("INSERT INTO project_notes (date, kind, contact, body, follow_up, project_id, created_by, created_at)"
-                " VALUES (?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
+        execute("INSERT INTO project_notes (date, kind, contact, body, follow_up, our_people, project_id, created_by, created_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
         audit("gespreksnotitie", "project", pid, (kind + ": " + body)[:120])
         flash("Gespreksnotitie opgeslagen.", "ok")
     return redirect(target)
+
+
+@bp.route("/<int:pid>/notitie/<int:nid>/reactie", methods=["POST"])
+def note_reply(pid, nid):
+    """Reactie op een gespreksnotitie (iedereen die het project/de order mag zien)."""
+    p = _row(pid)
+    _need(LEZEN, KINDS[BP_OF_KIND[p["kind"]]]["module"])
+    n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
+    target = werk_url("detail", p, pid=pid) + f"#n{nid}"
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        flash("Schrijf eerst een reactie.", "error")
+        return redirect(target)
+    execute("INSERT INTO project_note_replies (note_id, body, created_by, created_at) VALUES (?,?,?,?)",
+            (nid, body[:4000], g.user["id"], now_iso()))
+    audit("reactie op gespreksnotitie", "project", pid, body[:120])
+    if n["created_by"] and n["created_by"] != g.user["id"]:
+        try:
+            from .notify import notify_user
+            notify_user(get_db(), n["created_by"], f"Reactie op je notitie · {p['number']}",
+                        f"{g.user['name']}: {body[:200]}", url=target, email=False)
+        except Exception:
+            pass
+    return redirect(target)
+
+
+@bp.route("/<int:pid>/notitie/<int:nid>/reactie/<int:rid>/verwijderen", methods=["POST"])
+def note_reply_delete(pid, nid, rid):
+    p = _row(pid)
+    r = query("SELECT r.* FROM project_note_replies r JOIN project_notes n ON n.id = r.note_id WHERE r.id = ? AND n.id = ? AND n.project_id = ?",
+              (rid, nid, pid), one=True) or abort(404)
+    if r["created_by"] != g.user["id"] and not can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER):
+        abort(403)
+    execute("DELETE FROM project_note_replies WHERE id = ?", (rid,))
+    return redirect(werk_url("detail", p, pid=pid) + f"#n{nid}")
 
 
 @bp.route("/<int:pid>/notitie/<int:nid>/actie", methods=["POST"])
