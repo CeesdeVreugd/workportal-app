@@ -728,45 +728,117 @@
 })();
 
 
-/* Gespreksnotities: afvinkpunten aan/uit en "☐ Afvinkpunt" in het tekstvak */
+/* Gespreksnotities: afvinkpunten aan/uit in de notitie, en een editor met echte vinkvakjes per regel */
 (function () {
   var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
   document.addEventListener("change", function (e) {
     var cb = e.target.closest && e.target.closest("input[data-notecheck]");
     if (!cb) return;
-    var lab = cb.closest(".notecheck"), fd = new FormData();
+    var fd = new FormData();
     fd.append("idx", cb.getAttribute("data-idx")); fd.append("csrf_token", CSRF);
-    lab.classList.toggle("done", cb.checked); cb.disabled = true;
+    cb.disabled = true;
     fetch(cb.getAttribute("data-notecheck"), { method: "POST", body: fd, credentials: "same-origin", headers: { "X-CSRF-Token": CSRF, "X-Requested-With": "fetch" } })
-      .then(function (r) { return r.json().then(function (js) { if (!r.ok || !js.ok) throw new Error(js.error || "mislukt"); cb.checked = js.done; lab.classList.toggle("done", js.done); }); })
-      .catch(function () { cb.checked = !cb.checked; lab.classList.toggle("done", cb.checked); alert("Afvinken is niet opgeslagen. Probeer het opnieuw."); })
+      .then(function (r) { return r.json().then(function (js) {
+        if (!r.ok || !js.ok) throw new Error(js.error || "mislukt");
+        cb.checked = js.done;
+        // bewerkformulier van deze notitie bijwerken, zodat opslaan het vinkje niet terugzet
+        var ed = cb.closest("article") && cb.closest("article").querySelector(".noteedit [data-cleditor]");
+        if (ed && ed._setCheck) ed._setCheck(parseInt(cb.getAttribute("data-idx"), 10), js.done);
+      }); })
+      .catch(function () { cb.checked = !cb.checked; alert("Afvinken is niet opgeslagen. Probeer het opnieuw."); })
       .then(function () { cb.disabled = false; });
   });
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest("[data-checkline]");
-    if (!b) return;
-    e.preventDefault();
-    var ta = b.closest(".f").querySelector("textarea"), v = ta.value, pos = ta.selectionStart || 0;
-    var start = v.lastIndexOf("\n", pos - 1) + 1, line = v.slice(start).split("\n")[0];
-    if (/^\s*\[( |x|X)\]\s?/.test(line)) { ta.focus(); return; }
-    if (line.trim() !== "" || start !== pos) {
-      // regel met tekst: vinkje ervoor zetten
-      ta.value = v.slice(0, start) + "[ ] " + v.slice(start); ta.selectionStart = ta.selectionEnd = pos + 4;
-    } else {
-      ta.value = v.slice(0, pos) + "[ ] " + v.slice(pos); ta.selectionStart = ta.selectionEnd = pos + 4;
+
+  var RE = /^(\s*)\[( |x|X)\]\s?(.*)$/;
+  function grow(t) { if (!t.offsetParent) return; t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }
+  function initEditor(ed) {
+    var src = ed.parentNode.querySelector("textarea.cl-source"), form = ed.closest("form"), last = null;
+    function rows() { return Array.prototype.slice.call(ed.querySelectorAll(".clrow")); }
+    function sync() {
+      src.value = rows().map(function (r) {
+        var cb = r.querySelector("input[type=checkbox]"), t = r.querySelector("textarea").value;
+        return cb ? "[" + (cb.checked ? "x" : " ") + "] " + t : t;
+      }).join("\n").replace(/\s+$/, "");
+      ed.classList.toggle("empty", !src.value);
     }
-    ta.focus();
-  });
-  // Enter na een afvinkpunt: volgende regel begint ook met [ ]; Enter op een leeg afvinkpunt haalt het weg
-  document.addEventListener("keydown", function (e) {
-    var ta = e.target;
-    if (e.key !== "Enter" || e.shiftKey || !ta.matches || !ta.matches("#notities textarea[name=body]")) return;
-    var v = ta.value, pos = ta.selectionStart, start = v.lastIndexOf("\n", pos - 1) + 1, line = v.slice(start, pos);
-    var m = line.match(/^(\s*)\[( |x|X)\]\s?(.*)$/);
-    if (!m) return;
-    e.preventDefault();
-    if (!m[3].trim()) { ta.value = v.slice(0, start) + v.slice(pos); ta.selectionStart = ta.selectionEnd = start; return; }
-    var ins = "\n" + m[1] + "[ ] ";
-    ta.value = v.slice(0, pos) + ins + v.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = pos + ins.length;
+    function setCheck(row, on, checked) {
+      var cb = row.querySelector("input[type=checkbox]");
+      if (on && !cb) { cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!checked; cb.addEventListener("change", sync); row.insertBefore(cb, row.firstChild); }
+      if (!on && cb) cb.remove();
+      row.classList.toggle("is-check", !!on);
+    }
+    function makeRow(text, check, checked, after) {
+      var row = document.createElement("div"); row.className = "clrow";
+      var t = document.createElement("textarea"); t.rows = 1; t.value = text || ""; t.setAttribute("aria-label", "Regel");
+      row.appendChild(t);
+      if (check) setCheck(row, true, checked);
+      if (after) after.after(row); else ed.appendChild(row);
+      t.addEventListener("input", function () { grow(t); sync(); });
+      t.addEventListener("focus", function () { last = row; });
+      t.addEventListener("keydown", function (e) { key(e, row, t); });
+      t.addEventListener("paste", function (e) {
+        var txt = (e.clipboardData || window.clipboardData).getData("text");
+        if (txt.indexOf("\n") < 0) return;
+        e.preventDefault();
+        var a = t.value.slice(0, t.selectionStart), b = t.value.slice(t.selectionEnd), lines = txt.replace(/\r/g, "").split("\n"), cur = row;
+        t.value = a + lines[0]; grow(t);
+        for (var i = 1; i < lines.length; i++) { var m = lines[i].match(RE); cur = makeRow(m ? m[3] : lines[i], !!m, m && m[2] !== " ", cur); }
+        var lt = cur.querySelector("textarea"), pos = lt.value.length; lt.value += b; grow(lt); lt.focus(); lt.setSelectionRange(pos, pos); sync();
+      });
+      setTimeout(function () { if (t.offsetParent) grow(t); });
+      return row;
+    }
+    function focusAt(row, pos) { var t = row.querySelector("textarea"); t.focus(); pos = pos === "end" ? t.value.length : pos; t.setSelectionRange(pos, pos); }
+    function key(e, row, t) {
+      var isCheck = !!row.querySelector("input[type=checkbox]");
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (isCheck && !t.value.trim()) { setCheck(row, false); sync(); return; }  // leeg vinkje + Enter = lijst stoppen
+        var rest = t.value.slice(t.selectionEnd); t.value = t.value.slice(0, t.selectionStart); grow(t);
+        var nr = makeRow(rest, isCheck, false, row); focusAt(nr, 0); sync();
+      } else if (e.key === "Backspace" && t.selectionStart === 0 && t.selectionEnd === 0) {
+        if (isCheck) { e.preventDefault(); setCheck(row, false); sync(); return; }
+        var prev = row.previousElementSibling;
+        if (prev) { e.preventDefault(); var pt = prev.querySelector("textarea"), pos = pt.value.length; pt.value += t.value; grow(pt); row.remove(); focusAt(prev, pos); sync(); }
+      } else if (e.key === "ArrowUp" && t.selectionStart === 0 && row.previousElementSibling) { e.preventDefault(); focusAt(row.previousElementSibling, "end"); }
+      else if (e.key === "ArrowDown" && t.selectionEnd === t.value.length && row.nextElementSibling) { e.preventDefault(); focusAt(row.nextElementSibling, 0); }
+    }
+    ed._setCheck = function (idx, done) {
+      var cbs = ed.querySelectorAll(".clrow input[type=checkbox]");
+      if (cbs[idx]) { cbs[idx].checked = done; sync(); src.defaultValue = src.value; }
+    };
+    ed._grow = function () { ed.querySelectorAll(".clrow textarea").forEach(grow); };
+    var det = ed.closest("details");
+    if (det) det.addEventListener("toggle", function () { if (det.open) ed._grow(); });
+    var lines = (src.value || "").replace(/\r/g, "").split("\n");
+    lines.forEach(function (l) { var m = l.match(RE); makeRow(m ? m[3] : l, !!m, m && m[2] !== " "); });
+    ed.setAttribute("data-ph", ed.getAttribute("data-placeholder") || "");
+    sync();
+    ed.addEventListener("click", function (e) { if (e.target === ed) focusAt(rows()[rows().length - 1], "end"); });
+    var btn = ed.parentNode.querySelector("[data-checkline]");
+    if (btn) {
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); });  // focus in het tekstvak houden
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var row = last && ed.contains(last) ? last : rows()[rows().length - 1];
+        var t = row.querySelector("textarea");
+        if (row.querySelector("input[type=checkbox]")) setCheck(row, false);
+        else if (t.value.trim() && row === rows()[rows().length - 1] && document.activeElement !== t) { row = makeRow("", true, false, row); }
+        else setCheck(row, true, false);
+        focusAt(row, "end"); sync();
+      });
+    }
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        sync();
+        if (!src.value.trim() && !(e.submitter && e.submitter.hasAttribute("formnovalidate"))) { e.preventDefault(); alert("Schrijf eerst wat er besproken is."); focusAt(rows()[0], 0); }
+      });
+      form.addEventListener("reset", function () { setTimeout(function () { ed.innerHTML = ""; var l2 = (src.defaultValue || "").split("\n"); l2.forEach(function (l) { var m = l.match(RE); makeRow(m ? m[3] : l, !!m, m && m[2] !== " "); }); sync(); }); });
+    }
+  }
+  document.querySelectorAll("[data-cleditor]").forEach(initEditor);
+  window.addEventListener("resize", function () { document.querySelectorAll("[data-cleditor]").forEach(function (ed) { if (ed.offsetParent && ed._grow) ed._grow(); }); });
+  document.addEventListener("click", function (e) {  // nieuw-formulier wordt zichtbaar via de knop "Notitie"
+    if (e.target.closest && e.target.closest("#notities .card-head button")) setTimeout(function () { var ed = document.querySelector("#noteform [data-cleditor]"); if (ed && ed._grow) ed._grow(); });
   });
 })();

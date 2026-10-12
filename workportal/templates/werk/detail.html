@@ -58,8 +58,9 @@
     <label class="f full">Aanwezig van de klant<input type="text" name="contact" list="notecontacts" value="{{ (n.contact or '') if n else (p.contact_name or '') }}" placeholder="{{ p.contact_name or 'Naam contactpersoon' }}"><span class="hint">Meerdere namen scheiden met een komma.</span></label>
     <div class="f full"><span>Aanwezig van De Vreugd</span>
       <div class="pchips">{% for u in staff %}<label class="pchip"><input type="checkbox" name="our_people" value="{{ u.name }}" {{ 'checked' if u.name in ours }}><span>{{ u.name }}</span></label>{% endfor %}</div></div>
-    <div class="f full"><span class="notelabel">{{ 'Notitie' if n else 'Wat is er besproken? *' }}<button type="button" class="btn sm ghost" data-checkline title="Afvinkpunt toevoegen op de huidige regel">☐ Afvinkpunt</button></span>
-      <textarea name="body" rows="5" required placeholder="Afspraken, wensen van de klant, aanpassingen, prijsafspraken…&#10;[ ] begin een regel met [ ] voor een afvinkpunt">{{ n.body if n else '' }}</textarea></div>
+    <div class="f full"><span class="notelabel">{{ 'Notitie' if n else 'Wat is er besproken? *' }}<button type="button" class="btn sm ghost" data-checkline title="Vinkvakje op de huidige regel aan/uit">☐ Afvinkpunt</button></span>
+      <div class="cleditor" data-cleditor data-placeholder="Afspraken, wensen van de klant, aanpassingen, prijsafspraken…"></div>
+      <textarea name="body" class="cl-source" hidden>{{ n.body if n else '' }}</textarea></div>
     <label class="f">Actie / terugkomen op<input type="date" name="follow_up" value="{{ (n.follow_up or '') if n else '' }}"></label>
   </div>
 {% endmacro %}

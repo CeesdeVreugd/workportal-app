@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V86: afvinkpunten in gespreksnotities en annuleerknop"
+set "OMSCHRIJVING=WorkPortal V87: notities met echte vinkvakjes tijdens het typen, niet meer doorgestreept"
 
 echo.
 echo ============================================

@@ -834,6 +834,13 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .notecheck { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; cursor: pointer; line-height: 1.45; }
 .notecheck input { flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--ok); cursor: pointer; }
 .notecheck span { white-space: pre-wrap; }
-.notecheck.done span { text-decoration: line-through; color: var(--muted); }
 .notelabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .notelabel .btn { min-height: 32px; padding: 0 10px; font-size: 13px; }
+
+/* Notitie-editor met vinkvakjes per regel */
+.cleditor { position: relative; border: 1px solid #D5DAE8; border-radius: 10px; background: #fff; padding: 8px 10px; min-height: 120px; cursor: text; }
+.cleditor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cleditor.empty::before { content: attr(data-ph); position: absolute; left: 12px; top: 10px; color: #9AA0B8; pointer-events: none; font-size: 15px; }
+.clrow { display: flex; align-items: flex-start; gap: 10px; }
+.clrow input[type=checkbox] { flex: none; width: 20px; height: 20px; margin: 4px 0 0; accent-color: var(--ok); cursor: pointer; }
+.clrow textarea { flex: 1; border: 0 !important; outline: 0; box-shadow: none !important; padding: 2px 0 !important; margin: 0; min-height: 0 !important; resize: none; overflow: hidden; background: transparent; font: inherit; font-size: 15px; line-height: 1.45; color: var(--ink); border-radius: 0; }
