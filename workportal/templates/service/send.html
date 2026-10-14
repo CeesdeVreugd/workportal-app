@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Werkbon versturen · {{ t.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / werkbon versturen</div>
+<h1>Werkbon versturen</h1>
+<p class="muted">{{ t.title }}{% if t.customer %} · {{ t.customer }}{% endif %} · bezoek {{ v.date|date }}
+  {% if v.signed_at %}· <span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% elif v.closed_at %}· <span class="badge">Afgerond zonder handtekening</span>{% endif %}
+  {% if v.sent_at %}· <span class="badge b-blue">Al verstuurd naar {{ v.sent_to }} op {{ v.sent_at|dt }}</span>{% endif %}</p>
+<form method="post" class="card form" style="max-width:760px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p style="margin:0"><a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}">{{ icon('pdf') }}Werkbon bekijken</a></p>
+  <label class="f">Aan<input type="text" name="to" value="{{ form.to or '' }}" placeholder="naam@klant.nl" inputmode="email"><span class="hint">Meerdere adressen scheiden met een komma.{% if not form.to %} Geen e-mailadres bekend bij de klant of contactpersoon.{% endif %}</span></label>
+  <label class="f">CC<input type="text" name="cc" value="{{ form.cc or '' }}" inputmode="email"></label>
+  <label class="check"><input type="checkbox" name="cc_me" value="1" {{ 'checked' if form.cc_me }}> Kopie aan mij ({{ g.user.email }})</label>
+  <label class="f">Onderwerp<input type="text" name="subject" value="{{ form.subject or '' }}"></label>
+  <label class="f">Tekst<textarea name="body" rows="6">{{ form.body or '' }}</textarea></label>
+  {% if sharepoint %}<label class="check"><input type="checkbox" name="sharepoint" value="1" {{ 'checked' if request.method == 'GET' or form.sharepoint }}> Werkbon ook in SharePoint (projectmap) plaatsen</label>{% endif %}
+  <div class="actions"><button class="btn primary">{{ icon('mail') }}Versturen</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) }}#bezoek{{ v.id }}">{{ 'Overslaan' if request.method == 'GET' and not v.sent_at else 'Annuleren' }}</a></div>
+</form>
+{% endblock %}

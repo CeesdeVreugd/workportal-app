@@ -620,6 +620,11 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_note_replies ON project_note_replies(note_id, id);
     """,
+    # 22 - werkbon (ook zonder handtekening) achteraf versturen: laatst verstuurd naar/op
+    """
+    ALTER TABLE visits ADD COLUMN sent_at TEXT;
+    ALTER TABLE visits ADD COLUMN sent_to TEXT;
+    """,
 ]
 
 

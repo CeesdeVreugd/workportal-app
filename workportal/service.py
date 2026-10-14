@@ -7,6 +7,7 @@ from .mail import send_mail
 from .pdf import visit_pdf
 from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
 from .klanten import customer_options, ask_snelstart
+from .util import fmt_date
 from .util import (now_iso, audit, files_for, save_uploads, save_signature, file_path, to_float, to_int,
                    next_number, get_setting, local, now_utc, delete_file, safe_filename)
 
@@ -305,8 +306,8 @@ def visit(tid, vid=None):
             return redirect(url_for("service.sign", tid=tid, vid=vid))
         if request.form.get("next") == "afronden":
             _close_visit(tid, vid, None, True)
-            flash("Bezoek afgerond zonder handtekening en ticket afgesloten.", "ok")
-            return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
+            flash("Bezoek afgerond zonder handtekening en ticket afgesloten. Je kunt de werkbon nu versturen.", "ok")
+            return redirect(url_for("service.visit_send", tid=tid, vid=vid))
         flash("Bezoek opgeslagen.", "ok")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     v = v or {"date": local(now_utc()).strftime("%Y-%m-%d"), "technicians": g.user["name"]}
@@ -332,7 +333,8 @@ def visit_close(tid, vid):
     else:
         close = bool(request.form.get("close_ticket"))
         _close_visit(tid, vid, _f("note"), close)
-        flash("Bezoek afgerond zonder handtekening" + (" en ticket afgesloten." if close else "."), "ok")
+        flash("Bezoek afgerond zonder handtekening" + (" en ticket afgesloten." if close else ".") + " Je kunt de werkbon nu versturen.", "ok")
+        return redirect(url_for("service.visit_send", tid=tid, vid=vid))
     return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
 
 
@@ -389,6 +391,60 @@ def sign(tid, vid):
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     return render_template("service/sign.html", t=t, v=v, mail_to=t["contact_email"] or t["customer_email"] or "",
                            sharepoint=_sp_available(t))
+
+
+@bp.route("/<int:tid>/bezoek/<int:vid>/versturen", methods=["GET", "POST"])
+@require("service", BEWERKEN)
+def visit_send(tid, vid):
+    """Werkbon (achteraf) mailen naar de klant en/of in SharePoint zetten, ook als hij niet getekend is."""
+    import re as _re
+    t = _ticket(tid)
+    v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
+    back = url_for("service.detail", tid=tid) + f"#bezoek{vid}"
+    default_to = t["contact_email"] or t["customer_email"] or ""
+    greet = v["signed_name"] or t["contact"] or "relatie"
+    if request.method == "POST":
+        to = [a.strip() for a in _re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
+        cc = [a.strip() for a in _re.split(r"[;,\s]+", request.form.get("cc") or "") if a.strip()]
+        if request.form.get("cc_me") and g.user["email"] and g.user["email"] not in cc:
+            cc.append(g.user["email"])
+        bad = [a for a in to + cc if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
+        want_sp = bool(request.form.get("sharepoint")) and _sp_available(t)
+        if (not to and not want_sp) or bad:
+            flash("Vul een geldig e-mailadres in" + (f" (ongeldig: {', '.join(bad)})" if bad else "") + ", of kies SharePoint.", "error")
+            return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t))
+        pdf, fname = _werkbon(tid, vid)
+        msgs = []
+        if to:
+            from .mail import send_mail_with_files
+            import os as _os
+            sender = get_setting("cert_sender") or _os.environ.get("CERT_MAIL_FROM") or _os.environ.get("MAIL_FROM") or ""
+            ok, err = send_mail_with_files(sender, to, (request.form.get("subject") or "").strip() or f"Werkbon {t['number']}",
+                                           (request.form.get("body") or "").strip(), [(fname, pdf, "application/pdf")],
+                                           cc=cc or None, signer="werkvoorbereiding")
+            if ok:
+                execute("UPDATE visits SET sent_at = ?, sent_to = ? WHERE id = ?", (now_iso(), ", ".join(to)[:300], vid))
+                audit("werkbon verstuurd", "ticket", tid, f"{v['date']} aan {', '.join(to)}"[:300])
+                msgs.append("Werkbon gemaild naar " + ", ".join(to) + ".")
+            else:
+                flash(f"Mailen is mislukt: {err}", "error")
+                return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t))
+        if want_sp:
+            res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_werkbon"), fname, pdf)
+            if res is None:
+                ok, msg = upload_to_sharepoint(pdf, fname, _sp_folder(t, "Service"), t["project_no"] or "", "werkbon")
+            else:
+                ok, msg = res
+            execute("UPDATE visits SET sharepoint_status = ? WHERE id = ?", (msg, vid))
+            msgs.append(msg + ".")
+        flash(" ".join(msgs), "ok")
+        return redirect(back)
+    form = {"to": default_to, "cc_me": "1",
+            "subject": f"Werkbon {t['number']} – {t['title']}",
+            "body": f"Beste {greet},\n\nIn de bijlage vindt u de werkbon van ons bezoek op {fmt_date(v['date'])}."
+                    + ("" if v["signed_at"] else "\nDe werkbon is niet ter plaatse ondertekend.")
+                    + "\n\nHeeft u vragen, neem dan gerust contact met ons op."}
+    return render_template("service/send.html", t=t, v=v, form=form, sharepoint=_sp_available(t))
 
 
 def _sp_available(t):

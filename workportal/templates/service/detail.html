@@ -114,7 +114,9 @@
                 <label class="check"><input type="checkbox" name="close_ticket" value="1" checked> Ticket ook afsluiten</label>
                 <div><button class="btn primary sm">Afronden</button></div>
               </form></details>{% endif %}
+          {% if v.sent_at %}<span class="badge b-blue" title="{{ v.sent_to }}">Verstuurd {{ v.sent_at|dt }}</span>{% endif %}
           <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
+          {% if edit and (v.signed_at or v.closed_at) %}<a class="btn sm" href="{{ url_for('service.visit_send', tid=t.id, vid=v.id) }}">{{ icon('mail') }}Versturen</a>{% endif %}
           {% if edit and (not v.signed_at or can('service', 3)) %}<form method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=v.id) }}" data-confirm="{{ 'Dit bezoek is ondertekend door ' ~ v.signed_name ~ '. Toch verwijderen, met werkbon en foto\'s?' if v.signed_at else 'Bezoek van ' ~ (v.date|date) ~ ' met foto\'s verwijderen?' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Bezoek verwijderen">{{ icon('trash') }}</button></form>{% endif %}
         </div>
       </div>

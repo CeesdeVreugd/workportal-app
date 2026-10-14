@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V91: fotos bij notities (ticket en project), notitieformulier dichtgeklapt, logo op pinscherm"
+set "OMSCHRIJVING=WorkPortal V92: werkbon versturen na afronden zonder handtekening (en achteraf)"
 
 echo.
 echo ============================================
