@@ -843,6 +843,7 @@
         if (!src.value.trim() && !(e.submitter && e.submitter.hasAttribute("formnovalidate"))) { e.preventDefault(); alert("Schrijf eerst wat er besproken is."); focusAt(rows()[0], 0); }
       });
       form.addEventListener("reset", function () { setTimeout(function () { ed.innerHTML = ""; var l2 = (src.defaultValue || "").split("\n"); l2.forEach(function (l) { var m = l.match(RE); makeRow(m ? m[3] : l, !!m, m && m[2] !== " "); }); sync(); }); });
+      src.addEventListener("wp:set", function () { ed.innerHTML = ""; (src.value || "").split("\n").forEach(function (l) { var m = l.match(RE); makeRow(m ? m[3] : l, !!m, m && m[2] !== " "); }); sync(); });
     }
   }
   document.querySelectorAll("[data-cleditor]").forEach(initEditor);

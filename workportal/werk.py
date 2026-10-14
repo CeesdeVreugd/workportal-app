@@ -185,13 +185,15 @@ def detail(pid):
                    " LEFT JOIN users u ON u.id = r.created_by WHERE n.project_id = ? ORDER BY r.id", (pid,)):
         replies.setdefault(r["note_id"], []).append(r)
     staff = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
+    from .util import files_for
+    nfiles = {n["id"]: files_for("project_note", n["id"]) for n in notes}
     from .kennis import calcs_for
     from .aantekeningen import annotations_for, STATUS_LABEL
     return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
-                           note_lines=note_lines,
+                           note_lines=note_lines, nfiles=nfiles,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),
                            oprops=__import__("workportal.komdex", fromlist=["order_props"]).order_props(p))
@@ -270,10 +272,14 @@ def note_save(pid, nid=None):
                 " WHERE id = ?", vals + (now_iso(), nid))
         flash("Gespreksnotitie bijgewerkt.", "ok")
     else:
-        execute("INSERT INTO project_notes (date, kind, contact, body, follow_up, our_people, project_id, created_by, created_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
+        nid = execute("INSERT INTO project_notes (date, kind, contact, body, follow_up, our_people, project_id, created_by, created_at)"
+                      " VALUES (?,?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
         audit("gespreksnotitie", "project", pid, (kind + ": " + body)[:120])
         flash("Gespreksnotitie opgeslagen.", "ok")
+    from .util import save_uploads
+    save_uploads("project_note", nid)
+    if getattr(g, "upload_skipped", 0):
+        flash(f"{g.upload_skipped} foto('s) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
     return redirect(target)
 
 
@@ -369,6 +375,9 @@ def note_delete(pid, nid):
     n = query("SELECT * FROM project_notes WHERE id = ? AND project_id = ?", (nid, pid), one=True) or abort(404)
     if not (_can_note(p) and (n["created_by"] == g.user["id"] or can(KINDS[BP_OF_KIND[p["kind"]]]["module"], BEHEER))):
         abort(403)
+    from .util import files_for, delete_file
+    for f in files_for("project_note", nid):
+        delete_file(f["id"])
     execute("DELETE FROM project_notes WHERE id = ?", (nid,))
     flash("Gespreksnotitie verwijderd.", "ok")
     return redirect(werk_url("detail", p, pid=pid) + "#notities")

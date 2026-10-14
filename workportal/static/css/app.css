@@ -826,8 +826,9 @@ select { text-overflow: ellipsis; }
 @media (max-width: 600px) { .notegrid { grid-template-columns: 1fr; } .replyform form { flex-direction: column; align-items: stretch; } }
 
 /* Datumvelden op iPhone/iPad: zelfde breedte en links uitgelijnd zoals de andere velden */
-input[type="date"], input[type="time"], input[type="datetime-local"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; text-align: left; min-height: 44px; }
-input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type="date"], input[type="time"], input[type="datetime-local"] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; text-align: left; height: 44px; line-height: 44px; padding-top: 0; padding-bottom: 0; }
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; padding: 0; line-height: normal; }
+@media (max-width: 900px) { input[type="date"], input[type="time"], input[type="datetime-local"] { height: 42px; line-height: 42px; } }
 input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .notebody { white-space: normal; }
 .noteline { white-space: pre-wrap; min-height: 1.5em; }
@@ -860,3 +861,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .savetxt { font-size: 13px; color: var(--muted); }
 .photo-wait { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); background: var(--line-2); text-align: center; padding: 6px; }
 .photos .photo a { display: block; }
+.notephotos { display: flex; gap: 8px; flex-wrap: wrap; }
+.addphoto.sm { width: auto; height: auto; aspect-ratio: auto; flex-direction: row; gap: 6px; padding: 10px 14px; font-size: 14px; }
+.notepics { margin: 8px 0 2px; }
+.notepics .photos { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+/* Inlogscherm: logo en kop nooit laten krimpen (iPhone bij opstart) */
+.auth-card > *, .auth-brand > * { flex-shrink: 0; }
+@media (max-width: 900px) { .auth { overflow-y: auto; height: auto; } .auth-card { height: auto; min-height: 100%; } }

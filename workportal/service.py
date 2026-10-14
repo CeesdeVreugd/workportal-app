@@ -142,10 +142,11 @@ def detail(tid):
     vfiles = {v["id"]: files_for("visit", v["id"]) for v in visits}
     notes = query("SELECT n.*, u.name AS author FROM ticket_notes n LEFT JOIN users u ON u.id = n.created_by"
                   " WHERE n.ticket_id = ? ORDER BY n.created_at DESC, n.id DESC", (tid,))
+    nfiles = {n["id"]: files_for("ticket_note", n["id"]) for n in notes}
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'ticket' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 30", (tid,))
     from .kennis import calcs_for
-    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, files=files_for("ticket", tid),
+    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, nfiles=nfiles, files=files_for("ticket", tid),
                            toolcalcs=calcs_for(ticket_id=tid),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
@@ -197,6 +198,10 @@ def note_save(tid, nid=None):
                       (tid, body, g.user["id"], now))
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
         audit("notitie toegevoegd", "ticket", tid, body[:80])
+    save_uploads("ticket_note", nid)
+    if getattr(g, "upload_skipped", 0):
+        flash(f"{g.upload_skipped} foto('s) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
+    flash("Notitie opgeslagen.", "ok")
     return redirect(url_for("service.detail", tid=tid) + f"#notitie{nid}")
 
 
@@ -206,6 +211,8 @@ def note_delete(tid, nid):
     n = query("SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?", (nid, tid), one=True) or abort(404)
     if n["created_by"] != g.user["id"] and not can("service", BEHEER):
         abort(403)
+    for f in files_for("ticket_note", nid):
+        delete_file(f["id"])
     execute("DELETE FROM ticket_notes WHERE id = ?", (nid,))
     return redirect(url_for("service.detail", tid=tid) + "#notities")
 

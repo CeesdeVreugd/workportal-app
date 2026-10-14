@@ -5,18 +5,22 @@
    - Het concept wordt pas weggegooid als het opslaan gelukt is. */
 (function () {
   "use strict";
-  var form = document.querySelector("form[data-draft]");
-  var CLEAR = "wp_draft_clear";
+  var CLEAR = "wp_draft_clear", cleared = null;
   // Na een geslaagd opslaan (groene melding op de volgende pagina) het concept opruimen
   try {
     var pend = sessionStorage.getItem(CLEAR);
-    if (pend && (!form || form.getAttribute("data-draft") !== pend)) {
-      if (document.querySelector(".flash.ok")) { localStorage.removeItem("wp_draft:" + pend); idbDel(pend); }
+    if (pend) {
+      if (document.querySelector(".flash.ok")) {
+        cleared = pend;
+        localStorage.removeItem("wp_draft:" + pend);
+        if (window.indexedDB) { var r0 = indexedDB.open("wp_drafts", 1); r0.onupgradeneeded = function () { r0.result.createObjectStore("photos"); }; r0.onsuccess = function () { try { r0.result.transaction("photos", "readwrite").objectStore("photos").delete(pend); } catch (x) {} }; }
+      }
       sessionStorage.removeItem(CLEAR);
     }
   } catch (e) {}
-  if (!form) return;
+  document.querySelectorAll("form[data-draft]").forEach(initDraft);
 
+  function initDraft(form) {
   var KEY = form.getAttribute("data-draft"), LS = "wp_draft:" + KEY;
   var collected = [];   // {name, type, blob}
   var canDT = (function () { try { return !!new DataTransfer(); } catch (e) { return false; } })();
@@ -161,10 +165,18 @@
       var url = xhr.responseURL || "";
       if (xhr.status >= 200 && xhr.status < 400 && url && !/\/(login|pin|vergrendel)/.test(url)) {
         progress(100, "Opgeslagen");
-        if (url.split("#")[0] === location.href.split("#")[0]) {   // formulier opnieuw getoond (bijv. melding): pagina tonen, concept blijft
-          try { sessionStorage.removeItem(CLEAR); } catch (x) {}
-          document.open(); document.write(xhr.responseText); document.close();
-        } else location.href = url;
+        var ok = /class="flash ok"/.test(xhr.responseText);
+        try { sessionStorage.removeItem(CLEAR); } catch (x) {}
+        if (ok) { try { localStorage.removeItem(LS); } catch (x) {} idbDel(KEY); }   // gelukt: concept weg
+        setTimeout(function () {
+          if (!ok) {   // formulier met een melding terug: die pagina tonen, concept blijft bewaard
+            try { history.replaceState(null, "", url); } catch (x) {}
+            document.open(); document.write(xhr.responseText); document.close();
+          } else if (url.split("#")[0] === location.href.split("#")[0]) {
+            try { history.replaceState(null, "", url); } catch (x) {}
+            location.reload();
+          } else location.replace(url);
+        }, ok ? 150 : 0);
         return;
       }
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
@@ -195,6 +207,7 @@
       try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); location.reload();
     });
     b.appendChild(x); form.parentNode.insertBefore(b, form);
+    form.classList.remove("hidden");
   }
   var restoredText = false;
   if (raw && raw.fields) {
@@ -205,12 +218,13 @@
       if (!(k in raw.fields)) return;
       var v = raw.fields[k];
       if (el.type === "checkbox" || el.type === "radio") { if (el.checked !== v) { el.checked = v; restoredText = true; } }
-      else if (el.value !== v) { el.value = v; restoredText = true; el.dispatchEvent(new Event("input", { bubbles: true })); }
+      else if (el.value !== v) { el.value = v; restoredText = true; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("wp:set")); }
     });
   }
-  idbGet(KEY).then(function (list) {
+  (KEY === cleared ? Promise.resolve(null) : idbGet(KEY)).then(function (list) {
     if (list && list.length && canDT) { collected = list.map(function (f) { return { name: f.name, type: f.type, blob: f.blob, thumb: f.thumb || null }; }); render(); }
     if (restoredText || collected.length) banner(raw ? raw.at : Date.now(), collected.length);
     initial = restoredText ? "" : initial;
   });
+  }
 })();

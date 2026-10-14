@@ -8,7 +8,7 @@ from .util import file_path, now_iso, now_utc, iso
 bp = Blueprint("main", __name__)
 
 ENTITY_MODULE = {
-    "ticket": "service", "visit": "service",
+    "ticket": "service", "visit": "service", "ticket_note": "service",
     "pressure_test": "druktest", "pressure_reading": "druktest",
     "customer": "klanten", "installation": "klanten", "project": "klanten",
     "article": "kennis", "nacalc": "nacalculatie", "calc": "calculatie", "invoice": "crediteuren",
@@ -102,7 +102,7 @@ def _file_row(fid):
     row = query("SELECT * FROM files WHERE id = ?", (fid,), one=True)
     if not row:
         abort(404)
-    if row["entity"] in ("project", "order_inbox"):
+    if row["entity"] in ("project", "order_inbox", "project_note"):
         if not (can("projecten") or can("orders") or can("service") or can("druktest")):
             abort(403)
     else:
