@@ -123,6 +123,12 @@ def file(fid, name=None):
 
 # ---------------------------------------------------------------- push
 
+@bp.route("/api/ping", methods=["POST"])
+def ping():
+    """Houdt de sessie open zolang iemand actief is (bijv. lang typen in een formulier)."""
+    return ("", 204)
+
+
 @bp.route("/api/printers")
 def api_printers():
     """Printers voor het afdrukvenster: de toegestane printers en de standaardprinter."""

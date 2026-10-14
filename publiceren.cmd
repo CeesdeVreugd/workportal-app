@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V87: notities met echte vinkvakjes tijdens het typen, niet meer doorgestreept"
+set "OMSCHRIJVING=WorkPortal V88: servicebezoek - concept wordt bewaard (tekst en fotos), fotos tellen op, uren onderaan, geen springende menubalk"
 
 echo.
 echo ============================================

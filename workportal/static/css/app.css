@@ -844,3 +844,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .clrow { display: flex; align-items: flex-start; gap: 10px; }
 .clrow input[type=checkbox] { flex: none; width: 20px; height: 20px; margin: 4px 0 0; accent-color: var(--ok); cursor: pointer; }
 .clrow textarea { flex: 1; border: 0 !important; outline: 0; box-shadow: none !important; padding: 2px 0 !important; margin: 0; min-height: 0 !important; resize: none; overflow: hidden; background: transparent; font: inherit; font-size: 15px; line-height: 1.45; color: var(--ink); border-radius: 0; }
+
+/* Toetsenbord open op de telefoon: geen vaste menubalk onderin */
+@media (max-width: 900px) { body.kb-open .bottomnav { display: none !important; } body.kb-open .content { padding-bottom: 24px; } }
+/* Concept teruggezet + foto's weghalen vóór opslaan */
+.draftbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; max-width: 900px; }
+.photos .photo { position: relative; }
+.photo-x { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(20,22,58,.75); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }

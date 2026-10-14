@@ -503,3 +503,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Reageren** onder elke notitie: iedereen die het project/de order mag zien (ook de werkplaats) kan reageren. De maker van de notitie krijgt een pushmelding (geen e-mail). Eigen reacties kun je verwijderen.
 - Datumvelden staan op de iPhone nu even breed en links uitgelijnd zoals de andere velden.
 - **Afvinkpunten** (V87): tik op *☐ Afvinkpunt*; er verschijnt direct een vinkvakje op de regel. Na Enter krijgt de volgende regel ook een vakje; Enter op een leeg vakje (of Backspace aan het begin) haalt het weg. In de notitie kan iedereen die het project mag zien de punten afvinken. *Annuleren* sluit het formulier zonder op te slaan.
+
+## Servicebezoek: niets meer kwijt (V88)
+- Tekst en foto's van een bezoek worden tijdens het invullen **op het apparaat bewaard**. Valt de app weg, wordt hij vergrendeld of herstart de telefoon, dan staat bij terugkomst alles er weer ("Concept teruggezet"). Het concept verdwijnt pas als het opslaan gelukt is (of met *Concept weggooien*).
+- **Foto's tellen op**: meerdere keren *Foto maken* of *Uit galerij* voegt toe in plaats van te vervangen; met × haal je een foto weg vóór het opslaan.
+- Zolang je bezig bent (typen, tikken) blijft de sessie open; na het maken van een foto wordt niet meer om de pincode gevraagd.
+- Op de telefoon verdwijnt de menubalk onderin zolang het toetsenbord open is. Datum staat over de volle breedte; uren, reistijd en kilometers staan onderaan.

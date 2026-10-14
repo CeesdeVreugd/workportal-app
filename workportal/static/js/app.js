@@ -723,6 +723,15 @@
     if (!locking && now() - lastActive() > limit && (locking = true)) location.replace("/vergrendel?reden=inactief&next=" + encodeURIComponent(location.pathname + location.search));
   }
   setInterval(check, 15000);
+  // zolang er gewerkt wordt (typen, tikken) de sessie op de server openhouden
+  var lastPing = now();
+  setInterval(function () {
+    if (now() - last < 120000 && now() - lastPing > 240000) {
+      lastPing = now();
+      var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+      fetch("/api/ping", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF } }).catch(function () {});
+    }
+  }, 30000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
   window.addEventListener("pageshow", function (e) { if (e.persisted) check(); });
 })();
@@ -841,4 +850,12 @@
   document.addEventListener("click", function (e) {  // nieuw-formulier wordt zichtbaar via de knop "Notitie"
     if (e.target.closest && e.target.closest("#notities .card-head button")) setTimeout(function () { var ed = document.querySelector("#noteform [data-cleditor]"); if (ed && ed._grow) ed._grow(); });
   });
+})();
+
+
+/* Telefoon: bij typen de onderste menubalk verbergen (anders springt hij mee met het toetsenbord) */
+(function () {
+  function isField(el) { return el && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !/^(checkbox|radio|file|submit|button|range|color)$/.test(el.type)) || el.isContentEditable); }
+  document.addEventListener("focusin", function (e) { if (isField(e.target)) document.body.classList.add("kb-open"); });
+  document.addEventListener("focusout", function () { setTimeout(function () { if (!isField(document.activeElement)) document.body.classList.remove("kb-open"); }, 100); });
 })();
