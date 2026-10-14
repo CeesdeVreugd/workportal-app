@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V88: servicebezoek - concept wordt bewaard (tekst en fotos), fotos tellen op, uren onderaan, geen springende menubalk"
+set "OMSCHRIJVING=WorkPortal V89: fotos verkleind en betrouwbaar opslaan met voortgang, fotoviewer bij bezoeken"
 
 echo.
 echo ============================================

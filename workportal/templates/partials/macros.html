@@ -10,9 +10,9 @@
 {%- set v = m.get(s, (s, '')) -%}<span class="badge {{ v[1] }}">{{ v[0] }}</span>
 {%- endmacro %}
 {% macro photos(files, can_delete=False, back='') -%}
-<div class="photos">
+<div class="photos" data-gallery>
 {%- for f in files if f.kind == 'photo' -%}
-<div class="photo"><a href="{{ url_for('main.file', fid=f.id) }}" target="_blank"><img src="{{ url_for('main.file', fid=f.id) }}" alt="{{ f.caption or 'Foto' }}" loading="lazy"></a>{% if f.caption %}<div class="cap">{{ f.caption }}</div>{% endif %}</div>
+<div class="photo"><a href="{{ url_for('main.file', fid=f.id) }}" target="_blank" data-full="{{ url_for('main.file', fid=f.id) }}" data-dl="{{ url_for('main.file', fid=f.id, download=1) }}" data-name="{{ f.caption or f.filename }}" data-info="{{ f.created_at|dt }}"><img src="{{ url_for('main.file', fid=f.id) }}" alt="{{ f.caption or 'Foto' }}" loading="lazy"></a>{% if f.caption %}<div class="cap">{{ f.caption }}</div>{% endif %}</div>
 {%- endfor -%}
 {{ caller() if caller }}
 </div>

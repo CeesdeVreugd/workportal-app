@@ -290,6 +290,8 @@ def visit(tid, vid=None):
             if t["status"] in ("nieuw", "ingepland"):
                 execute("UPDATE tickets SET status = 'in_uitvoering' WHERE id = ?", (tid,))
         save_uploads("visit", vid)
+        if getattr(g, "upload_skipped", 0):
+            flash(f"{g.upload_skipped} foto('s) waren leeg of onleesbaar en zijn niet opgeslagen. Voeg ze opnieuw toe.", "error")
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now_iso(), tid))
         audit("bezoek opgeslagen", "ticket", tid, vals[0])
         if request.form.get("next") == "tekenen":

@@ -60,46 +60,125 @@
   form.addEventListener("input", save);
   form.addEventListener("change", function (e) { if (e.target.type !== "file") save(); });
 
-  // ---------------------------------------------------------------- foto's verzamelen
+  // ---------------------------------------------------------------- foto's verzamelen (verkleind, zodat opslaan snel gaat)
   var inputs = Array.prototype.slice.call(form.querySelectorAll("input[type=file][data-collect]"));
   var box = inputs.length ? document.getElementById(inputs[0].getAttribute("data-preview")) : null;
+  if (box) box.setAttribute("data-gallery", "");
+  var busy = 0;
+  function loadImg(file) {
+    if (window.createImageBitmap) return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () { return createImageBitmap(file); });
+    return new Promise(function (res, rej) { var u = URL.createObjectURL(file), im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = u; });
+  }
+  function toBlob(src, max, q) {
+    var w = src.width, h = src.height, r = Math.min(1, max / Math.max(w, h));
+    var c = document.createElement("canvas"); c.width = Math.round(w * r); c.height = Math.round(h * r);
+    c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+    return new Promise(function (res) { c.toBlob(function (b) { c.width = c.height = 0; res(b); }, "image/jpeg", q); });
+  }
+  function shrink(file) {
+    return loadImg(file).then(function (img) {
+      return Promise.all([toBlob(img, 2000, 0.85), toBlob(img, 360, 0.7)]).then(function (r) { if (img.close) img.close(); return { blob: r[0], thumb: r[1] }; });
+    }).catch(function () { return { blob: file, thumb: null }; });  // geen afbeelding die de browser kan lezen: origineel houden
+  }
   function render() {
     if (!box) return;
-    box.querySelectorAll("[data-collected], [data-from]").forEach(function (x) { x.remove(); });
+    box.querySelectorAll("[data-collected], [data-from]").forEach(function (x) { if (x._url) URL.revokeObjectURL(x._url); if (x._full) URL.revokeObjectURL(x._full); x.remove(); });
     collected.forEach(function (f, i) {
       var d = document.createElement("div"); d.className = "photo"; d.setAttribute("data-collected", "1");
-      var img = document.createElement("img"); img.src = URL.createObjectURL(f.blob); img.alt = f.name; d.appendChild(img);
+      var a = document.createElement("a"); a.href = "#"; d._full = URL.createObjectURL(f.blob);
+      a.setAttribute("data-full", d._full); a.setAttribute("data-dl", d._full); a.setAttribute("data-name", "Nieuwe foto " + (i + 1) + " (nog niet opgeslagen)");
+      var img = document.createElement("img"); d._url = URL.createObjectURL(f.thumb || f.blob); img.src = d._url; img.alt = f.name; a.appendChild(img); d.appendChild(a);
       var x = document.createElement("button"); x.type = "button"; x.className = "photo-x"; x.textContent = "×"; x.setAttribute("aria-label", "Foto weghalen");
       x.addEventListener("click", function () { collected.splice(i, 1); render(); persistPhotos(); save(); });
       d.appendChild(x); box.appendChild(d);
     });
+    if (busy) { var w = document.createElement("div"); w.className = "photo photo-wait"; w.setAttribute("data-collected", "1"); w.textContent = "Foto verwerken…"; box.appendChild(w); }
   }
-  function persistPhotos() { return idbPut(KEY, collected.map(function (f) { return { name: f.name, type: f.type, blob: f.blob }; })); }
+  function persistPhotos() { return idbPut(KEY, collected.map(function (f) { return { name: f.name, type: f.type, blob: f.blob, thumb: f.thumb }; })); }
   if (canDT) {
     inputs.forEach(function (inp) {
       inp.removeAttribute("data-preview");   // de verzamelaar toont de voorbeelden zelf
       inp.addEventListener("change", function (e) {
         e.stopImmediatePropagation();
-        Array.prototype.forEach.call(inp.files, function (f, n) {
-          var name = f.name && f.name !== "image.jpg" ? f.name : "foto-" + Date.now() + "-" + n + ".jpg";
-          collected.push({ name: name, type: f.type || "image/jpeg", blob: f });
-        });
-        inp.value = "";
-        render(); persistPhotos(); save();
+        var files = Array.prototype.slice.call(inp.files); inp.value = "";
+        busy += files.length; render();
+        files.reduce(function (p, f, n) {   // één voor één, zodat de telefoon niet vastloopt op geheugen
+          return p.then(function () {
+            return shrink(f).then(function (r) {
+              var base = f.name && f.name !== "image.jpg" ? f.name.replace(/\.[^.]+$/, "") : "foto-" + Date.now() + "-" + n;
+              collected.push({ name: base + ".jpg", type: r.blob.type || "image/jpeg", blob: r.blob, thumb: r.thumb });
+              busy--; render();
+            });
+          });
+        }, Promise.resolve()).then(function () { persistPhotos(); save(); });
       }, true);
     });
   }
 
-  // ---------------------------------------------------------------- opslaan
-  form.addEventListener("submit", function () {
-    if (canDT && collected.length && inputs.length) {
-      var dt = new DataTransfer();
-      collected.forEach(function (f) { dt.items.add(new File([f.blob], f.name, { type: f.type })); });
-      inputs[0].files = dt.files;
-      inputs.slice(1).forEach(function (i) { i.value = ""; });
+  // ---------------------------------------------------------------- opslaan met voortgang (de pagina blijft staan tot alles binnen is)
+  var overlay = null;
+  function progress(pct, text) {
+    if (!overlay) {
+      overlay = document.createElement("div"); overlay.className = "saveoverlay";
+      overlay.innerHTML = '<div class="savebox"><b>Bezig met opslaan…</b><div class="savebar"><i></i></div><span class="savetxt"></span></div>';
+      document.body.appendChild(overlay);
     }
-    try { sessionStorage.setItem(CLEAR, KEY); } catch (e) {}
+    overlay.querySelector("i").style.width = pct + "%";
+    overlay.querySelector(".savetxt").textContent = text || "";
+  }
+  function unlock() { setTimeout(function () { form.querySelectorAll("button").forEach(function (b) { b.disabled = false; }); }, 50); }
+  form.addEventListener("submit", function (e) {
+    if (e.defaultPrevented) return;
+    try { sessionStorage.setItem(CLEAR, KEY); } catch (x) {}
+    if (!canDT || !window.FormData || !window.XMLHttpRequest) return;   // oude browser: gewoon versturen
+    if (busy) { e.preventDefault(); unlock(); alert("Even wachten: de foto's worden nog verwerkt."); return; }
+    e.preventDefault();
+    var submitter = e.submitter;
+    progress(1, collected.length ? "Foto's klaarmaken…" : "");
+    // foto's eerst echt inlezen (iPhone: een bewaard of gekozen bestand kan anders leeg verstuurd worden)
+    Promise.all(collected.map(function (f) {
+      return (f.blob.arrayBuffer ? f.blob.arrayBuffer() : new Response(f.blob).arrayBuffer()).then(function (buf) {
+        if (!buf || buf.byteLength < 500) throw new Error("leeg");
+        return new File([buf], f.name, { type: f.type || "image/jpeg" });
+      });
+    })).then(function (files) { send(files, submitter); }).catch(function () {
+      if (overlay) { overlay.remove(); overlay = null; } unlock();
+      try { sessionStorage.removeItem(CLEAR); } catch (x) {}
+      alert("Een of meer foto's konden niet worden gelezen. Haal die foto's weg (×) en voeg ze opnieuw toe. De tekst is bewaard.");
+    });
   });
+
+  function send(files, submitter) {
+    var fd = new FormData(form);
+    fd.delete("photos");
+    files.forEach(function (f) { fd.append("photos", f); });
+    if (submitter && submitter.name) fd.append(submitter.name, submitter.value);
+    progress(2, files.length ? files.length + " foto" + (files.length === 1 ? "" : "'s") + " versturen" : "");
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", form.getAttribute("action") || location.href);
+    xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) progress(Math.round(ev.loaded / ev.total * 95), Math.round(ev.loaded / 1048576 * 10) / 10 + " van " + Math.round(ev.total / 1048576 * 10) / 10 + " MB"); };
+    xhr.onload = function () {
+      var url = xhr.responseURL || "";
+      if (xhr.status >= 200 && xhr.status < 400 && url && !/\/(login|pin|vergrendel)/.test(url)) {
+        progress(100, "Opgeslagen");
+        if (url.split("#")[0] === location.href.split("#")[0]) {   // formulier opnieuw getoond (bijv. melding): pagina tonen, concept blijft
+          try { sessionStorage.removeItem(CLEAR); } catch (x) {}
+          document.open(); document.write(xhr.responseText); document.close();
+        } else location.href = url;
+        return;
+      }
+      try { sessionStorage.removeItem(CLEAR); } catch (x) {}
+      overlay.remove(); overlay = null; unlock();
+      if (/\/(login|pin|vergrendel)/.test(url)) { alert("Je was vergrendeld. Je bezoek en foto's zijn bewaard: voer je pincode in en sla opnieuw op."); location.href = url; }
+      else alert("Opslaan is niet gelukt (" + (xhr.status || "geen verbinding") + "). Je bezoek en foto's zijn bewaard; probeer het opnieuw.");
+    };
+    xhr.onerror = function () {
+      try { sessionStorage.removeItem(CLEAR); } catch (x) {}
+      if (overlay) { overlay.remove(); overlay = null; } unlock();
+      alert("Geen verbinding. Je bezoek en foto's zijn bewaard op dit apparaat; probeer het opnieuw als je weer bereik hebt.");
+    };
+    xhr.send(fd);
+  }
 
   // ---------------------------------------------------------------- concept terugzetten
   var raw = null;
@@ -130,7 +209,7 @@
     });
   }
   idbGet(KEY).then(function (list) {
-    if (list && list.length && canDT) { collected = list.map(function (f) { return { name: f.name, type: f.type, blob: f.blob }; }); render(); }
+    if (list && list.length && canDT) { collected = list.map(function (f) { return { name: f.name, type: f.type, blob: f.blob, thumb: f.thumb || null }; }); render(); }
     if (restoredText || collected.length) banner(raw ? raw.at : Date.now(), collected.length);
     initial = restoredText ? "" : initial;
   });

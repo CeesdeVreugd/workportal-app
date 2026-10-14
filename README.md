@@ -509,3 +509,4 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Foto's tellen op**: meerdere keren *Foto maken* of *Uit galerij* voegt toe in plaats van te vervangen; met × haal je een foto weg vóór het opslaan.
 - Zolang je bezig bent (typen, tikken) blijft de sessie open; na het maken van een foto wordt niet meer om de pincode gevraagd.
 - Op de telefoon verdwijnt de menubalk onderin zolang het toetsenbord open is. Datum staat over de volle breedte; uren, reistijd en kilometers staan onderaan.
+- (V89) Foto's worden op de telefoon verkleind (max. 2000 px, ±200 kB) vóór het versturen; opslaan toont een voortgangsbalk en de pagina blijft staan tot alles binnen is. Lukt het niet (geen bereik, vergrendeld), dan blijft alles bewaard. Lege of onleesbare foto's worden geweigerd met een melding. Tik op een foto (ook vóór het opslaan) voor groot beeld.

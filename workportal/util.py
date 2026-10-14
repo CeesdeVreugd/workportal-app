@@ -266,13 +266,21 @@ def save_image(entity, entity_id, storage, kind="photo", caption=None, max_side=
 
 
 def save_uploads(entity, entity_id, field="photos", kind="photo", caption=None):
+    """Slaat geüploade foto's/bijlagen op. Lege of onleesbare bestanden worden overgeslagen en geteld in g.upload_skipped."""
     ids = []
+    g.upload_skipped = 0
     for f in request.files.getlist(field):
         if not f or not f.filename:
+            continue
+        head = f.stream.read(16); f.stream.seek(0)
+        if len(head) < 16:
+            g.upload_skipped += 1
             continue
         ext = os.path.splitext(f.filename)[1].lower()
         if ext in IMAGE_EXT or (f.mimetype or "").startswith("image/"):
             fid = save_image(entity, entity_id, f, kind=kind, caption=caption)
+            if not fid:
+                g.upload_skipped += 1
         else:
             if ext not in ALLOWED_EXT:
                 continue
