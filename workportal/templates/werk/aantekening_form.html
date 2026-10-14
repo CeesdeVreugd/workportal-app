@@ -4,7 +4,7 @@
 {% block content %}
 <div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.annot_index', pid=p.id) }}">Aantekeningen</a> / {{ a.number if a else 'Nieuw' }}</div>
 <div class="pagehead"><div><div class="eyebrow">{{ p.number }} · {{ p.name }}</div><h1>{{ 'Aantekening ' ~ a.number if a else 'Nieuwe aantekening' }}</h1></div></div>
-<form method="post" id="annform" class="annlayout" action="{{ url_for(B ~ '.annot_edit', pid=p.id, aid=a.id) if a else url_for(B ~ '.annot_edit', pid=p.id) }}">
+<form method="post" id="annform" class="annlayout" data-draft="annot:{{ g.user.id }}:{{ p.id }}:{{ a.id if a else 'nieuw' }}" action="{{ url_for(B ~ '.annot_edit', pid=p.id, aid=a.id) if a else url_for(B ~ '.annot_edit', pid=p.id) }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="image" id="ann-image" value="">
   <input type="hidden" name="image_changed" id="ann-changed" value="0">

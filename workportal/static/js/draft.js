@@ -13,12 +13,30 @@
       if (document.querySelector(".flash.ok")) {
         cleared = pend;
         localStorage.removeItem("wp_draft:" + pend);
+        if (window.indexedDB) { var r1 = indexedDB.open("wp_drafts", 1); r1.onsuccess = function () { try { r1.result.transaction("photos", "readwrite").objectStore("photos").delete(pend + ":img"); } catch (x) {} }; }
         if (window.indexedDB) { var r0 = indexedDB.open("wp_drafts", 1); r0.onupgradeneeded = function () { r0.result.createObjectStore("photos"); }; r0.onsuccess = function () { try { r0.result.transaction("photos", "readwrite").objectStore("photos").delete(pend); } catch (x) {} }; }
       }
       sessionStorage.removeItem(CLEAR);
     }
   } catch (e) {}
+  // Ook zonder data-draft: elk invulformulier met tekst (niet in Beheer) krijgt automatisch een concept
+  var uid = (document.body.getAttribute("data-uid") || "0");
+  if (!/^\/beheer/.test(location.pathname)) {
+    Array.prototype.forEach.call(document.querySelectorAll("form"), function (f, i) {
+      if (f.hasAttribute("data-draft") || f.hasAttribute("data-no-draft") || (f.method || "").toLowerCase() !== "post") return;
+      var texts = f.querySelectorAll("textarea, input[type=text], input:not([type])");
+      if (!f.querySelector("textarea") && texts.length < 2) return;
+      f.setAttribute("data-draft", "auto:" + uid + ":" + location.pathname + ":" + (f.getAttribute("action") || "") + ":" + i);
+    });
+  }
   document.querySelectorAll("form[data-draft]").forEach(initDraft);
+
+  window.WPDraft = { idbPut: function (k, v) { return idbPutG(k, v); }, idbGet: function (k) { return idbGetG(k); }, idbDel: function (k) { return idbDelG(k); } };
+  function idbG() { return new Promise(function (res, rej) { if (!window.indexedDB) return rej(); var r = indexedDB.open("wp_drafts", 1); r.onupgradeneeded = function () { r.result.createObjectStore("photos"); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
+  function idbPutG(key, val) { return idbG().then(function (db) { return new Promise(function (res) { var tx = db.transaction("photos", "readwrite"); tx.objectStore("photos").put(val, key); tx.oncomplete = res; tx.onerror = res; }); }).catch(function () {}); }
+  function idbGetG(key) { return idbG().then(function (db) { return new Promise(function (res) { var q = db.transaction("photos").objectStore("photos").get(key); q.onsuccess = function () { res(q.result); }; q.onerror = function () { res(null); }; }); }).catch(function () { return null; }); }
+  function idbDelG(key) { return idbG().then(function (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(key); }).catch(function () {}); }
+  window.WPDraft.cleared = function () { return cleared; };
 
   function initDraft(form) {
   var KEY = form.getAttribute("data-draft"), LS = "wp_draft:" + KEY;
@@ -51,7 +69,9 @@
     return d;
   }
   var initial = JSON.stringify(snapshot()), timer = null;
+  var submitting = false;
   function save() {
+    if (submitting) return;
     clearTimeout(timer);
     timer = setTimeout(function () {
       var snap = snapshot(), changed = JSON.stringify(snap) !== initial || collected.length;
@@ -130,10 +150,15 @@
     overlay.querySelector("i").style.width = pct + "%";
     overlay.querySelector(".savetxt").textContent = text || "";
   }
-  function unlock() { setTimeout(function () { form.querySelectorAll("button").forEach(function (b) { b.disabled = false; }); }, 50); }
+  function unlock() { submitting = false; form.removeAttribute("data-submitting"); setTimeout(function () { form.querySelectorAll("button").forEach(function (b) { b.disabled = false; }); }, 50); }
   form.addEventListener("submit", function (e) {
     if (e.defaultPrevented) return;
     try { sessionStorage.setItem(CLEAR, KEY); } catch (x) {}
+    clearTimeout(timer); submitting = true; form.setAttribute("data-submitting", "1");
+    if (!inputs.length) {   // gewoon versturen; werd het toch tegengehouden (bijv. een melding), dan verder bewaren
+      setTimeout(function () { if (e.defaultPrevented) { submitting = false; form.removeAttribute("data-submitting"); try { sessionStorage.removeItem(CLEAR); } catch (x) {} } }, 0);
+      return;
+    }   // geen foto-verzamelaar: gewoon versturen
     if (!canDT || !window.FormData || !window.XMLHttpRequest) return;   // oude browser: gewoon versturen
     if (busy) { e.preventDefault(); unlock(); alert("Even wachten: de foto's worden nog verwerkt."); return; }
     e.preventDefault();
@@ -204,10 +229,11 @@
     var x = document.createElement("button"); x.type = "button"; x.className = "btn sm ghost"; x.textContent = "Concept weggooien";
     x.addEventListener("click", function () {
       if (!confirm("Het teruggezette concept weggooien?")) return;
-      try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); location.reload();
+      try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); idbDel(KEY + ":img"); setTimeout(function () { location.reload(); }, 150);
     });
     b.appendChild(x); form.parentNode.insertBefore(b, form);
     form.classList.remove("hidden");
+    var det = form.closest("details"); if (det) det.open = true;
   }
   var restoredText = false;
   if (raw && raw.fields) {

@@ -36,7 +36,7 @@
 })();
 </script>
 </head>
-<body data-idle="{{ idle_minutes() }}">
+<body data-idle="{{ idle_minutes() }}" data-uid="{{ g.user.id if g.user else 0 }}">
 {% set ep = request.endpoint or '' %}
 {% macro navlink(endpoint, label, ico, prefix) -%}
 <a href="{{ url_for(endpoint) }}" class="{{ 'active' if ep.startswith(prefix) }}">{{ icon(ico) }}<span>{{ label }}</span></a>

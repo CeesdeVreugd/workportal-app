@@ -29,7 +29,7 @@
     empty.hidden = on; cv.hidden = !on; tools.hidden = !on || !!crop; cropbar.hidden = !crop; removeBtn.hidden = !on;
   }
   function setBase(src, isNew) {
-    base = toCanvas(src); cv.width = base.width; cv.height = base.height;
+    base = toCanvas(src); cv.width = base.width; cv.height = base.height; baseBlobP = null;
     marks = []; cur = null; crop = null;
     if (isNew) changed = true;
     removed = false;
@@ -55,7 +55,38 @@
   }
 
   var seed = edit.getAttribute("data-seed");
-  if (seed) loadUrl(seed, seed.indexOf("data:") === 0, seed.indexOf("data:") === 0);
+  // Concept van de afbeelding met markeringen (bewaard op dit apparaat tot het opslaan gelukt is)
+  var DFORM = form.getAttribute("data-draft"), DKEY = DFORM ? DFORM + ":img" : null;
+  var baseBlobP = null, ptimer = null, restoring = false;
+  function persistImg() {
+    if (!DKEY || !window.WPDraft || restoring || form.hasAttribute("data-submitting")) return;
+    clearTimeout(ptimer);
+    ptimer = setTimeout(function () {
+      if (form.hasAttribute("data-submitting")) return;
+      if (removed && !base) { WPDraft.idbPut(DKEY, { removed: true, at: Date.now() }); return; }
+      if (!base || !changed || crop) return;
+      if (!baseBlobP) { var b0 = base; baseBlobP = new Promise(function (r) { b0.toBlob(r, "image/jpeg", 0.9); }); }
+      baseBlobP.then(function (b) { if (b) WPDraft.idbPut(DKEY, { base: b, marks: marks.slice(), at: Date.now() }); });
+    }, 700);
+  }
+  function startSeed() { if (seed) loadUrl(seed, seed.indexOf("data:") === 0, seed.indexOf("data:") === 0); }
+  function restoredNotice() {
+    var n = document.createElement("div"); n.className = "flash info"; n.style.maxWidth = "100%";
+    n.textContent = "De afbeelding met markeringen van je vorige keer is teruggezet. Controleer en sla op.";
+    form.parentNode.insertBefore(n, form);
+  }
+  var fresh3D = seed && seed.indexOf("data:") === 0;
+  if (DKEY && window.WPDraft && !fresh3D && WPDraft.cleared() !== DFORM) {
+    WPDraft.idbGet(DKEY).then(function (d) {
+      if (d && d.base && Date.now() - d.at < 14 * 864e5) {
+        restoring = true;
+        var im = new Image();
+        im.onload = function () { setBase(im, true); marks = d.marks || []; restoring = false; redraw(); restoredNotice(); };
+        im.onerror = function () { restoring = false; startSeed(); };
+        im.src = URL.createObjectURL(d.base);
+      } else startSeed();
+    });
+  } else startSeed();
 
   // ------------------------------------------------------------ tekenen
   function drawMark(m, c) {
@@ -126,6 +157,7 @@
     ctx.drawImage(base, 0, 0);
     marks.forEach(function (m) { drawMark(m, ctx); });
     if (cur) drawMark(cur, ctx);
+    if (!cur && typeof persistImg === "function") persistImg();
   }
   function norm(r) { return { x: Math.min(r.x1, r.x2), y: Math.min(r.y1, r.y2), w: Math.abs(r.x2 - r.x1), h: Math.abs(r.y2 - r.y1) }; }
   function nextNum() { var n = 0; marks.forEach(function (m) { if (m.t === "num") n = Math.max(n, m.n); }); return n + 1; }
@@ -230,7 +262,7 @@
   });
   removeBtn.addEventListener("click", function () {
     if (!confirm("Afbeelding weghalen?")) return;
-    base = null; marks = []; crop = null; removed = true; changed = true; showEditor(false);
+    base = null; marks = []; crop = null; removed = true; changed = true; showEditor(false); persistImg();
   });
   document.addEventListener("paste", function (e) {
     var items = (e.clipboardData && e.clipboardData.items) || [];
