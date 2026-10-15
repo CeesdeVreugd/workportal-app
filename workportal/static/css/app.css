@@ -868,3 +868,33 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 /* Inlogscherm: logo en kop nooit laten krimpen (iPhone bij opstart) */
 .auth-card > *, .auth-brand > * { flex-shrink: 0; }
 @media (max-width: 900px) { .auth { overflow-y: auto; height: auto; } .auth-card { height: auto; min-height: 100%; } }
+
+/* Bezoek: kop, statuslabels en een nette knoppenbalk */
+.rowitem.visit { flex-direction: column; align-items: stretch; gap: 10px; }
+.vbadges { display: flex; flex-wrap: wrap; gap: 6px; }
+.vbadges .badge { white-space: normal; display: inline-flex; align-items: center; gap: 5px; }
+.vbadges .badge svg { width: 14px; height: 14px; }
+.vbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; padding: 10px 0 2px; border-top: 1px solid var(--line-2); }
+.vbar > .btn, .vbar > .vclose > summary { display: inline-flex; align-items: center; justify-content: center; }
+.vbar > .vdel { margin: 0 0 0 auto; display: flex; }
+.vbar > .vdel .btn { height: 100%; }
+.vbar > .vclose { flex: 1 1 100%; }
+.vbar > .vclose[open] > form { width: auto; }
+@media (max-width: 699px) {
+  .vbar > .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; }
+  .vbar > .vmain { flex: 1 1 100%; }
+  .vbar > .vdel { flex: 0 0 auto; }
+  .vbar > .vclose > summary { width: 100%; }
+}
+
+/* Aantekeningen-kop: titel + teller, daaronder/ernaast een nette knoppenbalk */
+.annhead { flex-wrap: wrap; align-items: flex-start; }
+.annhead .small { margin-top: 2px; }
+.annbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.annbar > .btn { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+@media (max-width: 699px) {
+  .annhead { flex-direction: column; align-items: stretch; gap: 10px; }
+  .annbar { flex-wrap: nowrap; }
+  .annbar > .btn { flex: 1 1 0; min-width: 0; }
+  .annbar > .btn.primary { flex: 1.4 1 0; }
+}

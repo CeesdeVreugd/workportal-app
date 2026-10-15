@@ -513,3 +513,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - (V91) **Foto's bij notities**: bij ticketnotities en gespreksnotities kun je foto's maken of uit de galerij kiezen (verkleind, met groot beeld). Ook voor notities wordt een concept bewaard. Het notitieformulier bij een ticket staat standaard dichtgeklapt.
 - (V92) **Werkbon versturen** ook zonder handtekening: na *Afronden zonder handtekening* opent direct het verstuurscherm (aan/cc/kopie aan mij, onderwerp, tekst, SharePoint), en bij elk afgerond bezoek staat een knop *Versturen*. Laatst verstuurd naar/op staat bij het bezoek.
 - (V93) **Nooit meer iets kwijt**: elk invulformulier met tekst (tickets, projecten, notities, druktesten, aantekeningen …, niet in Beheer) bewaart tijdens het typen een concept op het apparaat. Bij een aantekening wordt ook de afbeelding met pijlen en tekst bewaard. Bij terugkomst staat alles er weer; na een geslaagd opslaan verdwijnt het concept.
+
+## V94 – Knoppen bij een servicebezoek
+- Per bezoek: kop (datum, monteur, uren), daaronder de statuslabels (getekend / afgerond zonder handtekening, verstuurd, SharePoint) en een aparte knoppenbalk.
+- Open bezoek: "Handtekening & afronden" als hoofdknop over de volle breedte (mobiel), daaronder Bewerken, Werkbon en verwijderen; "Afronden zonder handtekening" eronder.
+- Afgerond bezoek: Werkbon en Versturen naast elkaar, prullenbak rechts.
+
+## V95 – Kop van Aantekeningen in een project
+- Titel "Aantekeningen" met daaronder de teller (x open · y totaal).
+- Knoppenbalk: "+ Aantekening" (hoofdknop), PDF en "Alles (n)"; op de telefoon even breed naast elkaar onder de titel, op de computer rechts.

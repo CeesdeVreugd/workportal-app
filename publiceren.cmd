@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V93: concept bewaren voor alle invulformulieren en voor aantekeningen (afbeelding met markeringen)"
+set "OMSCHRIJVING=WorkPortal V95: knoppen bij aantekeningen in een project netjes uitgelijnd"
 
 echo.
 echo ============================================
