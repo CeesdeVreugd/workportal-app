@@ -243,23 +243,45 @@ def notify_pending(conn):
     _notify(conn, [dict(r) for r in rows])
 
 
-def _notify(conn, items):
+def notify_targets(conn):
+    """Wie krijgt een melding over ordermappen met actie nodig: (gebruikers-id's, ook e-mail?).
+    Instelbaar in Beheer > DC01; zonder instelling: iedereen met de rol verkoop of directie."""
+    raw = sp.setting(conn, "komdex_notify_users")
+    email = (sp.setting(conn, "komdex_notify_email") or "1") == "1"
+    if raw is not None and raw != "":
+        try:
+            ids = [int(x) for x in json.loads(raw)]
+        except (ValueError, TypeError):
+            ids = []
+        rows = conn.execute(f"SELECT id FROM users WHERE active = 1 AND id IN ({','.join('?' * len(ids)) or 'NULL'})", ids).fetchall()
+        return [r["id"] for r in rows], email
     roles = [r.strip() for r in (sp.setting(conn, "komdex_notify_roles") or "verkoop,directie").split(",") if r.strip()]
-    if not roles or not items:
-        return
-    users = conn.execute(
+    if not roles:
+        return [], email
+    rows = conn.execute(
         "SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id"
         f" WHERE u.active = 1 AND r.key IN ({','.join('?' * len(roles))})", roles).fetchall()
+    return [r["id"] for r in rows], email
+
+
+def _notify(conn, items):
+    users, email = notify_targets(conn)
+    if not users or not items:
+        return
+    # reden erbij (bijv. onbekend ordertype of klant niet herkend), zodat meteen duidelijk is wat er ingevuld moet worden
+    notes = {r["id"]: r["note"] for r in conn.execute(
+        f"SELECT id, note FROM order_inbox WHERE id IN ({','.join('?' * len(items))})", [i["id"] for i in items])} if all("id" in i for i in items) else {}
     if len(items) == 1:
         it = items[0]
-        title = f"Nieuwe order uit Komdex: {it['number']}"
-        body = f"{it['folder']}. Zet hem goed als project of order in WorkPortal."
+        title = f"Nieuwe order {it['number']} moet nog goed gezet worden"
+        why = notes.get(it.get("id"))
+        body = f"{it['folder']}." + (f" {why}" if why else "") + " Zet hem goed als project of order in WorkPortal."
     else:
-        title = f"{len(items)} nieuwe orders uit Komdex"
-        body = ", ".join(i["number"] for i in items[:10]) + (" …" if len(items) > 10 else "") + ". Zet ze goed in WorkPortal."
+        title = f"{len(items)} nieuwe orders moeten nog goed gezet worden"
+        body = ", ".join(i["number"] for i in items[:10]) + (" …" if len(items) > 10 else "") + ". Zet ze goed in WorkPortal (Orders > Actievenster)."
     for u in users:
         try:
-            notify_user(conn, u["id"], title, body, url="/orders/inbox")
+            notify_user(conn, u, title, body, url="/orders/inbox", email=email)
         except Exception as exc:  # pragma: no cover - netwerk
             print(f"[WorkPortal] Melding nieuwe order mislukt: {exc}", flush=True)
 

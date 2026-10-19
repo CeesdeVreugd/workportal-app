@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V100: komdex-orders.ps1 - logboek kan het script niet meer laten stoppen"
+set "OMSCHRIJVING=WorkPortal V101: instelbaar wie meldingen krijgt over orders die nog goed gezet moeten worden"
 
 echo.
 echo ============================================

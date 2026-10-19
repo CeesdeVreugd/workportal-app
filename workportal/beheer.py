@@ -269,6 +269,17 @@ def sharepoint_snelstart():
 def dc01():
     """Sync met de Komdex-ordermappen op de server DC01 (via het script komdex-orders.ps1)."""
     from . import komdex
+    if request.method == "POST" and request.form.get("action") == "meldingen":
+        import json as _json
+        conn = get_db()
+        ids = sorted({to_int(x) for x in request.form.getlist("notify_user") if to_int(x)})
+        sp.set_setting(conn, "komdex_notify_users", _json.dumps(ids))
+        sp.set_setting(conn, "komdex_notify_email", "1" if request.form.get("notify_email") == "1" else "0")
+        names = [r["name"] for r in query(f"SELECT name FROM users WHERE id IN ({','.join('?' * len(ids)) or 'NULL'})", ids)]
+        audit("instellingen", "komdex", None, "Meldingen orders met actie nodig: " + (", ".join(names) or "niemand"))
+        flash("Opgeslagen: " + (", ".join(names) + " krijg" + ("t" if len(names) == 1 else "en") + " een melding" if names
+                                else "niemand krijgt nog een melding") + ".", "ok")
+        return redirect(url_for("beheer.dc01"))
     if request.method == "POST":
         ids = [to_int(x) for x in request.form.getlist("ids") if to_int(x)]
         if request.form.get("action") == "opnieuw" and ids:
@@ -336,8 +347,12 @@ def dc01():
                    " SUM(status = 'nieuw' AND missing = 0) AS actie, SUM(missing = 1) AS weg,"
                    " SUM(nacalc_sig IS NOT NULL) AS nacalc, SUM(nacalc_note IS NOT NULL) AS nacalc_fout,"
                    " SUM(status = 'genegeerd') AS genegeerd FROM order_inbox", one=True)
+    n_users, n_email = komdex.notify_targets(get_db())
+    staff = query("SELECT u.id, u.name, GROUP_CONCAT(r.name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id"
+                  " LEFT JOIN roles r ON r.id = ur.role_id WHERE u.active = 1 GROUP BY u.id ORDER BY u.name")
     return render_template("beheer/dc01.html", items=items, counts=counts, flt=flt, q=q, status=komdex.status(),
-                           order_dir=sp.setting(get_db(), "komdex_order_dir"))
+                           order_dir=sp.setting(get_db(), "komdex_order_dir"), staff=staff, notify_ids=set(n_users),
+                           notify_email=n_email, notify_custom=bool(sp.setting(get_db(), "komdex_notify_users")))
 
 
 @bp.route("/printen", methods=["GET", "POST"])

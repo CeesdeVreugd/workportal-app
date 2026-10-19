@@ -551,3 +551,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V100 – Script komdex-orders.ps1: logboek
 - Oorzaak dat er sinds 18-10 geen orderbonnen meer binnenkwamen: het logbestand werd groter dan 1 MB; het inkorten (Get-Content | Set-Content op hetzelfde bestand) gaf "bestand in gebruik", waardoor het script na de mappenlijst stopte en de orderbonnen nooit verstuurde.
 - Log-functie: eerst inlezen, dan overschrijven, en fouten bij het loggen worden genegeerd. Moet op DC01 worden bijgewerkt.
+
+## V101 – Meldingen over orders die nog goed gezet moeten worden
+- Beheer > DC01 > "Meldingen": kies per persoon wie een melding krijgt als een nieuwe ordermap na 10 minuten nog in het actievenster staat, en of dat push + e-mail of alleen push is.
+- Instellingen `komdex_notify_users` (JSON-lijst met gebruikers-id's) en `komdex_notify_email`; zonder instelling blijft de standaard (rol verkoop/directie).
+- De melding noemt nu ook de reden (bijv. onbekend ordertype of klant niet herkend).

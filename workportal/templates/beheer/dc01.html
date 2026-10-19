@@ -35,6 +35,19 @@
   </section>
 </div>
 
+<section class="card" id="meldingen">
+  <div class="card-head"><h2>Meldingen: orders die nog goed gezet moeten worden</h2></div>
+  <p class="muted small" style="margin-top:-6px">Staat een nieuwe ordermap na 10 minuten nog in het actievenster (bijv. onbekend ordertype of klant niet herkend), dan krijgen deze mensen een melding met de reden erbij.{% if not notify_custom %} Nu nog de standaard: iedereen met de rol verkoop of directie.{% endif %}</p>
+  <form method="post" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="meldingen">
+    <div class="pchips">{% for u in staff %}<label class="pchip" title="{{ u.roles or '' }}"><input type="checkbox" name="notify_user" value="{{ u.id }}" {{ 'checked' if u.id in notify_ids }}><span>{{ u.name }}</span></label>{% endfor %}</div>
+    <div class="fgrid" style="margin-top:12px"><label class="f">Hoe<select name="notify_email">
+      <option value="1" {{ 'selected' if notify_email }}>Pushmelding en e-mail</option>
+      <option value="0" {{ 'selected' if not notify_email }}>Alleen pushmelding</option></select></label></div>
+    <div class="actions"><button class="btn primary">Opslaan</button></div>
+  </form>
+</section>
+
 <form class="search" style="max-width:none" method="get">
   <input type="hidden" name="filter" value="{{ flt }}">
   {{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op ordernummer, map of klant">
