@@ -213,7 +213,9 @@ def next_number(table, prefix, width=4, yearly=True):
 # ---------------------------------------------------------------- bestanden
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".bmp"}
-ALLOWED_EXT = IMAGE_EXT | {".pdf", ".xlsx", ".xls", ".docx", ".doc", ".txt", ".csv", ".dwg", ".dxf", ".step", ".stp", ".zip"}
+ALLOWED_EXT = IMAGE_EXT | {".pdf", ".xlsx", ".xls", ".xlsm", ".docx", ".doc", ".docm", ".rtf", ".odt", ".ods", ".pptx", ".ppt",
+                           ".txt", ".csv", ".msg", ".eml", ".dwg", ".dxf", ".step", ".stp", ".igs", ".iges", ".zip"}
+ATTACH_ACCEPT = ",".join(sorted(ALLOWED_EXT))
 
 
 def upload_dir():

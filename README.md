@@ -522,3 +522,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V95 – Kop van Aantekeningen in een project
 - Titel "Aantekeningen" met daaronder de teller (x open · y totaal).
 - Knoppenbalk: "+ Aantekening" (hoofdknop), PDF en "Alles (n)"; op de telefoon even breed naast elkaar onder de titel, op de computer rechts.
+
+## V96 – Dashboard, Word-viewer en bijlagen bij gespreksnotities
+- Dashboard: "Aantekeningen met een actie voor mij" toont de eerste 3; knop "Toon alle n" klapt de rest uit.
+- Word-viewer (`/word?src=…`, `docview.py`): .docx-bestanden lezen binnen de app (projectmappen in SharePoint én bijlagen overal), met terug-knop en "Opslaan/delen".
+  Eigen omzetter zonder extra pakketten: koppen, opmaak, lijsten/nummering, tabellen (samengevoegde cellen, arcering), afbeeldingen, kop-/voettekst, voetnoten, links (alleen http/mailto/tel).
+  Oude .doc-bestanden: melding + downloadknop. Gedeelde bronlader `_viewer_src()` voor Excel- en Word-viewer.
+- Bijlagen tonen overal als nette regels met type-icoon; PDF, Word en Excel openen in de viewer, andere typen downloaden.
+- Gespreksnotities: "Bestand bijvoegen" (Word, Excel, PDF, tekening, e-mail …). Bijlagen worden als concept op het apparaat bewaard tot opslaan gelukt is (IndexedDB, `KEY:att`, tot 40 MB).
+  Bij bewerken: huidige foto's/bijlagen aanvinken om te verwijderen (`del_file`). Extra toegestane typen: .xlsm, .docm, .rtf, .odt, .ods, .pptx, .ppt, .msg, .eml, .igs, .iges.

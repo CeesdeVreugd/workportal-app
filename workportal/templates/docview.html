@@ -1,0 +1,100 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+<style>
+  .dv-wrap { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; background: #E9ECF3; padding: 18px 12px calc(28px + env(safe-area-inset-bottom)); }
+  .dv-paper { margin: 0 auto; background: #fff; box-shadow: 0 1px 3px rgba(20,22,58,.12), 0 6px 24px rgba(20,22,58,.08); border-radius: 4px;
+    color: #14163A; font-family: Calibri, Carlito, "Segoe UI", Ubuntu, Arial, sans-serif; line-height: 1.32; overflow-wrap: anywhere; transform-origin: top center; }
+  .dv-paper p, .dv-paper h1, .dv-paper h2, .dv-paper h3, .dv-paper h4, .dv-paper h5, .dv-paper h6 { margin: 0 0 6px; }
+  .dv-paper h1 { font-size: 1.9em; font-weight: 600; color: #0A0A96; } .dv-paper h2 { font-size: 1.45em; font-weight: 600; color: #0A0A96; }
+  .dv-paper h3 { font-size: 1.22em; font-weight: 600; color: #0A0A96; } .dv-paper h4, .dv-paper h5, .dv-paper h6 { font-size: 1.05em; font-weight: 600; }
+  .dv-paper .dv-empty { min-height: 1em; }
+  .dv-paper img { max-width: 100%; height: auto; vertical-align: middle; }
+  .dv-paper a { color: #0059B3; }
+  .dv-num { display: inline-block; text-indent: 0; }
+  .dv-tab { display: inline-block; width: 3em; }
+  .dv-page { border: 0; border-top: 2px dashed #C9CEDD; margin: 22px -20px; }
+  .dv-tw { overflow-x: auto; margin: 4px 0 10px; max-width: 100%; }
+  .dv-t { border-collapse: collapse; max-width: none; table-layout: fixed; }
+  .dv-t td, .dv-t th { padding: 3px 6px; vertical-align: top; text-align: left; font-weight: inherit; }
+  .dv-t.dv-grid td, .dv-t.dv-grid th { border: 1px solid #9AA0B4; }
+  .dv-t p { margin: 0; }
+  .dv-box { border: 1px solid #D5DAE8; border-radius: 4px; padding: 6px 8px; margin: 4px 0; }
+  .dv-float { display: block; }
+  .dv-noimg { display: inline-block; font-size: 12px; color: #8A4B08; background: #FEF3E2; padding: 2px 8px; border-radius: 6px; }
+  .dv-hdr { border-bottom: 1px dashed #D5DAE8; margin-bottom: 14px; padding-bottom: 8px; font-size: .92em; color: #3A3F60; }
+  .dv-ftr { border-top: 1px dashed #D5DAE8; margin-top: 18px; padding-top: 8px; font-size: .85em; color: #5A5F80; }
+  .dv-notes { border-top: 1px solid #D5DAE8; margin-top: 20px; padding-top: 8px; font-size: .85em; }
+  .dv-fnref a { text-decoration: none; }
+  .dv-err { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px; color: #14163A; }
+  .xv-zoom { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 6px; z-index: 5; }
+  .xv-zoom button { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(20,22,58,.85); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+  @media (max-width: 699px) { .dv-wrap { padding: 10px 8px calc(70px + env(safe-area-inset-bottom)); } }
+</style>
+</head>
+<body class="v3d-body">
+<div class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" id="xv-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b>{{ title }}</b><span>Word · alleen lezen</span></div>
+    <button type="button" class="iconbtn light" id="xv-dl" data-src="{{ dl }}" data-name="{{ title }}" aria-label="Opslaan of delen" title="Downloaden / openen in Word">{{ icon('download') }}</button>
+  </header>
+  <main class="dv-wrap" id="dv-wrap">
+    {% if error %}
+      <div class="dv-err"><p>{{ error }}</p><button type="button" class="btn primary" onclick="document.getElementById('xv-dl').click()">{{ icon('download') }}Bestand downloaden</button></div>
+    {% else %}
+      <article class="dv-paper" id="dv-paper" data-w="{{ doc.width }}" style="width:{{ doc.width }}px;padding:{{ doc.pad_t }}px {{ doc.pad_r }}px {{ doc.pad_b }}px {{ doc.pad_l }}px;font-size:{{ doc.font }}px">{{ doc.html|safe }}</article>
+      <div class="xv-zoom"><button type="button" id="xv-out" aria-label="Kleiner">−</button><button type="button" id="xv-in" aria-label="Groter">+</button></div>
+    {% endif %}
+  </main>
+</div>
+<script>
+(function () {
+  var back = document.getElementById("xv-back");
+  back.addEventListener("click", function (e) {
+    if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+  });
+  // Pagina passend maken: op de telefoon wordt het papier smaller (tekst loopt door) in plaats van piepklein
+  var paper = document.getElementById("dv-paper"), wrap = document.getElementById("dv-wrap");
+  if (paper) {
+    var W = parseFloat(paper.getAttribute("data-w")) || 794, z = 1;
+    var pad = paper.style.padding;
+    function fit() {
+      var avail = wrap.clientWidth - (window.innerWidth < 700 ? 16 : 24);
+      if (avail < W) {
+        paper.style.width = Math.max(280, avail) + "px";
+        if (window.innerWidth < 700) paper.style.padding = "18px 16px 24px";
+      } else { paper.style.width = W + "px"; paper.style.padding = pad; }
+      // tabellen op een smal scherm passend maken (blijft scrollbaar als het echt niet past)
+      paper.querySelectorAll(".dv-t[data-w]").forEach(function (t) { t.style.width = avail < W ? "100%" : t.getAttribute("data-w"); });
+      paper.style.zoom = z;
+    }
+    fit(); window.addEventListener("resize", fit);
+    document.getElementById("xv-in").addEventListener("click", function () { z = Math.min(2.5, z * 1.15); fit(); });
+    document.getElementById("xv-out").addEventListener("click", function () { z = Math.max(0.5, z / 1.15); fit(); });
+  }
+  // downloaden zonder de app te verlaten: telefoon -> deelmenu (openen in Word, bewaren), computer -> downloaden
+  var dl = document.getElementById("xv-dl");
+  dl.addEventListener("click", function () {
+    var name = dl.getAttribute("data-name") || "document.docx";
+    dl.disabled = true;
+    fetch(dl.getAttribute("data-src"), { credentials: "same-origin" }).then(function (r) { if (!r.ok) throw new Error(); return r.blob(); }).then(function (blob) {
+      var file = null;
+      try { file = new File([blob], name.replace(/[\\/:*?"<>|]+/g, "_"), { type: blob.type || "application/octet-stream" }); } catch (x) {}
+      if (file && navigator.canShare && /Android|iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 0 && navigator.canShare({ files: [file] }))
+        return navigator.share({ files: [file] }).catch(function () {});
+      var u = URL.createObjectURL(blob), l = document.createElement("a"); l.href = u; l.download = file ? file.name : name;
+      document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    }).catch(function () { alert("Downloaden lukte niet."); }).then(function () { dl.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>

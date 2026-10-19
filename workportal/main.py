@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, render_template, request, g, send_file, abort, jsonify, url_for
 
 from .db import query, execute, get_db
@@ -45,7 +46,7 @@ def dashboard():
             " ORDER BY n.follow_up LIMIT 10", (g.user["id"],))
     if can("projecten") or can("orders"):
         from .aantekeningen import open_for_user
-        data["annots"] = open_for_user(g.user["id"])
+        data["annots"] = open_for_user(g.user["id"], limit=200)
         data["today"] = now_iso()[:10]
     return render_template("dashboard.html", d=data)
 
@@ -144,15 +145,14 @@ def api_printers():
                                  for p in printix.allowed_printers(conn)]})
 
 
-@bp.route("/excel")
-def xlsview():
-    """Excel (of CSV) bekijken binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""
+def _viewer_src():
+    """Leest het bestand achter src (een link naar een bestand in WorkPortal) voor de Excel- en Word-viewer.
+    Geeft (naam, data, foutmelding, terug-url, download-url)."""
     from urllib.parse import urlsplit, parse_qs
     from flask import current_app
     import requests
     from werkzeug.exceptions import HTTPException
     from . import sharepoint as sp
-    from .xlsview import render, MAX_ROWS, MAX_COLS
     src = request.args.get("src") or ""
     if not src.startswith("/") or src.startswith("//") or "\\" in src:
         abort(400)
@@ -165,7 +165,7 @@ def xlsview():
     except HTTPException:
         abort(404)
     qs = parse_qs(u.query)
-    error, sheets, name, data = None, [], "", None
+    error, name, data = None, "", None
     if endpoint in ("projecten.project_file", "orders.project_file"):
         from .werk import _project_sp
         _project_sp(args["pid"])
@@ -186,19 +186,46 @@ def xlsview():
     elif endpoint == "main.file":
         row = _file_row(args["fid"])
         name = row["filename"]
-        with open(file_path(row), "rb") as fh:
-            data = fh.read()
+        if os.path.getsize(file_path(row)) > 20 * 1048576:
+            error = "Dit bestand is te groot om hier te bekijken (meer dan 20 MB). Download het bestand."
+        else:
+            with open(file_path(row), "rb") as fh:
+                data = fh.read()
     else:
         abort(400)
+    dl = src + ("&" if "?" in src else "?") + "download=1"
+    return name, data, error, back, dl
+
+
+@bp.route("/excel")
+def xlsview():
+    """Excel (of CSV) bekijken binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""
+    from .xlsview import render, MAX_ROWS, MAX_COLS
+    name, data, error, back, dl = _viewer_src()
+    sheets = []
     if data is not None:
         try:
             sheets = render(data, name)
         except ValueError as exc:
             error = str(exc)
     title = (request.args.get("titel") or name or "Excel")[:150]
-    dl = src + ("&" if "?" in src else "?") + "download=1"
     return render_template("xlsview.html", sheets=sheets, error=error, back=back, title=title, dl=dl,
                            max_rows=MAX_ROWS, max_cols=MAX_COLS)
+
+
+@bp.route("/word")
+def docview():
+    """Word-document (.docx) lezen binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""
+    from .docview import render
+    name, data, error, back, dl = _viewer_src()
+    doc = None
+    if data is not None:
+        try:
+            doc = render(data)
+        except ValueError as exc:
+            error = str(exc)
+    title = (request.args.get("titel") or name or "Word")[:150]
+    return render_template("docview.html", doc=doc, error=error, back=back, title=title, dl=dl)
 
 
 @bp.route("/pdf")

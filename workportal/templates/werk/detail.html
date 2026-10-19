@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/orderprops.html" import order_props %}
-{% from "partials/macros.html" import ticket_status, calc_status, photos %}
+{% from "partials/macros.html" import ticket_status, calc_status, photos, attachments %}
 {% block title %}{{ K.label }} {{ p.number }}{% endblock %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / {{ p.number }}</div>
@@ -66,6 +66,11 @@
     <div class="f full"><span>Foto's</span>
       <div class="notephotos"><label class="addphoto sm">{{ icon('camera') }}Foto maken<input type="file" name="photos" accept="image/*" capture="environment" multiple data-preview="{{ pv }}" {{ 'data-collect' if not n }}></label><label class="addphoto sm">{{ icon('image') }}Uit galerij<input type="file" name="photos" accept="image/*" multiple data-preview="{{ pv }}" {{ 'data-collect' if not n }}></label></div>
       <div class="photos" id="{{ pv }}"></div></div>
+    {% set av = 'pnoteatt' ~ (n.id if n else '') %}
+    <div class="f full"><span>Bijlagen <span class="muted small">(Word, Excel, PDF, tekening, e-mail …)</span></span>
+      <div class="attpick"><label class="addphoto sm">{{ icon('clip') }}Bestand bijvoegen<input type="file" name="files" multiple accept="{{ ATTACH_ACCEPT }}" data-attach="{{ av }}"></label></div>
+      <div class="attnew" id="{{ av }}"></div>
+      {% if n %}{% set cur = nfiles.get(n.id, []) %}{% if cur %}<div class="small muted" style="margin-top:8px">Huidige foto's en bijlagen – vink aan wat weg moet:</div>{{ attachments(cur, 'del_file') }}{% endif %}{% endif %}</div>
   </div>
 {% endmacro %}
 <section class="card" id="notities">

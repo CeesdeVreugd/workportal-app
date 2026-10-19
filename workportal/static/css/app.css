@@ -898,3 +898,24 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
   .annbar > .btn { flex: 1 1 0; min-width: 0; }
   .annbar > .btn.primary { flex: 1.4 1 0; }
 }
+
+/* Dashboard: lijst inklappen tot 3 */
+.rowitem[hidden] { display: none !important; }
+.dash-more { margin-top: 8px; width: 100%; justify-content: center; }
+
+/* Bijlagen (Word, Excel, PDF, tekeningen …) */
+.attlist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.attrow { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px 4px 4px; background: #fff; }
+.attmain { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 4px; color: inherit; text-decoration: none; }
+.attico { flex: none; width: 40px; height: 40px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: #fff; background: #6B7090; }
+.att-pdf { background: #D93025; } .att-docx, .att-doc { background: #2B579A; } .att-xlsx, .att-xls, .att-csv { background: #217346; }
+.att-dwg, .att-dxf, .att-step, .att-stp { background: #B26A00; } .att-zip { background: #5A5F80; }
+.attname { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attmeta { display: block; font-size: 12.5px; color: var(--muted, #5A5F80); }
+.attdel { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--bad, #C62828); white-space: nowrap; padding: 0 4px; }
+/* nog niet opgeslagen bijlagen in een formulier */
+.attpick { display: flex; flex-wrap: wrap; gap: 8px; }
+.attnew { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.attnew:empty { display: none; }
+.attnew .attrow { padding: 6px 6px 6px 4px; }
+.attnew .attx { flex: none; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--line-2); color: var(--ink-2); font-size: 20px; line-height: 1; cursor: pointer; }

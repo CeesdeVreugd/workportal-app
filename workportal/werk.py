@@ -193,7 +193,7 @@ def detail(pid):
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
-                           note_lines=note_lines, nfiles=nfiles,
+                           note_lines=note_lines, nfiles=nfiles, ATTACH_ACCEPT=__import__("workportal.util", fromlist=["x"]).ATTACH_ACCEPT,
                            NOTE_KINDS=NOTE_KINDS, can_note=_can_note(p), today=now_iso()[:10],
                            folder_name=sp.folder_name(p["number"], p["name"], p["kind"]), can_print=_can_print(),
                            oprops=__import__("workportal.komdex", fromlist=["order_props"]).order_props(p))
@@ -276,10 +276,24 @@ def note_save(pid, nid=None):
                       " VALUES (?,?,?,?,?,?,?,?,?)", vals + (pid, g.user["id"], now_iso()))
         audit("gespreksnotitie", "project", pid, (kind + ": " + body)[:120])
         flash("Gespreksnotitie opgeslagen.", "ok")
-    from .util import save_uploads
+    from .util import save_uploads, delete_file, ALLOWED_EXT
+    removed = 0
+    for fid in request.form.getlist("del_file"):
+        if fid.isdigit() and query("SELECT id FROM files WHERE id = ? AND entity = 'project_note' AND entity_id = ?", (int(fid), nid), one=True):
+            delete_file(int(fid))
+            removed += 1
     save_uploads("project_note", nid)
-    if getattr(g, "upload_skipped", 0):
-        flash(f"{g.upload_skipped} foto('s) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
+    skipped = getattr(g, "upload_skipped", 0)
+    names = [f.filename for f in request.files.getlist("files") if f and f.filename]
+    added = save_uploads("project_note", nid, field="files")
+    skipped += getattr(g, "upload_skipped", 0)
+    refused = [n for n in names if os.path.splitext(n)[1].lower() not in ALLOWED_EXT]
+    if added:
+        audit("bijlage", "project", pid, f"{len(added)} bijlage(n) bij gespreksnotitie")
+    if skipped:
+        flash(f"{skipped} bestand(en) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
+    if refused:
+        flash("Dit soort bestand kan niet worden bijgevoegd: " + ", ".join(refused[:5]), "error")
     return redirect(target)
 
 

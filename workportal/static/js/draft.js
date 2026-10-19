@@ -1,6 +1,7 @@
 /* Concept bewaren voor formulieren met data-draft="sleutel" (bijv. een servicebezoek).
    - Tekstvelden worden tijdens het typen bewaard op dit apparaat (localStorage).
    - Foto's uit invoervelden met data-collect worden verzameld (meerdere keren foto maken telt op) en bewaard in IndexedDB.
+   - Bijlagen uit invoervelden met data-attach="id-van-lijst" (Word, Excel, PDF …) ook, onverkleind.
    - Gaat er iets mis (app herstart, vergrendeld, verbinding weg), dan wordt het concept bij terugkomst teruggezet.
    - Het concept wordt pas weggegooid als het opslaan gelukt is. */
 (function () {
@@ -13,7 +14,7 @@
       if (document.querySelector(".flash.ok")) {
         cleared = pend;
         localStorage.removeItem("wp_draft:" + pend);
-        if (window.indexedDB) { var r1 = indexedDB.open("wp_drafts", 1); r1.onsuccess = function () { try { r1.result.transaction("photos", "readwrite").objectStore("photos").delete(pend + ":img"); } catch (x) {} }; }
+        if (window.indexedDB) { var r1 = indexedDB.open("wp_drafts", 1); r1.onsuccess = function () { try { var st = r1.result.transaction("photos", "readwrite").objectStore("photos"); st.delete(pend + ":img"); st.delete(pend + ":att"); } catch (x) {} }; }
         if (window.indexedDB) { var r0 = indexedDB.open("wp_drafts", 1); r0.onupgradeneeded = function () { r0.result.createObjectStore("photos"); }; r0.onsuccess = function () { try { r0.result.transaction("photos", "readwrite").objectStore("photos").delete(pend); } catch (x) {} }; }
       }
       sessionStorage.removeItem(CLEAR);
@@ -41,6 +42,7 @@
   function initDraft(form) {
   var KEY = form.getAttribute("data-draft"), LS = "wp_draft:" + KEY;
   var collected = [];   // {name, type, blob}
+  var attached = [];    // bijlagen (Word, Excel, PDF …): {name, type, blob, size}
   var canDT = (function () { try { return !!new DataTransfer(); } catch (e) { return false; } })();
 
   // ---------------------------------------------------------------- IndexedDB voor foto's
@@ -74,9 +76,9 @@
     if (submitting) return;
     clearTimeout(timer);
     timer = setTimeout(function () {
-      var snap = snapshot(), changed = JSON.stringify(snap) !== initial || collected.length;
+      var snap = snapshot(), changed = JSON.stringify(snap) !== initial || collected.length || attached.length;
       try {
-        if (changed) localStorage.setItem(LS, JSON.stringify({ at: Date.now(), fields: snap, photos: collected.length }));
+        if (changed) localStorage.setItem(LS, JSON.stringify({ at: Date.now(), fields: snap, photos: collected.length, files: attached.length }));
         else localStorage.removeItem(LS);
       } catch (e) {}
     }, 400);
@@ -139,6 +141,53 @@
     });
   }
 
+  // ---------------------------------------------------------------- bijlagen verzamelen (niet verkleind; blijven bewaard tot opslaan gelukt is)
+  var attInputs = Array.prototype.slice.call(form.querySelectorAll("input[type=file][data-attach]"));
+  var attBox = attInputs.length ? document.getElementById(attInputs[0].getAttribute("data-attach")) : null;
+  var attBusy = 0;
+  function fmtSize(n) { return n >= 1048576 ? (Math.round(n / 104857.6) / 10).toString().replace(".", ",") + " MB" : Math.max(1, Math.round(n / 1024)) + " kB"; }
+  function renderAtt() {
+    if (!attBox) return;
+    attBox.innerHTML = "";
+    attached.forEach(function (f, i) {
+      var ext = (f.name.split(".").length > 1 ? f.name.split(".").pop() : "").toLowerCase();
+      var row = document.createElement("div"); row.className = "attrow";
+      var ico = document.createElement("span"); ico.className = "attico att-" + ext; ico.textContent = (ext || "?").slice(0, 4).toUpperCase();
+      var t = document.createElement("span"); t.className = "grow";
+      var nm = document.createElement("span"); nm.className = "attname"; nm.textContent = f.name;
+      var mt = document.createElement("span"); mt.className = "attmeta"; mt.textContent = fmtSize(f.size || f.blob.size) + " · nog niet opgeslagen";
+      t.appendChild(nm); t.appendChild(mt);
+      var main = document.createElement("span"); main.className = "attmain"; main.appendChild(ico); main.appendChild(t);
+      var x = document.createElement("button"); x.type = "button"; x.className = "attx"; x.textContent = "×"; x.setAttribute("aria-label", "Bijlage weghalen");
+      x.addEventListener("click", function () { attached.splice(i, 1); renderAtt(); persistAtt(); save(); });
+      row.appendChild(main); row.appendChild(x); attBox.appendChild(row);
+    });
+    if (attBusy) { var w = document.createElement("div"); w.className = "attrow"; w.innerHTML = '<span class="attmain"><span class="attmeta">Bestand inlezen…</span></span>'; attBox.appendChild(w); }
+  }
+  function persistAtt() {
+    var total = attached.reduce(function (n, f) { return n + (f.size || 0); }, 0);
+    if (total > 40 * 1048576) return idbDel(KEY + ":att");   // te groot om op het apparaat te bewaren; versturen kan wel
+    return idbPut(KEY + ":att", attached.map(function (f) { return { name: f.name, type: f.type, blob: f.blob, size: f.size }; }));
+  }
+  if (canDT) {
+    attInputs.forEach(function (inp) {
+      inp.addEventListener("change", function (e) {
+        e.stopImmediatePropagation();
+        var files = Array.prototype.slice.call(inp.files); inp.value = "";
+        attBusy += files.length; renderAtt();
+        files.reduce(function (p, f) {
+          return p.then(function () {
+            // direct inlezen: een gekozen bestand kan op de telefoon later onleesbaar zijn
+            return (f.arrayBuffer ? f.arrayBuffer() : new Response(f).arrayBuffer()).then(function (buf) {
+              if (buf && buf.byteLength) attached.push({ name: f.name || "bestand", type: f.type || "application/octet-stream", blob: new Blob([buf], { type: f.type || "application/octet-stream" }), size: buf.byteLength });
+              else alert("'" + f.name + "' is leeg of kon niet gelezen worden.");
+            }).catch(function () { alert("'" + f.name + "' kon niet gelezen worden."); }).then(function () { attBusy--; renderAtt(); });
+          });
+        }, Promise.resolve()).then(function () { persistAtt(); save(); });
+      }, true);
+    });
+  }
+
   // ---------------------------------------------------------------- opslaan met voortgang (de pagina blijft staan tot alles binnen is)
   var overlay = null;
   function progress(pct, text) {
@@ -155,34 +204,42 @@
     if (e.defaultPrevented) return;
     try { sessionStorage.setItem(CLEAR, KEY); } catch (x) {}
     clearTimeout(timer); submitting = true; form.setAttribute("data-submitting", "1");
-    if (!inputs.length) {   // gewoon versturen; werd het toch tegengehouden (bijv. een melding), dan verder bewaren
+    if (!inputs.length && !attInputs.length) {   // gewoon versturen; werd het toch tegengehouden (bijv. een melding), dan verder bewaren
       setTimeout(function () { if (e.defaultPrevented) { submitting = false; form.removeAttribute("data-submitting"); try { sessionStorage.removeItem(CLEAR); } catch (x) {} } }, 0);
       return;
     }   // geen foto-verzamelaar: gewoon versturen
     if (!canDT || !window.FormData || !window.XMLHttpRequest) return;   // oude browser: gewoon versturen
-    if (busy) { e.preventDefault(); unlock(); alert("Even wachten: de foto's worden nog verwerkt."); return; }
+    if (busy || attBusy) { e.preventDefault(); unlock(); alert("Even wachten: de foto's / bestanden worden nog verwerkt."); return; }
     e.preventDefault();
     var submitter = e.submitter;
-    progress(1, collected.length ? "Foto's klaarmaken…" : "");
+    progress(1, collected.length || attached.length ? "Bestanden klaarmaken…" : "");
     // foto's eerst echt inlezen (iPhone: een bewaard of gekozen bestand kan anders leeg verstuurd worden)
     Promise.all(collected.map(function (f) {
       return (f.blob.arrayBuffer ? f.blob.arrayBuffer() : new Response(f.blob).arrayBuffer()).then(function (buf) {
         if (!buf || buf.byteLength < 500) throw new Error("leeg");
         return new File([buf], f.name, { type: f.type || "image/jpeg" });
       });
-    })).then(function (files) { send(files, submitter); }).catch(function () {
+    })).then(function (files) {
+      return Promise.all(attached.map(function (f) {
+        return (f.blob.arrayBuffer ? f.blob.arrayBuffer() : new Response(f.blob).arrayBuffer()).then(function (buf) {
+          if (!buf || !buf.byteLength) throw new Error("leeg");
+          return new File([buf], f.name, { type: f.type || "application/octet-stream" });
+        });
+      })).then(function (atts) { send(files, submitter, atts); });
+    }).catch(function () {
       if (overlay) { overlay.remove(); overlay = null; } unlock();
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
-      alert("Een of meer foto's konden niet worden gelezen. Haal die foto's weg (×) en voeg ze opnieuw toe. De tekst is bewaard.");
+      alert("Een of meer foto's of bestanden konden niet worden gelezen. Haal die weg (×) en voeg ze opnieuw toe. De tekst is bewaard.");
     });
   });
 
-  function send(files, submitter) {
+  function send(files, submitter, atts) {
     var fd = new FormData(form);
-    fd.delete("photos");
-    files.forEach(function (f) { fd.append("photos", f); });
+    if (inputs.length) { fd.delete("photos"); files.forEach(function (f) { fd.append("photos", f); }); }
+    if (attInputs.length && canDT) { fd.delete(attInputs[0].name || "files"); (atts || []).forEach(function (f) { fd.append(attInputs[0].name || "files", f); }); }
     if (submitter && submitter.name) fd.append(submitter.name, submitter.value);
-    progress(2, files.length ? files.length + " foto" + (files.length === 1 ? "" : "'s") + " versturen" : "");
+    var nAll = files.length + (atts || []).length;
+    progress(2, nAll ? nAll + (files.length && !(atts || []).length ? " foto" + (nAll === 1 ? "" : "'s") : " bestand" + (nAll === 1 ? "" : "en")) + " versturen" : "");
     var xhr = new XMLHttpRequest();
     xhr.open("POST", form.getAttribute("action") || location.href);
     xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) progress(Math.round(ev.loaded / ev.total * 95), Math.round(ev.loaded / 1048576 * 10) / 10 + " van " + Math.round(ev.total / 1048576 * 10) / 10 + " MB"); };
@@ -192,7 +249,7 @@
         progress(100, "Opgeslagen");
         var ok = /class="flash ok"/.test(xhr.responseText);
         try { sessionStorage.removeItem(CLEAR); } catch (x) {}
-        if (ok) { try { localStorage.removeItem(LS); } catch (x) {} idbDel(KEY); }   // gelukt: concept weg
+        if (ok) { try { localStorage.removeItem(LS); } catch (x) {} idbDel(KEY); idbDel(KEY + ":att"); }   // gelukt: concept weg
         setTimeout(function () {
           if (!ok) {   // formulier met een melding terug: die pagina tonen, concept blijft bewaard
             try { history.replaceState(null, "", url); } catch (x) {}
@@ -206,13 +263,13 @@
       }
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
       overlay.remove(); overlay = null; unlock();
-      if (/\/(login|pin|vergrendel)/.test(url)) { alert("Je was vergrendeld. Je bezoek en foto's zijn bewaard: voer je pincode in en sla opnieuw op."); location.href = url; }
-      else alert("Opslaan is niet gelukt (" + (xhr.status || "geen verbinding") + "). Je bezoek en foto's zijn bewaard; probeer het opnieuw.");
+      if (/\/(login|pin|vergrendel)/.test(url)) { alert("Je was vergrendeld. Wat je had ingevuld (met foto's en bestanden) is bewaard: voer je pincode in en sla opnieuw op."); location.href = url; }
+      else alert("Opslaan is niet gelukt (" + (xhr.status || "geen verbinding") + "). Wat je had ingevuld is bewaard; probeer het opnieuw.");
     };
     xhr.onerror = function () {
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
       if (overlay) { overlay.remove(); overlay = null; } unlock();
-      alert("Geen verbinding. Je bezoek en foto's zijn bewaard op dit apparaat; probeer het opnieuw als je weer bereik hebt.");
+      alert("Geen verbinding. Wat je had ingevuld is bewaard op dit apparaat; probeer het opnieuw als je weer bereik hebt.");
     };
     xhr.send(fd);
   }
@@ -221,15 +278,15 @@
   var raw = null;
   try { raw = JSON.parse(localStorage.getItem(LS) || "null"); } catch (e) {}
   if (raw && Date.now() - raw.at > 14 * 864e5) { try { localStorage.removeItem(LS); } catch (e) {} raw = null; idbDel(KEY); }
-  function banner(at, nPhotos) {
+  function banner(at, nPhotos, nFiles) {
     var b = document.createElement("div"); b.className = "flash info draftbar";
     var t = new Date(at), hh = ("0" + t.getHours()).slice(-2) + ":" + ("0" + t.getMinutes()).slice(-2);
     b.innerHTML = "<span><b>Concept teruggezet</b> van " + t.toLocaleDateString("nl-NL") + " " + hh +
-      (nPhotos ? " (met " + nPhotos + " foto" + (nPhotos === 1 ? "" : "'s") + ")" : "") + ". Controleer en sla op.</span>";
+      (nPhotos || nFiles ? " (met " + [nPhotos ? nPhotos + " foto" + (nPhotos === 1 ? "" : "'s") : "", nFiles ? nFiles + " bijlage" + (nFiles === 1 ? "" : "n") : ""].filter(Boolean).join(" en ") + ")" : "") + ". Controleer en sla op.</span>";
     var x = document.createElement("button"); x.type = "button"; x.className = "btn sm ghost"; x.textContent = "Concept weggooien";
     x.addEventListener("click", function () {
       if (!confirm("Het teruggezette concept weggooien?")) return;
-      try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); idbDel(KEY + ":img"); setTimeout(function () { location.reload(); }, 150);
+      try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); idbDel(KEY + ":img"); idbDel(KEY + ":att"); setTimeout(function () { location.reload(); }, 150);
     });
     b.appendChild(x); form.parentNode.insertBefore(b, form);
     form.classList.remove("hidden");
@@ -247,9 +304,11 @@
       else if (el.value !== v) { el.value = v; restoredText = true; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("wp:set")); }
     });
   }
-  (KEY === cleared ? Promise.resolve(null) : idbGet(KEY)).then(function (list) {
+  (KEY === cleared ? Promise.resolve([null, null]) : Promise.all([idbGet(KEY), attInputs.length ? idbGet(KEY + ":att") : null])).then(function (res) {
+    var list = res[0], alist = res[1];
     if (list && list.length && canDT) { collected = list.map(function (f) { return { name: f.name, type: f.type, blob: f.blob, thumb: f.thumb || null }; }); render(); }
-    if (restoredText || collected.length) banner(raw ? raw.at : Date.now(), collected.length);
+    if (alist && alist.length && canDT) { attached = alist.filter(function (f) { return f && f.blob; }); renderAtt(); }
+    if (restoredText || collected.length || attached.length) banner(raw ? raw.at : Date.now(), collected.length, attached.length);
     initial = restoredText ? "" : initial;
   });
   }
