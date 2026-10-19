@@ -335,6 +335,14 @@ def receive(conn, folders):
         "SELECT path FROM order_inbox WHERE bon_received_at IS NULL AND missing = 0 AND status <> 'genegeerd'"
         " AND ((status NOT IN ('bestaand','gekoppeld') AND first_seen >= ?) OR status = 'bestaand' OR project_id IS NOT NULL)"
         " ORDER BY number DESC LIMIT 2000", (since,))]
+    # genegeerde mappen (60 dagen) zonder orderbon ook vragen: komt er toch een orderbon in, dan is het een echte order.
+    # Werkt ook met een oudere versie van het script (die de orderbon-gegevens nog niet in de mappenlijst meestuurt).
+    ign_since = iso(now_utc() - 2 * BON_WINDOW)
+    have = set(want)
+    for r in conn.execute("SELECT path FROM order_inbox WHERE status = 'genegeerd' AND bon_received_at IS NULL AND missing = 0"
+                          " AND first_seen >= ? ORDER BY number DESC LIMIT 300", (ign_since,)):
+        if r["path"] not in have and len(want) < 2000:
+            want.append(r["path"])
     # orderbon gewijzigd (opnieuw opgeslagen in de map): opnieuw ophalen, zodat o.a. de vinkjes bijgewerkt worden
     if bon_seen:
         have = set(want)
@@ -387,6 +395,11 @@ def orderbon():
                       f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400] if js.get("modified") else None, it["id"]))
         conn.commit()
         return jsonify({"ok": False, "melding": "Orderbon niet leesbaar"}), 200
+    if it["status"] == "genegeerd":
+        # genegeerde map met een orderbon: het is een echte order, dus weer oppakken
+        conn.execute("UPDATE order_inbox SET status = 'nieuw', handled_by = NULL, handled_at = NULL,"
+                     " note = 'Was genegeerd; er staat nu een orderbon in de map, dus opnieuw opgepakt.' WHERE id = ?", (it["id"],))
+        conn.commit()
     fid = save_bytes("order_inbox", it["id"], data, fname, kind="orderbon", mime="application/pdf")
     cid = it["customer_id"]
     if bon.get("customer"):

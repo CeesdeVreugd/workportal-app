@@ -537,3 +537,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Komt er na het negeren toch een orderbon in de map, dan wordt de map automatisch weer opgepakt (status "nieuw") en de orderbon opgehaald en verwerkt.
 - Orders > Inbox > Laatst verwerkt: knop "Niet meer negeren" bij genegeerde mappen.
 - Beheer > DC01: filter "Genegeerd"; "Orderbon opnieuw ophalen" zet geselecteerde genegeerde mappen ook terug.
+
+## V98 – Genegeerde ordermap: orderbon toch ophalen
+- V97 leunde op de orderbon-gegevens in de mappenlijst; een oudere versie van komdex-orders.ps1 op DC01 stuurt die niet mee, waardoor een genegeerde map nooit werd opgepakt.
+- Nu vraagt WorkPortal het script ook om de orderbon van genegeerde mappen (laatste 60 dagen, nog geen orderbon). Staat er een orderbon in, dan stuurt het script die op; WorkPortal pakt de map dan weer op (status "nieuw"), verwerkt de bon en print hem (als automatisch printen aan staat).
