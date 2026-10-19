@@ -531,3 +531,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Bijlagen tonen overal als nette regels met type-icoon; PDF, Word en Excel openen in de viewer, andere typen downloaden.
 - Gespreksnotities: "Bestand bijvoegen" (Word, Excel, PDF, tekening, e-mail …). Bijlagen worden als concept op het apparaat bewaard tot opslaan gelukt is (IndexedDB, `KEY:att`, tot 40 MB).
   Bij bewerken: huidige foto's/bijlagen aanvinken om te verwijderen (`del_file`). Extra toegestane typen: .xlsm, .docm, .rtf, .odt, .ods, .pptx, .ppt, .msg, .eml, .igs, .iges.
+
+## V97 – Genegeerde ordermappen
+- Oorzaak: een ordermap die op "Negeren" is gezet, haalt nooit meer de orderbon op (ook niet als die er later in komt).
+- Komt er na het negeren toch een orderbon in de map, dan wordt de map automatisch weer opgepakt (status "nieuw") en de orderbon opgehaald en verwerkt.
+- Orders > Inbox > Laatst verwerkt: knop "Niet meer negeren" bij genegeerde mappen.
+- Beheer > DC01: filter "Genegeerd"; "Orderbon opnieuw ophalen" zet geselecteerde genegeerde mappen ook terug.

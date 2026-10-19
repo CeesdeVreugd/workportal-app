@@ -301,6 +301,14 @@ def receive(conn, folders):
         elif st == "bestaand":
             # bestaande map: geen melding, niets aanmaken (alleen koppelen en later aanvullen met de orderbon)
             conn.execute("UPDATE order_inbox SET notified_at = ? WHERE path = ?", (now, path))
+    # genegeerde map waar (na het negeren) toch een orderbon in komt: het is dus een echte order -> niet meer negeren
+    if bon_seen:
+        for r in conn.execute("SELECT id, path FROM order_inbox WHERE status = 'genegeerd' AND bon_received_at IS NULL"
+                              " AND missing = 0").fetchall():
+            if r["path"] in bon_seen:
+                conn.execute("UPDATE order_inbox SET status = 'nieuw', first_seen = ?, handled_by = NULL, handled_at = NULL,"
+                             " note = 'Was genegeerd; er staat nu een orderbon in de map, dus opnieuw opgepakt.' WHERE id = ?",
+                             (now, r["id"]))
     # mappen die in Komdex zijn verdwenen verdwijnen ook uit het actievenster
     for path, r in known.items():
         if path not in seen and r["status"] == "nieuw":

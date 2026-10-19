@@ -73,7 +73,8 @@
 <section class="card"><h2>Laatst verwerkt</h2>
   <div class="rows">{% for d in done %}<div class="rowitem"><div class="grow"><div class="t">{{ d.folder }}</div>
     <div class="s">{% if d.status == 'automatisch' %}Automatisch · {% endif %}{% if d.status == 'genegeerd' %}Genegeerd{% else %}{{ (d.kind or '')|capitalize }}{% if d.project_id %} · <a href="{{ url_for('projecten.detail', pid=d.project_id) }}">{{ d.number }} {{ d.pname or '' }}</a>{% endif %}{% endif %}{{ ' · ' ~ d.who if d.who }}{{ ' · ' ~ (d.handled_at|dt) if d.handled_at }}</div></div>
-    <span class="badge {{ 'b-ok' if d.status in ['verwerkt','gekoppeld','automatisch'] else '' }}">{{ d.status|capitalize }}</span></div>{% endfor %}</div>
+    <span class="badge {{ 'b-ok' if d.status in ['verwerkt','gekoppeld','automatisch'] else '' }}">{{ d.status|capitalize }}</span>
+    {% if d.status == 'genegeerd' and can('orders', 2) %}<form method="post" action="{{ url_for('orders.inbox_unignore', iid=d.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" title="Weer oppakken: de orderbon wordt bij de volgende run opgehaald">{{ icon('refresh') }}Niet meer negeren</button></form>{% endif %}</div>{% endfor %}</div>
 </section>
 {% endif %}
 {% endblock %}

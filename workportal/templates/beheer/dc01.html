@@ -40,13 +40,13 @@
 {% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('beheer.dc01', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
 <div class="fchips">
   {{ fbtn('alle', 'Alle', counts.alle) }}{{ fbtn('bon', 'Met orderbon', counts.bon) }}{{ fbtn('zonderbon', 'Zonder orderbon', counts.zonderbon) }}
-  {{ fbtn('gekoppeld', 'Gekoppeld', counts.gekoppeld) }}{{ fbtn('niet', 'Niet in WorkPortal', counts.niet) }}{{ fbtn('actie', 'Actie nodig', counts.actie) }}{{ fbtn('nacalc', 'Met na-calculatie', counts.nacalc) }}{% if counts.weg %}{{ fbtn('weg', 'Verdwenen', counts.weg) }}{% endif %}
+  {{ fbtn('gekoppeld', 'Gekoppeld', counts.gekoppeld) }}{{ fbtn('niet', 'Niet in WorkPortal', counts.niet) }}{{ fbtn('actie', 'Actie nodig', counts.actie) }}{{ fbtn('nacalc', 'Met na-calculatie', counts.nacalc) }}{% if counts.genegeerd %}{{ fbtn('genegeerd', 'Genegeerd', counts.genegeerd) }}{% endif %}{% if counts.weg %}{{ fbtn('weg', 'Verdwenen', counts.weg) }}{% endif %}
 </div>
 
 <form method="post" id="bulkform">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="filter" value="{{ flt }}"><input type="hidden" name="q" value="{{ q }}">
 <div class="bulkbar hidden" id="bulkbar"><span><b id="bulkn">0</b> geselecteerd</span>
-  <button class="btn sm primary" name="action" value="opnieuw">{{ icon('refresh') }}Orderbon opnieuw ophalen</button>
+  <button class="btn sm primary" name="action" value="opnieuw" title="Ook genegeerde mappen worden dan weer opgepakt">{{ icon('refresh') }}Orderbon opnieuw ophalen</button>
   <button class="btn sm" name="action" value="printen">{{ icon('pdf') }}Orderbon printen</button>
   <button class="btn sm" name="action" value="nacalc">{{ icon('refresh') }}Na-calculatie opnieuw ophalen</button>
   <button class="btn sm ghost" type="button" data-bulk-clear>Selectie wissen</button></div>

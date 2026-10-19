@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V96: dashboard max 3 aantekeningen, Word-viewer, bijlagen bij gespreksnotities"
+set "OMSCHRIJVING=WorkPortal V97: genegeerde ordermap met orderbon wordt weer opgepakt; knop Niet meer negeren"
 
 echo.
 echo ============================================

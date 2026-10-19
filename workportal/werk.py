@@ -921,6 +921,21 @@ def inbox_types():
     return redirect(url_for("orders.inbox") + "#ordertypes")
 
 
+@bp.route("/inbox/<int:iid>/niet-negeren", methods=["POST"])
+def inbox_unignore(iid):
+    """Een genegeerde ordermap weer oppakken; de orderbon wordt bij de volgende run van het script opgehaald."""
+    if request.blueprint != "orders":
+        abort(404)
+    _need(BEWERKEN, "orders")
+    it = query("SELECT * FROM order_inbox WHERE id = ?", (iid,), one=True) or abort(404)
+    if it["status"] == "genegeerd":
+        execute("UPDATE order_inbox SET status = 'nieuw', first_seen = ?, bon_received_at = NULL, note = NULL,"
+                " handled_by = NULL, handled_at = NULL WHERE id = ?", (now_iso(), iid))
+        audit("niet meer negeren", "order_inbox", iid, it["folder"])
+        flash(f"{it['folder']} wordt weer opgepakt. De orderbon komt binnen bij de volgende run van het script (binnen een paar minuten).", "ok")
+    return redirect(url_for("orders.inbox"))
+
+
 @bp.route("/inbox/<int:iid>", methods=["POST"])
 def inbox_handle(iid):
     if request.blueprint != "orders":

@@ -273,7 +273,13 @@ def dc01():
         ids = [to_int(x) for x in request.form.getlist("ids") if to_int(x)]
         if request.form.get("action") == "opnieuw" and ids:
             execute(f"UPDATE order_inbox SET bon_received_at = NULL, note = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
-            flash(f"Orderbon wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen)).", "ok")
+            # genegeerde mappen worden niet opgehaald: die eerst terugzetten
+            n_ign = query(f"SELECT COUNT(*) AS n FROM order_inbox WHERE status = 'genegeerd' AND id IN ({','.join('?' * len(ids))})", ids, one=True)["n"]
+            if n_ign:
+                execute(f"UPDATE order_inbox SET status = 'nieuw', first_seen = ?, handled_by = NULL, handled_at = NULL"
+                        f" WHERE status = 'genegeerd' AND id IN ({','.join('?' * len(ids))})", [now_iso()] + ids)
+            flash(f"Orderbon wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} map(pen))"
+                  + (f"; {n_ign} genegeerde map(pen) worden weer opgepakt." if n_ign else "."), "ok")
         elif request.form.get("action") == "printen" and ids:
             from . import printix
             from .util import file_path
@@ -309,6 +315,8 @@ def dc01():
         where.append("i.missing = 1")
     elif flt == "nacalc":
         where.append("i.nacalc_sig IS NOT NULL")
+    elif flt == "genegeerd":
+        where.append("i.status = 'genegeerd'")
     else:
         flt = "alle"
     if q:
@@ -326,7 +334,8 @@ def dc01():
                    " SUM(project_id IS NOT NULL) AS gekoppeld,"
                    " SUM(project_id IS NULL AND missing = 0 AND status <> 'genegeerd') AS niet,"
                    " SUM(status = 'nieuw' AND missing = 0) AS actie, SUM(missing = 1) AS weg,"
-                   " SUM(nacalc_sig IS NOT NULL) AS nacalc, SUM(nacalc_note IS NOT NULL) AS nacalc_fout FROM order_inbox", one=True)
+                   " SUM(nacalc_sig IS NOT NULL) AS nacalc, SUM(nacalc_note IS NOT NULL) AS nacalc_fout,"
+                   " SUM(status = 'genegeerd') AS genegeerd FROM order_inbox", one=True)
     return render_template("beheer/dc01.html", items=items, counts=counts, flt=flt, q=q, status=komdex.status(),
                            order_dir=sp.setting(get_db(), "komdex_order_dir"))
 
