@@ -30,10 +30,17 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Log($tekst) {
-    $regel = "{0:yyyy-MM-dd HH:mm:ss}  {1}" -f (Get-Date), $tekst
-    Add-Content -Path $Logbestand -Value $regel -Encoding UTF8
-    # log klein houden
-    if ((Get-Item $Logbestand).Length -gt 1MB) { Get-Content $Logbestand -Tail 2000 | Set-Content $Logbestand -Encoding UTF8 }
+    # Logboek bijhouden mag het script NOOIT laten stoppen (anders worden er geen orderbonnen meer opgehaald).
+    try {
+        $regel = "{0:yyyy-MM-dd HH:mm:ss}  {1}" -f (Get-Date), $tekst
+        Add-Content -LiteralPath $Logbestand -Value $regel -Encoding UTF8
+        # log klein houden: eerst de laatste regels helemaal inlezen, daarna pas het bestand overschrijven
+        if ((Get-Item -LiteralPath $Logbestand).Length -gt 1MB) {
+            $laatste = @(Get-Content -LiteralPath $Logbestand -Tail 2000)
+            Set-Content -LiteralPath $Logbestand -Value $laatste -Encoding UTF8
+        }
+    }
+    catch { }
 }
 
 # Nieuwste Excel "Nacalculatie..." in een ordermap (ook "Nacacalculatie"); tijdelijke ~$-bestanden van Excel overslaan

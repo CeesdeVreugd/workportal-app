@@ -547,3 +547,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Bij ontvangst wordt direct "Orderbon '…' ontvangen" vastgelegd; blijft die melding staan, dan liep het verwerken mis.
 - Beheer > DC01 status: "Om orderbon gevraagd" (aantal mappen bij laatste run) en "Laatste orderbon binnen" (tijd + ordernummer).
 - scripts/komdex-orders.ps1: elke orderbon apart afgevangen en fouten met map in het logboek (optioneel bijwerken op DC01; $Sleutel opnieuw invullen).
+
+## V100 – Script komdex-orders.ps1: logboek
+- Oorzaak dat er sinds 18-10 geen orderbonnen meer binnenkwamen: het logbestand werd groter dan 1 MB; het inkorten (Get-Content | Set-Content op hetzelfde bestand) gaf "bestand in gebruik", waardoor het script na de mappenlijst stopte en de orderbonnen nooit verstuurde.
+- Log-functie: eerst inlezen, dan overschrijven, en fouten bij het loggen worden genegeerd. Moet op DC01 worden bijgewerkt.
