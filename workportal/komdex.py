@@ -44,7 +44,8 @@ def status():
     dt = parse_iso(last) if last else None
     return {"configured": configured(), "last_push": last,
             "stale": bool(dt and now_utc() - dt > timedelta(hours=1)),
-            "count": sp.setting(conn, "komdex_last_count")}
+            "count": sp.setting(conn, "komdex_last_count"), "want": sp.setting(conn, "komdex_last_want"),
+            "last_bon": sp.setting(conn, "komdex_last_bon")}
 
 
 NOTIFY_AFTER = timedelta(minutes=10)   # eerst de orderbon een kans geven (volgende run van het script)
@@ -360,6 +361,7 @@ def receive(conn, folders):
                 want_nacalc.append(path)
             if len(want_nacalc) >= NACALC_PER_RUN:
                 break
+    sp.set_setting(conn, "komdex_last_want", str(len(want)))
     return {"ontvangen": len(folders), "ordermappen": len(seen), "nieuw": len(new_items), "eerste_keer": first,
             "want": want, "want_nacalc": want_nacalc, "nacalc_gezien": len(nacalc_seen)}
 
@@ -387,11 +389,22 @@ def orderbon():
     except (binascii.Error, ValueError):
         return jsonify({"error": "Ongeldige inhoud"}), 400
     fname = re.sub(r'[\\/:*?"<>|]+', "_", str(js.get("filename") or "orderbon.pdf"))[:150]
-    bon = parse(data) if data[:4] == b"%PDF" else None
     now = now_iso()
+    sp.set_setting(conn, "komdex_last_bon", f"{now_iso()}|{it['number']}")
+    # eerst vastleggen dat de orderbon binnen is, zodat een fout bij het verwerken zichtbaar wordt in Beheer > DC01
+    conn.execute("UPDATE order_inbox SET note = ? WHERE id = ?", (f"Orderbon '{fname}' ontvangen ({len(data) // 1024} kB), wordt verwerkt…", it["id"]))
+    conn.commit()
+    reden = ""
+    try:
+        bon = parse(data) if data[:4] == b"%PDF" else None
+        if data[:4] != b"%PDF":
+            reden = " (geen PDF-bestand)"
+    except Exception as exc:  # noqa: BLE001 - nooit het hele script laten vastlopen op één bon
+        print(f"[WorkPortal] Orderbon {fname} uitlezen mislukt: {exc!r}", flush=True)
+        bon, reden = None, f" ({type(exc).__name__}: {str(exc)[:150]})"
     if not bon:
         conn.execute("UPDATE order_inbox SET bon_received_at = ?, note = ?, bon_sig = COALESCE(?, bon_sig) WHERE id = ?",
-                     (now, f"Orderbon '{fname}' kon niet worden gelezen.",
+                     (now, f"Orderbon '{fname}' kon niet worden gelezen{reden}.",
                       f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400] if js.get("modified") else None, it["id"]))
         conn.commit()
         return jsonify({"ok": False, "melding": "Orderbon niet leesbaar"}), 200
@@ -408,8 +421,17 @@ def orderbon():
     conn.execute("UPDATE order_inbox SET bon_json = ?, bon_file_id = ?, bon_received_at = ?, customer_id = ?,"
                  " description = COALESCE(?, description), bon_sig = COALESCE(?, bon_sig) WHERE id = ?",
                  (json.dumps(bon, ensure_ascii=False), fid, now, cid, bon.get("description"), sig, it["id"]))
+    conn.execute("UPDATE order_inbox SET note = NULL WHERE id = ? AND note LIKE 'Orderbon ''%'' ontvangen (%'", (it["id"],))
     conn.commit()
-    result = auto_process(conn, it["id"])
+    try:
+        result = auto_process(conn, it["id"])
+    except Exception as exc:  # noqa: BLE001 - bon is opgeslagen; fout tonen in plaats van het script te laten falen
+        print(f"[WorkPortal] Orderbon {fname} verwerken mislukt: {exc!r}", flush=True)
+        conn.rollback()
+        conn.execute("UPDATE order_inbox SET note = ? WHERE id = ?",
+                     (f"Orderbon ontvangen, maar automatisch verwerken mislukte ({type(exc).__name__}: {str(exc)[:150]}). Zet hem handmatig goed in het actievenster.", it["id"]))
+        conn.commit()
+        result = "actie nodig (fout bij verwerken)"
     # nieuwe order (geen bestaande map van vóór de koppeling), eerste keer dat de orderbon binnenkomt: automatisch printen
     from . import printix
     if (it["status"] != "bestaand" and not it["printed_at"] and not it["bon_received_at"] and printix.configured()

@@ -14,6 +14,8 @@
       <dt>Laatste run script</dt><dd>{{ status.last_push|dt if status.last_push else '–' }}</dd>
       <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">{{ order_dir or '–' }}</dd>
       <dt>Ordermappen gezien</dt><dd>{{ status.count or 0 }} <span class="muted">(bij laatste run)</span></dd>
+      <dt>Om orderbon gevraagd</dt><dd>{{ status.want or 0 }} <span class="muted">mappen (bij laatste run)</span></dd>
+      <dt>Laatste orderbon binnen</dt><dd>{% if status.last_bon %}{% set lb = status.last_bon.split('|') %}{{ lb[0]|dt }} <span class="muted">· {{ lb[1] }}</span>{% else %}<span class="muted">–</span>{% endif %}</dd>
       <dt>Met orderbon</dt><dd>{{ counts.bon or 0 }}</dd>
       <dt>Na-calculaties uit de map</dt><dd>{{ counts.nacalc or 0 }}{% if counts.nacalc_fout %} <span class="badge b-warn">{{ counts.nacalc_fout }} niet leesbaar</span>{% endif %}</dd>
       <dt>Gekoppeld aan project/order</dt><dd>{{ counts.gekoppeld or 0 }}</dd>

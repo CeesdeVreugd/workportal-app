@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V98: genegeerde ordermappen vragen ook om de orderbon (werkt met elke scriptversie)"
+set "OMSCHRIJVING=WorkPortal V99: orderbon-ontvangst robuuster en zichtbaar in Beheer > DC01"
 
 echo.
 echo ============================================

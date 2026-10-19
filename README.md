@@ -541,3 +541,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V98 – Genegeerde ordermap: orderbon toch ophalen
 - V97 leunde op de orderbon-gegevens in de mappenlijst; een oudere versie van komdex-orders.ps1 op DC01 stuurt die niet mee, waardoor een genegeerde map nooit werd opgepakt.
 - Nu vraagt WorkPortal het script ook om de orderbon van genegeerde mappen (laatste 60 dagen, nog geen orderbon). Staat er een orderbon in, dan stuurt het script die op; WorkPortal pakt de map dan weer op (status "nieuw"), verwerkt de bon en print hem (als automatisch printen aan staat).
+
+## V99 – Orderbon-ontvangst robuuster en zichtbaar
+- Een orderbon die bij het uitlezen of verwerken een fout geeft, laat het script niet meer vastlopen: de fout staat als melding bij de map in Beheer > DC01.
+- Bij ontvangst wordt direct "Orderbon '…' ontvangen" vastgelegd; blijft die melding staan, dan liep het verwerken mis.
+- Beheer > DC01 status: "Om orderbon gevraagd" (aantal mappen bij laatste run) en "Laatste orderbon binnen" (tijd + ordernummer).
+- scripts/komdex-orders.ps1: elke orderbon apart afgevangen en fouten met map in het logboek (optioneel bijwerken op DC01; $Sleutel opnieuw invullen).
