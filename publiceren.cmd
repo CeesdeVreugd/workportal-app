@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V140: inkoopfacturen - status en Outlook-categorie lopen gelijk (ook vanuit Outlook), één status zichtbaar"
+set "OMSCHRIJVING=WorkPortal V141: inkoopfacturen - teller Vraag open geel"
 
 echo.
 echo ============================================
