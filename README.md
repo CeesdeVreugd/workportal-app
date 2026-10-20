@@ -641,3 +641,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Bij facturen waar de kopjes kleiner zijn dan de waarden en dicht op elkaar staan (Heleon) haalde de standaard tekst-indeling de regels door elkaar ("F D O P a a e rd …"). Nu wordt ook een strakkere regel-indeling gelezen (reserve), en zoekt WorkPortal de waarde rechts van het kopje op ongeveer dezelfde hoogte.
 - Tekens die de PDF niet kan vertalen ("(cid:16)") tussen cijfers worden als streepje gelezen.
 - Inkoopnummer ook op positie (rechts van "Uw referentie"), zodat het volledige nummer (4288-20260000) wordt genomen.
+
+## V119 – Heleon: zacht afbreekstreepje
+- Getest op de echte PDF: Heleon gebruikt in datums en nummers het "zachte afbreekstreepje" (U+00AD). V113 haalde dat teken weg, waardoor 15‑10‑2026 → 15102026 en 4288‑20260000 → 428820260000 werd. Het wordt nu als gewoon streepje gelezen: factuurdatum 15-10-2026, vervaldatum 14-11-2026, inkoopnummer 4288-20260000.
+- Reserve-leveranciersnaam slaat regels als "Debiteurnr. : …", straat + huisnummer en "Afleveradres" over.

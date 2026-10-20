@@ -218,7 +218,7 @@ def _supplier(text):
         wm = re.search(r"(?:www\.|https?://)([\w-]+(?:\.[\w-]+)+)", line, re.I) or re.search(r"[\w.+-]+@([\w-]+(?:\.[\w-]+)+)", line)
         if wm and "vreugd" not in wm.group(1).lower():
             return wm.group(1).lower()[:80]
-    addr = re.compile(r"\d{4}\s?[A-Z]{2}\b|@|www\.|^\s*[TFEM]\s|\btel\b|\bfax\b|iban|kvk|btw|^\W*\d|factuur|invoice|rechnung|vreugd|\|", re.I)
+    addr = re.compile(r"\d{4}\s?[A-Z]{2}\b|@|www\.|^\s*[TFEM]\s|\btel\b|\bfax\b|iban|kvk|btw|^\W*\d|factuur|invoice|rechnung|vreugd|\||:|nummer|\bnr\b|referentie|\s\d+\s?[a-z]?$|afleveradres|pagina", re.I)
     first = next((l.strip() for l in head if len(re.sub(r"[^A-Za-z]", "", l)) >= 3 and not addr.search(l)), None)
     return (first or "")[:80] or None
 
@@ -232,7 +232,7 @@ def _close_vat(excl, vat):
 
 
 _DASHES = str.maketrans({"\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-", "\u2014": "-", "\u2212": "-",
-                         "\u00a0": " ", "\u2007": " ", "\u202f": " ", "\u00ad": ""})
+                         "\u00a0": " ", "\u2007": " ", "\u202f": " ", "\u00ad": "-"})
 
 
 def _clean(v):
