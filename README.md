@@ -734,3 +734,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V137 (1.84.0)
 - Inkoopfacturen: de tellers "Nog in Komdex" en "Nog in SnelStart" hebben de kleur van de Outlook-categorie die bij die stap hoort (Beheer > Instellingen); zonder categorie Komdex groen en SnelStart oranje.
+
+## V138 (1.85.0)
+- Inkoopfacturen: extra Outlook-categorie "Vraag uitstaand": de factuurmail krijgt hem zolang er een vraag bij een collega openstaat (intern) of onze laatste mail aan de leverancier nog niet beantwoord is (extern). Bij het antwoord, intrekken of afwijzen gaat hij eraf.
+- De categorie wordt nu na élke wijziging op een factuurkaart bijgewerkt (status, vraag, antwoord, mail, afwijzen) en als er een reactie van de leverancier binnenkomt.
+- Raden op naam herkent nu ook "vraag" (bijv. "VRAAG in Workportal").

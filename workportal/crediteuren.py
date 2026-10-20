@@ -828,6 +828,10 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
                  (iid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()).replace("Z", "+00:00")[:25],
                   json.dumps(meta, ensure_ascii=False)))
     log(conn, iid, f"Reactie per mail van {who}" + (f" met {len(names)} bijlage(n)" if names else ""))
+    try:
+        apply_categories(conn, iid, box)   # antwoord binnen: categorie 'vraag' eraf
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WorkPortal] Categorie na reactie mislukt: {exc}", flush=True)
     # wie de mail verstuurde krijgt een melding
     last = conn.execute("SELECT created_by FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_uit' AND created_by IS NOT NULL"
                         " ORDER BY id DESC LIMIT 1", (iid,)).fetchone()
@@ -1577,8 +1581,10 @@ def _ask_archive(conn, iid, actor):
 
 
 CAT_STEPS = [("komdex", "Verwerkt in Komdex"), ("buiten", "Verwerkt buiten Komdex om"),
-             ("snelstart", "Verwerkt in SnelStart"), ("afgewezen", "Afgewezen")]
-_CAT_GUESS = {"komdex": r"komdex", "buiten": r"buiten", "snelstart": r"snel\s*start", "afgewezen": r"afgewezen|afwijz"}
+             ("snelstart", "Verwerkt in SnelStart"), ("afgewezen", "Afgewezen"),
+             ("vraag", "Vraag uitstaand (intern of extern)")]
+_CAT_GUESS = {"komdex": r"komdex", "buiten": r"buiten", "snelstart": r"snel\s*start", "afgewezen": r"afgewezen|afwijz",
+              "vraag": r"vraag"}
 
 
 def _step_colors(conn):
@@ -1626,6 +1632,12 @@ def apply_categories(conn, iid, box):
             want.add(cmap.get(r["route"]))
         if r["snelstart_at"]:
             want.add(cmap.get("snelstart"))
+    if r["status"] != "afgewezen" and cmap.get("vraag"):
+        # vraag uitstaand: intern bij een collega, of extern (onze laatste mail aan de leverancier is nog niet beantwoord)
+        last = conn.execute("SELECT kind FROM invoice_notes WHERE invoice_id = ? AND kind IN ('mail_uit', 'mail_in')"
+                            " ORDER BY created_at DESC, id DESC LIMIT 1", (iid,)).fetchone()
+        if r["question_to"] or (last and last["kind"] == "mail_uit"):
+            want.add(cmap["vraag"])
     want.discard(None)
     managed = set(cmap.values())
     mid = r["mail_id"].split(":")[0]
@@ -1689,6 +1701,20 @@ def _archive_bg(iid):
     _bg(iid, "categorie", "verplaatsen")
 
 
+@bp.after_request
+def _sync_category(resp):
+    """Na elke wijziging aan een factuurkaart (status, vraag, antwoord, mail, afwijzen …) de Outlook-categorie bijwerken."""
+    try:
+        iid = (request.view_args or {}).get("iid")
+        if request.method == "POST" and iid and resp.status_code < 400 and request.endpoint not in ("crediteuren.delete",):
+            r = get_db().execute("SELECT source, mail_id FROM invoices WHERE id = ?", (iid,)).fetchone()
+            if r and r["source"] == "mail" and r["mail_id"] and request.endpoint != "crediteuren.mail_archive":
+                _bg(iid, "categorie")
+    except Exception as exc:  # pragma: no cover
+        print(f"[WorkPortal] Categorie bijwerken niet gestart: {exc}", flush=True)
+    return resp
+
+
 @bp.route("/<int:iid>/status", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def set_status(iid):
@@ -1728,8 +1754,7 @@ def set_status(iid):
     conn.commit()
     if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
         _ask_archive(conn, iid, uid)
-    if r["source"] == "mail":
-        _bg(iid, "categorie")
+
     # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
     lane = "komdex" if act in ("erp", "buiten") else ("snelstart" if act == "snelstart" else "")
     return redirect(url_for("crediteuren.detail", iid=iid, gewijzigd=msg, baan=lane or None))
@@ -1777,8 +1802,7 @@ def reject(iid):
                  (iid, "afwijzing", reason[:2000], uid, now))
     log(conn, iid, "Afgewezen: " + reason[:120], uid)
     conn.commit()
-    if r["source"] == "mail":
-        _bg(iid, "categorie")
+
     flash("Factuur afgewezen.", "success")
     back = request.form.get("terug") or ""
     if back.startswith("/") and not back.startswith("//"):
