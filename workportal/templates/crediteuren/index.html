@@ -31,7 +31,7 @@
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='komdex') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in Komdex</div><div class="value" style="color:{{ step_color.komdex }}">{{ counts.komdex }}</div><div class="sub">waarvan {{ counts.ss_klaar }} al in SnelStart</div></a>
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in SnelStart</div><div class="value" style="color:{{ step_color.snelstart }}">{{ counts.erp }}</div><div class="sub">waarvan {{ counts.erp_klaar }} al in (of buiten) Komdex</div></a>
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='vraag') }}" style="text-decoration:none;color:inherit"><div class="label">Vraag open</div><div class="value" style="color:#E0A800">{{ counts.vraag }}</div><div class="sub">{{ counts.mij }} wacht{{ 'en' if counts.mij != 1 }} op jou</div></a>
-  <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" {% if counts.verval %}style="color:var(--bad)"{% endif %}>{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
+  <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" style="color:#E53935">{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
 </div>
 
 {% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('crediteuren.index', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}

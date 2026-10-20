@@ -751,3 +751,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V141 (1.88.0)
 - Inkoopfacturen: teller "Vraag open" in geel.
+
+## V142 (1.89.0)
+- Inkoopfacturen: teller "Vervalt binnen 7 dagen" in (helder) rood.
