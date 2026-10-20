@@ -739,3 +739,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Inkoopfacturen: extra Outlook-categorie "Vraag uitstaand": de factuurmail krijgt hem zolang er een vraag bij een collega openstaat (intern) of onze laatste mail aan de leverancier nog niet beantwoord is (extern). Bij het antwoord, intrekken of afwijzen gaat hij eraf.
 - De categorie wordt nu na élke wijziging op een factuurkaart bijgewerkt (status, vraag, antwoord, mail, afwijzen) en als er een reactie van de leverancier binnenkomt.
 - Raden op naam herkent nu ook "vraag" (bijv. "VRAAG in Workportal").
+
+## V139 (1.86.0)
+- Inkoopfacturen: knop "Categorieën ophalen" (naast "Mailbox nu ophalen", voor beheer) haalt de categorielijst met kleuren en de categorieën van de factuurmails direct opnieuw uit Outlook.
+- Beheer > Instellingen, bij Outlook-categorie per status: "Categorieën opnieuw ophalen" en "Categorieën toepassen op openstaande facturen" (zet bij alle openstaande en recente factuurmails de categorie volgens de huidige status, op de achtergrond).

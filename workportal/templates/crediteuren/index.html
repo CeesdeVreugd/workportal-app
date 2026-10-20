@@ -20,6 +20,8 @@
     {% if mail.configured %}
     <form method="post" action="{{ url_for('crediteuren.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn primary">{{ icon('refresh') }}Mailbox nu ophalen</button></form>
+    {% if can('crediteuren', 3) %}<form method="post" action="{{ url_for('crediteuren.categories_refresh') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="terug" value="{{ request.full_path }}"><button class="btn" name="action" value="ophalen" title="Categorielijst met kleuren en de categorieën van de mails opnieuw uit Outlook halen">{{ icon('refresh') }}Categorieën ophalen</button></form>{% endif %}
     {% endif %}
   </div>
   {% endif %}

@@ -52,7 +52,12 @@
         </select>{% if cred.cat_map.get(key) %}<span class="ocat" style="--c:{{ cred.cat_colors.get(cred.cat_map.get(key), '#8A90A6') }};align-self:flex-start;margin-top:6px">{{ cred.cat_map.get(key) }}</span>{% endif %}</label>
         {% endfor %}
       </div>
-      {% if not cred.cat_colors %}<span class="hint">Nog geen categorielijst uit de mailbox: klik eerst bij Inkoopfacturen op "Mailbox nu ophalen".</span>{% endif %}
+      {% if cred.graph %}<div class="actions" style="margin-top:10px">
+        <input type="hidden" name="terug" value="{{ url_for('beheer.settings') }}">
+        <button class="btn sm" formaction="{{ url_for('crediteuren.categories_refresh') }}" name="action" value="ophalen" formnovalidate>{{ icon('refresh') }}Categorieën opnieuw ophalen</button>
+        <button class="btn sm" formaction="{{ url_for('crediteuren.categories_refresh') }}" name="action" value="toepassen" formnovalidate title="Bij alle openstaande en recente facturen de categorie zetten volgens de status">Categorieën toepassen op openstaande facturen</button>
+      </div>{% endif %}
+      {% if not cred.cat_colors %}<span class="hint">Nog geen categorielijst uit de mailbox: klik op "Categorieën opnieuw ophalen".</span>{% endif %}
     </div>
     <p class="small muted" style="margin:0">
       {% if not cred.graph %}<span class="badge b-warn">Microsoft-koppeling niet ingesteld</span>

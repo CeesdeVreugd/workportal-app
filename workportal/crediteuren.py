@@ -1701,6 +1701,42 @@ def _archive_bg(iid):
     _bg(iid, "categorie", "verplaatsen")
 
 
+@bp.route("/categorieen", methods=["POST"])
+def categories_refresh():
+    """Beheer: categorielijst (met kleuren) en de categorieën van de factuurmails nu opnieuw ophalen,
+    of de categorieën bij alle openstaande/recente facturen opnieuw zetten volgens de status."""
+    if not (can("crediteuren", 3) or can("beheer", 3)):
+        abort(403)
+    conn = get_db()
+    back = request.form.get("terug") or url_for("crediteuren.index")
+    if not back.startswith("/") or back.startswith("//"):
+        back = url_for("crediteuren.index")
+    if not mail_configured():
+        flash("De Microsoft-koppeling is niet ingesteld.", "error")
+        return redirect(back)
+    box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    if request.form.get("action") == "toepassen":
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM invoices WHERE source = 'mail' AND mail_id IS NOT NULL AND (status NOT IN ('snelstart', 'afgewezen')"
+            " OR updated_at >= ?) ORDER BY id", ((now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),))]
+        for iid in ids:
+            _bg(iid, "categorie")
+        flash(f"De Outlook-categorieën worden bij {len(ids)} factuurmail(s) bijgewerkt volgens de status (op de achtergrond).", "ok")
+        return redirect(back)
+    from .mail import _graph_token
+    _set(conn, "cred_cat_at", "")
+    try:
+        sync_categories(conn, box, {"Authorization": f"Bearer {_graph_token(force=True)}"})
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Categorieën ophalen mislukt: {str(exc)[:200]}", "error")
+        return redirect(back)
+    err = _setting(conn, "cred_cat_err", "")
+    n = len(category_colors(conn))
+    flash(err if err else f"Categorieën opnieuw opgehaald: {n} in de categorielijst, en de categorieën van de factuurmails zijn bijgewerkt.",
+          "error" if err else "ok")
+    return redirect(back)
+
+
 @bp.after_request
 def _sync_category(resp):
     """Na elke wijziging aan een factuurkaart (status, vraag, antwoord, mail, afwijzen …) de Outlook-categorie bijwerken."""
