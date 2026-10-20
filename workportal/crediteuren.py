@@ -165,10 +165,17 @@ def _below_amount(words, label, value_re=None):
             if not hit:
                 continue
             x0, x1 = min(w["x0"] for w in hit), max(w["x1"] for w in hit)
-            # bedrag rechts op dezelfde regel
-            right = [w for w in ws if w["x0"] > x1 and value_re.match(w["text"])]
-            if right and right[0]["x0"] - x1 < 200:
-                return right[0]["text"]
+            # waarde rechts op dezelfde regel, of op bijna dezelfde hoogte (kopje en waarde in een andere letter)
+            lt = min(w["top"] for w in hit)
+            lb = max(w["bottom"] for w in hit)
+            near = [w for t2, ws2 in lines[max(0, i - 2):i + 3] for w in ws2
+                    if w["x0"] > x1 and w["x0"] - x1 < 220 and abs((w["top"] + w["bottom"]) / 2 - (lt + lb) / 2) <= max(3.0, (lb - lt) * 0.7)]
+            for w in sorted(near, key=lambda w: w["x0"]):
+                tx = w["text"].lstrip(":").strip()
+                if tx and value_re.match(tx):
+                    return tx
+                if tx and not re.match(r"^[:.\-]*$", tx) and value_re is not _AMOUNT_ONLY:
+                    break   # er staat iets anders tussen: geen waarde van dit kopje
             best = None
             for top2, ws2 in lines[i + 1:i + 4]:
                 if top2 - top > 45:
@@ -229,7 +236,11 @@ _DASHES = str.maketrans({"\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": 
 
 
 def _clean(v):
-    return (v or "").translate(_DASHES)
+    v = (v or "").translate(_DASHES)
+    # tekens die de PDF niet kan vertalen komen als "(cid:16)"; tussen cijfers is dat (vrijwel altijd) een streepje:
+    # 15(cid:16)10(cid:16)2026 -> 15-10-2026, 4288(cid:16)20260000 -> 4288-20260000
+    v = re.sub(r"(?<=\d)\s?\(cid:\d+\)\s?(?=\d)", "-", v)
+    return re.sub(r"\(cid:\d+\)", "", v)
 
 
 def extract(data):
@@ -245,9 +256,17 @@ def extract(data):
             idx = sorted({0, 1, len(allp) - 2, len(allp) - 1} & set(range(len(allp))))
             pages = [allp[i] for i in idx]
             text = "\n".join((p.extract_text() or "") for p in pages)
+            # Kopjes in een kleinere letter dan de waarde (Heleon) raken bij de standaard regel-indeling door elkaar
+            # ("F D O P a a e rd c k ..."). Daarom ook de tekst met een strakkere regel-indeling erachter, als reserve.
+            try:
+                strict = "\n".join((p.extract_text(y_tolerance=1) or "") for p in pages)
+                if strict and strict != text:
+                    text = text + "\n" + strict
+            except Exception:  # noqa: BLE001
+                pass
             # woorden met positie van de laatste pagina (daar staan de totalen) en de eerste (kopgegevens)
             for p in ([pages[-1]] + ([pages[0]] if len(pages) > 1 else [])):
-                words.append(p.extract_words(keep_blank_chars=False, use_text_flow=False))
+                words.append(p.extract_words(keep_blank_chars=False, use_text_flow=False, y_tolerance=1))
     except Exception:
         return out
     if not text.strip():
@@ -362,6 +381,12 @@ def extract(data):
         out["due_date"] = (datetime.strptime(out["invoice_date"], "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d")
         out["due_assumed"] = True
     out["erp_ref"] = _po_ref(text)
+    if not out["erp_ref"] or "-" not in out["erp_ref"]:
+        for ws in words:
+            v = _below_amount(ws, _PO_LABEL, re.compile(r"^\d{4}(?:-\d{1,8})?$"))
+            if v and (not out["erp_ref"] or len(v) > len(out["erp_ref"])):
+                out["erp_ref"] = v
+                break
     out["supplier_guess"] = _supplier(text)
     out["text"] = text
     return out
