@@ -754,3 +754,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V142 (1.89.0)
 - Inkoopfacturen: teller "Vervalt binnen 7 dagen" in (helder) rood.
+
+## V143 (1.90.0)
+- Inkoopfacturen: tussenstap **Af te ronden door boekhouder**. Zijn Komdex (of buiten Komdex om) en SnelStart klaar – in WorkPortal of via de Outlook-categorie – dan staat de factuur op "Af te ronden door boekhouder". Pas als de boekhouder afrondt, wordt het "Afgerond".
+  - Boekhouder: gele balk op de kaart ("Afronden, mail laten staan" / "Afronden en mail verplaatsen"; bij een geüploade factuur alleen "Afronden"), of in het venster na de statuswijziging (vinkjes "Factuur afronden" en "Mail naar 01-Verwerkt").
+  - Anderen zien "Af te ronden door <naam boekhouder>". De boekhouder krijgt een pushmelding.
+  - Voortgangsbalk met een 4e stap; filter "Af te ronden"; "Alles open" telt ze mee, "Afgerond" niet.
+  - Wat al afgerond was blijft afgerond (migratie 29).
+- Status in het overzicht en op de kaart als losse stappen onder elkaar, elk in de kleur van zijn Outlook-categorie (Verwerkt in Komdex, Verwerkt in SnelStart, Vraag open, Vraag bij leverancier, Af te ronden …).
+- Categoriekleuren zoals de nieuwe Outlook ze toont: Perzik (oranje), Pruimenpaars (buiten Komdex om), Lichtgroen, Lichtblauw, Zilver.

@@ -56,7 +56,7 @@
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>
       <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
       <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp','buiten') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
-      <td><span class="badge {{ STATUS_BADGE[r.skey] }}">{{ r.label }}</span>{% if has_cats(r, cat_hide)|int > 0 %}<div class="ocats">{{ cats(r, cat_colors, cat_hide) }}</div>{% endif %}</td>
+      <td><span class="stchips">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span>{% if has_cats(r, cat_hide)|int > 0 %}<div class="ocats">{{ cats(r, cat_colors, cat_hide) }}</div>{% endif %}</td>
       <td class="hide-m small muted">{{ r.last_action or '' }}</td>
     </tr>
     {% else %}<tr><td colspan="7" class="empty">Geen facturen in deze lijst.</td></tr>{% endfor %}

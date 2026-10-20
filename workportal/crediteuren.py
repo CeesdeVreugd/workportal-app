@@ -27,7 +27,9 @@ MODULE = "crediteuren"
 STATUS = {"nieuw": "Nieuw", "erp": "Verwerkt in Komdex", "buiten": "Verwerkt buiten Komdex om",
           "ss_eerst": "In SnelStart, nog Komdex", "snelstart": "Afgerond (Komdex en SnelStart)", "afgewezen": "Afgewezen"}
 STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "ss_eerst": "b-purple", "snelstart": "b-ok",
-                "afgewezen": "b-bad", "vraag": "b-warn"}
+                "afgewezen": "b-bad", "vraag": "b-warn", "afronden": "b-warn"}
+TODO_FINISH = ("", "gevraagd", "mislukt")   # mail_archive: Komdex + SnelStart klaar, boekhouder moet nog afronden
+SQL_FINISH = "i.status = 'snelstart' AND IFNULL(i.mail_archive, '') IN ('', 'gevraagd', 'mislukt')"
 OPEN = ("nieuw", "erp", "buiten", "ss_eerst")   # nog niet afgerond
 TO_SNELSTART = ("erp", "buiten")         # klaar voor SnelStart
 DEFAULT_MAILBOX = "factuur@devreugd-pt.nl"
@@ -945,12 +947,12 @@ def _poll(conn, upload_dir):
 
 
 # Outlook-kleuren van categorieën (Graph: preset0 .. preset24)
-CAT_PRESETS = {
-    "preset0": "#E74C3C", "preset1": "#F39C12", "preset2": "#A0522D", "preset3": "#F1C40F", "preset4": "#4CAF50",
-    "preset5": "#1ABC9C", "preset6": "#8A9A2B", "preset7": "#3B82F6", "preset8": "#9B59B6", "preset9": "#C2185B",
-    "preset10": "#6C8EAD", "preset11": "#4A6378", "preset12": "#9E9E9E", "preset13": "#616161", "preset14": "#212121",
+CAT_PRESETS = {   # zoals de nieuwe Outlook ze toont (de Graph-namen wijken daar soms van af)
+    "preset0": "#E74C3C", "preset1": "#F7630C", "preset2": "#F08C2E", "preset3": "#E6B800", "preset4": "#4CAF50",
+    "preset5": "#1ABC9C", "preset6": "#8A9A2B", "preset7": "#29A9D6", "preset8": "#9B59B6", "preset9": "#C2185B",
+    "preset10": "#9AA0A6", "preset11": "#4A6378", "preset12": "#9E9E9E", "preset13": "#616161", "preset14": "#212121",
     "preset15": "#A93226", "preset16": "#C0580A", "preset17": "#6D3B1F", "preset18": "#B7950B", "preset19": "#2E7D32",
-    "preset20": "#117864", "preset21": "#5F6B1E", "preset22": "#1E3A8A", "preset23": "#5B2C6F", "preset24": "#880E4F",
+    "preset20": "#117864", "preset21": "#5F6B1E", "preset22": "#1E3A8A", "preset23": "#5B2C6F", "preset24": "#B0559A",
 }
 
 
@@ -1044,7 +1046,7 @@ def adopt_categories(conn, iid, cats, box):
     conn.execute("UPDATE invoices SET status = ?, route = ?, updated_at = ? WHERE id = ?", (new, route, now, iid))
     log(conn, iid, "Status overgenomen uit Outlook: " + ", ".join(done) + f" → {STATUS[new]}")
     conn.commit()
-    if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
+    if new == "snelstart" and r["status"] != "snelstart":
         _ask_archive(conn, iid, None)
     apply_categories(conn, iid, box)   # bijv. een dubbele (Komdex én buiten Komdex) rechtzetten
 
@@ -1087,9 +1089,15 @@ def scheduled_poll(conn, app, state):
 
 # ------------------------------------------------------------------ helpers voor de schermen
 
+def _to_finish(r):
+    return r["status"] == "snelstart" and (r["mail_archive"] or "") in TODO_FINISH
+
+
 def _status_key(r):
     if r["status"] in OPEN and r["question_to"]:
         return "vraag"
+    if _to_finish(r):
+        return "afronden"
     return r["status"]
 
 
@@ -1104,6 +1112,8 @@ def _label(r):
         return "Vraag open bij " + (r["question_name"] or "collega")
     if r["status"] == "afgewezen":
         return "Afgewezen door " + (r["rejected_name"] or "onbekend")
+    if _to_finish(r):
+        return "Af te ronden door boekhouder"
     if r["status"] == "snelstart":
         return "Afgerond · " + ("buiten Komdex om" if r["route"] == "buiten" else "Komdex") + " + SnelStart"
     return STATUS.get(r["status"], r["status"])
@@ -1151,6 +1161,7 @@ FILTERS = [
     ("komdex", "Nog in Komdex"),
     ("erp", "Nog in SnelStart"),
     ("vraag", "Vraag open"),
+    ("afronden", "Af te ronden"),
     ("mij", "Wacht op mij"),
     ("boekhouding", "Voor de boekhouding"),
     ("afgewezen", "Afgewezen"),
@@ -1167,7 +1178,8 @@ def index():
     where, params = [], []
     uid = g.user["id"]
     cond = {
-        "open": "i.status IN ('nieuw','erp','buiten','ss_eerst')",
+        "open": "(i.status IN ('nieuw','erp','buiten','ss_eerst') OR " + SQL_FINISH + ")",
+        "afronden": SQL_FINISH,
         "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
         "erp": "i.status IN ('nieuw','erp','buiten')",       # nog te boeken in SnelStart (Komdex gedaan of nog niet)
         "komdex": "i.status IN ('nieuw','ss_eerst')",        # nog te verwerken in Komdex (SnelStart gedaan of nog niet)
@@ -1175,7 +1187,7 @@ def index():
         "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
         "afgewezen": "i.status = 'afgewezen'",
-        "klaar": "i.status = 'snelstart'",
+        "klaar": "i.status = 'snelstart' AND NOT (" + SQL_FINISH + ")",
         "alle": "1=1",
     }
     if flt not in cond:
@@ -1189,15 +1201,18 @@ def index():
     rows = query(
         "SELECT i.*, q.name AS question_name, (SELECT name FROM users WHERE id = i.rejected_by) AS rejected_name,"
         " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1) AS acc_notes,"
+        " (SELECT n.kind FROM invoice_notes n WHERE n.invoice_id = i.id AND n.kind IN ('mail_uit', 'mail_in')"
+        "   ORDER BY n.created_at DESC, n.id DESC LIMIT 1) AS last_mail,"
         " (SELECT l.action || ' · ' || IFNULL(u.name, 'systeem') FROM invoice_log l LEFT JOIN users u ON u.id = l.user_id"
         "   WHERE l.invoice_id = i.id ORDER BY l.id DESC LIMIT 1) AS last_action"
         " FROM invoices i LEFT JOIN users q ON q.id = i.question_to WHERE " + " AND ".join(where) +
         " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten','ss_eerst') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
-    c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
+    fin = SQL_FINISH.replace("i.", "")
+    c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst') OR (" + fin + ")) AS open, SUM(" + fin + ") AS afronden, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
               " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
               " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
-              " SUM(status='snelstart') AS klaar, COUNT(*) AS alle,"
+              " SUM(status='snelstart' AND NOT (" + fin + ")) AS klaar, COUNT(*) AS alle,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
               " SUM(status = 'afgewezen' AND rejected_at >= date('now','start of month')) AS af_maand"
               " FROM invoices", (uid,), one=True)
@@ -1205,10 +1220,13 @@ def index():
     counts["boekhouding"] = query("SELECT COUNT(DISTINCT n.invoice_id) AS n FROM invoice_notes n JOIN invoices i ON i.id = n.invoice_id"
                                   " WHERE n.for_accounting = 1 AND i.status <> 'snelstart'", one=True)["n"] or 0
     items = []
+    scol = _step_colors(get_db())
     for r in rows:
         d = dict(r)
         d["skey"] = _status_key(r)
         d["label"] = _label(r)
+        d["to_finish"] = _to_finish(r)
+        d["chips"] = status_chips(r, scol)
         items.append(d)
     conn = get_db()
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
@@ -1283,6 +1301,10 @@ def detail(iid):
     d = dict(r)
     d["skey"] = _status_key(r)
     d["label"] = _label(r)
+    d["to_finish"] = _to_finish(r)
+    lm = query("SELECT kind FROM invoice_notes WHERE invoice_id = ? AND kind IN ('mail_uit', 'mail_in') ORDER BY created_at DESC, id DESC LIMIT 1",
+               (iid,), one=True)
+    d["chips"] = status_chips(dict(d, last_mail=lm["kind"] if lm else None), _step_colors(get_db()))
     next_inv = None
     changed_msg = (request.args.get("gewijzigd") or "")[:120]
     if changed_msg:
@@ -1334,7 +1356,7 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=_may_archive(get_db()), cat_colors=category_colors(get_db()),
+                           archive_me=_may_archive(get_db()), archive_owner_name=_owner_name(get_db()), cat_colors=category_colors(get_db()),
                            cat_hide=set(category_map(get_db()).values()))
 
 
@@ -1603,28 +1625,39 @@ def _may_archive(conn):
     return g.user["id"] == o if o else can("crediteuren", 3)
 
 
+def _owner_name(conn):
+    o = archive_owner(conn)
+    row = conn.execute("SELECT name FROM users WHERE id = ?", (o,)).fetchone() if o else None
+    return row["name"] if row else "de boekhouder"
+
+
 def _archive_folder(conn):
     return (_setting(conn, "cred_done_folder", DONE_FOLDER) or DONE_FOLDER).strip() or DONE_FOLDER
 
 
 def _ask_archive(conn, iid, actor):
-    """Factuur net afgerond: de boekhouding een melding met de vraag of de mail naar 'Verwerkt' mag."""
-    r = conn.execute("SELECT supplier, invoice_no, mail_archive FROM invoices WHERE id = ?", (iid,)).fetchone()
+    """Komdex + SnelStart klaar: tussenstap 'af te ronden door boekhouder'. De boekhouder krijgt een melding; bij een
+    factuur uit de mailbox met de vraag of de mail naar 'Verwerkt' mag."""
+    r = conn.execute("SELECT supplier, invoice_no, mail_archive, source FROM invoices WHERE id = ?", (iid,)).fetchone()
     if r["mail_archive"] in ("verplaatst", "bezig"):
         return
     conn.execute("UPDATE invoices SET mail_archive = 'gevraagd' WHERE id = ?", (iid,))
     conn.commit()
     folder = _archive_folder(conn)
+    name = f"{r['supplier'] or 'Factuur'} {r['invoice_no'] or ''}".strip()
     try:
         from .notify import notify_user
         for uid in archive_targets(conn):
-            if uid != actor:   # wie hem zelf afrondt krijgt de vraag meteen in het venster
-                notify_user(conn, uid, "Factuur afgerond – mail naar " + folder + "?",
-                            f"{r['supplier'] or 'Factuur'} {r['invoice_no'] or ''}".strip()
-                            + f" is verwerkt in Komdex en SnelStart. Mag de mail (met de onderliggende mails) naar de map '{folder}'?",
-                            url=f"/inkoopfacturen/{iid}", email=False)
+            if uid != actor:   # wie het zelf doet krijgt de vraag meteen in het venster
+                if r["source"] == "mail":
+                    notify_user(conn, uid, "Factuur af te ronden", f"{name} is verwerkt in Komdex en SnelStart. Rond hem af"
+                                f" en geef aan of de mail (met de onderliggende mails) naar de map '{folder}' mag.",
+                                url=f"/inkoopfacturen/{iid}", email=False)
+                else:
+                    notify_user(conn, uid, "Factuur af te ronden", f"{name} is verwerkt in Komdex en SnelStart. Rond hem af.",
+                                url=f"/inkoopfacturen/{iid}", email=False)
     except Exception as exc:  # pragma: no cover
-        print(f"[WorkPortal] Melding mail naar Verwerkt mislukt: {exc}", flush=True)
+        print(f"[WorkPortal] Melding afronden mislukt: {exc}", flush=True)
 
 
 CAT_STEPS = [("komdex", "Verwerkt in Komdex"), ("buiten", "Verwerkt buiten Komdex om"),
@@ -1634,10 +1667,38 @@ _CAT_GUESS = {"komdex": r"komdex", "buiten": r"buiten", "snelstart": r"snel\s*st
               "vraag": r"vraag"}
 
 
+STEP_DEFAULT = {"komdex": "#2E7D32", "buiten": "#8A6D3B", "snelstart": "#E67E22", "afgewezen": "#E53935", "vraag": "#E0A800"}
+
+
 def _step_colors(conn):
-    """Kleur per stap, gelijk aan de Outlook-categorie die erbij hoort (anders Komdex groen, SnelStart oranje)."""
+    """Kleur per stap, gelijk aan de Outlook-categorie die erbij hoort (anders vaste kleuren: Komdex groen, SnelStart oranje …)."""
     cols, cmap = category_colors(conn), category_map(conn)
-    return {"komdex": cols.get(cmap.get("komdex"), "#2E7D32"), "snelstart": cols.get(cmap.get("snelstart"), "#E67E22")}
+    return {k: cols.get(cmap.get(k), d) for k, d in STEP_DEFAULT.items()}
+
+
+def status_chips(r, colors):
+    """De status als losse stappen onder elkaar, elk in de kleur van zijn Outlook-categorie: [(tekst, kleur), …]."""
+    keys = r.keys() if hasattr(r, "keys") else r
+    if r["status"] == "afgewezen":
+        return [("Afgewezen" + (f" door {r['rejected_name']}" if "rejected_name" in keys and r["rejected_name"] else ""), colors["afgewezen"])]
+    out = []
+    if r["status"] == "snelstart" and not _to_finish(r):
+        return [("Afgerond", "#1E7A3C")]
+    if r["route"] == "komdex":
+        out.append(("Verwerkt in Komdex", colors["komdex"]))
+    elif r["route"] == "buiten":
+        out.append(("Verwerkt buiten Komdex om", colors["buiten"]))
+    if r["snelstart_at"] and r["status"] in ("snelstart", "ss_eerst"):
+        out.append(("Verwerkt in SnelStart", colors["snelstart"]))
+    if not out:
+        out.append(("Nieuw", "#0059B3"))
+    if r["question_to"]:
+        out.append(("Vraag open bij " + ((r["question_name"] if "question_name" in keys else None) or "collega"), colors["vraag"]))
+    if "last_mail" in keys and r["last_mail"] == "mail_uit":
+        out.append(("Vraag bij leverancier", colors["vraag"]))
+    if _to_finish(r):
+        out.append(("Af te ronden door boekhouder", "#E0A800"))
+    return out
 
 
 def category_map(conn):
@@ -1835,7 +1896,7 @@ def set_status(iid):
                  (new, route, 1 if ss else 0, now, iid))
     log(conn, iid, f"Status: {msg}" + (f" → {STATUS[new]}" if STATUS[new] != msg else ""), uid)
     conn.commit()
-    if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
+    if new == "snelstart" and r["status"] != "snelstart":
         _ask_archive(conn, iid, uid)
 
     # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
@@ -1850,17 +1911,23 @@ def mail_archive(iid):
     r = _load(iid)
     conn = get_db()
     folder = _archive_folder(conn)
-    if r["source"] == "mail" and r["status"] == "snelstart" and _may_archive(conn):
-        if request.form.get("verplaatsen") == "1":
+    if r["status"] == "snelstart" and _may_archive(conn) and request.form.get("afronden") == "1":
+        if r["source"] != "mail":
+            conn.execute("UPDATE invoices SET mail_archive = 'afgerond' WHERE id = ?", (iid,))
+            log(conn, iid, "Afgerond door de boekhouder", g.user["id"])
+            conn.commit()
+            flash("Factuur afgerond.", "ok")
+        elif request.form.get("verplaatsen") == "1":
             conn.execute("UPDATE invoices SET mail_archive = 'bezig' WHERE id = ?", (iid,))
-            log(conn, iid, f"Mail naar map '{folder}': ja", g.user["id"])
+            log(conn, iid, f"Afgerond door de boekhouder; mail naar map '{folder}'", g.user["id"])
             conn.commit()
             _archive_bg(iid)
-            flash(f"De mail wordt naar de map '{folder}' verplaatst.", "ok")
+            flash(f"Factuur afgerond. De mail wordt naar de map '{folder}' verplaatst.", "ok")
         else:
             conn.execute("UPDATE invoices SET mail_archive = 'laten' WHERE id = ?", (iid,))
-            log(conn, iid, f"Mail naar map '{folder}': nee, laten staan", g.user["id"])
+            log(conn, iid, "Afgerond door de boekhouder; mail blijft in het postvak", g.user["id"])
             conn.commit()
+            flash("Factuur afgerond.", "ok")
     nxt = request.form.get("naar") or ""
     if not nxt.startswith("/") or nxt.startswith("//"):
         nxt = url_for("crediteuren.detail", iid=iid)

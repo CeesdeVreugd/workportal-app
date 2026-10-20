@@ -11,7 +11,7 @@
     <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}</h1>
     <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
   </div>
-  <div class="actions">{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
+  <div class="actions">{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="stchips row">{% for t, col in r.chips %}<span class="stchip lg" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span></div>
 </div>
 
 {% set route = r.route if r.status != 'afgewezen' else None %}
@@ -24,12 +24,15 @@
 {% elif done2 %}{% set s2, s2done, s3, s3done = lab_route, True, 'Nog: verwerken in SnelStart', False %}
 {% elif done3 %}{% set s2, s2done, s3, s3done = 'Verwerkt in SnelStart', True, 'Nog: Komdex (of buiten Komdex om)', False %}
 {% else %}{% set s2, s2done, s3, s3done = '', False, '', False %}{% endif %}
+{% if s2done and s3done %}{% set s4, s4done = ('Nog: afronden door boekhouder' if r.to_finish else 'Afgerond'), not r.to_finish %}{% else %}{% set s4, s4done = '', False %}{% endif %}
 <div class="card cred-flow lin" aria-label="Voortgang">
   <span class="cf-node done"><b>{{ icon('check') }}</b>Binnengekomen</span>
   <i class="cf-line {{ 'on' if s2done }}"></i>
   <span class="cf-node {{ 'done' if s2done }}"><b>{% if s2done %}{{ icon('check') }}{% else %}2{% endif %}</b>{{ s2 }}</span>
   <i class="cf-line {{ 'on' if s3done }}"></i>
   <span class="cf-node {{ 'done' if s3done else ('todo' if s3) }}"><b>{% if s3done %}{{ icon('check') }}{% else %}3{% endif %}</b>{{ s3 }}</span>
+  <i class="cf-line {{ 'on' if s4done }}"></i>
+  <span class="cf-node {{ 'done' if s4done else ('todo' if s4) }}"><b>{% if s4done %}{{ icon('check') }}{% else %}4{% endif %}</b>{{ s4 }}</span>
 </div>
 {% else %}
 <div class="result bad" style="margin-bottom:16px"><b>Afgewezen door {{ r.rejected_name or 'onbekend' }}</b> op {{ r.rejected_at|dt }}: {{ r.reject_reason }}</div>
@@ -57,15 +60,18 @@
   </section>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-    {% if edit and r.status == 'snelstart' and r.source == 'mail' and r.mail_archive in ('gevraagd', 'mislukt') and archive_me %}
+    {% if edit and r.to_finish and archive_me %}
     <form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cred-arch-ask">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <span class="cred-arch-ic">{{ icon('mail') }}</span>
-      <span class="cred-arch-txt"><b>{{ 'Verplaatsen is niet gelukt – opnieuw proberen?' if r.mail_archive == 'mislukt' else 'Factuur afgerond' }}</b>
-        Mag de mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b>?{% if r.mail_archive == 'mislukt' %} <span class="muted">Zie het logboek voor de reden.</span>{% endif %}</span>
-      <span class="cred-arch-btns"><button class="btn sm ghost" name="verplaatsen" value="0">Nee, laten staan</button>
-        <button class="btn sm primary" name="verplaatsen" value="1">Ja, verplaatsen</button></span>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="afronden" value="1">
+      <span class="cred-arch-ic">{{ icon('check') }}</span>
+      <span class="cred-arch-txt"><b>{{ 'Mail verplaatsen is niet gelukt – opnieuw proberen?' if r.mail_archive == 'mislukt' else 'Af te ronden door de boekhouder' }}</b>
+        Komdex en SnelStart zijn klaar.{% if r.source == 'mail' %} Rond de factuur af; mag de mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b>?{% endif %}
+        {% if r.mail_archive == 'mislukt' %}<span class="muted">Zie het logboek voor de reden.</span>{% endif %}</span>
+      <span class="cred-arch-btns">{% if r.source == 'mail' %}<button class="btn sm ghost" name="verplaatsen" value="0">Afronden, mail laten staan</button>
+        <button class="btn sm primary" name="verplaatsen" value="1">Afronden en mail verplaatsen</button>{% else %}<button class="btn sm primary">Afronden</button>{% endif %}</span>
     </form>
+    {% elif r.to_finish %}
+    <div class="cred-arch-ask"><span class="cred-arch-ic">{{ icon('check') }}</span><span class="cred-arch-txt"><b>Af te ronden door {{ archive_owner_name }}</b> Komdex en SnelStart zijn klaar; {{ archive_owner_name }} rondt de factuur af{{ ' en zet de mail in ' ~ archive_folder if r.source == 'mail' }}.</span></div>
     {% endif %}
     <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form" data-no-draft>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -97,7 +103,7 @@
       <div class="card-head"><h2>Status</h2><span class="small muted">Komdex en SnelStart in willekeurige volgorde</span></div>
       {% if r.status == 'snelstart' and r.source == 'mail' and r.mail_archive in ('verplaatst', 'bezig', 'laten') %}
       <div class="small muted cred-arch-line">{{ icon('mail') }}{% if r.mail_archive == 'verplaatst' %}Mail staat in de map {{ archive_folder }}.{% elif r.mail_archive == 'bezig' %}Mail wordt naar de map {{ archive_folder }} verplaatst…{% else %}Mail is in het postvak blijven staan.
-        {% if archive_me %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="linkbtn" name="verplaatsen" value="1">Alsnog naar {{ archive_folder }}</button></form>{% endif %}{% endif %}</div>
+        {% if archive_me %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="afronden" value="1"><button class="linkbtn" name="verplaatsen" value="1">Alsnog naar {{ archive_folder }}</button></form>{% endif %}{% endif %}</div>
       {% endif %}
       {% if r.status != 'afgewezen' %}
       <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status">
@@ -259,11 +265,14 @@
   <div class="cdd-icon">{{ icon('check') }}</div>
   <h2>{{ changed_msg }}</h2>
   <p class="muted">Status van deze factuur: <b>{{ r.label }}</b></p>
-  {% set ask_arch = edit and archive_me and r.status == 'snelstart' and r.source == 'mail' and r.mail_archive == 'gevraagd' %}
+  {% set ask_arch = edit and archive_me and r.to_finish %}
   {% if ask_arch %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cdd-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label class="cdd-arch"><input type="checkbox" name="verplaatsen" value="1" checked>
-      <span>{{ icon('mail') }}Mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b> verplaatsen</span></label>
+    <label class="cdd-arch"><input type="checkbox" name="afronden" value="1" checked
+        onchange="var m=document.getElementById('cdd-mv'); if(m){m.disabled=!this.checked; if(!this.checked) m.checked=false;}">
+      <span>{{ icon('check') }}Factuur <b>afronden</b> <span class="muted">(anders blijft hij op "af te ronden door boekhouder")</span></span></label>
+    {% if r.source == 'mail' %}<label class="cdd-arch"><input type="checkbox" id="cdd-mv" name="verplaatsen" value="1" checked>
+      <span>{{ icon('mail') }}Mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b> verplaatsen</span></label>{% endif %}
   {% endif %}
   {% if next_inv %}
   {% set nurl = url_for('crediteuren.detail', iid=next_inv.id, terug=back) %}

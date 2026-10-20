@@ -654,6 +654,10 @@ MIGRATIONS = [
     """
     ALTER TABLE invoices ADD COLUMN mail_categories TEXT;
     """,
+    # 29 - inkoopfacturen: tussenstap 'af te ronden door boekhouder'; wat al afgerond was blijft afgerond
+    """
+    UPDATE invoices SET mail_archive = 'afgerond' WHERE status = 'snelstart' AND mail_archive IS NULL;
+    """,
 ]
 
 

@@ -1045,3 +1045,11 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
   background: color-mix(in srgb, var(--c) 14%, #fff); color: #1F2240; border: 1px solid color-mix(in srgb, var(--c) 45%, #fff); white-space: nowrap; }
 .ocat::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
 .catmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 6px; }
+.cred-flow.lin .cf-node { min-width: 0; }
+/* status als losse stappen in de kleur van de Outlook-categorie */
+.stchips { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.stchips.row { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+.stchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; line-height: 1.15; padding: 4px 10px 4px 8px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--c) 15%, #fff); color: color-mix(in srgb, var(--c) 55%, #14163A); border: 1px solid color-mix(in srgb, var(--c) 40%, #fff); font-weight: 500; }
+.stchip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.stchip.lg { font-size: 14px; padding: 6px 14px 6px 11px; }
