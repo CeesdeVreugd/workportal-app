@@ -642,6 +642,8 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     iid = cur.lastrowid
     if supplier_id:
         conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
+    if mail.get("conv"):
+        conn.execute("UPDATE invoices SET mail_conv = ? WHERE id = ?", (mail["conv"], iid))
     fid = _store_file(conn, upload_dir, iid, data, safe_filename(filename) or "factuur.pdf", user_id)
     conn.execute("UPDATE invoices SET file_id = ? WHERE id = ?", (fid, iid))
     for ename, edata, emime in (extra or []):
@@ -840,7 +842,7 @@ def _poll(conn, upload_dir):
     refreshed = False
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/inbox/messages"
            f"?$filter=receivedDateTime ge {since}"
-           f"&$select=id,subject,from,receivedDateTime,hasAttachments&$orderby=receivedDateTime asc&$top=50")
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId&$orderby=receivedDateTime asc&$top=50")
     new = 0
     pages = 0
     while url and pages < 10:
@@ -865,8 +867,15 @@ def _poll(conn, upload_dir):
                 continue
             frm = (m.get("from") or {}).get("emailAddress") or {}
             tag = MAIL_TAG.search(m.get("subject") or "")
-            if tag and conn.execute("SELECT 1 FROM invoices WHERE id = ?", (int(tag.group(1)),)).fetchone():
-                _store_reply(conn, upload_dir, box, headers, m, frm, int(tag.group(1)))
+            target = int(tag.group(1)) if tag and conn.execute("SELECT 1 FROM invoices WHERE id = ?", (int(tag.group(1)),)).fetchone() else None
+            if not target and m.get("conversationId"):
+                # antwoord in de mailwisseling van een factuur waarop wij vanaf de kaart hebben gereageerd
+                hit = conn.execute("SELECT i.id FROM invoices i WHERE i.mail_conv = ? AND EXISTS (SELECT 1 FROM invoice_notes n"
+                                   " WHERE n.invoice_id = i.id AND n.kind = 'mail_uit') ORDER BY i.id DESC LIMIT 1",
+                                   (m["conversationId"],)).fetchone()
+                target = hit["id"] if hit else None
+            if target:
+                _store_reply(conn, upload_dir, box, headers, m, frm, target)
                 conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
                              (mid, m.get("receivedDateTime")))
                 conn.commit()
@@ -901,7 +910,7 @@ def _poll(conn, upload_dir):
                 extra = [f for f in files if f is not main]
                 received = (m.get("receivedDateTime") or "").replace("Z", "+00:00")
                 _, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail={
-                    "key": mid, "from_addr": (frm.get("address") or "").lower(),
+                    "key": mid, "conv": m.get("conversationId"), "from_addr": (frm.get("address") or "").lower(),
                     "from_name": frm.get("name"), "subject": m.get("subject"), "received": received or None})
                 new += 1 if created else 0
             conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
@@ -1233,7 +1242,12 @@ def mail_supplier(iid):
     if not to or bad or not body:
         flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
         return redirect(back)
-    subject = MAIL_TAG.sub("", subject).strip() + f" [WP-F{iid}]"
+    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
+    in_thread = bool(orig)
+    if in_thread:
+        subject = "RE: " + (r["mail_subject"] or "")   # Outlook zet het antwoord onder de binnengekomen mail
+    else:
+        subject = MAIL_TAG.sub("", subject).strip() + f" [WP-F{iid}]"
     atts = []
     if f.get("attach_pdf") and r["file_id"]:
         from .util import file_path
@@ -1241,10 +1255,19 @@ def mail_supplier(iid):
         if fr:
             with open(file_path(fr), "rb") as fh:
                 atts.append((fr["filename"] or "factuur.pdf", fh.read(), "application/pdf"))
-    from .mail import send_mail_with_files
+    from .mail import send_mail_with_files, reply_in_thread, graph_message
     conn = get_db()
     box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
-    ok, err = send_mail_with_files(box, to, subject, body, atts, cc=cc or None, signer="crediteuren:" + (g.user["name"] or ""))
+    signer = "crediteuren:" + (g.user["name"] or "")
+    if in_thread:
+        if not r["mail_conv"]:
+            gm = graph_message(box, orig)
+            if gm and gm.get("conversationId"):
+                conn.execute("UPDATE invoices SET mail_conv = ? WHERE id = ?", (gm["conversationId"], iid))
+                subject = "RE: " + (gm.get("subject") or r["mail_subject"] or "")
+        ok, err = reply_in_thread(box, orig, to, body, atts, cc=cc or None, signer=signer)
+    else:
+        ok, err = send_mail_with_files(box, to, subject, body, atts, cc=cc or None, signer=signer)
     if not ok:
         flash(f"Mail versturen is niet gelukt: {err}", "error")
         return redirect(back)

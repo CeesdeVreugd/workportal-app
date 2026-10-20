@@ -640,6 +640,11 @@ MIGRATIONS = [
     """
     ALTER TABLE invoice_notes ADD COLUMN mail_meta TEXT;
     """,
+    # 26 - inkoopfacturen: mailwisseling (conversationId) van de binnengekomen factuurmail, voor antwoorden in hetzelfde draadje
+    """
+    ALTER TABLE invoices ADD COLUMN mail_conv TEXT;
+    CREATE INDEX idx_invoices_conv ON invoices(mail_conv);
+    """,
 ]
 
 

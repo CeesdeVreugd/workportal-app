@@ -152,7 +152,12 @@
             <label class="f">Aan *<input type="text" name="to" value="{{ mail_to }}" required placeholder="naam@leverancier.nl"></label>
             <label class="f">Cc<input type="text" name="cc" placeholder="optioneel, meerdere met komma"></label>
           </div>
+          {% if r.source == 'mail' and r.mail_id %}
+          <div class="f lf"><span>Onderwerp</span><div class="mailsubj">RE: {{ r.mail_subject or '' }}</div>
+            <span class="hint">Antwoord op de binnengekomen factuurmail: hetzelfde onderwerp, zodat het in Outlook onder die mail hangt (ook de reactie van de leverancier).</span></div>
+          {% else %}
           <label class="f">Onderwerp<input type="text" name="subject" value="{{ mail_subject }}"></label>
+          {% endif %}
           <label class="f">Bericht *<textarea name="body" rows="7" required>Beste heer/mevrouw,
 
 </textarea></label>
@@ -161,7 +166,7 @@
             <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
             <button class="btn primary" style="margin-left:auto">{{ icon('mail') }}Versturen</button>
           </div>
-          <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier op deze mail, dan komt zijn antwoord (met bijlagen) hier in het gesprek – wie er ook reageert.</p>
+          <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier, dan komt zijn antwoord (met bijlagen) hier in het gesprek – wie er ook reageert.</p>
         </form>
       </details>
       {% endif %}

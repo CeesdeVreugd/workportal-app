@@ -303,6 +303,52 @@ def send_mail_with_files(sender, to, subject, text, attachments, cc=None, signer
         return False, str(exc)[:400]
 
 
+def reply_in_thread(sender, message_id, to, text, attachments=None, cc=None, signer="systeem"):
+    """Antwoord op een ontvangen mail in dezelfde mailwisseling (onderwerp "RE: …", hangt in Outlook onder het
+    origineel). Via Graph 'reply' (recht Mail.Send). Geeft (True, None) of (False, foutmelding)."""
+    html = (f'<div style="font-family:{FONT};font-size:11pt;color:#000;max-width:680px">'
+            f'{text_to_html(text)}{signature_html(signer)}</div>')
+    if not graph_configured():
+        print("=" * 60, flush=True)
+        print(f"[WorkPortal] ANTWOORD IN MAILWISSELING (Microsoft-koppeling niet ingesteld) van {sender} aan {to} cc {cc} op {message_id}", flush=True)
+        print((text or "") + signature_text(signer), flush=True)
+        print("=" * 60, flush=True)
+        return True, None
+    to = [to] if isinstance(to, str) else list(to)
+    msg = {"toRecipients": [{"emailAddress": {"address": a}} for a in to]}
+    if cc:
+        msg["ccRecipients"] = [{"emailAddress": {"address": a}} for a in ([cc] if isinstance(cc, str) else cc)]
+    atts, total = [], 0
+    for name, data, mime in attachments or []:
+        if total + len(data) > GRAPH_MAX_ATTACH:
+            continue
+        total += len(data)
+        atts.append({"@odata.type": "#microsoft.graph.fileAttachment", "name": name, "contentType": mime or "application/octet-stream",
+                     "contentBytes": base64.b64encode(data).decode()})
+    if atts:
+        msg["attachments"] = atts
+    try:
+        r = requests.post(f"https://graph.microsoft.com/v1.0/users/{sender}/messages/{message_id}/reply",
+                          json={"message": msg, "comment": html}, headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=60)
+        if r.status_code not in (200, 202):
+            return False, f"reply gaf {r.status_code}: {r.text[:300]}"
+        return True, None
+    except Exception as exc:  # pragma: no cover - netwerk
+        return False, str(exc)[:400]
+
+
+def graph_message(sender, message_id, fields="subject,conversationId"):
+    """Eén bericht uit een mailbox (alleen lezen). None als het niet lukt."""
+    if not graph_configured():
+        return None
+    try:
+        r = requests.get(f"https://graph.microsoft.com/v1.0/users/{sender}/messages/{message_id}?$select={fields}",
+                         headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=30)
+        return r.json() if r.status_code < 400 else None
+    except Exception:  # pragma: no cover
+        return None
+
+
 def _send_graph_large(sender, to, cc, subject, html, attachments):
     base = f"https://graph.microsoft.com/v1.0/users/{sender}"
     hdr = lambda: {"Authorization": f"Bearer {_graph_token()}"}

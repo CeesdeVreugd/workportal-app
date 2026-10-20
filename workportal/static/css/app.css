@@ -992,3 +992,4 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .cred-mail > summary { list-style: none; display: inline-flex; }
 .cred-mail > summary::-webkit-details-marker { display: none; }
 .cred-grid .notebody { white-space: pre-line; }
+.mailsubj { padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--line-2); color: var(--ink, #14163A); font-weight: 400; }

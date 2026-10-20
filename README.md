@@ -653,3 +653,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Het ophalen leest nu alle nieuwe mails in de inbox (niet alleen met bijlage); mails zonder bijlage en zonder code worden overgeslagen.
 - Leverancier herkennen: alleen "De Vreugd Productietechniek" (onszelf) wordt overgeslagen, andere "De Vreugd"-bedrijven (Transport) niet; ons eigen adresblok (t.a.v., Edisonring) telt niet mee; relaties van het type klant tellen minder zwaar.
 - Migratie 25: `invoice_notes.mail_meta`.
+
+## V121 – Mail aan leverancier in dezelfde mailwisseling
+- Kwam de factuur per mail binnen, dan is de mail vanaf de kaart een **antwoord op die mail** (Graph `reply`, recht Mail.Send): onderwerp exact "RE: <onderwerp van de factuurmail>", en in Outlook hangt hij onder de binnengekomen mail. Geen code meer in het onderwerp.
+- Reacties van de leverancier in diezelfde mailwisseling (conversationId) komen in het gesprek van de kaart, ook zonder code. Bij geüploade facturen (geen mail) blijft de code `[WP-F…]` in het onderwerp nodig.
+- Migratie 26: `invoices.mail_conv` (wordt voor nieuwe mails bij binnenkomst opgeslagen, voor oudere bij het eerste antwoord opgehaald).
