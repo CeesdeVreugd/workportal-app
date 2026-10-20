@@ -1,0 +1,4 @@
+{% macro cats(r, colors) -%}
+{%- set names = (r.mail_categories|fromjson) if r.mail_categories else [] -%}
+{%- for c in names %}<span class="ocat" style="--c:{{ colors.get(c, '#8A90A6') }}" title="Outlook-categorie">{{ c }}</span>{% endfor -%}
+{%- endmacro %}

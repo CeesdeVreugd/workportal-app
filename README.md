@@ -704,3 +704,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V130 (1.77.0)
 - Inkoopfacturen: de vraag "mail naar 01-Verwerkt?" gaat naar één verantwoordelijke boekhouder, te kiezen in Beheer > Instellingen (losse keuze, los van de rollen; de rollen blijven ongewijzigd). Alleen die persoon krijgt de melding, de vraag in het venster en de gele balk, en mag hem beantwoorden.
 - Niemand gekozen: iedereen met beheerrechten op inkoopfacturen kan het doen, zonder melding.
+
+## V131 (1.78.0)
+- Inkoopfacturen: de Outlook-categorieën van de factuurmail worden uitgelezen en getoond (met de kleur uit Outlook) in het overzicht onder de status en op de factuurkaart bovenaan ("Outlook: …").
+  - Bijgewerkt bij elk ophalen van de mailbox (elke 5 minuten / knop Postvak ophalen) voor openstaande facturen en facturen van de laatste 30 dagen. Alleen lezen: er wordt in Outlook niets veranderd.
+  - Categorieën: recht Mail.Read (is er al). Kleuren: recht MailboxSettings.Read (toepassingsrecht, beheerderstoestemming); zonder dat recht worden de categorieën grijs getoond en staat de reden bij Beheer > Instellingen.
+- Database-migratie 28: invoices.mail_categories.

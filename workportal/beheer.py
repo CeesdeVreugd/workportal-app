@@ -166,7 +166,7 @@ def settings():
     cred = {"on": get_setting("cred_mail_on") == "1", "box": get_setting("cred_mailbox") or "factuur@devreugd-pt.nl",
             "since": (get_setting("cred_since") or "")[:10], "last": get_setting("cred_last_poll"),
             "error": get_setting("cred_last_error"), "graph": mail_configured(),
-            "folder": get_setting("cred_done_folder") or "01-Verwerkt"}
+            "folder": get_setting("cred_done_folder") or "01-Verwerkt", "cat_err": get_setting("cred_cat_err")}
     from .crediteuren import archive_owner
     cred["owner"] = archive_owner(get_db())
     cred["staff"] = query("SELECT u.id, u.name, GROUP_CONCAT(r.name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id"

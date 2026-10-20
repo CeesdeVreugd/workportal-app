@@ -1038,3 +1038,9 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .cred-arch-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -4px 0 10px; }
 .cred-arch-line svg { width: 15px; height: 15px; }
 .cred-arch-line .linkbtn { color: var(--primary, #0A0A96); text-decoration: underline; font-size: inherit; }
+/* Outlook-categorieën */
+.ocats { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; }
+.actions .ocats { margin: 0 8px 0 0; gap: 6px; }
+.ocat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; line-height: 1; padding: 4px 8px 4px 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 14%, #fff); color: #1F2240; border: 1px solid color-mix(in srgb, var(--c) 45%, #fff); white-space: nowrap; }
+.ocat::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }

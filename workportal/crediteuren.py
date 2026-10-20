@@ -922,7 +922,66 @@ def _poll(conn, upload_dir):
                          (mid, m.get("receivedDateTime")))
             conn.commit()
         url = js.get("@odata.nextLink")
+    try:
+        sync_categories(conn, box, headers)
+    except Exception as exc:  # noqa: BLE001 - categorieën zijn bijzaak, het ophalen zelf is gelukt
+        print(f"[WorkPortal] Outlook-categorieën uitlezen mislukt: {exc}", flush=True)
     return new, None
+
+
+# Outlook-kleuren van categorieën (Graph: preset0 .. preset24)
+CAT_PRESETS = {
+    "preset0": "#E74C3C", "preset1": "#F39C12", "preset2": "#A0522D", "preset3": "#F1C40F", "preset4": "#4CAF50",
+    "preset5": "#1ABC9C", "preset6": "#8A9A2B", "preset7": "#3B82F6", "preset8": "#9B59B6", "preset9": "#C2185B",
+    "preset10": "#6C8EAD", "preset11": "#4A6378", "preset12": "#9E9E9E", "preset13": "#616161", "preset14": "#212121",
+    "preset15": "#A93226", "preset16": "#C0580A", "preset17": "#6D3B1F", "preset18": "#B7950B", "preset19": "#2E7D32",
+    "preset20": "#117864", "preset21": "#5F6B1E", "preset22": "#1E3A8A", "preset23": "#5B2C6F", "preset24": "#880E4F",
+}
+
+
+def category_colors(conn):
+    """{categorienaam: hexkleur} uit de bewaarde categorielijst van de mailbox (leeg als die niet gelezen kon worden)."""
+    import json
+    try:
+        raw = json.loads(_setting(conn, "cred_cat_colors", "") or "{}")
+    except ValueError:
+        raw = {}
+    return {k: CAT_PRESETS.get(v, "#8A90A6") for k, v in raw.items()}
+
+
+def sync_categories(conn, box, headers):
+    """Outlook-categorieën uitlezen (alleen lezen): de categorielijst met kleuren van de mailbox (recht MailboxSettings.Read,
+    hooguit 1x per uur) en de categorieën van de factuurmails van openstaande en recente facturen (recht Mail.Read)."""
+    import json
+    import requests
+    last = _setting(conn, "cred_cat_at", "")
+    if not last or (now_utc() - datetime.fromisoformat(last)).total_seconds() > 3600:
+        r = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
+        if r.status_code < 400:
+            _set(conn, "cred_cat_colors", json.dumps({c.get("displayName"): c.get("color") for c in r.json().get("value", [])
+                                                      if c.get("displayName")}, ensure_ascii=False))
+            _set(conn, "cred_cat_err", "")
+        else:
+            _set(conn, "cred_cat_err", f"categorielijst niet leesbaar ({r.status_code}); recht MailboxSettings.Read nodig voor de kleuren")
+        _set(conn, "cred_cat_at", now_iso())
+    rows = conn.execute("SELECT id, mail_id, mail_categories FROM invoices WHERE source = 'mail' AND mail_id IS NOT NULL"
+                        " AND (status NOT IN ('snelstart', 'afgewezen') OR updated_at >= ?) ORDER BY id DESC LIMIT 300",
+                        ((now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),)).fetchall()
+    for i in range(0, len(rows), 20):
+        part = rows[i:i + 20]
+        reqs = [{"id": str(r["id"]), "method": "GET",
+                 "url": f"/users/{box}/messages/{(r['mail_id'] or '').split(':')[0]}?$select=categories"} for r in part]
+        br = requests.post("https://graph.microsoft.com/v1.0/$batch", json={"requests": reqs}, headers=headers, timeout=40)
+        if br.status_code >= 400:
+            return
+        cur = {str(r["id"]): r["mail_categories"] for r in part}
+        for res in br.json().get("responses", []):
+            if res.get("status", 500) >= 400:
+                continue
+            val = json.dumps((res.get("body") or {}).get("categories") or [], ensure_ascii=False)
+            if cur.get(res.get("id")) != val:
+                conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (val, int(res["id"])))
+        conn.commit()
 
 
 def _mail_hint(status, box):
@@ -1088,7 +1147,7 @@ def index():
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
             "last": _setting(conn, "cred_last_poll"), "error": _setting(conn, "cred_last_error"), "configured": mail_configured()}
     return render_template("crediteuren/index.html", items=items, flt=flt, q=q, counts=counts, FILTERS=FILTERS,
-                           STATUS_BADGE=STATUS_BADGE, mail=mail, soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
+                           STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()), soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
 
 
 @bp.route("/uploaden", methods=["POST"])
@@ -1207,7 +1266,7 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=_may_archive(get_db()))
+                           archive_me=_may_archive(get_db()), cat_colors=category_colors(get_db()))
 
 
 def _reply_all(notes, box):

@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.77.0"
+VERSION = "1.78.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -28,6 +28,14 @@ def _secret_key(data_dir):
     with open(path, "w") as fh:
         fh.write(key)
     return key
+
+
+def _fromjson(v):
+    import json as _j
+    try:
+        return _j.loads(v) if v else []
+    except (ValueError, TypeError):
+        return []
 
 
 def create_app(test_config=None, start_scheduler=True):
@@ -63,7 +71,7 @@ def create_app(test_config=None, start_scheduler=True):
 
     app.teardown_appcontext(dbmod.close_db)
 
-    app.jinja_env.filters.update(dt=fmt_dt, date=fmt_date, eur=fmt_eur, num=fmt_num)
+    app.jinja_env.filters.update(dt=fmt_dt, date=fmt_date, eur=fmt_eur, num=fmt_num, fromjson=_fromjson)
     app.jinja_env.globals.update(csrf_token=csrf_token, can=can, MODULES=MODULES, LEVEL_NAMES=LEVEL_NAMES,
                                  long_date=long_date, greeting=greeting, VERSION=VERSION,
                                  sharepoint_configured=sharepoint_configured,

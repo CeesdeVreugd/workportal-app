@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V130: inkoopfacturen - één verantwoordelijke boekhouder voor mail naar 01-Verwerkt"
+set "OMSCHRIJVING=WorkPortal V131: inkoopfacturen - Outlook-categorieen (met kleur) van de factuurmail tonen"
 
 echo.
 echo ============================================

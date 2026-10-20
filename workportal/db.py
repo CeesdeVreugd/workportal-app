@@ -650,6 +650,10 @@ MIGRATIONS = [
     """
     ALTER TABLE invoices ADD COLUMN mail_archive TEXT;
     """,
+    # 28 - inkoopfacturen: Outlook-categorieën van de factuurmail (JSON-lijst met namen), alleen uitgelezen
+    """
+    ALTER TABLE invoices ADD COLUMN mail_categories TEXT;
+    """,
 ]
 
 
