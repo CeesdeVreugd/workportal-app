@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V144: inkoopfacturen - vraag bij leverancier afronden (knop), tot dan geen status of afronden"
+set "OMSCHRIJVING=WorkPortal V145: inkoopfacturen - boekhouder kan Verwerkt in SnelStart zetten bij open vraag leverancier"
 
 echo.
 echo ============================================

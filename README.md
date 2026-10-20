@@ -770,3 +770,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Met een open interne vraag kan de boekhouder niet afronden.
 - Teller en filter "Vraag open" tellen ook vragen bij de leverancier mee. De Outlook-categorie "VRAAG in Workportal" volgt dit.
 - Database-migratie 30: invoices.ext_question (bestaande facturen waarvan onze laatste mail nog onbeantwoord is, staan op open).
+
+## V145 (1.92.0)
+- Inkoopfacturen: staat er een vraag bij de leverancier open, dan kan de boekhouder (Beheer > Instellingen) wel "Verwerkt in SnelStart" zetten; de andere statussen en afronden blijven geblokkeerd tot de vraag is afgerond.

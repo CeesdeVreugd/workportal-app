@@ -1870,6 +1870,8 @@ def set_status(iid):
         abort(403)
     act = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
     why = _blocked(r, finishing=False)
+    if why and act == "snelstart" and _may_archive(get_db()):
+        why = None   # de boekhouder mag SnelStart wel zetten terwijl de vraag bij de leverancier loopt (afronden blijft geblokkeerd)
     if why:
         flash(why, "error")
         return redirect(url_for("crediteuren.detail", iid=iid))
