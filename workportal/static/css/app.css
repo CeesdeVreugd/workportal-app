@@ -1058,3 +1058,33 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .cred-lock > svg { width: 18px; height: 18px; color: #8A5A00; flex: none; }
 .cred-lock > span { flex: 1 1 200px; }
 .cred-status.locked-part > .cred-st:not(.free), .cred-status.locked-part > .cred-or:not(:last-of-type) { opacity: .45; pointer-events: none; }
+/* inkoopfacturen op de telefoon: knoppen in een net raster, filters schuiven, status onder de leverancier */
+@media (max-width: 699px) {
+  .cred-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .cred-acts > form { display: contents; }
+  .cred-acts .btn, .cred-acts label.btn { width: 100%; justify-content: center; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; min-width: 0; }
+  .cred-acts .ca-main .btn { grid-column: 1 / -1; order: -1; }
+  .cred-chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-left: -16px; margin-right: -16px; padding: 2px 16px; }
+  .cred-chips::-webkit-scrollbar { display: none; }
+  .cred-chips .fchip { flex: none; }
+  .stchips.row-m { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .stchips.row-m .stchip { white-space: normal; font-size: 12px; }
+  .pagehead .actions .stchips.row { justify-content: flex-start; }
+  .grid.g4 .kpi .sub { font-size: 12.5px; }
+}
+@media (max-width: 900px) { .show-m.stchips.row-m { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 6px; } }
+@media (max-width: 699px) {
+  .cred-acts .btn svg { flex: none; width: 18px; height: 18px; }
+  .cred-acts > form:last-child:not(.ca-main) .btn, .cred-acts > form:first-child:nth-last-child(2) .btn { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) { .btn.show-m { display: flex; justify-content: center; align-items: center; } }
+@media (max-width: 699px) {
+  /* voortgang onder elkaar in plaats van naast elkaar */
+  .cred-flow.lin { flex-direction: column; align-items: flex-start; gap: 0; padding: 12px 16px; }
+  .cred-flow.lin .cf-node { white-space: normal; align-self: flex-start; }
+  .cred-flow.lin .cf-node:empty, .cred-flow.lin .cf-node b:only-child { }
+  .cred-flow.lin .cf-line { flex: none; width: 2px; height: 12px; min-width: 0; margin: 3px 0 3px 12px; }
+  .pagehead .actions .ocats { margin: 0; }
+  .pagehead .actions { justify-content: flex-start; }
+}
+@media (max-width: 699px) { .dragfile { display: none; } }

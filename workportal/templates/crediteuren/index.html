@@ -8,7 +8,7 @@
     {% if mail.on and mail.error %}<p class="small" style="color:var(--bad);margin-top:4px">Ophalen uit de mailbox mislukt: {{ mail.error }}</p>{% endif %}
   </div>
   {% if can('crediteuren', 2) %}
-  <div class="actions">
+  <div class="actions cred-acts">
     <form method="post" action="{{ url_for('crediteuren.upload') }}" enctype="multipart/form-data" id="upform">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="btn">{{ icon('upload') }}PDF uploaden<input type="file" name="files" accept="application/pdf,.pdf" multiple hidden onchange="this.form.submit()"></label>
@@ -18,7 +18,7 @@
       <button class="btn" title="Openstaande facturen opnieuw uitlezen en losse kaarten uit dezelfde mail samenvoegen">{{ icon('refresh') }}Opnieuw uitlezen</button></form>
     {% endif %}
     {% if mail.configured %}
-    <form method="post" action="{{ url_for('crediteuren.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="post" action="{{ url_for('crediteuren.fetch') }}" class="ca-main"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn primary">{{ icon('refresh') }}Mailbox nu ophalen</button></form>
     {% if can('crediteuren', 3) %}<form method="post" action="{{ url_for('crediteuren.categories_refresh') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="terug" value="{{ request.full_path }}"><button class="btn" name="action" value="ophalen" title="Categorielijst met kleuren en de categorieën van de mails opnieuw uit Outlook halen">{{ icon('refresh') }}Categorieën ophalen</button></form>{% endif %}
@@ -46,17 +46,18 @@
 
 <section class="card flush tablewrap">
   <table class="table">
-    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th class="hide-m">Vervalt</th><th>Status</th><th class="hide-m">Laatste actie</th></tr></thead>
+    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th class="hide-m">Vervalt</th><th class="hide-m">Status</th><th class="hide-m">Laatste actie</th></tr></thead>
     <tbody>
     {% for r in items %}
     <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">
       <td class="nowrap small muted hide-m">{{ r.received_at|dt('%d-%m %H:%M') }}</td>
       <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
-        <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div></td>
+        <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div>
+        <div class="show-m stchips row-m">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</div></td>
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>
       <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
       <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp','buiten') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
-      <td><span class="stchips">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span>{% if has_cats(r, cat_hide)|int > 0 %}<div class="ocats">{{ cats(r, cat_colors, cat_hide) }}</div>{% endif %}</td>
+      <td class="hide-m"><span class="stchips">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span>{% if has_cats(r, cat_hide)|int > 0 %}<div class="ocats">{{ cats(r, cat_colors, cat_hide) }}</div>{% endif %}</td>
       <td class="hide-m small muted">{{ r.last_action or '' }}</td>
     </tr>
     {% else %}<tr><td colspan="7" class="empty">Geen facturen in deze lijst.</td></tr>{% endfor %}

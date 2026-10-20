@@ -786,3 +786,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - iedereen: vragen die aan jou gesteld zijn;
   - de boekhouder (Beheer > Instellingen): + nog boeken in SnelStart + af te ronden;
   - anderen met bewerkrecht: + nog verwerken in Komdex (zonder open vraag).
+
+## V149 (1.96.0)
+- Inkoopfacturen op de telefoon:
+  - knoppen bovenaan in een net raster: "Mailbox nu ophalen" over de volle breedte, daaronder de andere twee aan twee;
+  - filterknoppen op één regel om opzij te schuiven;
+  - in de lijst staat de status (gekleurde stappen) onder de leverancier, zodat niets meer wordt afgekapt;
+  - op de factuurkaart: voortgang onder elkaar, knop "Factuur bekijken" netjes uitgelijnd, het sleepblok (alleen nuttig op de computer) verborgen.
