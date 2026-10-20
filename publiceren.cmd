@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V113: inkoopfacturen - andere streepjes in datums/nummers, leverancier via website en naam afzender (ij=y)"
+set "OMSCHRIJVING=WorkPortal V114: inkoopfacturen - statusbalk met splitsing Komdex / buiten Komdex, afgewezen door"
 
 echo.
 echo ============================================

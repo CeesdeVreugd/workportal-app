@@ -853,6 +853,16 @@ def _status_key(r):
     return r["status"]
 
 
+def _label(r):
+    if _status_key(r) == "vraag":
+        return "Vraag open bij " + (r["question_name"] or "collega")
+    if r["status"] == "afgewezen":
+        return "Afgewezen door " + (r["rejected_name"] or "onbekend")
+    if r["status"] == "snelstart" and r["route"] == "buiten":
+        return "Verwerkt in SnelStart (buiten Komdex om)"
+    return STATUS.get(r["status"], r["status"])
+
+
 def _users():
     return query("SELECT u.id, u.name FROM users u WHERE u.active = 1 ORDER BY u.name")
 
@@ -928,7 +938,7 @@ def index():
         where.append("(i.supplier LIKE ? OR i.invoice_no LIKE ? OR i.erp_ref LIKE ? OR i.description LIKE ? OR i.mail_subject LIKE ?)")
         params += [f"%{q}%"] * 5
     rows = query(
-        "SELECT i.*, q.name AS question_name,"
+        "SELECT i.*, q.name AS question_name, (SELECT name FROM users WHERE id = i.rejected_by) AS rejected_name,"
         " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1) AS acc_notes,"
         " (SELECT l.action || ' · ' || IFNULL(u.name, 'systeem') FROM invoice_log l LEFT JOIN users u ON u.id = l.user_id"
         "   WHERE l.invoice_id = i.id ORDER BY l.id DESC LIMIT 1) AS last_action"
@@ -948,7 +958,7 @@ def index():
     for r in rows:
         d = dict(r)
         d["skey"] = _status_key(r)
-        d["label"] = ("Vraag open bij " + (r["question_name"] or "collega")) if d["skey"] == "vraag" else STATUS.get(r["status"], r["status"])
+        d["label"] = _label(r)
         items.append(d)
     conn = get_db()
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
@@ -1021,7 +1031,7 @@ def detail(iid):
                  " WHERE l.invoice_id = ? ORDER BY l.id DESC", (iid,))
     d = dict(r)
     d["skey"] = _status_key(r)
-    d["label"] = ("Vraag open bij " + (r["question_name"] or "collega")) if d["skey"] == "vraag" else STATUS.get(r["status"], r["status"])
+    d["label"] = _label(r)
     back = request.args.get("terug") or url_for("crediteuren.index")
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
@@ -1105,12 +1115,14 @@ def set_status(iid):
     conn = get_db()
     now, uid = now_iso(), g.user["id"]
     if new in ("erp", "buiten"):
-        conn.execute("UPDATE invoices SET status=?, erp_at=?, erp_by=?, updated_at=? WHERE id=?", (new, now, uid, now, iid))
+        # Komdex of buiten Komdex om: altijd één van de twee
+        conn.execute("UPDATE invoices SET status=?, route=?, erp_at=?, erp_by=?, updated_at=? WHERE id=?",
+                     (new, "komdex" if new == "erp" else "buiten", now, uid, now, iid))
     elif new == "snelstart":
         conn.execute("UPDATE invoices SET status='snelstart', snelstart_at=?, snelstart_by=?, erp_at=COALESCE(erp_at, ?),"
                      " erp_by=COALESCE(erp_by, ?), updated_at=? WHERE id=?", (now, uid, now, uid, now, iid))
     else:
-        conn.execute("UPDATE invoices SET status='nieuw', updated_at=? WHERE id=?", (now, iid))
+        conn.execute("UPDATE invoices SET status='nieuw', route=NULL, updated_at=? WHERE id=?", (now, iid))
     log(conn, iid, f"Status: {STATUS[new]}" + (f" (was {STATUS.get(r['status'], r['status'])})" if r["status"] != "nieuw" else ""), uid)
     conn.commit()
     flash(f"Status: {STATUS[new]}.", "ok")

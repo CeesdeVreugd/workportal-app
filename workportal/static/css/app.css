@@ -938,3 +938,28 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .eurin { position: relative; display: block; }
 .eurin > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink, #14163A); font-weight: 500; pointer-events: none; }
 .eurin > input { width: 100%; padding-left: 30px; }
+
+/* Inkoopfacturen: voortgang met splitsing (in Komdex óf buiten Komdex om) */
+.cred-flow { display: flex; align-items: stretch; gap: 0; padding: 12px 18px; margin-bottom: 16px; font-size: 14px; color: var(--muted); }
+.cf-node { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; align-self: center; }
+.cf-node b { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C9CEDF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); background: #fff; }
+.cf-node.done { color: var(--ink, #14163A); font-weight: 500; }
+.cf-node.done b { background: #1E7A3C; border-color: #1E7A3C; color: #fff; }
+.cf-node.done b svg { width: 14px; height: 14px; }
+.cf-node.off { opacity: .45; }
+.cf-branches { display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.cf-fork { flex: 1 1 40px; min-width: 28px; max-width: 160px; height: auto; align-self: stretch; margin: 0 8px; }
+.cf-fork path { fill: none; stroke: #D5DAE8; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.cf-fork path.on { stroke: #1E7A3C; }
+@media (max-width: 699px) {
+  .cred-flow { font-size: 12.5px; padding: 10px 12px; }
+  .cf-node { white-space: normal; line-height: 1.2; }
+  .cf-fork { margin: 0 4px; min-width: 16px; }
+}
+.cred-or { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.cred-or::before, .cred-or::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
+.cred-status .full { grid-column: 1 / -1; }
+.cred-st.past { border-color: #1E7A3C55; background: #F2FAF4; cursor: pointer; }
+.cred-st.past .dot { background: #1E7A3C; border-color: #1E7A3C; }
+.cred-st.bad { border-color: var(--bad, #C62828); background: #FDEEEE; }
+.cred-st.bad .dot { background: var(--bad, #C62828); border-color: var(--bad, #C62828); color: #fff; font-size: 13px; }

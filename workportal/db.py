@@ -630,6 +630,12 @@ MIGRATIONS = [
     ALTER TABLE invoices ADD COLUMN supplier_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
     ALTER TABLE invoices ADD COLUMN supplier_match TEXT;
     """,
+    # 24 - inkoopfacturen: welke weg (in Komdex of buiten Komdex om), ook nadat de factuur in SnelStart staat
+    """
+    ALTER TABLE invoices ADD COLUMN route TEXT;
+    UPDATE invoices SET route = 'buiten' WHERE status = 'buiten';
+    UPDATE invoices SET route = 'komdex' WHERE status IN ('erp', 'snelstart') AND erp_at IS NOT NULL;
+    """,
 ]
 
 

@@ -619,3 +619,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V113 – Inkoopfacturen: streepjes, ij/y en naam van de afzender
 - Sommige PDF's gebruiken een ander streepje (‑ – —) of een harde spatie: "15‑10‑2026" en "4288‑20260000" werden daardoor niet herkend (Heleon: datum leeg, inkoopnummer alleen "4288"). Alle streepjes en spaties worden nu eerst gelijkgemaakt.
 - Leverancier: website op de factuur die precies de naam is (waayenbergcoatings.nl ↔ "Waayenberg Coatings") telt als zeker; ook de naam van de afzender van de mail ("Digitale factuur van Waaijenberg Coatings BV") wordt gebruikt; ij en y gelden als gelijk.
+
+## V114 – Inkoopfacturen: statusbalk en statuskeuze
+- Voortgangsbalk met splitsing: Binnengekomen → óf Verwerkt in Komdex (boven) óf Verwerkt buiten Komdex om (onder) → Verwerkt in SnelStart. De gekozen weg kleurt groen, de andere wordt grijs.
+- Statuskaart: Nieuw, dan "stap 2 – kies één van de twee" (Komdex of buiten Komdex; nooit allebei), dan Verwerkt in SnelStart. Na SnelStart blijft zichtbaar welke weg genomen is.
+- Afgewezen: status "Afgewezen door <naam>" (met datum en reden), ook in het overzicht; "Afwijzing intrekken" zet hem terug naar Nieuw.
+- Migratie 24: `invoices.route` ('komdex' of 'buiten').
