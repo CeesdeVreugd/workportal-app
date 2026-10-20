@@ -1,4 +1,9 @@
-{% macro cats(r, colors) -%}
+{# Outlook-categorieën; de statuscategorieën (cat_hide) niet, want die zijn gelijk aan de status in WorkPortal #}
+{% macro cats(r, colors, hide=None) -%}
 {%- set names = (r.mail_categories|fromjson) if r.mail_categories else [] -%}
-{%- for c in names %}<span class="ocat" style="--c:{{ colors.get(c, '#8A90A6') }}" title="Outlook-categorie">{{ c }}</span>{% endfor -%}
+{%- for c in names if not hide or c not in hide %}<span class="ocat" style="--c:{{ colors.get(c, '#8A90A6') }}" title="Outlook-categorie">{{ c }}</span>{% endfor -%}
+{%- endmacro %}
+{% macro has_cats(r, hide=None) -%}
+{%- set names = (r.mail_categories|fromjson) if r.mail_categories else [] -%}
+{{- names|reject('in', hide or [])|list|length -}}
 {%- endmacro %}

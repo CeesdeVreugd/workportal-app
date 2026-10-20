@@ -1,4 +1,4 @@
-{% from "crediteuren/_cats.html" import cats %}{% extends "base.html" %}
+{% from "crediteuren/_cats.html" import cats, has_cats %}{% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/macros.html" import attachments as att_list %}
 {% block title %}{{ r.supplier or 'Factuur' }} {{ r.invoice_no or '' }}{% endblock %}
@@ -11,7 +11,7 @@
     <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}</h1>
     <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
   </div>
-  <div class="actions">{% if r.mail_categories and r.mail_categories != '[]' %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors) }}</span>{% endif %}<span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
+  <div class="actions">{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
 </div>
 
 {% set route = r.route if r.status != 'afgewezen' else None %}

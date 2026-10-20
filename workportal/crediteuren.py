@@ -1000,7 +1000,53 @@ def sync_categories(conn, box, headers):
             val = json.dumps((res.get("body") or {}).get("categories") or [], ensure_ascii=False)
             if cur.get(res.get("id")) != val:
                 conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (val, int(res["id"])))
+                try:
+                    adopt_categories(conn, int(res["id"]), json.loads(val), box)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[WorkPortal] Status uit Outlook overnemen mislukt (factuur {res.get('id')}): {exc}", flush=True)
         conn.commit()
+
+
+def adopt_categories(conn, iid, cats, box):
+    """Iemand heeft in Outlook een statuscategorie op de factuurmail gezet: die status in WorkPortal overnemen, zodat
+    WorkPortal en de mail gelijk lopen. (Weghalen in Outlook zet de status niet terug; terugzetten gaat in WorkPortal.)"""
+    cmap = category_map(conn)
+    if not cmap or not cats:
+        return
+    r = conn.execute("SELECT * FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if not r or r["status"] == "afgewezen":
+        return
+    now = now_iso()
+    done = []
+    if cmap.get("afgewezen") in cats and r["status"] != "snelstart":
+        conn.execute("UPDATE invoices SET status='afgewezen', rejected_at=?, reject_reason=?, question_to=NULL, updated_at=? WHERE id=?",
+                     (now, "Afgewezen via de Outlook-categorie", now, iid))
+        log(conn, iid, "Status overgenomen uit Outlook: Afgewezen")
+        conn.commit()
+        apply_categories(conn, iid, box)
+        return
+    route, ss = r["route"], bool(r["snelstart_at"])
+    if not route and cmap.get("komdex") in cats:
+        route = "komdex"
+        done.append(STATUS["erp"])
+    elif not route and cmap.get("buiten") in cats:
+        route = "buiten"
+        done.append(STATUS["buiten"])
+    if not ss and cmap.get("snelstart") in cats:
+        ss = True
+        done.append("Verwerkt in SnelStart")
+        conn.execute("UPDATE invoices SET snelstart_at = ? WHERE id = ?", (now, iid))
+    if not done:
+        return
+    if route != r["route"]:
+        conn.execute("UPDATE invoices SET erp_at = ? WHERE id = ?", (now, iid))
+    new = ("snelstart" if ss else ("erp" if route == "komdex" else "buiten")) if route else ("ss_eerst" if ss else "nieuw")
+    conn.execute("UPDATE invoices SET status = ?, route = ?, updated_at = ? WHERE id = ?", (new, route, now, iid))
+    log(conn, iid, "Status overgenomen uit Outlook: " + ", ".join(done) + f" → {STATUS[new]}")
+    conn.commit()
+    if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
+        _ask_archive(conn, iid, None)
+    apply_categories(conn, iid, box)   # bijv. een dubbele (Komdex én buiten Komdex) rechtzetten
 
 
 def _mail_hint(status, box):
@@ -1168,7 +1214,7 @@ def index():
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
             "last": _setting(conn, "cred_last_poll"), "error": _setting(conn, "cred_last_error"), "configured": mail_configured()}
     return render_template("crediteuren/index.html", items=items, flt=flt, q=q, counts=counts, FILTERS=FILTERS,
-                           STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()),
+                           STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()), cat_hide=set(category_map(get_db()).values()),
                            step_color=_step_colors(get_db()), soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
 
 
@@ -1288,7 +1334,8 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=_may_archive(get_db()), cat_colors=category_colors(get_db()))
+                           archive_me=_may_archive(get_db()), cat_colors=category_colors(get_db()),
+                           cat_hide=set(category_map(get_db()).values()))
 
 
 def _reply_all(notes, box):
@@ -1652,7 +1699,7 @@ def apply_categories(conn, iid, box):
             conn.commit()
             return
     new = [c for c in cur if c not in managed] + sorted(want)
-    if new == cur:
+    if set(new) == set(cur):
         return
     try:
         if graph_configured():

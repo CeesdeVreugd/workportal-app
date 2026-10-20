@@ -743,3 +743,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V139 (1.86.0)
 - Inkoopfacturen: knop "Categorieën ophalen" (naast "Mailbox nu ophalen", voor beheer) haalt de categorielijst met kleuren en de categorieën van de factuurmails direct opnieuw uit Outlook.
 - Beheer > Instellingen, bij Outlook-categorie per status: "Categorieën opnieuw ophalen" en "Categorieën toepassen op openstaande facturen" (zet bij alle openstaande en recente factuurmails de categorie volgens de huidige status, op de achtergrond).
+
+## V140 (1.87.0)
+- Inkoopfacturen: WorkPortal en de factuurmail lopen gelijk. Zet iemand in Outlook een statuscategorie (bijv. "Geboekt Snelstart" of "Verwerkt in KOMDEX"), dan neemt WorkPortal die status bij de volgende ophaalronde over (logboek: "Status overgenomen uit Outlook"). Afgewezen via Outlook kan ook (reden: "Afgewezen via de Outlook-categorie"). Wordt het zo afgerond, dan komt de vraag "mail naar 01-Verwerkt?" zoals gewoonlijk.
+- Een categorie weghalen in Outlook zet de status niet terug; terugzetten gaat in WorkPortal (dan gaat de categorie in Outlook ook weg).
+- De statuscategorieën worden niet meer naast de status getoond (dat waren dubbele statussen); alleen overige categorieën uit Outlook blijven zichtbaar.
