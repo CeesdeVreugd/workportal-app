@@ -281,8 +281,12 @@
   function banner(at, nPhotos, nFiles) {
     var b = document.createElement("div"); b.className = "flash info draftbar";
     var t = new Date(at), hh = ("0" + t.getHours()).slice(-2) + ":" + ("0" + t.getMinutes()).slice(-2);
-    b.innerHTML = "<span><b>Concept teruggezet</b> van " + t.toLocaleDateString("nl-NL") + " " + hh +
-      (nPhotos || nFiles ? " (met " + [nPhotos ? nPhotos + " foto" + (nPhotos === 1 ? "" : "'s") : "", nFiles ? nFiles + " bijlage" + (nFiles === 1 ? "" : "n") : ""].filter(Boolean).join(" en ") + ")" : "") + ". Controleer en sla op.</span>";
+    // waarvan is het concept? kop van de kaart of tekst van de knop waar het formulier onder zit
+    var src = "", hd = form.querySelector("h2, h3") || (form.closest(".card") && form.closest(".card").querySelector("h2, h3"));
+    var sm = form.closest("details") && form.closest("details").querySelector("summary");
+    src = ((sm && sm.textContent) || (hd && hd.textContent) || "").replace(/[\s\u2026.]+$/, "").trim();
+    b.innerHTML = "<span><b>Concept teruggezet</b>" + (src ? " – " + src.replace(/[<>&]/g, "") : "") + " – van " + t.toLocaleDateString("nl-NL") + " " + hh +
+      (nPhotos || nFiles ? " (met " + [nPhotos ? nPhotos + " foto" + (nPhotos === 1 ? "" : "'s") : "", nFiles ? nFiles + " bijlage" + (nFiles === 1 ? "" : "n") : ""].filter(Boolean).join(" en ") + ")" : "") + ". Controleer en sla op, of gooi het weg.</span>";
     var x = document.createElement("button"); x.type = "button"; x.className = "btn sm ghost"; x.textContent = "Concept weggooien";
     x.addEventListener("click", function () {
       if (!confirm("Het teruggezette concept weggooien?")) return;

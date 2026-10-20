@@ -57,7 +57,7 @@
   </section>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-    <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form">
+    <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form" data-no-draft>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
       <fieldset {{ 'disabled' if not edit }} style="border:0;padding:0;margin:0">
@@ -140,7 +140,7 @@
           </div>
           {% if mm %}<div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ mm.to|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% if mm.pdf %} · met factuur-PDF{% endif %}{% else %}Van {{ mm['from'] }}{% if mm.files %} · bijlage: {{ mm.files|join(', ') }} (bij "Andere bijlagen"){% endif %}{% endif %} · <i>{{ mm.subject }}</i></div>{% endif %}
           <div class="notebody">{{ n.body }}</div>
-          {% if edit and n.kind == 'mail_in' %}<div class="noteactions"><a class="btn sm" href="{{ url_for('crediteuren.detail', iid=r.id, mail=1, antwoord=n.id) }}#mailform">{{ icon('mail') }}Beantwoorden</a></div>{% endif %}
+          {% if edit and n.kind == 'mail_in' and not (reply_all and reply_all.note.id == n.id) %}<div class="noteactions"><a class="btn sm" href="{{ url_for('crediteuren.detail', iid=r.id, mail=1, antwoord=n.id) }}#mailform">{{ icon('mail') }}Beantwoorden</a></div>{% endif %}
         </article>
 {% endmacro %}
     {% set internal = notes|rejectattr('kind', 'in', ['mail_uit', 'mail_in'])|list %}
@@ -185,20 +185,25 @@
       </div>
       {% if edit %}
       <details class="cred-mail" id="mailform" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
-        <summary class="btn">{{ icon('mail') }}{{ 'Antwoord aan ' ~ (metas.get(reply_note.id).from_name or metas.get(reply_note.id)['from']) if reply_note else 'Mail leverancier' }}</summary>
+        <summary class="btn">{{ icon('mail') }}{% if reply_note %}{{ 'Antwoord aan ' ~ (metas.get(reply_note.id).from_name or metas.get(reply_note.id)['from']) }}{% elif reply_all %}Antwoord allen{% else %}{{ 'Nieuwe mail aan leverancier' if external else 'Mail leverancier' }}{% endif %}</summary>
         <form method="post" action="{{ url_for('crediteuren.mail_supplier', iid=r.id) }}" class="form" style="margin-top:12px">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% if reply_note %}<input type="hidden" name="reply_to" value="{{ reply_note.id }}">
-          <div class="hint" style="margin:0 0 8px">Antwoord op de reactie van {{ reply_note.created_at|dt }} · <a href="{{ url_for('crediteuren.detail', iid=r.id, mail=1) }}#mailform">nieuwe mail in plaats daarvan</a></div>{% endif %}
+          <div class="hint" style="margin:0 0 8px">Antwoord op de reactie van {{ reply_note.created_at|dt }} · <a href="{{ url_for('crediteuren.detail', iid=r.id, mail='nieuw') }}#mailform">nieuwe mail in plaats daarvan</a></div>
+          {% elif reply_all %}{% set lm = metas.get(reply_all.note.id) or {} %}<input type="hidden" name="reply_all" value="1">
+          <div class="hint" style="margin:0 0 8px">Antwoord aan iedereen op de laatste mail ({{ 'van ' ~ (lm.from_name or lm['from']) if reply_all.note.kind == 'mail_in' else 'van ons' }}, {{ reply_all.note.created_at|dt }}) · <a href="{{ url_for('crediteuren.detail', iid=r.id, mail='nieuw') }}#mailform">nieuwe mail in plaats daarvan</a></div>{% endif %}
           <div class="fgrid">
             <label class="f">Aan *<input type="text" name="to" id="mailto" value="{{ mail_to }}" required placeholder="naam@leverancier.nl">
-              {% if not reply_note and mail_options|length > 1 %}<span class="mailopts">{% for lab, adr in mail_options %}<button type="button" class="chipbtn" onclick="document.getElementById('mailto').value=this.dataset.a" data-a="{{ adr }}" title="{{ adr }}">{{ lab }}</button>{% endfor %}</span>
-              {% elif not reply_note and r.mail_from %}<span class="hint">Afzender van de factuurmail</span>{% endif %}</label>
-            <label class="f">Cc<input type="text" name="cc" placeholder="optioneel, meerdere met komma"></label>
+              {% if not reply_note and not reply_all and mail_options|length > 1 %}<span class="mailopts">{% for lab, adr in mail_options %}<button type="button" class="chipbtn" onclick="document.getElementById('mailto').value=this.dataset.a" data-a="{{ adr }}" title="{{ adr }}">{{ lab }}</button>{% endfor %}</span>
+              {% elif not reply_note and not reply_all and r.mail_from %}<span class="hint">Afzender van de factuurmail</span>{% endif %}</label>
+            <label class="f">Cc<input type="text" name="cc" value="{{ reply_all.cc if reply_all else '' }}" placeholder="optioneel, meerdere met komma"></label>
           </div>
           {% if reply_note %}
           <div class="f lf"><span>Onderwerp</span><div class="mailsubj">{{ mail_subject }}</div>
             <span class="hint">Antwoord op de mail van de leverancier: blijft in dezelfde mailwisseling.</span></div>
+          {% elif reply_all %}
+          <div class="f lf"><span>Onderwerp</span><div class="mailsubj">{{ reply_all.subject }}</div>
+            <span class="hint">Blijft in dezelfde mailwisseling als de laatste mail.</span></div>
           {% elif r.source == 'mail' and r.mail_id %}
           <div class="f lf"><span>Onderwerp</span><div class="mailsubj">RE: {{ r.mail_subject or '' }}</div>
             <span class="hint">Antwoord op de binnengekomen factuurmail: hetzelfde onderwerp, zodat het in Outlook onder die mail hangt (ook de reactie van de leverancier).</span></div>
@@ -209,9 +214,9 @@
 
 </textarea></label>
           <div class="cred-actions">
-            <label class="check"><input type="checkbox" name="attach_pdf" value="1" {{ '' if reply_note else 'checked' }}> Factuur-PDF meesturen</label>
+            <label class="check"><input type="checkbox" name="attach_pdf" value="1" {{ '' if reply_note or reply_all else 'checked' }}> Factuur-PDF meesturen</label>
             <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
-            <button type="button" class="btn ghost" style="margin-left:auto" data-cancel {% if reply_note %}data-cancel-href="{{ url_for('crediteuren.detail', iid=r.id) }}#extern"{% endif %}>Annuleren</button>
+            <button type="button" class="btn ghost" style="margin-left:auto" data-cancel {% if reply_note or request.args.get('mail') == 'nieuw' %}data-cancel-href="{{ url_for('crediteuren.detail', iid=r.id) }}#extern"{% endif %}>Annuleren</button>
             <button class="btn primary">{{ icon('mail') }}Versturen</button>
           </div>
           <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier, dan komt zijn antwoord (met bijlagen) hier – wie er ook reageert.</p>

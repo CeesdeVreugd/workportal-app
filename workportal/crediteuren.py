@@ -788,11 +788,16 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
     import requests
     mid = m["id"]
     body = ""
-    rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body",
+    rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
                       headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
     if rb.status_code < 400:
         js = rb.json()
         body = _reply_text((js.get("uniqueBody") or {}).get("content") or (js.get("body") or {}).get("content") or "")
+    rcpt = {"to": [], "cc": []}
+    if rb.status_code < 400:
+        for k, fld in (("to", "toRecipients"), ("cc", "ccRecipients")):
+            rcpt[k] = [((x.get("emailAddress") or {}).get("address") or "").lower() for x in (js.get(fld) or [])]
+            rcpt[k] = [a for a in rcpt[k] if a]
     names = []
     if m.get("hasAttachments"):
         ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
@@ -806,7 +811,7 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
                                 mime=a.get("contentType") or "application/octet-stream")
                     names.append(a.get("name") or "bijlage")
     meta = {"from": (frm.get("address") or "").lower(), "from_name": frm.get("name") or "", "subject": m.get("subject") or "",
-            "files": names, "msg_id": mid}
+            "files": names, "msg_id": mid, "to": rcpt["to"], "cc": rcpt["cc"]}
     who = frm.get("name") or frm.get("address") or "leverancier"
     conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_at, mail_meta) VALUES (?,?,?,?,?)",
                  (iid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()).replace("Z", "+00:00")[:25],
@@ -1184,14 +1189,50 @@ def detail(iid):
             mail_to = rm.get("from") or mail_to
             mail_subject = "RE: " + re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", rm.get("subject") or "", flags=re.I)
     metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
+    cred_box = _setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX)
+    ra_last, ra_to, ra_cc = _reply_all(notes, cred_box)
+    reply_all = None
+    if ra_last and not reply_note and request.args.get("mail") != "nieuw":
+        lm = metas.get(ra_last["id"]) or {}
+        reply_all = {"note": ra_last, "to": ", ".join(ra_to), "cc": ", ".join(ra_cc),
+                     "subject": "RE: " + re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", MAIL_TAG.sub("", lm.get("subject") or "").strip()
+                                               or (r["mail_subject"] or ""), flags=re.I)}
+        mail_to = reply_all["to"] or mail_to
     suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
                       " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
                       " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
-                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX), reply_note=reply_note,
+                           metas=metas, cred_box=cred_box, reply_note=reply_note, reply_all=reply_all,
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS)
+
+
+def _reply_all(notes, box):
+    """'Antwoord allen' op de allerlaatste mail met de leverancier: (laatste mail-notitie, aan, cc).
+    Laatste mail binnengekomen -> aan de afzender, cc iedereen die erop stond; laatste mail van ons -> dezelfde ontvangers."""
+    import json
+    mails = [n for n in notes if n["kind"] in ("mail_in", "mail_uit") and n["mail_meta"]]
+    if not mails:
+        return None, [], []
+    last = mails[-1]
+    m = json.loads(last["mail_meta"])
+    own = {(box or "").lower()}
+    if last["kind"] == "mail_uit":
+        to, cc = list(m.get("to") or []), list(m.get("cc") or [])
+    else:
+        to = [m.get("from")] if m.get("from") else []
+        cc = list(m.get("to") or []) + list(m.get("cc") or [])
+        prev = next((json.loads(n["mail_meta"]) for n in reversed(mails) if n["kind"] == "mail_uit"), None)
+        if prev:   # oudere reacties hebben geen ontvangerslijst: wie wij toen mailden hoort er ook bij
+            cc += list(prev.get("to") or []) + list(prev.get("cc") or [])
+    seen, out_to, out_cc = set(own), [], []
+    for lst, out in ((to, out_to), (cc, out_cc)):
+        for a in lst:
+            if a and a.lower() not in seen:
+                seen.add(a.lower())
+                out.append(a)
+    return last, out_to, out_cc
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -1281,6 +1322,20 @@ def mail_supplier(iid):
         rm = json.loads(rn["mail_meta"])
         if rm.get("msg_id"):
             orig, orig_subject = rm["msg_id"], re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", rm.get("subject") or orig_subject, flags=re.I)
+    if f.get("reply_all") and not rn:
+        # antwoord allen op de laatste mail: in de mailwisseling van de laatste reactie (of de factuurmail);
+        # was er nog niets binnengekomen en geen factuurmail, dan dezelfde mail opnieuw met het [WP-F]-onderwerp
+        notes = query("SELECT * FROM invoice_notes WHERE invoice_id = ? ORDER BY id", (iid,))
+        lin = next((n for n in reversed(notes) if n["kind"] == "mail_in" and n["mail_meta"]
+                    and json.loads(n["mail_meta"]).get("msg_id")), None)
+        if lin:
+            rm = json.loads(lin["mail_meta"])
+            orig, orig_subject = rm["msg_id"], re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", rm.get("subject") or orig_subject, flags=re.I)
+        elif not orig:
+            lout = next((json.loads(n["mail_meta"]) for n in reversed(notes) if n["kind"] == "mail_uit" and n["mail_meta"]), None)
+            if lout and lout.get("subject"):
+                subject = re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", lout["subject"], flags=re.I)
+                subject = "RE: " + MAIL_TAG.sub("", subject).strip()
     in_thread = bool(orig)
     if in_thread:
         subject = "RE: " + orig_subject.strip()   # zoals Graph 'reply' het zelf doet; Outlook zet het antwoord onder de vorige mail

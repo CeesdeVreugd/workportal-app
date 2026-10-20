@@ -686,3 +686,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V127 (1.74.0)
 - Inkoopfacturen: interne opmerking zit nu achter de knop "Opmerking plaatsen…" (naast "Vraag stellen aan collega…"); bij een openstaande vraag aan jou staat "Antwoord geven…" direct open. Annuleren klapt hem weer dicht.
 - Terug-link (kruimelpad) boven aan de pagina's: pijltje netjes in lijn met de tekst.
+
+## V128 (1.75.0)
+- Inkoopfacturen: is er al mail met de leverancier, dan wordt "Mail leverancier" de knop "Antwoord allen": antwoord op de allerlaatste mail, in dezelfde mailwisseling, aan de afzender met iedereen die erop stond in Cc (ons eigen factuuradres eruit). "Nieuwe mail in plaats daarvan" blijft mogelijk.
+- Reacties van leveranciers bewaren nu ook de Aan/Cc-lijst (voor Antwoord allen).
+- Gegevens-formulier van een factuur maakt geen (onterecht) concept meer; de concept-melding zegt nu waarvan het concept is.
