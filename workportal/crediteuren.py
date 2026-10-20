@@ -279,6 +279,18 @@ def extract(data):
             out["invoice_no"] = v.rstrip(".-/") if v else None
         if not out["invoice_date"]:
             out["invoice_date"] = parse_date(_below_amount(ws, _DATE_LABEL, _DATE_VALUE))
+        if not out["due_date"]:   # "Vervaldatum" als kopje met de datum eronder
+            out["due_date"] = parse_date(_below_amount(ws, r"verval\s*(?:datum|dag)|due\s*date|f[äa]llig(?:keit)?", _DATE_VALUE))
+    if not out["invoice_date"]:
+        # losse datum zonder kopje (bijv. rechts naast het debiteurnummer): de eerste datum die geen
+        # verval-, lever- of orderdatum is
+        for line in text.splitlines()[:40]:
+            if re.search(r"verval|due|f[äa]llig|lever|order|bestel|pakbon|periode|geldig|\btot\b|\bvan\b|termijn", line, re.I):
+                continue
+            dm = re.search(r"(?<![\d/.-])" + _DATE + r"(?![\d/.-])", line, re.I)
+            if dm and parse_date(dm.group(1)):
+                out["invoice_date"] = parse_date(dm.group(1))
+                break
     excl = excl or _find([r"(?:" + _SUBTOTAL_LABEL + r")" + gap + _AMOUNT_SL], text)
     for ws in words:
         excl = excl or _below_amount(ws, _SUBTOTAL_LABEL)

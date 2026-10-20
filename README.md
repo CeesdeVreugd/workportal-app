@@ -611,3 +611,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V111 – Vervaldatum standaard 30 dagen
 - Staat er geen vervaldatum of betalingstermijn op de factuur, dan wordt de vervaldatum factuurdatum + 30 dagen (in het logboek: "niet op de factuur: factuurdatum + 30 dagen"). Een gevonden vervaldatum of termijn gaat altijd voor.
+
+## V112 – Inkoopfacturen: datums zonder kopje ervoor
+- "Vervaldatum" als kopje met de datum eronder wordt gelezen (Gaasbeek: 13-11-2026).
+- Factuurdatum zonder kopje (losse datum in de kop, bijv. rechts naast het debiteurnummer): de eerste datum die geen verval-, lever-, order- of periodedatum is.
