@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V115: inkoopfacturen - bredere pagina, lagere statusbalk, SnelStart mag eerst, To pay"
+set "OMSCHRIJVING=WorkPortal V116: inkoopfactuur iets smaller (max 1640px)"
 
 echo.
 echo ============================================

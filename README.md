@@ -630,3 +630,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Factuurpagina over de volle breedte; PDF-kolom breder en hoger. Voortgangsbalk lager en over de hele breedte.
 - Komdex en SnelStart zijn twee losse stappen in willekeurige volgorde: Komdex óf buiten Komdex om (nog eens tikken = uit) en SnelStart aan/uit. Allebei gedaan = Afgerond. Eerst SnelStart → status "In SnelStart, nog Komdex" (filter "Nog in Komdex"). "Nieuw" zet alles terug.
 - Engelse facturen: "To pay in EUR", "Total due", "Grand total"; 0,00 telt niet ("To pay: 0,00" na vooruitbetaling); grondslag na "VAT on …" (Oceanz: excl. 168,80, incl. 204,25).
+
+## V116 – Inkoopfactuur iets smaller
+- Factuurpagina maximaal 1640 px breed (was de volle breedte); PDF : gegevens = 1,3 : 1.

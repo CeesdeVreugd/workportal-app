@@ -979,3 +979,6 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .cf-branches { height: 52px; justify-content: space-between; gap: 0; }
 .cf-branches .cf-node { padding: 0; height: 22px; }
 @media (max-width: 699px) { .cf-branches, .cf-fork { height: 60px; } .cf-branches .cf-node { height: auto; } }
+/* iets smaller dan de volle breedte: overzichtelijker */
+.content:has(> .cred-grid) { max-width: 1640px; }
+@media (min-width: 901px) { .cred-grid.g2 { grid-template-columns: minmax(0, 1.3fr) minmax(380px, 1fr); } }
