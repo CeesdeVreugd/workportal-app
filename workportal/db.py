@@ -636,6 +636,10 @@ MIGRATIONS = [
     UPDATE invoices SET route = 'buiten' WHERE status = 'buiten';
     UPDATE invoices SET route = 'komdex' WHERE status IN ('erp', 'snelstart') AND erp_at IS NOT NULL;
     """,
+    # 25 - inkoopfacturen: mailen met de leverancier vanaf de kaart (verstuurd en reacties)
+    """
+    ALTER TABLE invoice_notes ADD COLUMN mail_meta TEXT;
+    """,
 ]
 
 

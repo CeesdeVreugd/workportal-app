@@ -645,3 +645,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V119 – Heleon: zacht afbreekstreepje
 - Getest op de echte PDF: Heleon gebruikt in datums en nummers het "zachte afbreekstreepje" (U+00AD). V113 haalde dat teken weg, waardoor 15‑10‑2026 → 15102026 en 4288‑20260000 → 428820260000 werd. Het wordt nu als gewoon streepje gelezen: factuurdatum 15-10-2026, vervaldatum 14-11-2026, inkoopnummer 4288-20260000.
 - Reserve-leveranciersnaam slaat regels als "Debiteurnr. : …", straat + huisnummer en "Afleveradres" over.
+
+## V120 – Inkoopfacturen: leverancier mailen vanaf de kaart
+- Knop **Mail leverancier** in het gesprek: Aan (voorgevuld met het e-mailadres van de relatie, de vorige ontvanger of de afzender van de factuur; geen no-reply), Cc, onderwerp, bericht, "Factuur-PDF meesturen", "Kopie naar mij".
+- Verstuurd vanuit de factuurmailbox (Beheer › Instellingen, standaard factuur@devreugd-pt.nl) met de naam van de verzender + "Crediteurenadministratie" in de handtekening. Vereist het recht Mail.Send op die mailbox (zelfde app-registratie; staat er een ApplicationAccessPolicy, dan moet factuur@ in de groep).
+- In het onderwerp staat `[WP-F<nummer>]`. Bij het ophalen van de mailbox worden mails met die code (dus elke "RE:", van wie dan ook) als **reactie leverancier** in het gesprek van die kaart gezet, alleen het nieuwe deel van de tekst; bijlagen komen bij "Andere bijlagen". Wie de mail verstuurde krijgt een pushmelding.
+- Het ophalen leest nu alle nieuwe mails in de inbox (niet alleen met bijlage); mails zonder bijlage en zonder code worden overgeslagen.
+- Leverancier herkennen: alleen "De Vreugd Productietechniek" (onszelf) wordt overgeslagen, andere "De Vreugd"-bedrijven (Transport) niet; ons eigen adresblok (t.a.v., Edisonring) telt niet mee; relaties van het type klant tellen minder zwaar.
+- Migratie 25: `invoice_notes.mail_meta`.

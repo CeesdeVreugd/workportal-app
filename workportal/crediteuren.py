@@ -31,6 +31,7 @@ STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "ss_
 OPEN = ("nieuw", "erp", "buiten", "ss_eerst")   # nog niet afgerond
 TO_SNELSTART = ("erp", "buiten")         # klaar voor SnelStart
 DEFAULT_MAILBOX = "factuur@devreugd-pt.nl"
+OWN_NAME = re.compile(r"vreugd\s*productie|productietechniek", re.I)
 POLL_SECONDS = 300
 _poll_lock = threading.Lock()
 
@@ -205,7 +206,7 @@ def _po_ref(text):
 def _supplier(text):
     for line in text.splitlines()[:12]:
         m = _LEGAL.search(line)
-        if m and not re.search(r"vreugd", m.group(1), re.I):
+        if m and not OWN_NAME.search(m.group(1)):
             words = m.group(1).split()
             for k in range(1, len(words) // 2 + 1):   # logo-tekst + naam: "LM Systems LM Systems BV" -> "LM Systems BV"
                 if words[:k] == words[k:2 * k]:
@@ -216,9 +217,9 @@ def _supplier(text):
     # geen naam met B.V. e.d. in de kop (logo als plaatje): dan de website als aanwijzing, bijv. "bmn-bv.nl"
     for line in head:
         wm = re.search(r"(?:www\.|https?://)([\w-]+(?:\.[\w-]+)+)", line, re.I) or re.search(r"[\w.+-]+@([\w-]+(?:\.[\w-]+)+)", line)
-        if wm and "vreugd" not in wm.group(1).lower():
+        if wm and "devreugd-pt" not in wm.group(1).lower():
             return wm.group(1).lower()[:80]
-    addr = re.compile(r"\d{4}\s?[A-Z]{2}\b|@|www\.|^\s*[TFEM]\s|\btel\b|\bfax\b|iban|kvk|btw|^\W*\d|factuur|invoice|rechnung|vreugd|\||:|nummer|\bnr\b|referentie|\s\d+\s?[a-z]?$|afleveradres|pagina", re.I)
+    addr = re.compile(r"\d{4}\s?[A-Z]{2}\b|@|www\.|^\s*[TFEM]\s|\btel\b|\bfax\b|iban|kvk|btw|^\W*\d|factuur|invoice|rechnung|vreugd\s*productie|\||:|nummer|\bnr\b|referentie|\s\d+\s?[a-z]?$|afleveradres|pagina", re.I)
     first = next((l.strip() for l in head if len(re.sub(r"[^A-Za-z]", "", l)) >= 3 and not addr.search(l)), None)
     return (first or "")[:80] or None
 
@@ -459,6 +460,9 @@ def match_supplier(conn, text, mail_from=None, hint=None):
     name_key = lambda v: _yk(_nk(v))   # noqa: E731
     _norm = lambda v: _yk(_nm(v))      # noqa: E731
     text = text or ""
+    # ons eigen adresblok (factuuradres, t.a.v. Cees de Vreugd) hoort niet bij de leverancier: eruit halen
+    text = "\n".join(l for l in text.splitlines()
+                     if not re.search(r"t\.\s?a\.\s?v\.?|\battn\b|edisonring|6669\s?na|vreugd\s*productie|productietechniek", l, re.I))
     tkey = name_key(text)
     tnorm = _norm(text)
     hkey = name_key(hint) if hint else ""   # naam van de afzender in de mail, bijv. "Digitale factuur van Waaijenberg Coatings BV"
@@ -477,8 +481,8 @@ def match_supplier(conn, text, mail_from=None, hint=None):
     best = []
     for c in conn.execute("SELECT id, name, short_name, email, website, postcode, phone, relation_type FROM customers"
                           " WHERE IFNULL(active, 1) = 1"):
-        if re.search(r"vreugd", c["name"] or "", re.I):
-            continue
+        if OWN_NAME.search(c["name"] or ""):
+            continue   # onszelf (De Vreugd Productietechniek); andere "De Vreugd"-bedrijven (Transport) zijn wél leverancier
         score, why = 0.0, []
         nk = name_key(c["name"])
         full = _norm(c["name"])
@@ -525,6 +529,8 @@ def match_supplier(conn, text, mail_from=None, hint=None):
             continue
         if c["relation_type"] in ("leverancier", "beide"):
             score += 0.5
+        elif c["relation_type"] in ("klant", "prospect"):
+            score -= 1   # een factuur komt van een leverancier
         if any(_name_has_core(c["name"], cc) == 2 for cc in ({mcore} | tcores) if cc):
             score += 0.7   # naam begint met het domein (bmn-bv.nl -> "BMN ..."): voorrang bij dubbele relaties
         strong = len([w for w in why if not w.startswith("verkorte")]) >= 2 or "e-maildomein afzender" in why \
@@ -761,6 +767,63 @@ def poll_mailbox(conn, upload_dir):
         _poll_lock.release()
 
 
+MAIL_TAG = re.compile(r"\[WP-F(\d+)\]")
+
+
+def _reply_text(t):
+    """Alleen het nieuwe deel van een reactie (zonder het geciteerde bericht eronder)."""
+    t = (t or "").replace("\r\n", "\n")
+    cut = re.search(r"^\s*(?:-{2,}\s*(?:Oorspronkelijk|Original|Ursprüngliche)|Van:\s|From:\s|Von:\s|Op .{5,80} schreef|On .{5,80} wrote|>)",
+                    t, re.I | re.M)
+    if cut:
+        t = t[:cut.start()]
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
+    """Reactie van de leverancier op een mail vanaf de factuurkaart: als bericht in het gesprek, bijlagen bij de kaart."""
+    import json
+    import requests
+    mid = m["id"]
+    body = ""
+    rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body",
+                      headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
+    if rb.status_code < 400:
+        js = rb.json()
+        body = _reply_text((js.get("uniqueBody") or {}).get("content") or (js.get("body") or {}).get("content") or "")
+    names = []
+    if m.get("hasAttachments"):
+        ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
+        if ar.status_code < 400:
+            for a in ar.json().get("value", []):
+                if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
+                    continue
+                data = base64.b64decode(a.get("contentBytes") or "")
+                if data:
+                    _store_file(conn, upload_dir, iid, data, safe_filename(a.get("name") or "bijlage"), None, kind="attachment",
+                                mime=a.get("contentType") or "application/octet-stream")
+                    names.append(a.get("name") or "bijlage")
+    meta = {"from": (frm.get("address") or "").lower(), "from_name": frm.get("name") or "", "subject": m.get("subject") or "",
+            "files": names}
+    who = frm.get("name") or frm.get("address") or "leverancier"
+    conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_at, mail_meta) VALUES (?,?,?,?,?)",
+                 (iid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()).replace("Z", "+00:00")[:25],
+                  json.dumps(meta, ensure_ascii=False)))
+    log(conn, iid, f"Reactie per mail van {who}" + (f" met {len(names)} bijlage(n)" if names else ""))
+    # wie de mail verstuurde krijgt een melding
+    last = conn.execute("SELECT created_by FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_uit' AND created_by IS NOT NULL"
+                        " ORDER BY id DESC LIMIT 1", (iid,)).fetchone()
+    inv = conn.execute("SELECT supplier, invoice_no FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if last:
+        try:
+            from .notify import notify_user
+            notify_user(conn, last["created_by"], f"Reactie van {who}",
+                        f"Op je mail over factuur {inv['supplier'] or ''} {inv['invoice_no'] or ''}".strip() + ": " + (body[:140] or "(bijlage)"),
+                        url=f"/inkoopfacturen/{iid}#gesprek", email=False)
+        except Exception as exc:  # pragma: no cover
+            print(f"[WorkPortal] Melding reactie leverancier mislukt: {exc}", flush=True)
+
+
 def _poll(conn, upload_dir):
     import requests
     try:
@@ -776,8 +839,8 @@ def _poll(conn, upload_dir):
     headers = {"Authorization": f"Bearer {_graph_token()}"}
     refreshed = False
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/inbox/messages"
-           f"?$filter=receivedDateTime ge {since} and hasAttachments eq true"
-           f"&$select=id,subject,from,receivedDateTime&$orderby=receivedDateTime asc&$top=50")
+           f"?$filter=receivedDateTime ge {since}"
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments&$orderby=receivedDateTime asc&$top=50")
     new = 0
     pages = 0
     while url and pages < 10:
@@ -801,6 +864,18 @@ def _poll(conn, upload_dir):
             if conn.execute("SELECT 1 FROM invoice_mail_seen WHERE message_id = ?", (mid,)).fetchone():
                 continue
             frm = (m.get("from") or {}).get("emailAddress") or {}
+            tag = MAIL_TAG.search(m.get("subject") or "")
+            if tag and conn.execute("SELECT 1 FROM invoices WHERE id = ?", (int(tag.group(1)),)).fetchone():
+                _store_reply(conn, upload_dir, box, headers, m, frm, int(tag.group(1)))
+                conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
+                             (mid, m.get("receivedDateTime")))
+                conn.commit()
+                continue
+            if not m.get("hasAttachments"):
+                conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
+                             (mid, m.get("receivedDateTime")))
+                conn.commit()
+                continue
             ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments",
                               headers=headers, timeout=60)
             if ar.status_code >= 400:
@@ -1065,11 +1140,19 @@ def detail(iid):
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
     attachments = query("SELECT * FROM files WHERE entity = 'invoice' AND entity_id = ? AND kind = 'attachment' ORDER BY id", (iid,))
+    import json
+    rel = query("SELECT email FROM customers WHERE id = ?", (r["supplier_id"],), one=True) if r["supplier_id"] else None
+    prev_to = next((json.loads(n["mail_meta"]).get("to") for n in reversed(notes) if n["kind"] == "mail_uit" and n["mail_meta"]), None)
+    sender = r["mail_from"] if r["mail_from"] and not re.search(r"no-?reply|donotreply|noreply|mailer|postmaster", r["mail_from"], re.I) else ""
+    mail_to = ", ".join(prev_to) if prev_to else ((rel["email"] if rel and rel["email"] else "") or sender)
+    mail_subject = f"Factuur {r['invoice_no'] or ''} – De Vreugd Productietechniek".replace("Factuur  ", "Factuur ")
+    metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
     suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
                       " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
                       " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
-                           back=back, suppliers=suppliers, attachments=attachments)
+                           back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
+                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX))
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -1129,6 +1212,50 @@ def reread_all():
     flash((f"{merged} losse kaart(en) uit dezelfde mail samengevoegd (nu bijlage). " if merged else "")
           + f"Openstaande facturen opnieuw uitgelezen: {n} bijgewerkt. Wat iemand zelf had aangepast is blijven staan.", "ok")
     return redirect(url_for("crediteuren.index"))
+
+
+@bp.route("/<int:iid>/mailen", methods=["POST"])
+def mail_supplier(iid):
+    """Mail aan de leverancier vanuit de factuurmailbox; de reactie komt via [WP-F<id>] in het onderwerp terug op deze kaart."""
+    import json
+    r = _load(iid)
+    if not can("crediteuren", 2):
+        abort(403)
+    f = request.form
+    split = lambda v: [a.strip() for a in re.split(r"[;,\s]+", v or "") if a.strip()]   # noqa: E731
+    to, cc = split(f.get("to")), split(f.get("cc"))
+    if f.get("cc_me") and g.user["email"] and g.user["email"] not in cc:
+        cc.append(g.user["email"])
+    bad = [a for a in to + cc if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
+    body = (f.get("body") or "").replace("\r\n", "\n").strip()
+    subject = (f.get("subject") or "").strip() or f"Factuur {r['invoice_no'] or ''}".strip()
+    back = url_for("crediteuren.detail", iid=iid) + "#gesprek"
+    if not to or bad or not body:
+        flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
+        return redirect(back)
+    subject = MAIL_TAG.sub("", subject).strip() + f" [WP-F{iid}]"
+    atts = []
+    if f.get("attach_pdf") and r["file_id"]:
+        from .util import file_path
+        fr = query("SELECT * FROM files WHERE id = ?", (r["file_id"],), one=True)
+        if fr:
+            with open(file_path(fr), "rb") as fh:
+                atts.append((fr["filename"] or "factuur.pdf", fh.read(), "application/pdf"))
+    from .mail import send_mail_with_files
+    conn = get_db()
+    box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    ok, err = send_mail_with_files(box, to, subject, body, atts, cc=cc or None, signer="crediteuren:" + (g.user["name"] or ""))
+    if not ok:
+        flash(f"Mail versturen is niet gelukt: {err}", "error")
+        return redirect(back)
+    now = now_iso()
+    conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
+                 (iid, "mail_uit", body[:5000], g.user["id"], now,
+                  json.dumps({"to": to, "cc": cc, "subject": subject, "pdf": bool(atts), "from": box}, ensure_ascii=False)))
+    log(conn, iid, f"Mail aan leverancier ({', '.join(to)}): {subject[:80]}", g.user["id"])
+    conn.commit()
+    flash(f"Mail verstuurd aan {', '.join(to)}. De reactie komt hier in het gesprek.", "ok")
+    return redirect(back)
 
 
 @bp.route("/<int:iid>/status", methods=["POST"])

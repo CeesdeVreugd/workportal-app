@@ -98,8 +98,15 @@ SIGNERS = {
     "systeem": "Systeembeheer | De Vreugd Productietechniek",
     "werkvoorbereiding": "Werkvoorbereiding | De Vreugd Productietechniek",
     "administratie": "Administratie | De Vreugd Productietechniek",
+    "crediteuren": "Crediteurenadministratie | De Vreugd Productietechniek",
 }
-SIGNER_MAIL = {"administratie": "administratie@devreugd-pt.nl"}
+SIGNER_MAIL = {"administratie": "administratie@devreugd-pt.nl", "crediteuren": os.environ.get("CRED_MAILBOX", "factuur@devreugd-pt.nl")}
+
+
+def _signer(signer):
+    """'crediteuren:Cees de Vreugd' -> ('crediteuren', 'Cees de Vreugd')."""
+    key, _, name = (signer or "systeem").partition(":")
+    return key, name.strip()
 GREETING = "Met vriendelijke groeten / Kind regards / Mit Freundlichen Grüßen,"
 
 
@@ -126,7 +133,8 @@ def signature_html(signer="systeem"):
     base = os.environ.get("APP_URL", "").rstrip("/")
     img = lambda f, w, h, alt: (f'<img src="{base}/static/img/{f}" alt="{alt}" width="{w}" height="{h}" '
                                 f'style="display:inline-block;border:0;vertical-align:middle">') if base else ""
-    who = html_lib.escape(SIGNERS.get(signer, SIGNERS["systeem"]))
+    signer, person = _signer(signer)
+    who = (html_lib.escape(person) + "<br>" if person else "") + html_lib.escape(SIGNERS.get(signer, SIGNERS["systeem"]))
     contact = SIGNER_MAIL.get(signer, "werkvoorbereiding@devreugd-pt.nl")
     link = "color:#0563C1;text-decoration:underline"
     li = img("mail-linkedin.png", 30, 30, "LinkedIn")
@@ -152,7 +160,8 @@ def signature_html(signer="systeem"):
 
 def signature_text(signer="systeem"):
     disc = "\n\n".join("\n".join(b) for b in DISCLAIMER)
-    return (f"\n\n{GREETING}\n\n{SIGNERS.get(signer, SIGNERS['systeem'])}\n\n"
+    signer, person = _signer(signer)
+    return (f"\n\n{GREETING}\n\n{(person + chr(10)) if person else ''}{SIGNERS.get(signer, SIGNERS['systeem'])}\n\n"
             f"Edisonring 11, 6669 NA Dodewaard\n+31 (0)488 41 28 28\n{SIGNER_MAIL.get(signer, 'werkvoorbereiding@devreugd-pt.nl')} | www.devreugd-pt.nl\n\n{disc}")
 
 

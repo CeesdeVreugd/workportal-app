@@ -127,18 +127,44 @@
         {% for n in notes %}
         <article class="note {{ 'cred-acc' if n.for_accounting }} {{ 'cred-done' if n.handled }}">
           <div class="notehead">
-            <b>{{ n.who or 'Onbekend' }}</b><span class="small muted">{{ n.created_at|dt }}</span>
+            {% set mm = metas.get(n.id) %}
+            <b>{{ (mm.from_name or mm['from']) if n.kind == 'mail_in' and mm else (n.who or 'Onbekend') }}</b><span class="small muted">{{ n.created_at|dt }}</span>
             {% if n.kind == 'vraag' %}<span class="badge b-warn">vraag aan {{ n.to_name or 'collega' }}</span>
             {% elif n.kind == 'antwoord' %}<span class="badge b-ok">antwoord</span>
-            {% elif n.kind == 'afwijzing' %}<span class="badge b-bad">afgewezen</span>{% endif %}
+            {% elif n.kind == 'afwijzing' %}<span class="badge b-bad">afgewezen</span>
+            {% elif n.kind == 'mail_uit' %}<span class="badge b-blue">{{ icon('mail') }} mail aan leverancier</span>
+            {% elif n.kind == 'mail_in' %}<span class="badge b-ok">{{ icon('mail') }} reactie leverancier</span>{% endif %}
             {% if n.for_accounting %}<span class="badge b-purple">voor de boekhouding</span>
               {% if edit %}<form method="post" action="{{ url_for('crediteuren.note_done', iid=r.id, nid=n.id) }}" class="followup {{ 'done' if n.handled }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button title="Afvinken als verwerkt door de boekhouding">{{ icon('check') }} {{ 'Afgehandeld' if n.handled else 'Afhandelen' }}</button></form>{% endif %}
             {% endif %}
           </div>
+          {% if mm %}<div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ mm.to|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% if mm.pdf %} · met factuur-PDF{% endif %}{% else %}Van {{ mm['from'] }}{% if mm.files %} · bijlage: {{ mm.files|join(', ') }} (bij "Andere bijlagen"){% endif %}{% endif %} · <i>{{ mm.subject }}</i></div>{% endif %}
           <div class="notebody">{{ n.body }}</div>
         </article>
         {% else %}<div class="empty">Nog geen opmerkingen.</div>{% endfor %}
       </div>
+      {% if edit %}
+      <details class="cred-mail" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
+        <summary class="btn">{{ icon('mail') }}Mail leverancier</summary>
+        <form method="post" action="{{ url_for('crediteuren.mail_supplier', iid=r.id) }}" class="form" style="margin-top:12px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="fgrid">
+            <label class="f">Aan *<input type="text" name="to" value="{{ mail_to }}" required placeholder="naam@leverancier.nl"></label>
+            <label class="f">Cc<input type="text" name="cc" placeholder="optioneel, meerdere met komma"></label>
+          </div>
+          <label class="f">Onderwerp<input type="text" name="subject" value="{{ mail_subject }}"></label>
+          <label class="f">Bericht *<textarea name="body" rows="7" required>Beste heer/mevrouw,
+
+</textarea></label>
+          <div class="cred-actions">
+            <label class="check"><input type="checkbox" name="attach_pdf" value="1" checked> Factuur-PDF meesturen</label>
+            <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
+            <button class="btn primary" style="margin-left:auto">{{ icon('mail') }}Versturen</button>
+          </div>
+          <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier op deze mail, dan komt zijn antwoord (met bijlagen) hier in het gesprek – wie er ook reageert.</p>
+        </form>
+      </details>
+      {% endif %}
       {% if edit or r.question_to == g.user.id %}
       <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:14px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

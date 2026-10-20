@@ -987,3 +987,8 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .cf-line { flex: 1 1 40px; height: 2px; background: #D5DAE8; margin: 0 12px; min-width: 20px; }
 .cf-line.on { background: #1E7A3C; }
 .cf-node.todo { color: var(--ink-2, #3A3F60); font-style: italic; }
+.mailmeta { margin: 2px 0 4px; }
+.notehead .badge svg { width: 13px; height: 13px; vertical-align: -2px; }
+.cred-mail > summary { list-style: none; display: inline-flex; }
+.cred-mail > summary::-webkit-details-marker { display: none; }
+.cred-grid .notebody { white-space: pre-line; }

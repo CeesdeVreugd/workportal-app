@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V119: inkoopfacturen - zacht afbreekstreepje als streepje (Heleon)"
+set "OMSCHRIJVING=WorkPortal V120: inkoopfacturen - leverancier mailen vanaf de kaart, reacties in het gesprek"
 
 echo.
 echo ============================================
