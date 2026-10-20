@@ -1205,7 +1205,9 @@ def detail(iid):
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
                            metas=metas, cred_box=cred_box, reply_note=reply_note, reply_all=reply_all,
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
-                           next_lane=request.args.get("baan"), STATUS=STATUS)
+                           next_lane=request.args.get("baan"), STATUS=STATUS,
+                           archive_folder=_archive_folder(get_db()),
+                           archive_me=g.user["id"] in archive_targets(get_db()) or can("crediteuren", 3))
 
 
 def _reply_all(notes, box):
@@ -1375,6 +1377,143 @@ def mail_supplier(iid):
     return redirect(back)
 
 
+DONE_FOLDER = "01-Verwerkt"
+
+
+def archive_mails(conn, iid, box, folder):
+    """Afgeronde factuur: de factuurmail met alle mails uit dezelfde mailwisseling(en) (ook reacties en onze verzonden mails)
+    naar de map 'folder' in de factuurmailbox. Bewaarde bericht-id's worden bijgewerkt (verplaatsen geeft een nieuw id).
+    Geeft (aantal, foutmelding of None)."""
+    import json
+    from .mail import graph_configured, graph_message, graph_folder_id, graph_conversation, graph_move, graph_wellknown_id, GraphError
+    r = conn.execute("SELECT * FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if not r:
+        return 0, None
+    if not graph_configured():
+        print(f"[WorkPortal] MAILS VERPLAATSEN (Microsoft-koppeling niet ingesteld): factuur {iid} -> map '{folder}'", flush=True)
+        log(conn, iid, f"Mails verplaatst naar map '{folder}' (testmodus, geen Microsoft-koppeling)")
+        conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
+        conn.commit()
+        return 0, None
+    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
+    notes = conn.execute("SELECT id, mail_meta FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_in' AND mail_meta IS NOT NULL",
+                         (iid,)).fetchall()
+    try:
+        convs, ids = [], {orig} if orig else set()
+        if r["mail_conv"]:
+            convs.append(r["mail_conv"])
+        for mid in [orig] + [json.loads(n["mail_meta"]).get("msg_id") for n in notes]:
+            if mid:
+                ids.add(mid)
+                gm = graph_message(box, mid)
+                if gm and gm.get("conversationId") and gm["conversationId"] not in convs:
+                    convs.append(gm["conversationId"])
+        if not convs and not ids:
+            return 0, None
+        fid = graph_folder_id(box, folder)
+        skip = {fid} | {x for x in (graph_wellknown_id(box, "deleteditems"), graph_wellknown_id(box, "drafts")) if x}
+        msgs = {}
+        for c in convs:
+            for m in graph_conversation(box, c):
+                msgs[m["id"]] = m.get("parentFolderId")
+        for mid in ids:   # bijv. een reactie die alleen via [WP-F] in het onderwerp gekoppeld is
+            msgs.setdefault(mid, None)
+        moved, newid = 0, {}
+        for mid, parent in msgs.items():
+            if parent in skip:   # al in de map, of in Verwijderde items / Concepten: laten staan
+                continue
+            try:
+                nid = graph_move(box, mid, fid)
+            except GraphError as e:
+                if e.status == 404:   # al verplaatst of verwijderd
+                    continue
+                raise
+            moved += 1
+            if nid:
+                newid[mid] = nid
+        if orig in newid:
+            rest = (r["mail_id"] or "")[len(orig):]
+            conn.execute("UPDATE invoices SET mail_id = ? WHERE id = ?", (newid[orig] + rest, iid))
+        for n in notes:
+            m = json.loads(n["mail_meta"])
+            if m.get("msg_id") in newid:
+                m["msg_id"] = newid[m["msg_id"]]
+                conn.execute("UPDATE invoice_notes SET mail_meta = ? WHERE id = ?", (json.dumps(m, ensure_ascii=False), n["id"]))
+        log(conn, iid, f"Mail{'s' if moved != 1 else ''} verplaatst naar map '{folder}' ({moved})" if moved
+            else f"Mail stond al in map '{folder}'")
+        conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
+        conn.commit()
+        return moved, None
+    except GraphError as e:
+        err = (f"recht Mail.ReadWrite ontbreekt in de Microsoft-koppeling" if e.status == 403 else str(e))
+    except Exception as e:  # pragma: no cover - netwerk
+        err = str(e)[:300]
+    log(conn, iid, f"Mails niet verplaatst naar '{folder}': {err}")
+    conn.execute("UPDATE invoices SET mail_archive = 'mislukt' WHERE id = ?", (iid,))
+    conn.commit()
+    return 0, err
+
+
+def archive_targets(conn):
+    """Wie krijgt de vraag of de mail van een afgeronde factuur naar 'Verwerkt' mag (de boekhouding).
+    Instelbaar in Beheer > Instellingen; zonder instelling: iedereen met de rol administratie."""
+    import json
+    raw = _setting(conn, "cred_archive_users", "")
+    if raw:
+        try:
+            ids = [int(x) for x in json.loads(raw)]
+        except (ValueError, TypeError):
+            ids = []
+        rows = conn.execute(f"SELECT id FROM users WHERE active = 1 AND id IN ({','.join('?' * len(ids)) or 'NULL'})", ids).fetchall()
+    else:
+        rows = conn.execute("SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id"
+                            " WHERE u.active = 1 AND r.key = 'administratie'").fetchall()
+    return [r["id"] for r in rows]
+
+
+def _archive_folder(conn):
+    return (_setting(conn, "cred_done_folder", DONE_FOLDER) or DONE_FOLDER).strip() or DONE_FOLDER
+
+
+def _ask_archive(conn, iid, actor):
+    """Factuur net afgerond: de boekhouding een melding met de vraag of de mail naar 'Verwerkt' mag."""
+    r = conn.execute("SELECT supplier, invoice_no, mail_archive FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if r["mail_archive"] in ("verplaatst", "bezig"):
+        return
+    conn.execute("UPDATE invoices SET mail_archive = 'gevraagd' WHERE id = ?", (iid,))
+    conn.commit()
+    folder = _archive_folder(conn)
+    try:
+        from .notify import notify_user
+        for uid in archive_targets(conn):
+            if uid != actor:   # wie hem zelf afrondt krijgt de vraag meteen in het venster
+                notify_user(conn, uid, "Factuur afgerond – mail naar " + folder + "?",
+                            f"{r['supplier'] or 'Factuur'} {r['invoice_no'] or ''}".strip()
+                            + f" is verwerkt in Komdex en SnelStart. Mag de mail (met de onderliggende mails) naar de map '{folder}'?",
+                            url=f"/inkoopfacturen/{iid}", email=False)
+    except Exception as exc:  # pragma: no cover
+        print(f"[WorkPortal] Melding mail naar Verwerkt mislukt: {exc}", flush=True)
+
+
+def _archive_bg(iid):
+    """Op de achtergrond, zodat de statusknop niet op Microsoft hoeft te wachten."""
+    import sqlite3
+    import threading
+    db_path = current_app.config["DB_PATH"]
+
+    def run():
+        conn = sqlite3.connect(db_path, timeout=30)
+        conn.row_factory = sqlite3.Row
+        try:
+            box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+            archive_mails(conn, iid, box, _archive_folder(conn))
+        except Exception as exc:  # pragma: no cover
+            print(f"[WorkPortal] Mails verplaatsen mislukt (factuur {iid}): {exc}", flush=True)
+        finally:
+            conn.close()
+    threading.Thread(target=run, daemon=True).start()
+
+
 @bp.route("/<int:iid>/status", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def set_status(iid):
@@ -1412,9 +1551,35 @@ def set_status(iid):
                  (new, route, 1 if ss else 0, now, iid))
     log(conn, iid, f"Status: {msg}" + (f" → {STATUS[new]}" if STATUS[new] != msg else ""), uid)
     conn.commit()
+    if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
+        _ask_archive(conn, iid, uid)
     # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
     lane = "komdex" if act in ("erp", "buiten") else ("snelstart" if act == "snelstart" else "")
     return redirect(url_for("crediteuren.detail", iid=iid, gewijzigd=msg, baan=lane or None))
+
+
+@bp.route("/<int:iid>/mail-verwerkt", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def mail_archive(iid):
+    """Antwoord op 'mail naar Verwerkt?': verplaatsen (op de achtergrond) of laten staan; daarna naar 'naar' (volgende factuur e.d.)."""
+    r = _load(iid)
+    conn = get_db()
+    folder = _archive_folder(conn)
+    if r["source"] == "mail" and r["status"] == "snelstart":
+        if request.form.get("verplaatsen") == "1":
+            conn.execute("UPDATE invoices SET mail_archive = 'bezig' WHERE id = ?", (iid,))
+            log(conn, iid, f"Mail naar map '{folder}': ja", g.user["id"])
+            conn.commit()
+            _archive_bg(iid)
+            flash(f"De mail wordt naar de map '{folder}' verplaatst.", "ok")
+        else:
+            conn.execute("UPDATE invoices SET mail_archive = 'laten' WHERE id = ?", (iid,))
+            log(conn, iid, f"Mail naar map '{folder}': nee, laten staan", g.user["id"])
+            conn.commit()
+    nxt = request.form.get("naar") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("crediteuren.detail", iid=iid)
+    return redirect(nxt)
 
 
 @bp.route("/<int:iid>/afwijzen", methods=["POST"])

@@ -57,6 +57,16 @@
   </section>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    {% if edit and r.status == 'snelstart' and r.source == 'mail' and r.mail_archive in ('gevraagd', 'mislukt') and archive_me %}
+    <form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cred-arch-ask">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span class="cred-arch-ic">{{ icon('mail') }}</span>
+      <span class="cred-arch-txt"><b>{{ 'Verplaatsen is niet gelukt – opnieuw proberen?' if r.mail_archive == 'mislukt' else 'Factuur afgerond' }}</b>
+        Mag de mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b>?{% if r.mail_archive == 'mislukt' %} <span class="muted">Zie het logboek voor de reden.</span>{% endif %}</span>
+      <span class="cred-arch-btns"><button class="btn sm ghost" name="verplaatsen" value="0">Nee, laten staan</button>
+        <button class="btn sm primary" name="verplaatsen" value="1">Ja, verplaatsen</button></span>
+    </form>
+    {% endif %}
     <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form" data-no-draft>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
@@ -85,6 +95,10 @@
     {% if edit %}
     <section class="card">
       <div class="card-head"><h2>Status</h2><span class="small muted">Komdex en SnelStart in willekeurige volgorde</span></div>
+      {% if r.status == 'snelstart' and r.source == 'mail' and r.mail_archive in ('verplaatst', 'bezig', 'laten') %}
+      <div class="small muted cred-arch-line">{{ icon('mail') }}{% if r.mail_archive == 'verplaatst' %}Mail staat in de map {{ archive_folder }}.{% elif r.mail_archive == 'bezig' %}Mail wordt naar de map {{ archive_folder }} verplaatst…{% else %}Mail is in het postvak blijven staan.
+        {% if archive_me %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="linkbtn" name="verplaatsen" value="1">Alsnog naar {{ archive_folder }}</button></form>{% endif %}{% endif %}</div>
+      {% endif %}
       {% if r.status != 'afgewezen' %}
       <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -245,16 +259,29 @@
   <div class="cdd-icon">{{ icon('check') }}</div>
   <h2>{{ changed_msg }}</h2>
   <p class="muted">Status van deze factuur: <b>{{ r.label }}</b></p>
+  {% set ask_arch = edit and archive_me and r.status == 'snelstart' and r.source == 'mail' and r.mail_archive == 'gevraagd' %}
+  {% if ask_arch %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cdd-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="cdd-arch"><input type="checkbox" name="verplaatsen" value="1" checked>
+      <span>{{ icon('mail') }}Mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b> verplaatsen</span></label>
+  {% endif %}
   {% if next_inv %}
-  <a class="btn primary cdd-next" href="{{ url_for('crediteuren.detail', iid=next_inv.id, terug=back) }}">Door naar volgende factuur →
-    <small>{{ next_inv.supplier or 'Onbekende leverancier' }}{{ ' · ' ~ next_inv.invoice_no if next_inv.invoice_no }} · {{ STATUS.get(next_inv.status, next_inv.status) }}</small></a>
+  {% set nurl = url_for('crediteuren.detail', iid=next_inv.id, terug=back) %}
+  <{{ 'button name="naar" value="' ~ nurl ~ '"' if ask_arch else 'a href="' ~ nurl ~ '"' }} class="btn primary cdd-next">Door naar volgende factuur →
+    <small>{{ next_inv.supplier or 'Onbekende leverancier' }}{{ ' · ' ~ next_inv.invoice_no if next_inv.invoice_no }} · {{ STATUS.get(next_inv.status, next_inv.status) }}</small></{{ 'button' if ask_arch else 'a' }}>
   {% else %}
   <p class="cdd-none">Er staan geen andere openstaande facturen{{ ' voor deze stap' if next_lane }} meer klaar. 🎉</p>
   {% endif %}
   <div class="cdd-row">
+    {% if ask_arch %}
+    <button class="btn" name="naar" value="{{ url_for('crediteuren.detail', iid=r.id) }}">Op deze kaart blijven</button>
+    <button class="btn ghost" name="naar" value="{{ back }}">Naar het overzicht</button>
+    {% else %}
     <button type="button" class="btn" onclick="document.getElementById('donedlg').close()">Op deze kaart blijven</button>
     <a class="btn ghost" href="{{ back }}">Naar het overzicht</a>
+    {% endif %}
   </div>
+  {% if ask_arch %}</form>{% endif %}
 </dialog>
 <script>
 (function () {

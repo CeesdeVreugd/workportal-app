@@ -691,3 +691,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Inkoopfacturen: is er al mail met de leverancier, dan wordt "Mail leverancier" de knop "Antwoord allen": antwoord op de allerlaatste mail, in dezelfde mailwisseling, aan de afzender met iedereen die erop stond in Cc (ons eigen factuuradres eruit). "Nieuwe mail in plaats daarvan" blijft mogelijk.
 - Reacties van leveranciers bewaren nu ook de Aan/Cc-lijst (voor Antwoord allen).
 - Gegevens-formulier van een factuur maakt geen (onterecht) concept meer; de concept-melding zegt nu waarvan het concept is.
+
+## V129 (1.76.0)
+- Inkoopfacturen: komt een factuur (uit de mailbox) op Afgerond (Komdex + SnelStart), dan vraagt WorkPortal de boekhouding of de mail – met alle mails uit dezelfde mailwisseling, ook reacties en onze verzonden mails – naar de map "01-Verwerkt" mag.
+  - Wie afrondt en bij de boekhouding hoort, krijgt de vraag direct in het venster "Door naar volgende factuur / Op deze kaart blijven" (vinkje staat standaard aan).
+  - De andere boekhouders krijgen een pushmelding; op de factuurkaart staat een gele balk "Ja, verplaatsen / Nee, laten staan". Bij "Nee" kan later nog "Alsnog naar 01-Verwerkt".
+  - Beheer > Instellingen: mapnaam en wie de vraag krijgt (standaard: rol administratie). Bestaat de map niet, dan komt hij onder Postvak IN.
+  - Nodig in Entra (app-registratie): toepassingsrecht Mail.ReadWrite met beheerderstoestemming. Zonder dat recht: melding in het logboek en de balk "opnieuw proberen".
+  - Mails in Verwijderde items en Concepten blijven staan. Na verplaatsen worden de bewaarde bericht-id's bijgewerkt, zodat Antwoord allen blijft werken.
+- Database-migratie 27: invoices.mail_archive.

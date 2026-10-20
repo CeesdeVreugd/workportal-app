@@ -388,3 +388,48 @@ def _send_graph_large(sender, to, cc, subject, html, attachments):
     if sres.status_code not in (200, 202):
         return False, f"Versturen mislukt ({sres.status_code}): {sres.text[:200]}"
     return True, None
+
+
+# ------------------------------------------------------------------ mails verplaatsen (recht Mail.ReadWrite)
+class GraphError(RuntimeError):
+    def __init__(self, status, text):
+        super().__init__(f"{status}: {text[:300]}")
+        self.status = status
+
+
+def _gcall(method, path, **kw):
+    r = requests.request(method, "https://graph.microsoft.com/v1.0" + path,
+                         headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=40, **kw)
+    if r.status_code >= 400:
+        raise GraphError(r.status_code, r.text)
+    return r.json() if r.content else {}
+
+
+def graph_folder_id(box, name):
+    """Id van de map 'name': eerst direct onder de mailbox, dan onder Postvak IN; bestaat hij niet, dan onder Postvak IN aanmaken."""
+    esc = name.replace("'", "''")
+    for base in ("/mailFolders", "/mailFolders/inbox/childFolders"):
+        js = _gcall("GET", f"/users/{box}{base}", params={"$filter": f"displayName eq '{esc}'", "$select": "id,displayName"})
+        if js.get("value"):
+            return js["value"][0]["id"]
+    return _gcall("POST", f"/users/{box}/mailFolders/inbox/childFolders", json={"displayName": name})["id"]
+
+
+def graph_wellknown_id(box, name):
+    """Id van een standaardmap (bijv. 'deleteditems'); None als het niet lukt."""
+    try:
+        return _gcall("GET", f"/users/{box}/mailFolders/{name}", params={"$select": "id"}).get("id")
+    except GraphError:
+        return None
+
+
+def graph_conversation(box, conv_id):
+    """Alle berichten (alle mappen, ook Verzonden items) uit één mailwisseling: [{id, parentFolderId}]."""
+    esc = conv_id.replace("'", "''")
+    js = _gcall("GET", f"/users/{box}/messages", params={"$filter": f"conversationId eq '{esc}'", "$select": "id,parentFolderId", "$top": "100"})
+    return js.get("value") or []
+
+
+def graph_move(box, message_id, folder_id):
+    """Bericht verplaatsen; geeft het nieuwe bericht-id (Graph geeft een verplaatst bericht een nieuw id)."""
+    return _gcall("POST", f"/users/{box}/messages/{message_id}/move", json={"destinationId": folder_id}).get("id")

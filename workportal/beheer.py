@@ -145,6 +145,8 @@ def settings():
         if request.form.get("cred_form") == "1":
             set_setting("cred_mail_on", "1" if request.form.get("cred_mail_on") else "0")
             set_setting("cred_mailbox", (request.form.get("cred_mailbox") or "").strip().lower() or "factuur@devreugd-pt.nl")
+            set_setting("cred_done_folder", (request.form.get("cred_done_folder") or "").strip()[:80] or "01-Verwerkt")
+            set_setting("cred_archive_users", json.dumps(sorted({int(x) for x in request.form.getlist("cred_archive_user") if x.isdigit()})))
             since = (request.form.get("cred_since") or "").strip()
             if since and since != (get_setting("cred_since") or "")[:10]:
                 set_setting("cred_since", since + "T00:00:00Z")
@@ -163,7 +165,12 @@ def settings():
     from .crediteuren import mail_configured
     cred = {"on": get_setting("cred_mail_on") == "1", "box": get_setting("cred_mailbox") or "factuur@devreugd-pt.nl",
             "since": (get_setting("cred_since") or "")[:10], "last": get_setting("cred_last_poll"),
-            "error": get_setting("cred_last_error"), "graph": mail_configured()}
+            "error": get_setting("cred_last_error"), "graph": mail_configured(),
+            "folder": get_setting("cred_done_folder") or "01-Verwerkt", "custom": bool(get_setting("cred_archive_users"))}
+    from .crediteuren import archive_targets
+    cred["archive_ids"] = set(archive_targets(get_db()))
+    cred["staff"] = query("SELECT u.id, u.name, GROUP_CONCAT(r.name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id"
+                          " LEFT JOIN roles r ON r.id = ur.role_id WHERE u.active = 1 GROUP BY u.id ORDER BY u.name")
     return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(), cred=cred,
                            phone_modules=[(k, dict(MODULES)[k]) for k in PHONE_MODULES])
 

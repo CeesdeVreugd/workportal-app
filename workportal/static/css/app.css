@@ -1024,3 +1024,17 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .cred-tools .cred-pop[open] > form { width: auto; }
 .crumbs a { display: inline-flex; align-items: center; gap: 3px; line-height: 1.2; }
 .crumbs a svg { width: 15px; height: 15px; flex: none; margin-left: -3px; }
+/* inkoopfacturen: mail naar 'Verwerkt' */
+.cdd-arch { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: var(--bg, #F4F6FB); border: 1px solid var(--line, #D5DAE8); border-radius: 10px; padding: 10px 12px; margin: 4px 0 12px; cursor: pointer; font-size: 14px; }
+.cdd-arch input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.cdd-arch svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 5px; color: var(--primary, #0A0A96); }
+.cdd-form { display: contents; }
+button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
+.cred-arch-ask { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #FFF8E6; border: 1px solid #F1D38A; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; }
+.cred-arch-ic svg { width: 22px; height: 22px; color: #8A5A00; display: block; }
+.cred-arch-txt { flex: 1 1 260px; font-size: 14px; }
+.cred-arch-txt > b:first-child { display: block; }
+.cred-arch-btns { display: flex; gap: 8px; margin-left: auto; }
+.cred-arch-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -4px 0 10px; }
+.cred-arch-line svg { width: 15px; height: 15px; }
+.cred-arch-line .linkbtn { color: var(--primary, #0A0A96); text-decoration: underline; font-size: inherit; }

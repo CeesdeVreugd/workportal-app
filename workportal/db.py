@@ -645,6 +645,11 @@ MIGRATIONS = [
     ALTER TABLE invoices ADD COLUMN mail_conv TEXT;
     CREATE INDEX idx_invoices_conv ON invoices(mail_conv);
     """,
+    # 27 - inkoopfacturen: afgeronde factuur -> vraag aan de boekhouding of de mail naar de map 'Verwerkt' mag
+    #      (NULL / gevraagd / bezig / verplaatst / laten / mislukt)
+    """
+    ALTER TABLE invoices ADD COLUMN mail_archive TEXT;
+    """,
 ]
 
 
