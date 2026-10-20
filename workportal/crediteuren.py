@@ -397,7 +397,12 @@ def extract(data):
 
 _GENERIC_DOMAINS = {"gmail.com", "hotmail.com", "hotmail.nl", "outlook.com", "outlook.nl", "live.nl", "live.com", "icloud.com",
                     "me.com", "yahoo.com", "ziggo.nl", "kpnmail.nl", "planet.nl", "home.nl", "xs4all.nl", "upcmail.nl",
-                    "onmicrosoft.com", "devreugd-pt.nl", "exactonline.nl", "snelstart.nl", "twinfield.com", "basecone.com"}
+                    "onmicrosoft.com", "devreugd-pt.nl", "exactonline.nl", "snelstart.nl", "twinfield.com", "basecone.com",
+                    # facturatieplatforms: één afzender voor heel veel verschillende bedrijven
+                    "exact.com", "exactonline.com", "e-boekhouden.nl", "moneybird.com", "moneybird.nl", "jortt.nl", "informer.nl",
+                    "yukiworks.nl", "yuki.nl", "visma.net", "visma.com", "afas.nl", "afasonline.nl", "rompslomp.nl", "tradeshift.com",
+                    "zenvoices.com", "unit4.com", "accountview.nl", "kingfinance.nl", "minox.nl", "gripp.com", "teamleader.eu",
+                    "sendgrid.net", "mailgun.org", "amazonses.com", "mandrillapp.com"}
 _OWN_POSTCODES = {"6669NA"}
 
 
@@ -475,7 +480,7 @@ def match_supplier(conn, text, mail_from=None, hint=None):
     mcore = _yk(_dom_core(mdom) or "") or None
     tcores = {_yk(cc) for cc in (_dom_core(d) for d in tdom) if cc}
     prev = None
-    if mail_from:
+    if mail_from and mdom:   # niet bij een gedeeld afzenderadres (bijv. mail@klantmail.snelstart.nl: daar mailen veel bedrijven mee)
         prev = conn.execute("SELECT supplier_id FROM invoices WHERE mail_from = ? AND supplier_id IS NOT NULL"
                             " ORDER BY id DESC LIMIT 1", (mail_from.lower(),)).fetchone()
     best = []
@@ -616,7 +621,9 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     x = x or extract(data)
     mail = mail or {}
     supplier = None
-    if mail.get("from_addr"):
+    if mail.get("from_addr") and not _domain(mail["from_addr"]):
+        supplier = mail.get("from_name") or None   # gedeeld afzenderadres (facturatieplatform): naam uit de mail, niet de vorige factuur
+    elif mail.get("from_addr"):
         prev = conn.execute("SELECT supplier FROM invoices WHERE mail_from = ? AND IFNULL(supplier,'') <> ''"
                             " ORDER BY id DESC LIMIT 1", (mail["from_addr"],)).fetchone()
         supplier = prev["supplier"] if prev else (mail.get("from_name") or None)
@@ -727,9 +734,12 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
         if x.get(k) is not None and (overwrite or r[k] in (None, "") or not by_hand) and x[k] != r[k]:
             upd[k] = x[k]
     if overwrite or not r["supplier_id"]:
-        m = match_supplier(conn, x["text"], r["mail_from"], hint=r["supplier"])
+        m = match_supplier(conn, x["text"], r["mail_from"], hint=None if r["supplier_id"] else r["supplier"])
         if m and m[0] != r["supplier_id"]:
             upd.update(supplier_id=m[0], supplier=m[1], supplier_match=", ".join(m[2]))
+        elif not m and overwrite and r["supplier_id"] and (r["supplier_match"] or "") == "eerdere factuur van dit e-mailadres":
+            # alleen gekoppeld omdat een ander bedrijf eerder via hetzelfde (gedeelde) adres mailde: loskoppelen
+            upd.update(supplier_id=None, supplier=x["supplier_guess"] or None, supplier_match=None)
         elif not m and not r["supplier_id"] and x["supplier_guess"] and _bad_supplier(r["supplier"]):
             upd["supplier"] = x["supplier_guess"]   # bijv. "Invoice ." vervangen door de naam uit de kop
     if upd:
@@ -738,9 +748,10 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
         names = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum", "amount_incl": "bedrag incl.",
                  "amount_excl": "bedrag excl.", "erp_ref": "inkoopnummer", "supplier": "leverancier"}
         log(conn, iid, "Opnieuw uitgelezen: " + ", ".join(names[k] for k in upd if k in names)
-            + (f" (leverancier uit de relaties, op {upd['supplier_match']})" if "supplier_match" in upd else ""), user_id)
+            + (f" (leverancier uit de relaties, op {upd['supplier_match']})" if upd.get("supplier_match") else "")
+            + (" (koppeling via gedeeld afzenderadres losgemaakt)" if "supplier_id" in upd and not upd["supplier_id"] else ""), user_id)
         conn.commit()
-    return [k for k in upd if k != "supplier_match"]
+    return [k for k in upd if k not in ("supplier_match", "supplier_id")]
 
 
 # ------------------------------------------------------------------ mailbox (Microsoft Graph, alleen lezen)

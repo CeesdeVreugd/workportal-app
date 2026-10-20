@@ -710,3 +710,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Bijgewerkt bij elk ophalen van de mailbox (elke 5 minuten / knop Postvak ophalen) voor openstaande facturen en facturen van de laatste 30 dagen. Alleen lezen: er wordt in Outlook niets veranderd.
   - Categorieën: recht Mail.Read (is er al). Kleuren: recht MailboxSettings.Read (toepassingsrecht, beheerderstoestemming); zonder dat recht worden de categorieën grijs getoond en staat de reden bij Beheer > Instellingen.
 - Database-migratie 28: invoices.mail_categories.
+
+## V132 (1.79.0)
+- Inkoopfacturen: facturen die via een facturatieplatform binnenkomen (bijv. mail@klantmail.snelstart.nl, Exact, Moneybird, e-Boekhouden, Visma, AFAS …) werden gekoppeld aan de leverancier van een eerdere factuur van hetzelfde adres. Zo'n gedeeld adres telt niet meer mee; de leverancier komt dan uit de factuur zelf (naam, website, postcode, telefoon) en de naam van de afzender in de mail.
+- "Opnieuw uitlezen" maakt een koppeling die alleen op dat gedeelde adres berustte los.
