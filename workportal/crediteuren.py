@@ -806,7 +806,7 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
                                 mime=a.get("contentType") or "application/octet-stream")
                     names.append(a.get("name") or "bijlage")
     meta = {"from": (frm.get("address") or "").lower(), "from_name": frm.get("name") or "", "subject": m.get("subject") or "",
-            "files": names}
+            "files": names, "msg_id": mid}
     who = frm.get("name") or frm.get("address") or "leverancier"
     conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_at, mail_meta) VALUES (?,?,?,?,?)",
                  (iid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()).replace("Z", "+00:00")[:25],
@@ -1155,13 +1155,20 @@ def detail(iid):
     sender = r["mail_from"] if r["mail_from"] and not re.search(r"no-?reply|donotreply|noreply|mailer|postmaster", r["mail_from"], re.I) else ""
     mail_to = ", ".join(prev_to) if prev_to else ((rel["email"] if rel and rel["email"] else "") or sender)
     mail_subject = f"Factuur {r['invoice_no'] or ''} – De Vreugd Productietechniek".replace("Factuur  ", "Factuur ")
+    reply_note = None
+    if request.args.get("antwoord"):
+        reply_note = next((n for n in notes if n["kind"] == "mail_in" and str(n["id"]) == request.args.get("antwoord")), None)
+        if reply_note and reply_note["mail_meta"]:
+            rm = json.loads(reply_note["mail_meta"])
+            mail_to = rm.get("from") or mail_to
+            mail_subject = "RE: " + re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", rm.get("subject") or "", flags=re.I)
     metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
     suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
                       " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
                       " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
-                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX))
+                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX), reply_note=reply_note)
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -1243,9 +1250,17 @@ def mail_supplier(iid):
         flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
         return redirect(back)
     orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
+    orig_subject = r["mail_subject"] or ""
+    # antwoord op een reactie van de leverancier: op dát bericht antwoorden (blijft in dezelfde mailwisseling)
+    rn = query("SELECT * FROM invoice_notes WHERE id = ? AND invoice_id = ? AND kind = 'mail_in'",
+               (to_int(f.get("reply_to")), iid), one=True) if f.get("reply_to") else None
+    if rn and rn["mail_meta"]:
+        rm = json.loads(rn["mail_meta"])
+        if rm.get("msg_id"):
+            orig, orig_subject = rm["msg_id"], re.sub(r"^\s*((re|aw|antw|fw|fwd)\s*:\s*)+", "", rm.get("subject") or orig_subject, flags=re.I)
     in_thread = bool(orig)
     if in_thread:
-        subject = "RE: " + (r["mail_subject"] or "")   # Outlook zet het antwoord onder de binnengekomen mail
+        subject = "RE: " + orig_subject.strip()   # zoals Graph 'reply' het zelf doet; Outlook zet het antwoord onder de vorige mail
     else:
         subject = MAIL_TAG.sub("", subject).strip() + f" [WP-F{iid}]"
     atts = []
@@ -1260,7 +1275,7 @@ def mail_supplier(iid):
     box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
     signer = "crediteuren:" + (g.user["name"] or "")
     if in_thread:
-        if not r["mail_conv"]:
+        if not r["mail_conv"] and not rn:
             gm = graph_message(box, orig)
             if gm and gm.get("conversationId"):
                 conn.execute("UPDATE invoices SET mail_conv = ? WHERE id = ?", (gm["conversationId"], iid))
@@ -1274,7 +1289,8 @@ def mail_supplier(iid):
     now = now_iso()
     conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
                  (iid, "mail_uit", body[:5000], g.user["id"], now,
-                  json.dumps({"to": to, "cc": cc, "subject": subject, "pdf": bool(atts), "from": box}, ensure_ascii=False)))
+                  json.dumps({"to": to, "cc": cc, "subject": subject, "pdf": bool(atts), "from": box,
+                              "reply_to": rn["id"] if rn else None}, ensure_ascii=False)))
     log(conn, iid, f"Mail aan leverancier ({', '.join(to)}): {subject[:80]}", g.user["id"])
     conn.commit()
     flash(f"Mail verstuurd aan {', '.join(to)}. De reactie komt hier in het gesprek.", "ok")

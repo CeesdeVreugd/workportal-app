@@ -145,19 +145,25 @@
           </div>
           {% if mm %}<div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ mm.to|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% if mm.pdf %} · met factuur-PDF{% endif %}{% else %}Van {{ mm['from'] }}{% if mm.files %} · bijlage: {{ mm.files|join(', ') }} (bij "Andere bijlagen"){% endif %}{% endif %} · <i>{{ mm.subject }}</i></div>{% endif %}
           <div class="notebody">{{ n.body }}</div>
+          {% if edit and n.kind == 'mail_in' %}<div class="noteactions"><a class="btn sm" href="{{ url_for('crediteuren.detail', iid=r.id, mail=1, antwoord=n.id) }}#mailform">{{ icon('mail') }}Beantwoorden</a></div>{% endif %}
         </article>
         {% else %}<div class="empty">Nog geen opmerkingen.</div>{% endfor %}
       </div>
       {% if edit %}
-      <details class="cred-mail" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
-        <summary class="btn">{{ icon('mail') }}Mail leverancier</summary>
+      <details class="cred-mail" id="mailform" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
+        <summary class="btn">{{ icon('mail') }}{{ 'Antwoord aan ' ~ (metas.get(reply_note.id).from_name or metas.get(reply_note.id)['from']) if reply_note else 'Mail leverancier' }}</summary>
         <form method="post" action="{{ url_for('crediteuren.mail_supplier', iid=r.id) }}" class="form" style="margin-top:12px">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if reply_note %}<input type="hidden" name="reply_to" value="{{ reply_note.id }}">
+          <div class="hint" style="margin:0 0 8px">Antwoord op de reactie van {{ reply_note.created_at|dt }} · <a href="{{ url_for('crediteuren.detail', iid=r.id, mail=1) }}#mailform">nieuwe mail in plaats daarvan</a></div>{% endif %}
           <div class="fgrid">
             <label class="f">Aan *<input type="text" name="to" value="{{ mail_to }}" required placeholder="naam@leverancier.nl"></label>
             <label class="f">Cc<input type="text" name="cc" placeholder="optioneel, meerdere met komma"></label>
           </div>
-          {% if r.source == 'mail' and r.mail_id %}
+          {% if reply_note %}
+          <div class="f lf"><span>Onderwerp</span><div class="mailsubj">{{ mail_subject }}</div>
+            <span class="hint">Antwoord op de mail van de leverancier: blijft in dezelfde mailwisseling.</span></div>
+          {% elif r.source == 'mail' and r.mail_id %}
           <div class="f lf"><span>Onderwerp</span><div class="mailsubj">RE: {{ r.mail_subject or '' }}</div>
             <span class="hint">Antwoord op de binnengekomen factuurmail: hetzelfde onderwerp, zodat het in Outlook onder die mail hangt (ook de reactie van de leverancier).</span></div>
           {% else %}
@@ -167,7 +173,7 @@
 
 </textarea></label>
           <div class="cred-actions">
-            <label class="check"><input type="checkbox" name="attach_pdf" value="1" checked> Factuur-PDF meesturen</label>
+            <label class="check"><input type="checkbox" name="attach_pdf" value="1" {{ '' if reply_note else 'checked' }}> Factuur-PDF meesturen</label>
             <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
             <button class="btn primary" style="margin-left:auto">{{ icon('mail') }}Versturen</button>
           </div>

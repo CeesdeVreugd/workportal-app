@@ -662,3 +662,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V122 – Mails uit het gesprek verwijderen
 - Prullenbak bij elke mail (verstuurd of reactie) in het gesprek, en bij je eigen opmerkingen (Beheer: alle opmerkingen; een afwijzing niet). Na bevestigen weg uit het gesprek, met een regel in het logboek.
 - Alleen in WorkPortal: de mail blijft in Outlook (factuur@) staan; bijlagen van een reactie blijven bij de kaart.
+
+## V123 – Reactie van de leverancier beantwoorden
+- Onder elke reactie van een leverancier in het gesprek: **Beantwoorden**. Het mailformulier opent met "Antwoord aan <naam>", Aan = de afzender van die reactie, onderwerp "RE: …" van die mail (vast), PDF standaard niet mee.
+- Verstuurd als antwoord op dát bericht (Graph `reply`), dus in dezelfde mailwisseling in Outlook; ook de volgende reactie komt weer op de kaart. In het gesprek staat bij de verstuurde mail waarop hij een antwoord was.
+- Reacties bewaren nu het bericht-id (`msg_id` in `mail_meta`); bij oudere reacties zonder id wordt geantwoord op de oorspronkelijke factuurmail.
