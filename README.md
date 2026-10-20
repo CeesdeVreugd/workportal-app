@@ -673,3 +673,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Slepen naar Komdex:** boven de PDF een blok met de bestandsnaam ("Leverancier Factuurnummer.pdf"); sleep dat naar Komdex, de Verkenner, het bureaublad of een mail. Werkt in Chrome en Edge (DownloadURL). Ook "Andere bijlagen" zijn te slepen. Pakt Komdex het niet direct, sleep dan eerst naar het bureaublad.
 - Mail aan leverancier: Aan is standaard het adres waar de factuurmail vandaan kwam; knopjes om te wisselen naar het adres van de relatie of de vorige ontvanger.
 - Gesprek gesplitst in **Intern – vragen en opmerkingen** (collega's, vraag stellen, voor de boekhouding) en **Extern – leverancier** (mails, beantwoorden, mail leverancier).
+
+## V125 – Venster na statuswijziging
+- Na het wijzigen van de status verschijnt een venster: wat er gewijzigd is, de status van de factuur, en de knoppen **Door naar volgende factuur →** (met leverancier, nummer en status van die factuur), **Op deze kaart blijven** en **Naar het overzicht**.
+- "Volgende" = de oudste openstaande factuur zonder open vraag die nog dezelfde stap nodig heeft (na Komdex: nog geen Komdex; na SnelStart: nog niet in SnelStart); anders de oudste openstaande. Zijn er geen meer, dan staat dat erin.
+- Bij vernieuwen van de pagina komt het venster niet opnieuw.
+
+## V126 – Annuleren
+- Knop **Annuleren** bij een interne opmerking, een mail aan de leverancier (ook bij beantwoorden), een vraag aan een collega en bij afwijzen. Annuleren leegt het formulier (ook het bewaarde concept) en klapt het blok dicht; bij beantwoorden ga je terug naar de kaart.
+- Algemeen bruikbaar: `<button type="button" data-cancel [data-cancel-href]>`.

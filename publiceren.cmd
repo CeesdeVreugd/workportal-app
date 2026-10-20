@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V124: inkoopfacturen - vraag intrekken, slepen naar Komdex, intern/extern gesprek"
+set "OMSCHRIJVING=WorkPortal V126: inkoopfacturen - annuleren bij opmerking, mail, vraag en afwijzen"
 
 echo.
 echo ============================================

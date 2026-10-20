@@ -884,3 +884,22 @@
     if (el) el.classList.remove("dragging");
   });
 })();
+
+/* Annuleren in een formulier: <button type="button" data-cancel [data-cancel-href="…"]>
+   leegt het formulier (ook het bewaarde concept) en klapt het uitklapblok dicht. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-cancel]");
+    if (!b) return;
+    e.preventDefault();
+    var f = b.closest("form");
+    if (f) {
+      f.reset();
+      f.querySelectorAll("textarea, input").forEach(function (el) { el.dispatchEvent(new Event("input", { bubbles: true })); });
+      try { var k = f.getAttribute("data-draft"); if (k) localStorage.removeItem("wp_draft:" + k); } catch (x) {}
+    }
+    var href = b.getAttribute("data-cancel-href");
+    if (href) { location.href = href; return; }
+    var d = b.closest("details"); if (d) d.open = false;
+  });
+})();

@@ -108,7 +108,7 @@
         <details class="cred-pop"><summary class="btn danger">Afwijzen</summary>
           <form method="post" action="{{ url_for('crediteuren.reject', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="f">Reden *<textarea name="reason" rows="3" required placeholder="Bijv. uren niet afgesproken, prijs klopt niet met offerte"></textarea></label>
-            <div><button class="btn danger">Factuur afwijzen</button></div>
+            <div class="cred-actions"><button class="btn danger">Factuur afwijzen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
             <p class="hint">Op de kaart komt te staan: afgewezen door {{ g.user.name }}.</p>
           </form></details>
         {% elif r.status == 'afgewezen' %}
@@ -155,7 +155,7 @@
         <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
           <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
-          <div><button class="btn primary">Vraag versturen</button></div>
+          <div class="cred-actions"><button class="btn primary">Vraag versturen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
           <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
         </form></details>
       {% endif %}
@@ -166,7 +166,8 @@
         <div class="cred-actions">
           <label class="check"><input type="checkbox" name="for_accounting" value="1"> Voor de boekhouding</label>
           {% if r.question_to and r.question_to != g.user.id %}<label class="check"><input type="checkbox" name="close_question" value="1"> Vraag hiermee afsluiten</label>{% endif %}
-          <button class="btn primary" style="margin-left:auto">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
+          <button type="button" class="btn ghost" style="margin-left:auto" data-cancel>Annuleren</button>
+          <button class="btn primary">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
         </div>
       </form>
       {% endif %}
@@ -205,7 +206,8 @@
           <div class="cred-actions">
             <label class="check"><input type="checkbox" name="attach_pdf" value="1" {{ '' if reply_note else 'checked' }}> Factuur-PDF meesturen</label>
             <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
-            <button class="btn primary" style="margin-left:auto">{{ icon('mail') }}Versturen</button>
+            <button type="button" class="btn ghost" style="margin-left:auto" data-cancel {% if reply_note %}data-cancel-href="{{ url_for('crediteuren.detail', iid=r.id) }}#extern"{% endif %}>Annuleren</button>
+            <button class="btn primary">{{ icon('mail') }}Versturen</button>
           </div>
           <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier, dan komt zijn antwoord (met bijlagen) hier – wie er ook reageert.</p>
         </form>
@@ -228,4 +230,30 @@
     {% endif %}
   </div>
 </div>
+{% if changed_msg %}
+<dialog class="cred-done-dlg" id="donedlg">
+  <div class="cdd-icon">{{ icon('check') }}</div>
+  <h2>{{ changed_msg }}</h2>
+  <p class="muted">Status van deze factuur: <b>{{ r.label }}</b></p>
+  {% if next_inv %}
+  <a class="btn primary cdd-next" href="{{ url_for('crediteuren.detail', iid=next_inv.id, terug=back) }}">Door naar volgende factuur →
+    <small>{{ next_inv.supplier or 'Onbekende leverancier' }}{{ ' · ' ~ next_inv.invoice_no if next_inv.invoice_no }} · {{ STATUS.get(next_inv.status, next_inv.status) }}</small></a>
+  {% else %}
+  <p class="cdd-none">Er staan geen andere openstaande facturen{{ ' voor deze stap' if next_lane }} meer klaar. 🎉</p>
+  {% endif %}
+  <div class="cdd-row">
+    <button type="button" class="btn" onclick="document.getElementById('donedlg').close()">Op deze kaart blijven</button>
+    <a class="btn ghost" href="{{ back }}">Naar het overzicht</a>
+  </div>
+</dialog>
+<script>
+(function () {
+  var d = document.getElementById("donedlg"); if (!d) return;
+  try { history.replaceState(null, "", location.pathname + location.hash); } catch (x) {}   // bij vernieuwen niet opnieuw tonen
+  if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+  d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+  var n = d.querySelector(".cdd-next"); if (n) n.focus();
+})();
+</script>
+{% endif %}
 {% endblock %}

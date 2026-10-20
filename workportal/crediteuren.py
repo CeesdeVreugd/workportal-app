@@ -1151,6 +1151,15 @@ def detail(iid):
     d = dict(r)
     d["skey"] = _status_key(r)
     d["label"] = _label(r)
+    next_inv = None
+    changed_msg = (request.args.get("gewijzigd") or "")[:120]
+    if changed_msg:
+        lane = request.args.get("baan")
+        want = {"komdex": ("nieuw", "ss_eerst"), "snelstart": ("nieuw", "erp", "buiten")}.get(lane, OPEN)
+        next_inv = query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL"
+                         f" AND status IN ({','.join('?' * len(want))}) ORDER BY received_at, id LIMIT 1", [iid, *want], one=True) \
+            or query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL"
+                     f" AND status IN ({','.join('?' * len(OPEN))}) ORDER BY received_at, id LIMIT 1", [iid, *OPEN], one=True)
     back = request.args.get("terug") or url_for("crediteuren.index")
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
@@ -1181,7 +1190,8 @@ def detail(iid):
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
                            metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX), reply_note=reply_note,
-                           drag_name=_drag_name(r), mail_options=mail_options)
+                           drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
+                           next_lane=request.args.get("baan"), STATUS=STATUS)
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -1347,8 +1357,9 @@ def set_status(iid):
                  (new, route, 1 if ss else 0, now, iid))
     log(conn, iid, f"Status: {msg}" + (f" → {STATUS[new]}" if STATUS[new] != msg else ""), uid)
     conn.commit()
-    flash(f"Status: {STATUS[new]}.", "ok")
-    return redirect(url_for("crediteuren.detail", iid=iid))
+    # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
+    lane = "komdex" if act in ("erp", "buiten") else ("snelstart" if act == "snelstart" else "")
+    return redirect(url_for("crediteuren.detail", iid=iid, gewijzigd=msg, baan=lane or None))
 
 
 @bp.route("/<int:iid>/afwijzen", methods=["POST"])
