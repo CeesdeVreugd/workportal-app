@@ -963,3 +963,19 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 .cred-st.past .dot { background: #1E7A3C; border-color: #1E7A3C; }
 .cred-st.bad { border-color: var(--bad, #C62828); background: #FDEEEE; }
 .cred-st.bad .dot { background: var(--bad, #C62828); border-color: var(--bad, #C62828); color: #fff; font-size: 13px; }
+
+/* Inkoopfactuur: pagina over de volle breedte, PDF groter; voortgangsbalk lager en over de hele breedte */
+.content:has(> .cred-grid) { max-width: none; }
+@media (min-width: 901px) {
+  .cred-grid.g2 { grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr); }
+  .cred-pdf iframe { height: calc(100vh - 190px); min-height: 640px; }
+}
+.cred-flow { padding: 6px 18px; font-size: 13.5px; }
+.cf-branches { gap: 2px; justify-content: center; }
+.cf-branches .cf-node { padding: 2px 0; }
+.cf-node b { width: 22px; height: 22px; }
+.cf-fork { max-width: none; flex: 1 1 60px; }
+.cf-fork { height: 52px; align-self: center; }
+.cf-branches { height: 52px; justify-content: space-between; gap: 0; }
+.cf-branches .cf-node { padding: 0; height: 22px; }
+@media (max-width: 699px) { .cf-branches, .cf-fork { height: 60px; } .cf-branches .cf-node { height: auto; } }

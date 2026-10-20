@@ -625,3 +625,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Statuskaart: Nieuw, dan "stap 2 – kies één van de twee" (Komdex of buiten Komdex; nooit allebei), dan Verwerkt in SnelStart. Na SnelStart blijft zichtbaar welke weg genomen is.
 - Afgewezen: status "Afgewezen door <naam>" (met datum en reden), ook in het overzicht; "Afwijzing intrekken" zet hem terug naar Nieuw.
 - Migratie 24: `invoices.route` ('komdex' of 'buiten').
+
+## V115 – Inkoopfacturen: bredere pagina, vrije volgorde, Engelse totalen
+- Factuurpagina over de volle breedte; PDF-kolom breder en hoger. Voortgangsbalk lager en over de hele breedte.
+- Komdex en SnelStart zijn twee losse stappen in willekeurige volgorde: Komdex óf buiten Komdex om (nog eens tikken = uit) en SnelStart aan/uit. Allebei gedaan = Afgerond. Eerst SnelStart → status "In SnelStart, nog Komdex" (filter "Nog in Komdex"). "Nieuw" zet alles terug.
+- Engelse facturen: "To pay in EUR", "Total due", "Grand total"; 0,00 telt niet ("To pay: 0,00" na vooruitbetaling); grondslag na "VAT on …" (Oceanz: excl. 168,80, incl. 204,25).

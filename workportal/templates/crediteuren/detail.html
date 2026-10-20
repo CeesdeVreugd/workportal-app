@@ -14,20 +14,20 @@
   <div class="actions"><span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
 </div>
 
-{% set route = r.route or ('buiten' if r.status == 'buiten' else ('komdex' if r.status in ('erp', 'snelstart') else None)) %}
-{% set done2 = r.status in ('erp', 'buiten', 'snelstart') %}
-{% set done3 = r.status == 'snelstart' %}
+{% set route = r.route if r.status != 'afgewezen' else None %}
+{% set done2 = route is not none %}
+{% set done3 = r.status in ('snelstart', 'ss_eerst') %}
 {% if r.status != 'afgewezen' %}
 <div class="card cred-flow" aria-label="Voortgang">
   <span class="cf-node done"><b>{{ icon('check') }}</b>Binnengekomen</span>
-  <svg class="cf-fork" viewBox="0 0 40 60" preserveAspectRatio="none" aria-hidden="true">
-    <path class="{{ 'on' if route == 'komdex' }}" d="M0 30 C20 30 20 15 40 15"/><path class="{{ 'on' if route == 'buiten' }}" d="M0 30 C20 30 20 45 40 45"/></svg>
+  <svg class="cf-fork" viewBox="0 0 40 52" preserveAspectRatio="none" aria-hidden="true">
+    <path class="{{ 'on' if route == 'komdex' }}" d="M0 26 C20 26 20 11 40 11"/><path class="{{ 'on' if route == 'buiten' }}" d="M0 26 C20 26 20 41 40 41"/></svg>
   <div class="cf-branches">
     <span class="cf-node {{ 'done' if done2 and route == 'komdex' else ('off' if route == 'buiten' else '') }}"><b>{% if done2 and route == 'komdex' %}{{ icon('check') }}{% else %}2{% endif %}</b>Verwerkt in Komdex</span>
     <span class="cf-node {{ 'done' if done2 and route == 'buiten' else ('off' if route == 'komdex' else '') }}"><b>{% if done2 and route == 'buiten' %}{{ icon('check') }}{% else %}2{% endif %}</b>Verwerkt buiten Komdex om</span>
   </div>
-  <svg class="cf-fork" viewBox="0 0 40 60" preserveAspectRatio="none" aria-hidden="true">
-    <path class="{{ 'on' if done3 and route == 'komdex' }}" d="M0 15 C20 15 20 30 40 30"/><path class="{{ 'on' if done3 and route == 'buiten' }}" d="M0 45 C20 45 20 30 40 30"/></svg>
+  <svg class="cf-fork" viewBox="0 0 40 52" preserveAspectRatio="none" aria-hidden="true">
+    <path class="{{ 'on' if done3 and route == 'komdex' }}" d="M0 11 C20 11 20 26 40 26"/><path class="{{ 'on' if done3 and route == 'buiten' }}" d="M0 41 C20 41 20 26 40 26"/></svg>
   <span class="cf-node {{ 'done' if done3 }}"><b>{% if done3 %}{{ icon('check') }}{% else %}3{% endif %}</b>Verwerkt in SnelStart</span>
 </div>
 {% else %}
@@ -78,20 +78,21 @@
 
     {% if edit %}
     <section class="card">
-      <div class="card-head"><h2>Status</h2><span class="small muted">tik op de status die nu geldt</span></div>
+      <div class="card-head"><h2>Status</h2><span class="small muted">Komdex en SnelStart in willekeurige volgorde</span></div>
       {% if r.status != 'afgewezen' %}
       <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="cred-st full {{ 'on' if r.status == 'nieuw' }}" name="status" value="nieuw" {{ 'disabled' if r.status == 'nieuw' }}>
           <span class="dot">{% if r.status == 'nieuw' %}{{ icon('check') }}{% endif %}</span><span><b>Nieuw</b><small>nog niets mee gedaan</small></span></button>
-        <div class="cred-or full"><span>stap 2 – kies één van de twee</span></div>
+        <div class="cred-or full"><span>Komdex – één van de twee (nog eens tikken = uit)</span></div>
         {% for key, rkey, label, sub in [('erp', 'komdex', 'Verwerkt in Komdex', 'inkoop afgeboekt in Komdex'), ('buiten', 'buiten', 'Verwerkt buiten Komdex om', 'geen inkooporder, bijv. kosten')] %}
-        {% set cur = r.status == key %}{% set past = done3 and route == rkey %}
-        <button class="cred-st {{ 'on' if cur }} {{ 'past' if past }}" name="status" value="{{ key }}" {{ 'disabled' if cur }}>
-          <span class="dot">{% if cur or past %}{{ icon('check') }}{% endif %}</span><span><b>{{ label }}</b><small>{{ sub }}</small></span></button>
+        {% set cur = route == rkey %}
+        <button class="cred-st {{ 'on' if cur }}" name="status" value="{{ key }}" title="{{ 'Nog eens tikken om uit te zetten' if cur else '' }}">
+          <span class="dot">{% if cur %}{{ icon('check') }}{% endif %}</span><span><b>{{ label }}</b><small>{{ sub }}</small></span></button>
         {% endfor %}
-        <button class="cred-st full {{ 'on' if done3 }}" name="status" value="snelstart" {{ 'disabled' if done3 }}>
-          <span class="dot">{% if done3 %}{{ icon('check') }}{% endif %}</span><span><b>Verwerkt in SnelStart</b><small>geboekt, klaar{% if done3 and route == 'buiten' %} (buiten Komdex om){% endif %}</small></span></button>
+        <div class="cred-or full"><span>SnelStart – mag ook eerst</span></div>
+        <button class="cred-st full {{ 'on' if done3 }}" name="status" value="snelstart" title="{{ 'Nog eens tikken om uit te zetten' if done3 else '' }}">
+          <span class="dot">{% if done3 %}{{ icon('check') }}{% endif %}</span><span><b>Verwerkt in SnelStart</b><small>{{ 'geboekt' ~ (' · nog Komdex (of buiten Komdex om) kiezen' if not done2 else ' · afgerond') if done3 else 'geboekt in SnelStart' }}</small></span></button>
       </form>
       {% else %}
       <div class="cred-st on bad full" style="cursor:default"><span class="dot">✕</span><span><b>Afgewezen door {{ r.rejected_name or 'onbekend' }}</b><small>{{ r.rejected_at|dt }} · {{ r.reject_reason }}</small></span></div>

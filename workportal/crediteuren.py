@@ -25,9 +25,10 @@ bp = Blueprint("crediteuren", __name__, url_prefix="/inkoopfacturen")
 
 MODULE = "crediteuren"
 STATUS = {"nieuw": "Nieuw", "erp": "Verwerkt in Komdex", "buiten": "Verwerkt buiten Komdex om",
-          "snelstart": "Verwerkt in SnelStart", "afgewezen": "Afgewezen"}
-STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "snelstart": "b-ok", "afgewezen": "b-bad", "vraag": "b-warn"}
-OPEN = ("nieuw", "erp", "buiten")        # nog niet afgerond
+          "ss_eerst": "In SnelStart, nog Komdex", "snelstart": "Afgerond (Komdex en SnelStart)", "afgewezen": "Afgewezen"}
+STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "ss_eerst": "b-purple", "snelstart": "b-ok",
+                "afgewezen": "b-bad", "vraag": "b-warn"}
+OPEN = ("nieuw", "erp", "buiten", "ss_eerst")   # nog niet afgerond
 TO_SNELSTART = ("erp", "buiten")         # klaar voor SnelStart
 DEFAULT_MAILBOX = "factuur@devreugd-pt.nl"
 POLL_SECONDS = 300
@@ -93,7 +94,8 @@ def _find(patterns, text, group=1):
 
 _INCL_LABEL = (r"(?:totaal|total|eindtotaal)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:incl\.?|inclusief|including|inkl\.?)"
                r"|(?<!sub)(?<!sub )totaal\s*(?:in\s*)?(?:eur|euro|€)(?!\w)(?!\s*(?:excl|exclusief|ex\.))"
-               r"|te\s*betalen|factuurbedrag|totaalbedrag|eindbedrag|eindtotaal|amount\s*due|gesamtbetrag|rechnungsbetrag"
+               r"|te\s*betalen|te\s*voldoen|factuurbedrag|totaalbedrag|eindbedrag|eindtotaal|amount\s*due|amount\s*payable"
+               r"|to\s*pay(?:\s*in\s*(?:eur|euro|€))?|total\s*due|grand\s*total|gesamtbetrag|rechnungsbetrag"
                r"|(?<![a-z])incl\.?\s*(?:btw|vat)|inclusief\s*btw")
 _VAT_LABEL = r"(?:btw|b\.\s?t\.\s?w\.|vat|mwst|ust)\.?\s*(?:bedrag\s*)?(?:eur\s*)?(?:\d{1,2}(?:[,.]\d{1,2})?\s*%)?|\d{1,2}(?:[,.]\d)?\s*%\s*(?:btw|vat)"
 _EXCL_LABEL = (r"(?:totaal|total)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:excl\.?|exclusief|excluding|exkl\.?|net)"
@@ -124,7 +126,7 @@ def _line_amount(text, label, stop=None):
             cut = re.search(stop, rest, re.I)
             if cut:
                 rest = rest[:cut.start()]
-        nums = _AMT_TOKEN.findall(rest)
+        nums = [n for n in _AMT_TOKEN.findall(rest) if parse_amount(n)]   # 0,00 telt niet ("To pay: 0,00" na vooruitbetaling)
         if nums:
             return nums[-1]
     return None
@@ -281,7 +283,7 @@ def extract(data):
     incl = _line_amount(text, _INCL_LABEL, r"\bexcl|exclusief|\bnetto")
     excl = _line_amount(text, _EXCL_LABEL, r"\bincl|inclusief|te\s*betalen|eindbedrag|(?<!sub)totaal\s*(?:in\s*)?(?:eur|€)")
     if not excl:   # "btw 21,00 % over 1.421,11  298,43": het bedrag na "over" is de grondslag (excl.)
-        om = re.search(r"\b(?:btw|vat|b\.t\.w\.)\b[^\n]*?\b(?:over|van)\s*(?:€|eur)?\s*" + _AMOUNT_SL, text, re.I)
+        om = re.search(r"\b(?:btw|vat|b\.t\.w\.)\b[^\n]*?\b(?:over|van|on|auf)\s*(?:€|eur)?\s*" + _AMOUNT_SL, text, re.I)
         excl = om.group(1) if om else None
     for ws in words:   # totalen als tabel: bedrag onder het kopje
         incl = incl or _below_amount(ws, _INCL_LABEL)
@@ -858,8 +860,8 @@ def _label(r):
         return "Vraag open bij " + (r["question_name"] or "collega")
     if r["status"] == "afgewezen":
         return "Afgewezen door " + (r["rejected_name"] or "onbekend")
-    if r["status"] == "snelstart" and r["route"] == "buiten":
-        return "Verwerkt in SnelStart (buiten Komdex om)"
+    if r["status"] == "snelstart":
+        return "Afgerond · " + ("buiten Komdex om" if r["route"] == "buiten" else "Komdex") + " + SnelStart"
     return STATUS.get(r["status"], r["status"])
 
 
@@ -890,9 +892,9 @@ def open_counts():
     if not getattr(g, "user", None) or not can(MODULE):
         return {}
     r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
               " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp,"
-              " SUM(status IN ('nieuw','erp','buiten') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
     return {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
 
 
@@ -902,6 +904,7 @@ FILTERS = [
     ("open", "Alles open"),
     ("nieuw", "Nieuw"),
     ("erp", "Nog naar SnelStart"),
+    ("komdex", "Nog in Komdex"),
     ("vraag", "Vraag open"),
     ("mij", "Wacht op mij"),
     ("boekhouding", "Voor de boekhouding"),
@@ -919,11 +922,12 @@ def index():
     where, params = [], []
     uid = g.user["id"]
     cond = {
-        "open": "i.status IN ('nieuw','erp','buiten')",
+        "open": "i.status IN ('nieuw','erp','buiten','ss_eerst')",
         "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
         "erp": "i.status IN ('erp','buiten') AND i.question_to IS NULL",
-        "vraag": "i.status IN ('nieuw','erp','buiten') AND i.question_to IS NOT NULL",
-        "mij": "i.status IN ('nieuw','erp','buiten') AND i.question_to = ?",
+        "komdex": "i.status = 'ss_eerst' AND i.question_to IS NULL",
+        "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to IS NOT NULL",
+        "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
         "afgewezen": "i.status = 'afgewezen'",
         "klaar": "i.status = 'snelstart'",
@@ -943,12 +947,12 @@ def index():
         " (SELECT l.action || ' · ' || IFNULL(u.name, 'systeem') FROM invoice_log l LEFT JOIN users u ON u.id = l.user_id"
         "   WHERE l.invoice_id = i.id ORDER BY l.id DESC LIMIT 1) AS last_action"
         " FROM invoices i LEFT JOIN users q ON q.id = i.question_to WHERE " + " AND ".join(where) +
-        " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
-    c = query("SELECT SUM(status IN ('nieuw','erp','buiten')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp, SUM(status IN ('nieuw','erp','buiten') AND question_to IS NOT NULL) AS vraag,"
-              " SUM(status IN ('nieuw','erp','buiten') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
+        " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten','ss_eerst') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
+    c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
+              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp, SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
               " SUM(status='snelstart') AS klaar, COUNT(*) AS alle,"
-              " SUM(status IN ('nieuw','erp','buiten') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
               " SUM(status = 'afgewezen' AND rejected_at >= date('now','start of month')) AS af_maand"
               " FROM invoices", (uid,), one=True)
     counts = {k: (c[k] or 0) for k in c.keys()}
@@ -1105,25 +1109,39 @@ def reread_all():
 @bp.route("/<int:iid>/status", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def set_status(iid):
-    """Status direct kiezen: Verwerkt in Komdex, Verwerkt buiten Komdex om, Verwerkt in SnelStart, of terug naar Nieuw."""
+    """Twee losse stappen, in willekeurige volgorde:
+    - Komdex: 'Verwerkt in Komdex' óf 'Verwerkt buiten Komdex om' (nooit allebei; nog eens klikken = uit);
+    - SnelStart: aan/uit.
+    De status volgt daaruit: allebei gedaan = afgerond. 'Nieuw' zet alles terug."""
     r = _load(iid)
     if not can("crediteuren", 2):
         abort(403)
-    new = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
-    if new not in ("nieuw", "erp", "buiten", "snelstart") or new == r["status"]:
-        return redirect(url_for("crediteuren.detail", iid=iid))
+    act = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
     conn = get_db()
     now, uid = now_iso(), g.user["id"]
-    if new in ("erp", "buiten"):
-        # Komdex of buiten Komdex om: altijd één van de twee
-        conn.execute("UPDATE invoices SET status=?, route=?, erp_at=?, erp_by=?, updated_at=? WHERE id=?",
-                     (new, "komdex" if new == "erp" else "buiten", now, uid, now, iid))
-    elif new == "snelstart":
-        conn.execute("UPDATE invoices SET status='snelstart', snelstart_at=?, snelstart_by=?, erp_at=COALESCE(erp_at, ?),"
-                     " erp_by=COALESCE(erp_by, ?), updated_at=? WHERE id=?", (now, uid, now, uid, now, iid))
+    route = r["route"] if r["status"] != "afgewezen" else None
+    ss = bool(r["snelstart_at"]) and r["status"] != "afgewezen"
+    msg = None
+    if act in ("erp", "buiten"):
+        want = "komdex" if act == "erp" else "buiten"
+        if route == want:
+            route, msg = None, f"{STATUS[act]} uitgezet"
+        else:
+            route, msg = want, STATUS[act]
+            conn.execute("UPDATE invoices SET erp_at=?, erp_by=? WHERE id=?", (now, uid, iid))
+    elif act == "snelstart":
+        ss = not ss
+        msg = "Verwerkt in SnelStart" + ("" if ss else " uitgezet")
+        if ss:
+            conn.execute("UPDATE invoices SET snelstart_at=?, snelstart_by=? WHERE id=?", (now, uid, iid))
+    elif act == "nieuw":
+        route, ss, msg = None, False, "Terug naar Nieuw"
     else:
-        conn.execute("UPDATE invoices SET status='nieuw', route=NULL, updated_at=? WHERE id=?", (now, iid))
-    log(conn, iid, f"Status: {STATUS[new]}" + (f" (was {STATUS.get(r['status'], r['status'])})" if r["status"] != "nieuw" else ""), uid)
+        return redirect(url_for("crediteuren.detail", iid=iid))
+    new = ("snelstart" if ss else ("erp" if route == "komdex" else "buiten")) if route else ("ss_eerst" if ss else "nieuw")
+    conn.execute("UPDATE invoices SET status=?, route=?, snelstart_at=CASE WHEN ? THEN snelstart_at ELSE NULL END, updated_at=? WHERE id=?",
+                 (new, route, 1 if ss else 0, now, iid))
+    log(conn, iid, f"Status: {msg}" + (f" → {STATUS[new]}" if STATUS[new] != msg else ""), uid)
     conn.commit()
     flash(f"Status: {STATUS[new]}.", "ok")
     return redirect(url_for("crediteuren.detail", iid=iid))
