@@ -1016,8 +1016,8 @@ def adopt_categories(conn, iid, cats, box):
     if not cmap or not cats:
         return
     r = conn.execute("SELECT * FROM invoices WHERE id = ?", (iid,)).fetchone()
-    if not r or r["status"] == "afgewezen":
-        return
+    if not r or r["status"] == "afgewezen" or r["ext_question"]:
+        return   # bij een open vraag aan de leverancier geen status overnemen (komt bij de volgende wijziging in Outlook)
     now = now_iso()
     done = []
     if cmap.get("afgewezen") in cats and r["status"] != "snelstart":
@@ -1146,7 +1146,7 @@ def open_counts():
     if not getattr(g, "user", None) or not can(MODULE):
         return {}
     r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR ext_question = 1)) AS vraag,"
               " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
               " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
@@ -1183,7 +1183,7 @@ def index():
         "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
         "erp": "i.status IN ('nieuw','erp','buiten')",       # nog te boeken in SnelStart (Komdex gedaan of nog niet)
         "komdex": "i.status IN ('nieuw','ss_eerst')",        # nog te verwerken in Komdex (SnelStart gedaan of nog niet)
-        "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to IS NOT NULL",
+        "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (i.question_to IS NOT NULL OR i.ext_question = 1)",
         "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
         "afgewezen": "i.status = 'afgewezen'",
@@ -1210,7 +1210,7 @@ def index():
     fin = SQL_FINISH.replace("i.", "")
     c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst') OR (" + fin + ")) AS open, SUM(" + fin + ") AS afronden, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
               " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
-              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR ext_question = 1)) AS vraag,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
               " SUM(status='snelstart' AND NOT (" + fin + ")) AS klaar, COUNT(*) AS alle,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
@@ -1521,6 +1521,7 @@ def mail_supplier(iid):
                  (iid, "mail_uit", body[:5000], g.user["id"], now,
                   json.dumps({"to": to, "cc": cc, "subject": subject, "pdf": bool(atts), "from": box,
                               "reply_to": rn["id"] if rn else None}, ensure_ascii=False)))
+    conn.execute("UPDATE invoices SET ext_question = 1 WHERE id = ?", (iid,))
     log(conn, iid, f"Mail aan leverancier ({', '.join(to)}): {subject[:80]}", g.user["id"])
     conn.commit()
     flash(f"Mail verstuurd aan {', '.join(to)}. De reactie komt hier bij Extern – leverancier.", "ok")
@@ -1694,7 +1695,7 @@ def status_chips(r, colors):
         out.append(("Nieuw", "#0059B3"))
     if r["question_to"]:
         out.append(("Vraag open bij " + ((r["question_name"] if "question_name" in keys else None) or "collega"), colors["vraag"]))
-    if "last_mail" in keys and r["last_mail"] == "mail_uit":
+    if r["ext_question"]:
         out.append(("Vraag bij leverancier", colors["vraag"]))
     if _to_finish(r):
         out.append(("Af te ronden door boekhouder", "#E0A800"))
@@ -1742,9 +1743,7 @@ def apply_categories(conn, iid, box):
             want.add(cmap.get("snelstart"))
     if r["status"] != "afgewezen" and cmap.get("vraag"):
         # vraag uitstaand: intern bij een collega, of extern (onze laatste mail aan de leverancier is nog niet beantwoord)
-        last = conn.execute("SELECT kind FROM invoice_notes WHERE invoice_id = ? AND kind IN ('mail_uit', 'mail_in')"
-                            " ORDER BY created_at DESC, id DESC LIMIT 1", (iid,)).fetchone()
-        if r["question_to"] or (last and last["kind"] == "mail_uit"):
+        if r["question_to"] or r["ext_question"]:
             want.add(cmap["vraag"])
     want.discard(None)
     managed = set(cmap.values())
@@ -1870,6 +1869,10 @@ def set_status(iid):
     if not can("crediteuren", 2):
         abort(403)
     act = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
+    why = _blocked(r, finishing=False)
+    if why:
+        flash(why, "error")
+        return redirect(url_for("crediteuren.detail", iid=iid))
     conn = get_db()
     now, uid = now_iso(), g.user["id"]
     route = r["route"] if r["status"] != "afgewezen" else None
@@ -1904,6 +1907,30 @@ def set_status(iid):
     return redirect(url_for("crediteuren.detail", iid=iid, gewijzigd=msg, baan=lane or None))
 
 
+def _blocked(r, finishing=False):
+    """Zolang er een vraag bij de leverancier openstaat geen status geven of afronden; met een open interne vraag niet afronden."""
+    if r["ext_question"]:
+        return "Er staat nog een vraag bij de leverancier open. Rond die eerst af (knop 'Vraag bij leverancier afronden')."
+    if finishing and r["question_to"]:
+        return f"Er staat nog een vraag open bij {r['question_name'] or 'een collega'}. Afronden kan als die beantwoord of ingetrokken is."
+    return None
+
+
+@bp.route("/<int:iid>/vraag-leverancier-afronden", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def ext_question_done(iid):
+    r = _load(iid)
+    if r["ext_question"]:
+        conn = get_db()
+        conn.execute("UPDATE invoices SET ext_question = 0, updated_at = ? WHERE id = ?", (now_iso(), iid))
+        conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_by, created_at) VALUES (?,?,?,?,?)",
+                     (iid, "mail_klaar", "Vraag bij de leverancier afgerond.", g.user["id"], now_iso()))
+        log(conn, iid, "Vraag bij leverancier afgerond", g.user["id"])
+        conn.commit()
+        flash("Vraag bij de leverancier afgerond. Je kunt weer een status geven.", "ok")
+    return redirect(url_for("crediteuren.detail", iid=iid))
+
+
 @bp.route("/<int:iid>/mail-verwerkt", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def mail_archive(iid):
@@ -1911,7 +1938,10 @@ def mail_archive(iid):
     r = _load(iid)
     conn = get_db()
     folder = _archive_folder(conn)
-    if r["status"] == "snelstart" and _may_archive(conn) and request.form.get("afronden") == "1":
+    why = _blocked(r, finishing=True) if request.form.get("afronden") == "1" else None
+    if why:
+        flash(why, "error")
+    elif r["status"] == "snelstart" and _may_archive(conn) and request.form.get("afronden") == "1":
         if r["source"] != "mail":
             conn.execute("UPDATE invoices SET mail_archive = 'afgerond' WHERE id = ?", (iid,))
             log(conn, iid, "Afgerond door de boekhouder", g.user["id"])
@@ -1944,6 +1974,9 @@ def reject(iid):
         return redirect(request.form.get("terug") or url_for("crediteuren.detail", iid=iid))
     if r["status"] == "snelstart":
         abort(400)
+    if _blocked(r):
+        flash(_blocked(r), "error")
+        return redirect(url_for("crediteuren.detail", iid=iid))
     conn = get_db()
     now, uid = now_iso(), g.user["id"]
     conn.execute("UPDATE invoices SET status='afgewezen', rejected_at=?, rejected_by=?, reject_reason=?, question_to=NULL,"

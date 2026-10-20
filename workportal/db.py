@@ -658,6 +658,13 @@ MIGRATIONS = [
     """
     UPDATE invoices SET mail_archive = 'afgerond' WHERE status = 'snelstart' AND mail_archive IS NULL;
     """,
+    # 30 - inkoopfacturen: vraag bij de leverancier staat open tot iemand hem afrondt (knop); zolang geen status/afronden
+    """
+    ALTER TABLE invoices ADD COLUMN ext_question INTEGER NOT NULL DEFAULT 0;
+    UPDATE invoices SET ext_question = 1 WHERE status NOT IN ('snelstart', 'afgewezen') AND (
+      SELECT n.kind FROM invoice_notes n WHERE n.invoice_id = invoices.id AND n.kind IN ('mail_uit', 'mail_in')
+      ORDER BY n.created_at DESC, n.id DESC LIMIT 1) = 'mail_uit';
+    """,
 ]
 
 

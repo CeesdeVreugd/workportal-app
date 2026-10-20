@@ -38,6 +38,11 @@
 <div class="result bad" style="margin-bottom:16px"><b>Afgewezen door {{ r.rejected_name or 'onbekend' }}</b> op {{ r.rejected_at|dt }}: {{ r.reject_reason }}</div>
 {% endif %}
 
+{% macro extdone_btn(cls='btn sm') %}<form method="post" action="{{ url_for('crediteuren.ext_question_done', iid=r.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="{{ cls }}">{{ icon('check') }}Vraag bij leverancier afronden</button></form>{% endmacro %}
+{% if r.ext_question %}
+<div class="result warn" style="margin-bottom:16px"><b>Vraag bij de leverancier staat open.</b> Zolang die openstaat kan er geen status gegeven of afgerond worden.
+  {% if edit %}<span style="margin-left:8px">{{ extdone_btn() }}</span>{% endif %}</div>
+{% endif %}
 {% if r.question_to %}
 <div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
   {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}
@@ -60,7 +65,10 @@
   </section>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-    {% if edit and r.to_finish and archive_me %}
+    {% set fin_block = 'een vraag bij de leverancier' if r.ext_question else ('een vraag bij ' ~ r.question_name if r.question_to else '') %}
+    {% if r.to_finish and fin_block %}
+    <div class="cred-arch-ask"><span class="cred-arch-ic">{{ icon('check') }}</span><span class="cred-arch-txt"><b>Af te ronden door {{ archive_owner_name }}</b> Komdex en SnelStart zijn klaar, maar er staat nog {{ fin_block }} open. Afronden kan als die is afgehandeld.</span></div>
+    {% elif edit and r.to_finish and archive_me %}
     <form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cred-arch-ask">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="afronden" value="1">
       <span class="cred-arch-ic">{{ icon('check') }}</span>
@@ -105,8 +113,9 @@
       <div class="small muted cred-arch-line">{{ icon('mail') }}{% if r.mail_archive == 'verplaatst' %}Mail staat in de map {{ archive_folder }}.{% elif r.mail_archive == 'bezig' %}Mail wordt naar de map {{ archive_folder }} verplaatst…{% else %}Mail is in het postvak blijven staan.
         {% if archive_me %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="afronden" value="1"><button class="linkbtn" name="verplaatsen" value="1">Alsnog naar {{ archive_folder }}</button></form>{% endif %}{% endif %}</div>
       {% endif %}
+      {% if r.ext_question %}<div class="cred-lock">{{ icon('mail') }}<span>Vraag bij de leverancier staat open – eerst afronden, dan kun je weer een status geven.</span>{{ extdone_btn('btn sm primary') }}</div>{% endif %}
       {% if r.status != 'afgewezen' %}
-      <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status">
+      <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status {{ 'locked' if r.ext_question }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="cred-st full {{ 'on' if r.status == 'nieuw' }}" name="status" value="nieuw" {{ 'disabled' if r.status == 'nieuw' }}>
           <span class="dot">{% if r.status == 'nieuw' %}{{ icon('check') }}{% endif %}</span><span><b>Nieuw</b><small>nog niets mee gedaan</small></span></button>
@@ -124,7 +133,7 @@
       <div class="cred-st on bad full" style="cursor:default"><span class="dot">✕</span><span><b>Afgewezen door {{ r.rejected_name or 'onbekend' }}</b><small>{{ r.rejected_at|dt }} · {{ r.reject_reason }}</small></span></div>
       {% endif %}
       <div class="cred-actions" style="margin-top:12px">
-        {% if r.status != 'snelstart' and r.status != 'afgewezen' %}
+        {% if r.status != 'snelstart' and r.status != 'afgewezen' and not r.ext_question %}
         <details class="cred-pop"><summary class="btn danger">Afwijzen</summary>
           <form method="post" action="{{ url_for('crediteuren.reject', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="f">Reden *<textarea name="reason" rows="3" required placeholder="Bijv. uren niet afgesproken, prijs klopt niet met offerte"></textarea></label>
@@ -147,6 +156,7 @@
             {% if n.kind == 'vraag' %}<span class="badge b-warn">vraag aan {{ n.to_name or 'collega' }}</span>
             {% elif n.kind == 'antwoord' %}<span class="badge b-ok">antwoord</span>
             {% elif n.kind == 'afwijzing' %}<span class="badge b-bad">afgewezen</span>
+            {% elif n.kind == 'mail_klaar' %}<span class="badge b-ok">{{ icon('check') }} vraag leverancier afgerond</span>
             {% elif n.kind == 'mail_uit' %}<span class="badge b-blue">{{ icon('mail') }} mail aan leverancier</span>
             {% elif n.kind == 'mail_in' %}<span class="badge b-ok">{{ icon('mail') }} reactie leverancier</span>{% endif %}
             {% if n.for_accounting %}<span class="badge b-purple">voor de boekhouding</span>
@@ -163,8 +173,8 @@
           {% if edit and n.kind == 'mail_in' and not (reply_all and reply_all.note.id == n.id) %}<div class="noteactions"><a class="btn sm" href="{{ url_for('crediteuren.detail', iid=r.id, mail=1, antwoord=n.id) }}#mailform">{{ icon('mail') }}Beantwoorden</a></div>{% endif %}
         </article>
 {% endmacro %}
-    {% set internal = notes|rejectattr('kind', 'in', ['mail_uit', 'mail_in'])|list %}
-    {% set external = notes|selectattr('kind', 'in', ['mail_uit', 'mail_in'])|list %}
+    {% set internal = notes|rejectattr('kind', 'in', ['mail_uit', 'mail_in', 'mail_klaar'])|list %}
+    {% set external = notes|selectattr('kind', 'in', ['mail_uit', 'mail_in', 'mail_klaar'])|list %}
     <section class="card" id="gesprek">
       <div class="card-head"><h2>Intern – vragen en opmerkingen</h2><span class="small muted">alleen voor collega's</span></div>
       <div class="notes">
@@ -203,6 +213,7 @@
       <div class="notes">
         {% for n in external %}{{ note_item(n) }}{% else %}<div class="empty">Nog geen mail met de leverancier.</div>{% endfor %}
       </div>
+      {% if edit and r.ext_question %}<div style="margin-top:12px">{{ extdone_btn('btn') }}</div>{% endif %}
       {% if edit %}
       <details class="cred-mail" id="mailform" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
         <summary class="btn">{{ icon('mail') }}{% if reply_note %}{{ 'Antwoord aan ' ~ (metas.get(reply_note.id).from_name or metas.get(reply_note.id)['from']) }}{% elif reply_all %}Antwoord allen{% else %}{{ 'Nieuwe mail aan leverancier' if external else 'Mail leverancier' }}{% endif %}</summary>
@@ -265,7 +276,7 @@
   <div class="cdd-icon">{{ icon('check') }}</div>
   <h2>{{ changed_msg }}</h2>
   <p class="muted">Status van deze factuur: <b>{{ r.label }}</b></p>
-  {% set ask_arch = edit and archive_me and r.to_finish %}
+  {% set ask_arch = edit and archive_me and r.to_finish and not r.ext_question and not r.question_to %}
   {% if ask_arch %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cdd-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="cdd-arch"><input type="checkbox" name="afronden" value="1" checked

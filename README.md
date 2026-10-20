@@ -763,3 +763,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Wat al afgerond was blijft afgerond (migratie 29).
 - Status in het overzicht en op de kaart als losse stappen onder elkaar, elk in de kleur van zijn Outlook-categorie (Verwerkt in Komdex, Verwerkt in SnelStart, Vraag open, Vraag bij leverancier, Af te ronden …).
 - Categoriekleuren zoals de nieuwe Outlook ze toont: Perzik (oranje), Pruimenpaars (buiten Komdex om), Lichtgroen, Hemelsblauw (vraag), Zilver.
+
+## V144 (1.91.0)
+- Inkoopfacturen: een mail aan de leverancier zet "Vraag bij leverancier" open. Die blijft open (ook als er een reactie komt) tot iemand op **Vraag bij leverancier afronden** klikt (balk bovenaan, in de statuskaart en bij Extern). Dat komt als regel in het gesprek met de leverancier.
+- Zolang die vraag openstaat: geen status geven, niet afwijzen en niet afronden (knoppen grijs; ook op de server tegengehouden). Statussen uit Outlook worden dan niet overgenomen.
+- Met een open interne vraag kan de boekhouder niet afronden.
+- Teller en filter "Vraag open" tellen ook vragen bij de leverancier mee. De Outlook-categorie "VRAAG in Workportal" volgt dit.
+- Database-migratie 30: invoices.ext_question (bestaande facturen waarvan onze laatste mail nog onbeantwoord is, staan op open).

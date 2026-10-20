@@ -1053,3 +1053,7 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
   background: color-mix(in srgb, var(--c) 15%, #fff); color: color-mix(in srgb, var(--c) 55%, #14163A); border: 1px solid color-mix(in srgb, var(--c) 40%, #fff); font-weight: 500; }
 .stchip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
 .stchip.lg { font-size: 14px; padding: 6px 14px 6px 11px; }
+.cred-status.locked { opacity: .45; pointer-events: none; }
+.cred-lock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #FFF8E6; border: 1px solid #F1D38A; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+.cred-lock > svg { width: 18px; height: 18px; color: #8A5A00; flex: none; }
+.cred-lock > span { flex: 1 1 200px; }
