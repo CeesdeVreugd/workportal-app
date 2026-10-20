@@ -18,17 +18,18 @@
 {% set done2 = route is not none %}
 {% set done3 = r.status in ('snelstart', 'ss_eerst') %}
 {% if r.status != 'afgewezen' %}
-<div class="card cred-flow" aria-label="Voortgang">
+{% set lab_route = 'Verwerkt in Komdex' if route == 'komdex' else 'Verwerkt buiten Komdex om' %}
+{% if done2 and done3 %}{% set route_first = (r.erp_at or '') <= (r.snelstart_at or '') %}
+  {% set s2, s2done, s3, s3done = (lab_route if route_first else 'Verwerkt in SnelStart'), True, ('Verwerkt in SnelStart' if route_first else lab_route), True %}
+{% elif done2 %}{% set s2, s2done, s3, s3done = lab_route, True, 'Nog: verwerken in SnelStart', False %}
+{% elif done3 %}{% set s2, s2done, s3, s3done = 'Verwerkt in SnelStart', True, 'Nog: Komdex (of buiten Komdex om)', False %}
+{% else %}{% set s2, s2done, s3, s3done = '', False, '', False %}{% endif %}
+<div class="card cred-flow lin" aria-label="Voortgang">
   <span class="cf-node done"><b>{{ icon('check') }}</b>Binnengekomen</span>
-  <svg class="cf-fork" viewBox="0 0 40 52" preserveAspectRatio="none" aria-hidden="true">
-    <path class="{{ 'on' if route == 'komdex' }}" d="M0 26 C20 26 20 11 40 11"/><path class="{{ 'on' if route == 'buiten' }}" d="M0 26 C20 26 20 41 40 41"/></svg>
-  <div class="cf-branches">
-    <span class="cf-node {{ 'done' if done2 and route == 'komdex' else ('off' if route == 'buiten' else '') }}"><b>{% if done2 and route == 'komdex' %}{{ icon('check') }}{% else %}2{% endif %}</b>Verwerkt in Komdex</span>
-    <span class="cf-node {{ 'done' if done2 and route == 'buiten' else ('off' if route == 'komdex' else '') }}"><b>{% if done2 and route == 'buiten' %}{{ icon('check') }}{% else %}2{% endif %}</b>Verwerkt buiten Komdex om</span>
-  </div>
-  <svg class="cf-fork" viewBox="0 0 40 52" preserveAspectRatio="none" aria-hidden="true">
-    <path class="{{ 'on' if done3 and route == 'komdex' }}" d="M0 11 C20 11 20 26 40 26"/><path class="{{ 'on' if done3 and route == 'buiten' }}" d="M0 41 C20 41 20 26 40 26"/></svg>
-  <span class="cf-node {{ 'done' if done3 }}"><b>{% if done3 %}{{ icon('check') }}{% else %}3{% endif %}</b>Verwerkt in SnelStart</span>
+  <i class="cf-line {{ 'on' if s2done }}"></i>
+  <span class="cf-node {{ 'done' if s2done }}"><b>{% if s2done %}{{ icon('check') }}{% else %}2{% endif %}</b>{{ s2 }}</span>
+  <i class="cf-line {{ 'on' if s3done }}"></i>
+  <span class="cf-node {{ 'done' if s3done else ('todo' if s3) }}"><b>{% if s3done %}{{ icon('check') }}{% else %}3{% endif %}</b>{{ s3 }}</span>
 </div>
 {% else %}
 <div class="result bad" style="margin-bottom:16px"><b>Afgewezen door {{ r.rejected_name or 'onbekend' }}</b> op {{ r.rejected_at|dt }}: {{ r.reject_reason }}</div>

@@ -633,3 +633,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V116 – Inkoopfactuur iets smaller
 - Factuurpagina maximaal 1640 px breed (was de volle breedte); PDF : gegevens = 1,3 : 1.
+
+## V117 – Voortgangsbalk in volgorde van afhandelen
+- Drie stappen op één lijn: 1 Binnengekomen, 2 en 3 eerst leeg. De eerste status die gegeven wordt (Komdex, buiten Komdex om of SnelStart) komt bij 2; bij 3 staat wat nog moet ("Nog: verwerken in SnelStart" / "Nog: Komdex (of buiten Komdex om)"), en na afhandelen wat als tweede gedaan is. Volgorde op tijdstip (erp_at / snelstart_at).

@@ -982,3 +982,8 @@ div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
 /* iets smaller dan de volle breedte: overzichtelijker */
 .content:has(> .cred-grid) { max-width: 1640px; }
 @media (min-width: 901px) { .cred-grid.g2 { grid-template-columns: minmax(0, 1.3fr) minmax(380px, 1fr); } }
+/* voortgang: 1 binnengekomen, 2 = wat het eerst gedaan is, 3 = wat nog moet (of als tweede gedaan is) */
+.cred-flow.lin { align-items: center; padding: 10px 18px; }
+.cf-line { flex: 1 1 40px; height: 2px; background: #D5DAE8; margin: 0 12px; min-width: 20px; }
+.cf-line.on { background: #1E7A3C; }
+.cf-node.todo { color: var(--ink-2, #3A3F60); font-style: italic; }
