@@ -34,9 +34,12 @@
       <label class="f">Map voor afgeronde facturen<input type="text" name="cred_done_folder" value="{{ cred.folder }}" maxlength="80">
         <span class="hint">Is een factuur verwerkt in Komdex én SnelStart, dan wordt gevraagd of de mail (met de onderliggende mails) naar deze map mag. Bestaat de map nog niet, dan komt hij onder Postvak IN. Nodig: recht Mail.ReadWrite in de Microsoft-koppeling.</span></label>
     </div>
-    <div class="f lf"><span>Wie krijgt die vraag (de boekhouding)</span>
-      <div class="pchips">{% for u in cred.staff %}<label class="pchip" title="{{ u.roles or '' }}"><input type="checkbox" name="cred_archive_user" value="{{ u.id }}" {{ 'checked' if u.id in cred.archive_ids }}><span>{{ u.name }}</span></label>{% endfor %}</div>
-      {% if not cred.custom %}<span class="hint">Nu nog de standaard: iedereen met de rol administratie.</span>{% endif %}</div>
+    <div class="fgrid">
+      <label class="f">Verantwoordelijke boekhouder<select name="cred_bookkeeper">
+        <option value="">– niemand gekozen –</option>
+        {% for u in cred.staff %}<option value="{{ u.id }}" {{ 'selected' if u.id == cred.owner }}>{{ u.name }}{{ ' (' ~ u.roles ~ ')' if u.roles }}</option>{% endfor %}</select>
+        <span class="hint">Eén persoon: krijgt de melding en beslist of de mail naar de map gaat. {% if not cred.owner %}Nu niemand gekozen: dan kan iedereen met beheerrechten op inkoopfacturen het doen, zonder melding.{% endif %}</span></label>
+    </div>
     <p class="small muted" style="margin:0">
       {% if not cred.graph %}<span class="badge b-warn">Microsoft-koppeling niet ingesteld</span>
       {% elif cred.error %}<span class="badge b-bad">Laatste keer mislukt</span> {{ cred.error }}

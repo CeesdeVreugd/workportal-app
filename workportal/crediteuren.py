@@ -1207,7 +1207,7 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=g.user["id"] in archive_targets(get_db()) or can("crediteuren", 3))
+                           archive_me=_may_archive(get_db()))
 
 
 def _reply_all(notes, box):
@@ -1454,21 +1454,25 @@ def archive_mails(conn, iid, box, folder):
     return 0, err
 
 
+def archive_owner(conn):
+    """De verantwoordelijke boekhouder (één persoon, Beheer > Instellingen): krijgt de vraag of de mail van een
+    afgeronde factuur naar 'Verwerkt' mag. None als er niemand gekozen is."""
+    uid = to_int(_setting(conn, "cred_bookkeeper", ""))
+    if not uid:
+        return None
+    row = conn.execute("SELECT id FROM users WHERE id = ? AND active = 1", (uid,)).fetchone()
+    return row["id"] if row else None
+
+
 def archive_targets(conn):
-    """Wie krijgt de vraag of de mail van een afgeronde factuur naar 'Verwerkt' mag (de boekhouding).
-    Instelbaar in Beheer > Instellingen; zonder instelling: iedereen met de rol administratie."""
-    import json
-    raw = _setting(conn, "cred_archive_users", "")
-    if raw:
-        try:
-            ids = [int(x) for x in json.loads(raw)]
-        except (ValueError, TypeError):
-            ids = []
-        rows = conn.execute(f"SELECT id FROM users WHERE active = 1 AND id IN ({','.join('?' * len(ids)) or 'NULL'})", ids).fetchall()
-    else:
-        rows = conn.execute("SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id"
-                            " WHERE u.active = 1 AND r.key = 'administratie'").fetchall()
-    return [r["id"] for r in rows]
+    o = archive_owner(conn)
+    return [o] if o else []
+
+
+def _may_archive(conn):
+    """Mag de huidige gebruiker de vraag beantwoorden? De boekhouder; is die niet ingesteld, dan wie beheerrechten op inkoopfacturen heeft."""
+    o = archive_owner(conn)
+    return g.user["id"] == o if o else can("crediteuren", 3)
 
 
 def _archive_folder(conn):
@@ -1565,7 +1569,7 @@ def mail_archive(iid):
     r = _load(iid)
     conn = get_db()
     folder = _archive_folder(conn)
-    if r["source"] == "mail" and r["status"] == "snelstart":
+    if r["source"] == "mail" and r["status"] == "snelstart" and _may_archive(conn):
         if request.form.get("verplaatsen") == "1":
             conn.execute("UPDATE invoices SET mail_archive = 'bezig' WHERE id = ?", (iid,))
             log(conn, iid, f"Mail naar map '{folder}': ja", g.user["id"])

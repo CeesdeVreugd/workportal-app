@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V129: inkoopfacturen - afgeronde factuur: vraag boekhouding om mail naar 01-Verwerkt te verplaatsen"
+set "OMSCHRIJVING=WorkPortal V130: inkoopfacturen - één verantwoordelijke boekhouder voor mail naar 01-Verwerkt"
 
 echo.
 echo ============================================

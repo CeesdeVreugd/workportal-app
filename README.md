@@ -700,3 +700,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Nodig in Entra (app-registratie): toepassingsrecht Mail.ReadWrite met beheerderstoestemming. Zonder dat recht: melding in het logboek en de balk "opnieuw proberen".
   - Mails in Verwijderde items en Concepten blijven staan. Na verplaatsen worden de bewaarde bericht-id's bijgewerkt, zodat Antwoord allen blijft werken.
 - Database-migratie 27: invoices.mail_archive.
+
+## V130 (1.77.0)
+- Inkoopfacturen: de vraag "mail naar 01-Verwerkt?" gaat naar één verantwoordelijke boekhouder, te kiezen in Beheer > Instellingen (losse keuze, los van de rollen; de rollen blijven ongewijzigd). Alleen die persoon krijgt de melding, de vraag in het venster en de gele balk, en mag hem beantwoorden.
+- Niemand gekozen: iedereen met beheerrechten op inkoopfacturen kan het doen, zonder melding.
