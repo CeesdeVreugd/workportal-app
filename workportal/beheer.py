@@ -146,6 +146,10 @@ def settings():
             set_setting("cred_mail_on", "1" if request.form.get("cred_mail_on") else "0")
             set_setting("cred_mailbox", (request.form.get("cred_mailbox") or "").strip().lower() or "factuur@devreugd-pt.nl")
             set_setting("cred_done_folder", (request.form.get("cred_done_folder") or "").strip()[:80] or "01-Verwerkt")
+            if request.form.get("cred_cat_form") == "1":
+                from .crediteuren import CAT_STEPS
+                set_setting("cred_cat_map", json.dumps({k: (request.form.get("cat_" + k) or "").strip()[:100] for k, _ in CAT_STEPS},
+                                                       ensure_ascii=False))
             set_setting("cred_bookkeeper", (request.form.get("cred_bookkeeper") or "").strip() if (request.form.get("cred_bookkeeper") or "").isdigit() else "")
             since = (request.form.get("cred_since") or "").strip()
             if since and since != (get_setting("cred_since") or "")[:10]:
@@ -169,6 +173,8 @@ def settings():
             "folder": get_setting("cred_done_folder") or "01-Verwerkt", "cat_err": get_setting("cred_cat_err")}
     from .crediteuren import archive_owner
     cred["owner"] = archive_owner(get_db())
+    from .crediteuren import CAT_STEPS, category_map, category_colors
+    cred["cat_steps"], cred["cat_map"], cred["cat_colors"] = CAT_STEPS, category_map(get_db()), category_colors(get_db())
     cred["roles"] = []
     if cred["graph"]:
         try:

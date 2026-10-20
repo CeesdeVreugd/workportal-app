@@ -40,6 +40,20 @@
         {% for u in cred.staff %}<option value="{{ u.id }}" {{ 'selected' if u.id == cred.owner }}>{{ u.name }}{{ ' (' ~ u.roles ~ ')' if u.roles }}</option>{% endfor %}</select>
         <span class="hint">Eén persoon: krijgt de melding en beslist of de mail naar de map gaat. {% if not cred.owner %}Nu niemand gekozen: dan kan iedereen met beheerrechten op inkoopfacturen het doen, zonder melding.{% endif %}</span></label>
     </div>
+    <div class="f lf"><span>Outlook-categorie per status</span>
+      <input type="hidden" name="cred_cat_form" value="1">
+      <span class="hint" style="margin-top:0">Krijgt een factuur in WorkPortal een status, dan krijgt de factuurmail in Outlook deze categorie (de andere uit dit lijstje gaan eraf; zelf gegeven categorieën blijven staan). Leeg = niets zetten.</span>
+      <div class="catmap">
+        {% for key, label in cred.cat_steps %}
+        <label class="f">{{ label }}<select name="cat_{{ key }}">
+          <option value="">– geen –</option>
+          {% for n, col in cred.cat_colors.items() %}<option value="{{ n }}" {{ 'selected' if cred.cat_map.get(key) == n }}>{{ n }}</option>{% endfor %}
+          {% if cred.cat_map.get(key) and cred.cat_map.get(key) not in cred.cat_colors %}<option value="{{ cred.cat_map.get(key) }}" selected>{{ cred.cat_map.get(key) }}</option>{% endif %}
+        </select>{% if cred.cat_map.get(key) %}<span class="ocat" style="--c:{{ cred.cat_colors.get(cred.cat_map.get(key), '#8A90A6') }};align-self:flex-start;margin-top:6px">{{ cred.cat_map.get(key) }}</span>{% endif %}</label>
+        {% endfor %}
+      </div>
+      {% if not cred.cat_colors %}<span class="hint">Nog geen categorielijst uit de mailbox: klik eerst bij Inkoopfacturen op "Mailbox nu ophalen".</span>{% endif %}
+    </div>
     <p class="small muted" style="margin:0">
       {% if not cred.graph %}<span class="badge b-warn">Microsoft-koppeling niet ingesteld</span>
       {% elif cred.error %}<span class="badge b-bad">Laatste keer mislukt</span> {{ cred.error }}

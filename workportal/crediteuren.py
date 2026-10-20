@@ -1575,23 +1575,111 @@ def _ask_archive(conn, iid, actor):
         print(f"[WorkPortal] Melding mail naar Verwerkt mislukt: {exc}", flush=True)
 
 
-def _archive_bg(iid):
-    """Op de achtergrond, zodat de statusknop niet op Microsoft hoeft te wachten."""
+CAT_STEPS = [("komdex", "Verwerkt in Komdex"), ("buiten", "Verwerkt buiten Komdex om"),
+             ("snelstart", "Verwerkt in SnelStart"), ("afgewezen", "Afgewezen")]
+_CAT_GUESS = {"komdex": r"komdex", "buiten": r"buiten", "snelstart": r"snel\s*start", "afgewezen": r"afgewezen|afwijz"}
+
+
+def category_map(conn):
+    """{stap: Outlook-categorie} (Beheer > Instellingen). Niet ingesteld: raden op naam uit de categorielijst van de mailbox."""
+    import json
+    try:
+        saved = json.loads(_setting(conn, "cred_cat_map", "") or "null")
+    except ValueError:
+        saved = None
+    if isinstance(saved, dict):
+        return {k: v for k, v in saved.items() if v}
+    names = list(category_colors(conn))
+    out = {}
+    for k, rx in _CAT_GUESS.items():
+        hit = [n for n in names if re.search(rx, n, re.I)]
+        if k == "komdex":
+            hit = [n for n in hit if not re.search(_CAT_GUESS["buiten"], n, re.I)]
+        if hit:
+            out[k] = hit[0]
+    return out
+
+
+def apply_categories(conn, iid, box):
+    """De Outlook-categorie van de factuurmail laten passen bij de status in WorkPortal. Andere categorieën die iemand
+    zelf heeft gegeven blijven staan; alleen de categorieën uit de instelling worden gezet of weggehaald."""
+    import json
+    from .mail import graph_configured, _gcall, GraphError
+    r = conn.execute("SELECT * FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if not r or r["source"] != "mail" or not r["mail_id"]:
+        return
+    cmap = category_map(conn)
+    if not cmap:
+        return
+    want = set()
+    if r["status"] == "afgewezen":
+        want.add(cmap.get("afgewezen"))
+    else:
+        if r["route"] in ("komdex", "buiten"):
+            want.add(cmap.get(r["route"]))
+        if r["snelstart_at"]:
+            want.add(cmap.get("snelstart"))
+    want.discard(None)
+    managed = set(cmap.values())
+    mid = r["mail_id"].split(":")[0]
+    if not graph_configured():
+        cur = json.loads(r["mail_categories"] or "[]")
+    else:
+        try:
+            cur = _gcall("GET", f"/users/{box}/messages/{mid}", params={"$select": "categories"}).get("categories") or []
+        except GraphError as e:
+            log(conn, iid, "Outlook-categorie niet gezet: " + ("recht Mail.ReadWrite ontbreekt" if e.status == 403 else
+                                                               "mail niet gevonden" if e.status == 404 else str(e)[:120]))
+            conn.commit()
+            return
+    new = [c for c in cur if c not in managed] + sorted(want)
+    if new == cur:
+        return
+    try:
+        if graph_configured():
+            _gcall("PATCH", f"/users/{box}/messages/{mid}", json={"categories": new})
+        else:
+            print(f"[WorkPortal] OUTLOOK-CATEGORIE (Microsoft-koppeling niet ingesteld): factuur {iid} -> {new}", flush=True)
+    except GraphError as e:
+        log(conn, iid, "Outlook-categorie niet gezet: " + ("recht Mail.ReadWrite ontbreekt" if e.status == 403 else str(e)[:120]))
+        conn.commit()
+        return
+    conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (json.dumps(new, ensure_ascii=False), iid))
+    log(conn, iid, "Outlook-categorie: " + (", ".join(sorted(want)) or "weggehaald"))
+    conn.commit()
+
+
+_bg_lock = __import__("threading").Lock()
+
+
+def _bg(iid, *jobs):
+    """Microsoft-werk op de achtergrond (de knop hoeft niet te wachten); één tegelijk, zodat categorie zetten en
+    verplaatsen (dat geeft het bericht een nieuw id) elkaar niet in de weg zitten."""
     import sqlite3
     import threading
     db_path = current_app.config["DB_PATH"]
 
     def run():
-        conn = sqlite3.connect(db_path, timeout=30)
-        conn.row_factory = sqlite3.Row
-        try:
-            box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
-            archive_mails(conn, iid, box, _archive_folder(conn))
-        except Exception as exc:  # pragma: no cover
-            print(f"[WorkPortal] Mails verplaatsen mislukt (factuur {iid}): {exc}", flush=True)
-        finally:
-            conn.close()
+        with _bg_lock:
+            conn = sqlite3.connect(db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            try:
+                box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+                for job in jobs:
+                    try:
+                        if job == "categorie":
+                            apply_categories(conn, iid, box)
+                        elif job == "verplaatsen":
+                            archive_mails(conn, iid, box, _archive_folder(conn))
+                    except Exception as exc:  # pragma: no cover
+                        print(f"[WorkPortal] {job} mislukt (factuur {iid}): {exc}", flush=True)
+            finally:
+                conn.close()
     threading.Thread(target=run, daemon=True).start()
+
+
+def _archive_bg(iid):
+    _bg(iid, "categorie", "verplaatsen")
 
 
 @bp.route("/<int:iid>/status", methods=["POST"])
@@ -1633,6 +1721,8 @@ def set_status(iid):
     conn.commit()
     if new == "snelstart" and r["status"] != "snelstart" and r["source"] == "mail":
         _ask_archive(conn, iid, uid)
+    if r["source"] == "mail":
+        _bg(iid, "categorie")
     # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
     lane = "komdex" if act in ("erp", "buiten") else ("snelstart" if act == "snelstart" else "")
     return redirect(url_for("crediteuren.detail", iid=iid, gewijzigd=msg, baan=lane or None))
@@ -1680,6 +1770,8 @@ def reject(iid):
                  (iid, "afwijzing", reason[:2000], uid, now))
     log(conn, iid, "Afgewezen: " + reason[:120], uid)
     conn.commit()
+    if r["source"] == "mail":
+        _bg(iid, "categorie")
     flash("Factuur afgewezen.", "success")
     back = request.form.get("terug") or ""
     if back.startswith("/") and not back.startswith("//"):

@@ -726,3 +726,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Microsoft-koppeling: wordt een recht geweigerd (403), dan haalt WorkPortal één keer een vers token op – een net toegekend recht (Mail.ReadWrite, MailboxSettings.Read) werkt dan meteen, zonder herstart.
 - Categoriekleuren: na een mislukte poging wordt het bij elke ophaalronde opnieuw geprobeerd (niet pas na een uur).
 - Beheer > Instellingen: overzicht welke rechten de koppeling heeft (Mail.Read, Mail.Send, Mail.ReadWrite, MailboxSettings.Read) met "opnieuw controleren".
+
+## V136 (1.83.0)
+- Inkoopfacturen: krijgt een factuur in WorkPortal een status, dan krijgt de factuurmail in Outlook de bijbehorende categorie (Verwerkt in Komdex, Verwerkt buiten Komdex om, Verwerkt in SnelStart, Afgewezen). Terugzetten haalt de categorie weer weg. Categorieën die iemand zelf in Outlook heeft gegeven (en die niet in het lijstje staan) blijven staan.
+- Beheer > Instellingen: per status de Outlook-categorie kiezen uit de categorielijst van de mailbox (met kleur). Niet ingesteld: WorkPortal kiest op naam (bevat "Komdex", "buiten", "SnelStart", "afgewezen").
+- Gebeurt op de achtergrond, vóór het verplaatsen naar 01-Verwerkt. Recht: Mail.ReadWrite. Lukt het niet, dan staat de reden in het logboek van de factuur.
