@@ -587,3 +587,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Leverancier:** e-maildomein of website die bij de naam past (bmn-bv.nl ↔ "BMN …", ook als afkorting), en bij dubbele relaties voorrang voor de relatie waarvan de naam bij het domein past of die al eerder facturen had.
 - **Opnieuw uitlezen (overzicht):** werkt nu ook verkeerd uitgelezen waarden bij; wat iemand zelf heeft aangepast blijft staan.
 - Veld "Omschrijving" weg.
+
+## V107 – Inkoopfacturen: lange facturen en meer opmaak
+- Facturen met meerdere pagina's: de eerste twee én de laatste twee pagina's worden gelezen (de totalen staan op de laatste); eerder alleen pagina 1–3.
+- Factuurnummer moet een cijfer bevatten (niet meer "Klantnummer" uit de kolom ernaast); staat het nummer onder het kopje ("Refnr. / Invoice number"), dan wordt het daar gevonden.
+- "EINDBEDRAG", "Netto EUR …" en "B.T.W. 21,00 % …" worden herkend; ontbreekt incl., dan excl. + btw.

@@ -93,12 +93,12 @@ def _find(patterns, text, group=1):
 
 _INCL_LABEL = (r"(?:totaal|total|eindtotaal)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:incl\.?|inclusief|including|inkl\.?)"
                r"|(?<!sub)(?<!sub )totaal\s*(?:in\s*)?(?:eur|euro|€)(?!\w)(?!\s*(?:excl|exclusief|ex\.))"
-               r"|te\s*betalen|factuurbedrag|totaalbedrag|amount\s*due|gesamtbetrag|rechnungsbetrag"
+               r"|te\s*betalen|factuurbedrag|totaalbedrag|eindbedrag|eindtotaal|amount\s*due|gesamtbetrag|rechnungsbetrag"
                r"|(?<![a-z])incl\.?\s*(?:btw|vat)|inclusief\s*btw")
-_VAT_LABEL = r"(?:btw|vat|mwst|ust)\.?\s*(?:bedrag\s*)?(?:eur\s*)?(?:\d{1,2}(?:[,.]\d)?\s*%)?|\d{1,2}(?:[,.]\d)?\s*%\s*(?:btw|vat)"
+_VAT_LABEL = r"(?:btw|b\.\s?t\.\s?w\.|vat|mwst|ust)\.?\s*(?:bedrag\s*)?(?:eur\s*)?(?:\d{1,2}(?:[,.]\d{1,2})?\s*%)?|\d{1,2}(?:[,.]\d)?\s*%\s*(?:btw|vat)"
 _EXCL_LABEL = (r"(?:totaal|total)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:excl\.?|exclusief|excluding|exkl\.?|net)"
                r"|btw[\s-]*(?:basis|grondslag)|basis\s*btw|grondslag|taxable\s*amount|netto\s*bedrag|nettobetrag|totaal\s*netto"
-               r"|(?<![a-z])excl\.?\s*(?:btw|vat)|exclusief\s*btw")
+               r"|(?<![a-z])excl\.?\s*(?:btw|vat)|exclusief\s*btw|^\s*netto(?:\s*(?:eur|€))?(?=\s)")
 _SUBTOTAL_LABEL = r"subtotaal|sub\s*total"   # alleen als er niets beters is (vracht/toeslagen staan er vaak nog onder)
 _PO_LABEL = (r"(?:uw|your|ihre?)\s*(?:referentie|ref(?:erence|erenz)?\.?|kenmerk|zeichen|order\s*(?:nummer|nr\.?|no\.?|number)?"
              r"|bestel(?:ling|nummer|nr\.?)?|bestellung|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)?)"
@@ -210,7 +210,10 @@ def extract(data):
     try:
         import pdfplumber
         with pdfplumber.open(io.BytesIO(data)) as pdf:
-            pages = pdf.pages[:3]
+            allp = pdf.pages[:40]
+            # kop staat op de eerste pagina('s), de totalen op de laatste: bij lange facturen beide lezen
+            idx = sorted({0, 1, len(allp) - 2, len(allp) - 1} & set(range(len(allp))))
+            pages = [allp[i] for i in idx]
             text = "\n".join((p.extract_text() or "") for p in pages)
             # woorden met positie van de laatste pagina (daar staan de totalen) en de eerste (kopgegevens)
             for p in ([pages[-1]] + ([pages[0]] if len(pages) > 1 else [])):
@@ -220,10 +223,11 @@ def extract(data):
     if not text.strip():
         return out
     sep = r"[\s.:#\-]*"
+    num = r"((?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])"   # met minstens één cijfer (niet "Klantnummer")
     out["invoice_no"] = _find([
-        r"factuur\s*(?:nummer|nr\.?|no\.?)" + sep + r"([A-Z0-9][A-Z0-9\-/.]{2,24})",
-        r"invoice\s*(?:number|no\.?|nr\.?|#)" + sep + r"([A-Z0-9][A-Z0-9\-/.]{2,24})",
-        r"rechnungs?\s*(?:nummer|nr\.?)" + sep + r"([A-Z0-9][A-Z0-9\-/.]{2,24})",
+        r"factuur\s*(?:nummer|nr\.?|no\.?)" + sep + num,
+        r"invoice\s*(?:number|no\.?|nr\.?|#)" + sep + num,
+        r"rechnungs?\s*(?:nummer|nr\.?)" + sep + num,
         r"^\s*factuur" + sep + r"([A-Z]{0,4}[\-]?\d[\dA-Z\-/.]{2,20})",
     ], text)
     if out["invoice_no"]:
