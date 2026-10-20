@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V132: inkoopfacturen - geen leverancier meer raden via gedeeld afzenderadres (SnelStart klantmail e.d.)"
+set "OMSCHRIJVING=WorkPortal V133: inkoopfacturen - knop Door naar volgende factuur gaf 404"
 
 echo.
 echo ============================================

@@ -714,3 +714,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V132 (1.79.0)
 - Inkoopfacturen: facturen die via een facturatieplatform binnenkomen (bijv. mail@klantmail.snelstart.nl, Exact, Moneybird, e-Boekhouden, Visma, AFAS …) werden gekoppeld aan de leverancier van een eerdere factuur van hetzelfde adres. Zo'n gedeeld adres telt niet meer mee; de leverancier komt dan uit de factuur zelf (naam, website, postcode, telefoon) en de naam van de afzender in de mail.
 - "Opnieuw uitlezen" maakt een koppeling die alleen op dat gedeelde adres berustte los.
+
+## V133 (1.80.0)
+- Inkoopfacturen: de knop "Door naar volgende factuur" in het venster na een statuswijziging gaf "Niet gevonden" (404) door een fout in de link (sinds V129). Opgelost.

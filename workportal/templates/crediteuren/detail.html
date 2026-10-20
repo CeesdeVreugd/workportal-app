@@ -267,8 +267,9 @@
   {% endif %}
   {% if next_inv %}
   {% set nurl = url_for('crediteuren.detail', iid=next_inv.id, terug=back) %}
-  <{{ 'button name="naar" value="' ~ nurl ~ '"' if ask_arch else 'a href="' ~ nurl ~ '"' }} class="btn primary cdd-next">Door naar volgende factuur →
-    <small>{{ next_inv.supplier or 'Onbekende leverancier' }}{{ ' · ' ~ next_inv.invoice_no if next_inv.invoice_no }} · {{ STATUS.get(next_inv.status, next_inv.status) }}</small></{{ 'button' if ask_arch else 'a' }}>
+  {% set nsmall %}<small>{{ next_inv.supplier or 'Onbekende leverancier' }}{{ ' · ' ~ next_inv.invoice_no if next_inv.invoice_no }} · {{ STATUS.get(next_inv.status, next_inv.status) }}</small>{% endset %}
+  {% if ask_arch %}<button class="btn primary cdd-next" name="naar" value="{{ nurl }}">Door naar volgende factuur →{{ nsmall }}</button>
+  {% else %}<a class="btn primary cdd-next" href="{{ nurl }}">Door naar volgende factuur →{{ nsmall }}</a>{% endif %}
   {% else %}
   <p class="cdd-none">Er staan geen andere openstaande facturen{{ ' voor deze stap' if next_lane }} meer klaar. 🎉</p>
   {% endif %}
