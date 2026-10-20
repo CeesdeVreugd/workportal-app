@@ -933,3 +933,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 @media (max-width: 699px) { .cred-status { grid-template-columns: 1fr; } }
 .f .hint svg { width: 14px; height: 14px; vertical-align: -2px; }
 div.f.lf .combo, div.f.lf .hint { font-weight: 400; }
+
+/* Bedrag met euroteken in het invoerveld */
+.eurin { position: relative; display: block; }
+.eurin > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink, #14163A); font-weight: 500; pointer-events: none; }
+.eurin > input { width: 100%; padding-left: 30px; }

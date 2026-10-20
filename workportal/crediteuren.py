@@ -109,7 +109,7 @@ _INVNO_VALUE = re.compile(r"^(?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24}$", re
 _DATE_VALUE = re.compile(r"^" + _DATE + r"$", re.I)
 _INVNO_LABEL = r"fact(?:uur)?\.?\s*(?:nr|nummer|no)\.?|invoice\s*(?:no|number|nr)\.?|rechnungs?\s*(?:nr|nummer)\.?"
 _DATE_LABEL = r"fact(?:uur)?\.?\s*datum|invoice\s*date|rechnungsdatum"
-_VATAMT_LABEL = r"btw[\s-]*bedrag|bedrag\s*btw|vat\s*amount|mwst[\s-]*betrag"
+_VATAMT_LABEL = r"btw-?bedrag|bedrag\s*btw|vat\s*amount|mwst[\s-]*betrag"
 _AMOUNT_ONLY = re.compile(r"^(?:€|eur)?\s*" + _AMOUNT + r"$", re.I)
 _LEGAL = re.compile(r"([A-Z0-9][\w&'.\-]*(?:\s+[\w&'.\-]+){0,5}?\s+(?:B\.?V\.?|N\.?V\.?|GmbH|V\.?O\.?F\.?|BVBA|Ltd\.?|AG|S\.?A\.?))(?=\s|$|,)")
 
@@ -154,7 +154,7 @@ def _below_amount(words, label, value_re=None):
                 for w in ws2:
                     if not value_re.match(w["text"]):
                         continue
-                    if w["x1"] < x0 - 25 or w["x0"] > x1 + 25:
+                    if w["x1"] < x0 - 12 or w["x0"] > x1 + 12:
                         continue   # niet onder het kopje
                     d = (top2 - top) + abs((w["x0"] + w["x1"]) / 2 - (x0 + x1) / 2) / 4
                     if best is None or d < best[0]:
@@ -225,6 +225,7 @@ def extract(data):
     sep = r"[\s.:#\-]*"
     num = r"((?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])"   # met minstens één cijfer (niet "Klantnummer")
     out["invoice_no"] = _find([
+        r"(?:factuur|invoice|facture)\s*n[°º]\.?\s*((?:[A-Z]{1,5}\s)?(?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])",
         r"factuur\s*(?:nummer|nr\.?|no\.?)" + sep + num,
         r"invoice\s*(?:number|no\.?|nr\.?|#)" + sep + num,
         r"rechnungs?\s*(?:nummer|nr\.?)" + sep + num,
@@ -234,9 +235,10 @@ def extract(data):
         out["invoice_no"] = out["invoice_no"].rstrip(".-/")
     out["invoice_date"] = parse_date(_find([
         r"factuur\s*datum" + sep + _DATE, r"invoice\s*date" + sep + _DATE, r"rechnungsdatum" + sep + _DATE,
-        r"document\s*datum" + sep + _DATE, r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE, r"\bdate" + sep + _DATE], text))
+        r"document\s*datum" + sep + _DATE, r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE, r"\bdate" + sep + _DATE,
+        r"^[A-Za-z'’.\-\s]{2,40},\s*" + _DATE], text))   # "'s-Hertogenbosch, 02 oktober 2026"
     out["due_date"] = parse_date(_find([
-        r"verval\s*datum" + sep + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
+        r"verval\s*(?:datum|dag)" + sep + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
         r"betalen\s*(?:voor|vóór|uiterlijk)" + sep + _DATE, r"f[äa]llig(?:keit)?" + sep + _DATE], text))
     gap = r"[^\n\d€-]{0,25}"
     incl = _find([r"(?:" + _INCL_LABEL + r")" + gap + _AMOUNT_SL], text)
@@ -254,7 +256,11 @@ def extract(data):
     for ws in words:
         excl = excl or _below_amount(ws, _SUBTOTAL_LABEL)
     if not incl:
-        incl = _find([r"^\s*totaal[^\n\d€-]{0,15}" + _AMOUNT, r"^\s*total[^\n\d€-]{0,15}" + _AMOUNT], text)
+        incl = _find([r"^\s*totaal(?!\s*(?:btw|vat|excl|netto))[^\n\d€-]{0,15}" + _AMOUNT_SL,
+                      r"^\s*total(?!\s*(?:vat|excl|net))[^\n\d€-]{0,15}" + _AMOUNT_SL], text)
+    if not incl:
+        for ws in words:   # kolom "Totaal" naast "Excl. BTW" en "Bedrag BTW" (wordt hieronder met de btw gecontroleerd)
+            incl = incl or _below_amount(ws, r"(?<![\w.])(?:totaal|total)(?![\w ]*(?:btw|vat|excl|netto))")
     out["amount_incl"] = parse_amount(incl)
     out["amount_excl"] = parse_amount(excl)
     if out["amount_incl"] is None:

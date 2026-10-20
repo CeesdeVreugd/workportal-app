@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V107: inkoopfacturen - lange facturen (totalen op laatste pagina), eindbedrag, factuurnummer met cijfer"
+set "OMSCHRIJVING=WorkPortal V108: inkoopfacturen - euroteken bij bedragen, factuur N°, datum na plaatsnaam, kolom Totaal"
 
 echo.
 echo ============================================

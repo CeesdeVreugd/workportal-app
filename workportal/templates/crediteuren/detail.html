@@ -59,8 +59,8 @@
         <label class="f">Factuurnummer<input type="text" name="invoice_no" value="{{ r.invoice_no or '' }}"></label>
         <label class="f">Factuurdatum<input type="date" name="invoice_date" value="{{ r.invoice_date or '' }}"></label>
         <label class="f">Vervaldatum<input type="date" name="due_date" value="{{ r.due_date or '' }}"></label>
-        <label class="f">Bedrag incl. btw<input type="text" inputmode="decimal" name="amount_incl" value="{{ r.amount_incl|num(2) if r.amount_incl is not none else '' }}"></label>
-        <label class="f">Bedrag excl. btw<input type="text" inputmode="decimal" name="amount_excl" value="{{ r.amount_excl|num(2) if r.amount_excl is not none else '' }}"></label>
+        <label class="f">Bedrag incl. btw<span class="eurin"><span aria-hidden="true">€</span><input type="text" inputmode="decimal" name="amount_incl" value="{{ r.amount_incl|num(2) if r.amount_incl is not none else '' }}"></span></label>
+        <label class="f">Bedrag excl. btw<span class="eurin"><span aria-hidden="true">€</span><input type="text" inputmode="decimal" name="amount_excl" value="{{ r.amount_excl|num(2) if r.amount_excl is not none else '' }}"></span></label>
         <label class="f">Inkoopnummer<input type="text" name="erp_ref" value="{{ r.erp_ref or '' }}" placeholder="bijv. 4267-20260131"></label>
       </div>
       {% if edit %}<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Gegevens opslaan</button>

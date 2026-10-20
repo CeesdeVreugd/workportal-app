@@ -592,3 +592,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Facturen met meerdere pagina's: de eerste twee én de laatste twee pagina's worden gelezen (de totalen staan op de laatste); eerder alleen pagina 1–3.
 - Factuurnummer moet een cijfer bevatten (niet meer "Klantnummer" uit de kolom ernaast); staat het nummer onder het kopje ("Refnr. / Invoice number"), dan wordt het daar gevonden.
 - "EINDBEDRAG", "Netto EUR …" en "B.T.W. 21,00 % …" worden herkend; ontbreekt incl., dan excl. + btw.
+
+## V108 – Inkoopfacturen: euroteken en meer opmaak
+- Euroteken in de velden Bedrag incl./excl. btw.
+- "FACTUUR N° FLL A6665966" (ook met spatie en letters), datum na de plaatsnaam ("'s-Hertogenbosch, 02 oktober 2026"), "Vervaldag".
+- "Totaal BTW 21,00 %" wordt niet meer als totaalbedrag gezien; kolom "Totaal" naast "Excl. BTW"/"Bedrag BTW" wel (gecontroleerd met de btw).
+- Een kopje over twee kolommen ("BTW | Bedrag") telt niet meer als één kopje; waarden moeten echt onder het kopje staan.
