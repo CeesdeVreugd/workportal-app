@@ -1083,7 +1083,8 @@ def open_counts():
         return {}
     r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
-              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp,"
+              " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
+              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
     return {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
 
@@ -1093,8 +1094,8 @@ def open_counts():
 FILTERS = [
     ("open", "Alles open"),
     ("nieuw", "Nieuw"),
-    ("erp", "Nog naar SnelStart"),
     ("komdex", "Nog in Komdex"),
+    ("erp", "Nog in SnelStart"),
     ("vraag", "Vraag open"),
     ("mij", "Wacht op mij"),
     ("boekhouding", "Voor de boekhouding"),
@@ -1114,8 +1115,8 @@ def index():
     cond = {
         "open": "i.status IN ('nieuw','erp','buiten','ss_eerst')",
         "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
-        "erp": "i.status IN ('erp','buiten') AND i.question_to IS NULL",
-        "komdex": "i.status = 'ss_eerst' AND i.question_to IS NULL",
+        "erp": "i.status IN ('nieuw','erp','buiten')",       # nog te boeken in SnelStart (Komdex gedaan of nog niet)
+        "komdex": "i.status IN ('nieuw','ss_eerst')",        # nog te verwerken in Komdex (SnelStart gedaan of nog niet)
         "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to IS NOT NULL",
         "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
@@ -1139,7 +1140,8 @@ def index():
         " FROM invoices i LEFT JOIN users q ON q.id = i.question_to WHERE " + " AND ".join(where) +
         " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten','ss_eerst') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
     c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp, SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
+              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to IS NOT NULL) AS vraag,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
               " SUM(status='snelstart') AS klaar, COUNT(*) AS alle,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"

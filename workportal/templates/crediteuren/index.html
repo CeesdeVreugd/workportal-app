@@ -26,9 +26,9 @@
 </div>
 
 <div class="grid g4" style="margin-bottom:16px">
-  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="text-decoration:none;color:inherit"><div class="label">Nieuw</div><div class="value" style="color:#0059B3">{{ counts.nieuw }}</div><div class="sub">nog in Komdex te verwerken</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='komdex') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in Komdex</div><div class="value" style="color:#0059B3">{{ counts.komdex }}</div><div class="sub">waarvan {{ counts.ss_klaar }} al in SnelStart</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in SnelStart</div><div class="value" style="color:#2E268F">{{ counts.erp }}</div><div class="sub">waarvan {{ counts.erp_klaar }} al in (of buiten) Komdex</div></a>
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='vraag') }}" style="text-decoration:none;color:inherit"><div class="label">Vraag open</div><div class="value" style="color:var(--warn)">{{ counts.vraag }}</div><div class="sub">{{ counts.mij }} wacht{{ 'en' if counts.mij != 1 }} op jou</div></a>
-  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Nog naar SnelStart</div><div class="value" style="color:#2E268F">{{ counts.erp }}</div><div class="sub">verwerkt in of buiten Komdex</div></a>
   <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" {% if counts.verval %}style="color:var(--bad)"{% endif %}>{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
 </div>
 

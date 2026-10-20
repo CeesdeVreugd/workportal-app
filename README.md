@@ -717,3 +717,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V133 (1.80.0)
 - Inkoopfacturen: de knop "Door naar volgende factuur" in het venster na een statuswijziging gaf "Niet gevonden" (404) door een fout in de link (sinds V129). Opgelost.
+
+## V134 (1.81.0)
+- Inkoopfacturen: de tellers bovenaan tellen nu per boeking: "Nog in Komdex" (nieuw + al in SnelStart) en "Nog in SnelStart" (nieuw + al in/buiten Komdex), met eronder hoeveel daarvan de andere stap al hebben. Eerder telde "Nieuw" een factuur niet meer mee zodra hij alleen in SnelStart was geboekt.
+- Filters "Nog in Komdex" en "Nog in SnelStart" tonen dezelfde facturen als de tellers.
