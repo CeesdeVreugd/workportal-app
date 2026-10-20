@@ -560,3 +560,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V102 – Inkoopfacturen: mailbox geweigerd (403)
 - Bij een geweigerde mailbox haalt WorkPortal eerst één keer een nieuw Graph-token (een net toegevoegd recht zit niet in een bewaard token, dat tot een uur geldig is).
 - Blijft het 403, dan zegt de melding welke rechten de app-registratie nu heeft en of Mail.Read ontbreekt of Exchange (ApplicationAccessPolicy) de mailbox tegenhoudt.
+
+## V103 – Inkoopfacturen: beter uitlezen, leverancier uit de relaties, statussen
+- **Bedragen:** ook totalen die als tabel onder een kopje staan ("Totaal € excl. btw" met het bedrag eronder) worden gelezen (op positie in de PDF). Incl./excl. worden niet meer verwisseld.
+- **Inkoopnummer** (veld "Inkoopnummer", was "Inkooporder ERP"): begint altijd met 4 cijfers (4267, 4267-0, 4268-20260101), gezocht achter o.a. "Uw referentie", "Uw ordernr.", "PO number", "Your reference", "Bestellnummer"; anders elk "4xxx-2026xxxx".
+- **Factuurdatum** ook bij "Documentdatum". Leveranciersnaam uit de kop (zonder KvK/BTW-tekst).
+- **Leverancier uit de relaties** (`match_supplier`): controleert naam op de factuur, e-maildomein afzender, website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres. Alleen bij een overtuigende match (≥2 kenmerken, het e-maildomein, of een lange unieke naam) wordt de relatie gekoppeld; bij twijfel tussen twee relaties niet. Eigen adres/De Vreugd wordt overgeslagen. Migratie 23: `invoices.supplier_id`, `invoices.supplier_match`.
+- Detailscherm: leverancier kiezen uit een lijst met leveranciers; groen "Uit de relaties · herkend op …" of oranje "Niet gevonden in de relaties". Knop **Opnieuw uitlezen** (per factuur, overschrijft) en in het overzicht (Beheer-recht: alleen lege velden en leverancier aanvullen bij openstaande facturen).
+- **Statussen:** Nieuw, Verwerkt in Komdex, Verwerkt buiten Komdex om (nieuw, status `buiten`), Verwerkt in SnelStart; direct te kiezen (ook terug). De knoppen "Verwerkt in ERP" + "en volgende →" zijn vervangen door een statuskeuze.

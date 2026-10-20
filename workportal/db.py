@@ -625,6 +625,11 @@ MIGRATIONS = [
     ALTER TABLE visits ADD COLUMN sent_at TEXT;
     ALTER TABLE visits ADD COLUMN sent_to TEXT;
     """,
+    # 23 - inkoopfacturen: leverancier gekoppeld aan de relaties (en waarop dat herkend is)
+    """
+    ALTER TABLE invoices ADD COLUMN supplier_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+    ALTER TABLE invoices ADD COLUMN supplier_match TEXT;
+    """,
 ]
 
 

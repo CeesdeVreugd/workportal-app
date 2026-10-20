@@ -13,7 +13,7 @@
   <div class="actions"><span class="badge {{ STATUS_BADGE[r.skey] }}" style="font-size:14px;padding:6px 14px">{{ r.label }}</span></div>
 </div>
 
-{% set steps = [('Binnengekomen', True), ('Verwerkt in ERP', r.status in ('erp','snelstart')), ('Verwerkt in SnelStart', r.status == 'snelstart')] %}
+{% set steps = [('Binnengekomen', True), ('Verwerkt buiten Komdex om' if r.status == 'buiten' else 'Verwerkt in Komdex', r.status in ('erp','buiten','snelstart')), ('Verwerkt in SnelStart', r.status == 'snelstart')] %}
 {% if r.status != 'afgewezen' %}
 <div class="card cred-steps">
   {% for name, done in steps %}
@@ -46,33 +46,37 @@
       <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
       <fieldset {{ 'disabled' if not edit }} style="border:0;padding:0;margin:0">
       <div class="fgrid">
-        <label class="f">Leverancier<input type="text" name="supplier" value="{{ r.supplier or '' }}"></label>
+        <label class="f">Leverancier<input type="text" name="supplier" value="{{ r.supplier or '' }}" list="supplierlist" autocomplete="off">
+          {% if r.supplier_id %}<span class="hint" style="color:var(--ok,#1E7A3C)">{{ icon('check') }} Uit de relaties{% if r.supplier_match %} · herkend op {{ r.supplier_match }}{% endif %} · <a href="{{ url_for('klanten.customer', cid=r.supplier_id) }}">relatie openen</a></span>
+          {% elif r.supplier %}<span class="hint" style="color:var(--warn,#8A4B08)">Niet gevonden in de relaties – kies de leverancier uit de lijst.</span>{% endif %}</label>
         <label class="f">Factuurnummer<input type="text" name="invoice_no" value="{{ r.invoice_no or '' }}"></label>
         <label class="f">Factuurdatum<input type="date" name="invoice_date" value="{{ r.invoice_date or '' }}"></label>
         <label class="f">Vervaldatum<input type="date" name="due_date" value="{{ r.due_date or '' }}"></label>
         <label class="f">Bedrag incl. btw<input type="text" inputmode="decimal" name="amount_incl" value="{{ r.amount_incl|num(2) if r.amount_incl is not none else '' }}"></label>
         <label class="f">Bedrag excl. btw<input type="text" inputmode="decimal" name="amount_excl" value="{{ r.amount_excl|num(2) if r.amount_excl is not none else '' }}"></label>
-        <label class="f">Inkooporder ERP<input type="text" name="erp_ref" value="{{ r.erp_ref or '' }}" placeholder="bijv. IO-1825"></label>
+        <label class="f">Inkoopnummer<input type="text" name="erp_ref" value="{{ r.erp_ref or '' }}" placeholder="bijv. 4267-20260131"></label>
         <label class="f">Omschrijving<input type="text" name="description" value="{{ r.description or '' }}"></label>
       </div>
-      {% if edit %}<div style="margin-top:12px"><button class="btn">Gegevens opslaan</button></div>{% endif %}
+      {% if edit %}<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Gegevens opslaan</button>
+        <button class="btn ghost" formaction="{{ url_for('crediteuren.reread_one', iid=r.id) }}" formnovalidate title="De PDF opnieuw uitlezen en de leverancier opnieuw zoeken in de relaties">{{ icon('refresh') }}Opnieuw uitlezen</button></div>{% endif %}
       </fieldset>
+      <datalist id="supplierlist">{% for s in suppliers %}<option value="{{ s.name }}">{% endfor %}</datalist>
     </form>
 
     {% if edit %}
     <section class="card">
-      <div class="card-head"><h2>Acties</h2></div>
-      <div class="cred-actions">
-        {% if r.status == 'nieuw' %}
-        <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="action" value="erp"><button class="btn primary">{{ icon('check') }}Verwerkt in ERP</button>
-          <button class="btn" name="next" value="1" title="Opslaan en de volgende nieuwe factuur openen">en volgende →</button></form>
-        {% elif r.status == 'erp' %}
-        <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="action" value="snelstart"><button class="btn primary">{{ icon('check') }}Verwerkt in SnelStart</button>
-          <button class="btn" name="next" value="1" title="Opslaan en de volgende factuur voor SnelStart openen">en volgende →</button></form>
-        {% endif %}
-        {% if r.status in ('nieuw', 'erp') %}
+      <div class="card-head"><h2>Status</h2><span class="small muted">tik op de status die nu geldt</span></div>
+      {% if r.status != 'afgewezen' %}
+      <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for key, label, sub in [('nieuw', 'Nieuw', 'nog niets mee gedaan'), ('erp', 'Verwerkt in Komdex', 'inkoop afgeboekt in Komdex'), ('buiten', 'Verwerkt buiten Komdex om', 'geen inkooporder, bijv. kosten'), ('snelstart', 'Verwerkt in SnelStart', 'geboekt, klaar')] %}
+        <button class="cred-st {{ 'on' if r.status == key }}" name="status" value="{{ key }}" {{ 'disabled' if r.status == key }}>
+          <span class="dot">{% if r.status == key %}{{ icon('check') }}{% endif %}</span><span><b>{{ label }}</b><small>{{ sub }}</small></span></button>
+        {% endfor %}
+      </form>
+      {% endif %}
+      <div class="cred-actions" style="margin-top:12px">
+        {% if r.status != 'snelstart' and r.status != 'afgewezen' %}
         <details class="cred-pop"><summary class="btn">Vraag stellen aan…</summary>
           <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
@@ -85,10 +89,9 @@
             <label class="f">Reden *<textarea name="reason" rows="3" required placeholder="Bijv. uren niet afgesproken, prijs klopt niet met offerte"></textarea></label>
             <div><button class="btn danger">Factuur afwijzen</button></div>
           </form></details>
-        {% endif %}
-        {% if r.status in ('erp', 'snelstart', 'afgewezen') %}
+        {% elif r.status == 'afgewezen' %}
         <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="action" value="terug"><button class="btn sm" onclick="return confirm('Status een stap terugzetten?')">{{ 'Afwijzing intrekken' if r.status == 'afgewezen' else 'Status terugzetten' }}</button></form>
+          <button class="btn" name="status" value="nieuw" onclick="return confirm('Afwijzing intrekken? De factuur wordt weer Nieuw.')">Afwijzing intrekken</button></form>
         {% endif %}
       </div>
     </section>

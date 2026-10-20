@@ -919,3 +919,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .attnew:empty { display: none; }
 .attnew .attrow { padding: 6px 6px 6px 4px; }
 .attnew .attx { flex: none; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--line-2); color: var(--ink-2); font-size: 20px; line-height: 1; cursor: pointer; }
+
+/* Inkoopfacturen: status kiezen */
+.cred-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cred-st { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; font: inherit; color: inherit; }
+.cred-st:hover:not([disabled]) { border-color: var(--accent); background: #F3F7FF; }
+.cred-st b { display: block; font-weight: 600; }
+.cred-st small { display: block; color: var(--muted, #5A5F80); font-size: 12.5px; }
+.cred-st .dot { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+.cred-st .dot svg { width: 15px; height: 15px; }
+.cred-st.on { border-color: var(--basic, #0A0A96); background: #EEF0FF; cursor: default; }
+.cred-st.on .dot { background: var(--basic, #0A0A96); border-color: var(--basic, #0A0A96); }
+@media (max-width: 699px) { .cred-status { grid-template-columns: 1fr; } }

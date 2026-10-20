@@ -1,7 +1,8 @@
 """Inkoopfacturen (crediteuren): één plek per factuur met PDF, status, vragen, opmerkingen en logboek.
 
 Facturen komen binnen via de mailbox (Microsoft Graph, alleen lezen) of door uploaden.
-Statussen: nieuw -> erp (verwerkt in ERP) -> snelstart (verwerkt in SnelStart); of afgewezen.
+Statussen: nieuw -> erp (verwerkt in Komdex) of buiten (verwerkt buiten Komdex om) -> snelstart (verwerkt in SnelStart); of afgewezen.
+Elke status is direct te kiezen (ook terug naar nieuw).
 Een open vraag (question_to) staat los van de status.
 """
 import base64
@@ -23,8 +24,11 @@ from .util import now_iso, now_utc, to_float, safe_filename, fmt_eur
 bp = Blueprint("crediteuren", __name__, url_prefix="/inkoopfacturen")
 
 MODULE = "crediteuren"
-STATUS = {"nieuw": "Nieuw", "erp": "Verwerkt in ERP", "snelstart": "Verwerkt in SnelStart", "afgewezen": "Afgewezen"}
-STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "snelstart": "b-ok", "afgewezen": "b-bad", "vraag": "b-warn"}
+STATUS = {"nieuw": "Nieuw", "erp": "Verwerkt in Komdex", "buiten": "Verwerkt buiten Komdex om",
+          "snelstart": "Verwerkt in SnelStart", "afgewezen": "Afgewezen"}
+STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "snelstart": "b-ok", "afgewezen": "b-bad", "vraag": "b-warn"}
+OPEN = ("nieuw", "erp", "buiten")        # nog niet afgerond
+TO_SNELSTART = ("erp", "buiten")         # klaar voor SnelStart
 DEFAULT_MAILBOX = "factuur@devreugd-pt.nl"
 POLL_SECONDS = 300
 _poll_lock = threading.Lock()
@@ -87,14 +91,105 @@ def _find(patterns, text, group=1):
     return None
 
 
+_INCL_LABEL = (r"(?:totaal|total|eindtotaal)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:incl\.?|inclusief|including|inkl\.?)"
+               r"|te\s*betalen|factuurbedrag|totaalbedrag|amount\s*due|gesamtbetrag|rechnungsbetrag")
+_EXCL_LABEL = (r"(?:totaal|total)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:excl\.?|exclusief|excluding|exkl\.?|net)"
+               r"|subtotaal|sub\s*total|netto\s*bedrag|nettobetrag|totaal\s*netto")
+_PO_LABEL = (r"(?:uw|your|ihre?)\s*(?:referentie|ref(?:erence|erenz)?\.?|kenmerk|zeichen|order\s*(?:nummer|nr\.?|no\.?|number)?"
+             r"|bestel(?:ling|nummer|nr\.?)?|bestellung|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)?)"
+             r"|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)|purchase\s*order\s*(?:number|no\.?|nr\.?)?|p\.?o\.?\s*(?:number|nr\.?|no\.?|#)"
+             r"|customer\s*(?:ref(?:erence)?|po)|bestellnummer|referentie|reference|kenmerk")
+_AMOUNT_SL = _AMOUNT.replace(r"(?:€|eur|euro)?\s*", r"(?:€|eur|euro)?[ \t]*", 1)   # bedrag op dezelfde regel
+_AMOUNT_ONLY = re.compile(r"^(?:€|eur)?\s*" + _AMOUNT + r"$", re.I)
+_LEGAL = re.compile(r"([A-Z0-9][\w&'.\-]*(?:\s+[\w&'.\-]+){0,5}?\s+(?:B\.?V\.?|N\.?V\.?|GmbH|V\.?O\.?F\.?|BVBA|Ltd\.?|AG|S\.?A\.?))(?=\s|$|,)")
+
+
+def _lines(words):
+    """Woorden (pdfplumber) per regel, van boven naar onder."""
+    rows = []
+    for w in sorted(words, key=lambda w: (round(w["top"]), w["x0"])):
+        if rows and abs(rows[-1][0] - w["top"]) <= 2.5:
+            rows[-1][1].append(w)
+        else:
+            rows.append([w["top"], [w]])
+    return [(top, sorted(ws, key=lambda w: w["x0"])) for top, ws in rows]
+
+
+def _below_amount(words, label):
+    """Bedrag dat ónder een kopje staat (totaalregels als tabel: 'Totaal excl. btw' met het bedrag op de regel eronder)."""
+    lines = _lines(words)
+    pat = re.compile(label, re.I)
+    for i, (top, ws) in enumerate(lines):
+        text, spans = "", []
+        for w in ws:
+            if text:
+                text += " "
+            spans.append((len(text), len(text) + len(w["text"]), w))
+            text += w["text"]
+        for m in pat.finditer(text):
+            hit = [w for a, b, w in spans if a < m.end() and b > m.start()]
+            if not hit:
+                continue
+            x0, x1 = min(w["x0"] for w in hit), max(w["x1"] for w in hit)
+            # bedrag rechts op dezelfde regel
+            right = [w for w in ws if w["x0"] > x1 and _AMOUNT_ONLY.match(w["text"])]
+            if right and right[0]["x0"] - x1 < 200:
+                return right[0]["text"]
+            best = None
+            for top2, ws2 in lines[i + 1:i + 4]:
+                if top2 - top > 45:
+                    break
+                for w in ws2:
+                    if not _AMOUNT_ONLY.match(w["text"]):
+                        continue
+                    if w["x1"] < x0 - 25 or w["x0"] > x1 + 25:
+                        continue   # niet onder het kopje
+                    d = (top2 - top) + abs((w["x0"] + w["x1"]) / 2 - (x0 + x1) / 2) / 4
+                    if best is None or d < best[0]:
+                        best = (d, w["text"])
+                if best:
+                    return best[1]
+    return None
+
+
+def _po_ref(text):
+    """Inkoopnummer van De Vreugd: begint altijd met 4 cijfers (4267, 4267-0, 4268-20260101)."""
+    sep = r"[\s.:#\-]*"
+    m = re.search(r"(?:" + _PO_LABEL + r")" + sep + r"(\d{4}(?:\s*-\s*\d{1,8})?)(?![\d,.])", text, re.I)
+    if not m:
+        m = re.search(r"(?<![\d.,/])(\d{4}\s*-\s*20\d{6})(?!\d)", text)   # 4267-20260131: inkoopnummer met ordernummer
+    return re.sub(r"\s+", "", m.group(1)) if m else None
+
+
+def _supplier(text):
+    for line in text.splitlines()[:12]:
+        m = _LEGAL.search(line)
+        if m and not re.search(r"vreugd", m.group(1), re.I):
+            words = m.group(1).split()
+            for k in range(1, len(words) // 2 + 1):   # logo-tekst + naam: "LM Systems LM Systems BV" -> "LM Systems BV"
+                if words[:k] == words[k:2 * k]:
+                    words = words[k:]
+                    break
+            return " ".join(words)[:80]
+    first = next((l.strip() for l in text.splitlines() if len(l.strip()) > 2 and not re.search(r"factuur|invoice|rechnung", l, re.I)), None)
+    if first:
+        first = re.split(r"\s+(?:kvk|btw|vat|iban|tel|telefoon|www\.)\b", first, flags=re.I)[0]
+    return (first or "")[:80] or None
+
+
 def extract(data):
-    """Leest factuurnummer, datums en bedragen uit een (tekst-)PDF. Geeft altijd een dict; ontbrekend = None."""
+    """Leest factuurnummer, datums, bedragen en ons inkoopnummer uit een (tekst-)PDF. Geeft altijd een dict; ontbrekend = None."""
     out = {"invoice_no": None, "invoice_date": None, "due_date": None, "amount_incl": None, "amount_excl": None,
-           "supplier_guess": None}
+           "erp_ref": None, "supplier_guess": None, "text": ""}
+    words = []
     try:
         import pdfplumber
         with pdfplumber.open(io.BytesIO(data)) as pdf:
-            text = "\n".join((p.extract_text() or "") for p in pdf.pages[:3])
+            pages = pdf.pages[:3]
+            text = "\n".join((p.extract_text() or "") for p in pages)
+            # woorden met positie van de laatste pagina (daar staan de totalen) en de eerste (kopgegevens)
+            for p in ([pages[-1]] + ([pages[0]] if len(pages) > 1 else [])):
+                words.append(p.extract_words(keep_blank_chars=False, use_text_flow=False))
     except Exception:
         return out
     if not text.strip():
@@ -110,29 +205,127 @@ def extract(data):
         out["invoice_no"] = out["invoice_no"].rstrip(".-/")
     out["invoice_date"] = parse_date(_find([
         r"factuur\s*datum" + sep + _DATE, r"invoice\s*date" + sep + _DATE, r"rechnungsdatum" + sep + _DATE,
-        r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE], text))
+        r"document\s*datum" + sep + _DATE, r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE, r"\bdate" + sep + _DATE], text))
     out["due_date"] = parse_date(_find([
         r"verval\s*datum" + sep + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
         r"betalen\s*(?:voor|vóór|uiterlijk)" + sep + _DATE, r"f[äa]llig(?:keit)?" + sep + _DATE], text))
-    incl = _find([
-        r"te\s*betalen[^\n\d€-]{0,25}" + _AMOUNT, r"totaal\s*(?:incl\.?|inclusief)[^\n\d€-]{0,25}" + _AMOUNT,
-        r"total\s*(?:incl\.?|including|amount\s*due)[^\n\d€-]{0,25}" + _AMOUNT, r"amount\s*due[^\n\d€-]{0,25}" + _AMOUNT,
-        r"gesamtbetrag[^\n\d€-]{0,25}" + _AMOUNT, r"factuurbedrag[^\n\d€-]{0,25}" + _AMOUNT,
-        r"^\s*totaal[^\n\d€-]{0,15}" + _AMOUNT, r"^\s*total[^\n\d€-]{0,15}" + _AMOUNT], text)
+    gap = r"[^\n\d€-]{0,25}"
+    incl = _find([r"(?:" + _INCL_LABEL + r")" + gap + _AMOUNT_SL], text)
+    excl = _find([r"(?:" + _EXCL_LABEL + r")" + gap + _AMOUNT_SL], text)
+    for ws in words:   # totalen als tabel: bedrag onder het kopje
+        incl = incl or _below_amount(ws, _INCL_LABEL)
+        excl = excl or _below_amount(ws, _EXCL_LABEL)
+    if not incl:
+        incl = _find([r"^\s*totaal[^\n\d€-]{0,15}" + _AMOUNT, r"^\s*total[^\n\d€-]{0,15}" + _AMOUNT], text)
     out["amount_incl"] = parse_amount(incl)
-    excl = _find([
-        r"totaal\s*(?:excl\.?|exclusief)[^\n\d€-]{0,25}" + _AMOUNT, r"subtotaal[^\n\d€-]{0,25}" + _AMOUNT,
-        r"total\s*(?:excl\.?|excluding|net)[^\n\d€-]{0,25}" + _AMOUNT, r"netto(?:bedrag)?[^\n\d€-]{0,25}" + _AMOUNT,
-        r"sub\s*total[^\n\d€-]{0,25}" + _AMOUNT], text)
     out["amount_excl"] = parse_amount(excl)
     if out["amount_incl"] is None:
         nums = [parse_amount(x) for x in re.findall(r"€\s*" + _AMOUNT, text)]
         nums = [n for n in nums if n]
         if nums:
             out["amount_incl"] = max(nums)
-    first = next((l.strip() for l in text.splitlines() if len(l.strip()) > 2 and not re.search(r"factuur|invoice|rechnung", l, re.I)), None)
-    out["supplier_guess"] = (first or "")[:80] or None
+    if out["amount_incl"] is not None and out["amount_excl"] is not None and out["amount_excl"] > out["amount_incl"] > 0:
+        out["amount_incl"], out["amount_excl"] = out["amount_excl"], out["amount_incl"]
+    out["erp_ref"] = _po_ref(text)
+    out["supplier_guess"] = _supplier(text)
+    out["text"] = text
     return out
+
+
+# ------------------------------------------------------------------ leverancier herkennen uit de relaties
+
+_GENERIC_DOMAINS = {"gmail.com", "hotmail.com", "hotmail.nl", "outlook.com", "outlook.nl", "live.nl", "live.com", "icloud.com",
+                    "me.com", "yahoo.com", "ziggo.nl", "kpnmail.nl", "planet.nl", "home.nl", "xs4all.nl", "upcmail.nl",
+                    "onmicrosoft.com", "devreugd-pt.nl", "exactonline.nl", "snelstart.nl", "twinfield.com", "basecone.com"}
+_OWN_POSTCODES = {"6669NA"}
+
+
+def _domain(v):
+    v = str(v or "").strip().lower()
+    if not v:
+        return None
+    v = v.split("@")[-1]
+    v = re.sub(r"^[a-z]+://", "", v).split("/")[0].split("?")[0]
+    v = re.sub(r"^www\d?\.", "", v)
+    parts = [p for p in v.split(".") if p]
+    if len(parts) < 2:
+        return None
+    d = ".".join(parts[-3:]) if parts[-2] in ("co", "com") and len(parts) > 2 else ".".join(parts[-2:])
+    return None if d in _GENERIC_DOMAINS else d
+
+
+def _digits_phone(v):
+    d = re.sub(r"\D", "", str(v or ""))
+    if d.startswith("0031"):
+        d = "0" + d[4:]
+    elif d.startswith("31") and len(d) == 11:
+        d = "0" + d[2:]
+    return d if len(d) >= 9 else None
+
+
+def match_supplier(conn, text, mail_from=None):
+    """Zoekt de leverancier in de relaties op meerdere kenmerken: naam op de factuur, e-maildomein van de afzender,
+    website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres.
+    Geeft (id, naam, redenen) als het overtuigend is, anders None."""
+    from .relaties import name_key
+    text = text or ""
+    tkey = name_key(text)
+    tdom = {d for d in (_domain(x) for x in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|(?:https?://|www\.)[\w.-]+\.[a-z]{2,}"
+                                                       r"|\b[\w-]+\.(?:nl|com|de|be|eu|net|org|co\.uk)\b", text, re.I)) if d}
+    tpc = {re.sub(r"\s", "", m).upper() for m in re.findall(r"\b\d{4}\s?[A-Za-z]{2}\b", text)} - _OWN_POSTCODES
+    tph = {d for d in (_digits_phone(m) for m in re.findall(r"(?:\+|00)?\d[\d\s\-().]{8,16}\d", text)) if d}
+    mdom = _domain(mail_from)
+    prev = None
+    if mail_from:
+        prev = conn.execute("SELECT supplier_id FROM invoices WHERE mail_from = ? AND supplier_id IS NOT NULL"
+                            " ORDER BY id DESC LIMIT 1", (mail_from.lower(),)).fetchone()
+    best = []
+    for c in conn.execute("SELECT id, name, short_name, email, website, postcode, phone, relation_type FROM customers"
+                          " WHERE IFNULL(active, 1) = 1"):
+        if re.search(r"vreugd", c["name"] or "", re.I):
+            continue
+        score, why = 0.0, []
+        nk = name_key(c["name"])
+        if len(nk) >= 4 and nk in tkey:
+            score += 3
+            why.append("naam op de factuur")
+        elif c["short_name"] and len(name_key(c["short_name"])) >= 5 and name_key(c["short_name"]) in tkey:
+            score += 2
+            why.append("verkorte naam op de factuur")
+        doms = {d for d in (_domain(c["email"]), _domain(c["website"])) if d}
+        if mdom and mdom in doms:
+            score += 3
+            why.append("e-maildomein afzender")
+        if doms & tdom:
+            score += 2
+            why.append("website/e-mail op de factuur")
+        pc = re.sub(r"\s", "", c["postcode"] or "").upper()
+        if len(pc) == 6 and pc in tpc:
+            score += 2
+            why.append("postcode")
+        ph = _digits_phone(c["phone"])
+        if ph and ph in tph:
+            score += 2
+            why.append("telefoonnummer")
+        if prev and prev["supplier_id"] == c["id"]:
+            score += 4
+            why.append("eerdere factuur van dit e-mailadres")
+        if not score:
+            continue
+        if c["relation_type"] in ("leverancier", "beide"):
+            score += 0.5
+        strong = len([w for w in why if not w.startswith("verkorte")]) >= 2 or "e-maildomein afzender" in why \
+            or "eerdere factuur van dit e-mailadres" in why or ("naam op de factuur" in why and len(nk) >= 8)
+        best.append((score, strong, c["id"], c["name"], why))
+    if not best:
+        return None
+    best.sort(key=lambda b: -b[0])
+    top = best[0]
+    if not top[1]:
+        return None
+    if len(best) > 1 and best[1][0] >= top[0] - 0.5 and top[0] < 5:
+        return None   # twijfel tussen twee relaties: niet gokken
+    return top[2], top[3], top[4]
 
 
 # ------------------------------------------------------------------ opslaan (ook buiten een request)
@@ -175,18 +368,25 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
                             " ORDER BY id DESC LIMIT 1", (mail["from_addr"],)).fetchone()
         supplier = prev["supplier"] if prev else (mail.get("from_name") or None)
     supplier = supplier or x["supplier_guess"]
+    m = match_supplier(conn, x["text"], mail.get("from_addr"))
+    supplier_id = supplier_match = None
+    if m:
+        supplier_id, supplier, why = m
+        supplier_match = ", ".join(why)
     if x["invoice_no"] and supplier:
         same = conn.execute("SELECT id FROM invoices WHERE invoice_no = ? AND supplier = ?", (x["invoice_no"], supplier)).fetchone()
         if same:
             return same["id"], False
     now = now_iso()
     cur = conn.execute(
-        "INSERT INTO invoices (status, supplier, invoice_no, invoice_date, due_date, amount_incl, amount_excl, source,"
+        "INSERT INTO invoices (status, supplier, invoice_no, invoice_date, due_date, amount_incl, amount_excl, erp_ref, source,"
         " mail_id, mail_from, mail_subject, received_at, sha256, created_by, created_at, updated_at)"
-        " VALUES ('nieuw',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (supplier, x["invoice_no"], x["invoice_date"], x["due_date"], x["amount_incl"], x["amount_excl"], source,
+        " VALUES ('nieuw',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (supplier, x["invoice_no"], x["invoice_date"], x["due_date"], x["amount_incl"], x["amount_excl"], x["erp_ref"], source,
          mail.get("key"), mail.get("from_addr"), mail.get("subject"), mail.get("received") or now, sha, user_id, now, now))
     iid = cur.lastrowid
+    if supplier_id:
+        conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
     fid = _store_file(conn, upload_dir, iid, data, safe_filename(filename) or "factuur.pdf", user_id)
     conn.execute("UPDATE invoices SET file_id = ? WHERE id = ?", (fid, iid))
     if source == "mail":
@@ -194,12 +394,47 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
                        f" ({mail.get('subject') or 'geen onderwerp'})")
     else:
         log(conn, iid, "Geüpload", user_id)
-    found = [k for k in ("invoice_no", "invoice_date", "due_date", "amount_incl") if x[k]]
+    labels = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum",
+              "amount_excl": "bedrag excl.", "amount_incl": "bedrag incl.", "erp_ref": "inkoopnummer"}
+    found = [k for k in labels if x.get(k)]
     if found:
-        log(conn, iid, "Gegevens automatisch uitgelezen: " + ", ".join(
-            {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum", "amount_incl": "bedrag"}[k] for k in found))
+        log(conn, iid, "Gegevens automatisch uitgelezen: " + ", ".join(labels[k] for k in found))
+    if supplier_id:
+        log(conn, iid, f"Leverancier herkend uit de relaties: {supplier} (op {supplier_match})")
     conn.commit()
     return iid, True
+
+
+def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
+    """Factuur opnieuw uitlezen (na verbeteringen in het uitlezen). overwrite=False: alleen lege velden aanvullen.
+    De leverancier wordt gekoppeld aan de relaties als die herkend wordt en er nog geen koppeling is (of bij overwrite)."""
+    r = conn.execute("SELECT i.*, f.stored_name FROM invoices i LEFT JOIN files f ON f.id = i.file_id WHERE i.id = ?", (iid,)).fetchone()
+    if not r or not r["stored_name"]:
+        return []
+    from .util import file_path
+    try:
+        with open(file_path(r), "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return []
+    x = extract(data)
+    upd = {}
+    for k in ("invoice_no", "invoice_date", "due_date", "amount_incl", "amount_excl", "erp_ref"):
+        if x.get(k) is not None and (overwrite or r[k] in (None, "")) and x[k] != r[k]:
+            upd[k] = x[k]
+    if overwrite or not r["supplier_id"]:
+        m = match_supplier(conn, x["text"], r["mail_from"])
+        if m and m[0] != r["supplier_id"]:
+            upd.update(supplier_id=m[0], supplier=m[1], supplier_match=", ".join(m[2]))
+    if upd:
+        conn.execute("UPDATE invoices SET " + ", ".join(f"{k} = ?" for k in upd) + ", updated_at = ? WHERE id = ?",
+                     list(upd.values()) + [now_iso(), iid])
+        names = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum", "amount_incl": "bedrag incl.",
+                 "amount_excl": "bedrag excl.", "erp_ref": "inkoopnummer", "supplier": "leverancier"}
+        log(conn, iid, "Opnieuw uitgelezen: " + ", ".join(names[k] for k in upd if k in names)
+            + (f" (leverancier uit de relaties, op {upd['supplier_match']})" if "supplier_match" in upd else ""), user_id)
+        conn.commit()
+    return [k for k in upd if k != "supplier_match"]
 
 
 # ------------------------------------------------------------------ mailbox (Microsoft Graph, alleen lezen)
@@ -328,7 +563,7 @@ def scheduled_poll(conn, app, state):
 # ------------------------------------------------------------------ helpers voor de schermen
 
 def _status_key(r):
-    if r["status"] in ("nieuw", "erp") and r["question_to"]:
+    if r["status"] in OPEN and r["question_to"]:
         return "vraag"
     return r["status"]
 
@@ -360,9 +595,9 @@ def open_counts():
     if not getattr(g, "user", None) or not can(MODULE):
         return {}
     r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('nieuw','erp') AND question_to IS NOT NULL) AS vraag,"
-              " SUM(status='erp' AND question_to IS NULL) AS erp,"
-              " SUM(status IN ('nieuw','erp') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
+              " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp,"
+              " SUM(status IN ('nieuw','erp','buiten') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
     return {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
 
 
@@ -371,7 +606,7 @@ def open_counts():
 FILTERS = [
     ("open", "Alles open"),
     ("nieuw", "Nieuw"),
-    ("erp", "Naar SnelStart"),
+    ("erp", "Nog naar SnelStart"),
     ("vraag", "Vraag open"),
     ("mij", "Wacht op mij"),
     ("boekhouding", "Voor de boekhouding"),
@@ -389,11 +624,11 @@ def index():
     where, params = [], []
     uid = g.user["id"]
     cond = {
-        "open": "i.status IN ('nieuw','erp')",
+        "open": "i.status IN ('nieuw','erp','buiten')",
         "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
-        "erp": "i.status = 'erp' AND i.question_to IS NULL",
-        "vraag": "i.status IN ('nieuw','erp') AND i.question_to IS NOT NULL",
-        "mij": "i.status IN ('nieuw','erp') AND i.question_to = ?",
+        "erp": "i.status IN ('erp','buiten') AND i.question_to IS NULL",
+        "vraag": "i.status IN ('nieuw','erp','buiten') AND i.question_to IS NOT NULL",
+        "mij": "i.status IN ('nieuw','erp','buiten') AND i.question_to = ?",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
         "afgewezen": "i.status = 'afgewezen'",
         "klaar": "i.status = 'snelstart'",
@@ -413,12 +648,12 @@ def index():
         " (SELECT l.action || ' · ' || IFNULL(u.name, 'systeem') FROM invoice_log l LEFT JOIN users u ON u.id = l.user_id"
         "   WHERE l.invoice_id = i.id ORDER BY l.id DESC LIMIT 1) AS last_action"
         " FROM invoices i LEFT JOIN users q ON q.id = i.question_to WHERE " + " AND ".join(where) +
-        " ORDER BY CASE WHEN i.status IN ('nieuw','erp') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
-    c = query("SELECT SUM(status IN ('nieuw','erp')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status='erp' AND question_to IS NULL) AS erp, SUM(status IN ('nieuw','erp') AND question_to IS NOT NULL) AS vraag,"
-              " SUM(status IN ('nieuw','erp') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
+        " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
+    c = query("SELECT SUM(status IN ('nieuw','erp','buiten')) AS open, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
+              " SUM(status IN ('erp','buiten') AND question_to IS NULL) AS erp, SUM(status IN ('nieuw','erp','buiten') AND question_to IS NOT NULL) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
               " SUM(status='snelstart') AS klaar, COUNT(*) AS alle,"
-              " SUM(status IN ('nieuw','erp') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
+              " SUM(status IN ('nieuw','erp','buiten') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
               " SUM(status = 'afgewezen' AND rejected_at >= date('now','start of month')) AS af_maand"
               " FROM invoices", (uid,), one=True)
     counts = {k: (c[k] or 0) for k in c.keys()}
@@ -505,8 +740,10 @@ def detail(iid):
     back = request.args.get("terug") or url_for("crediteuren.index")
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
+    suppliers = query("SELECT name FROM customers WHERE IFNULL(active, 1) = 1 AND relation_type IN ('leverancier', 'beide')"
+                      " ORDER BY name")
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
-                           back=back)
+                           back=back, suppliers=suppliers)
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -525,11 +762,16 @@ def save(iid):
         "description": (f.get("description") or "").strip()[:300] or None,
     }
     changed = [k for k, v in vals.items() if (r[k] if not isinstance(v, float) else (r[k] if r[k] is None else round(r[k], 2))) != v]
+    if "supplier" in changed:
+        rel = query("SELECT id, name FROM customers WHERE lower(name) = lower(?) AND IFNULL(active, 1) = 1 ORDER BY"
+                    " CASE WHEN relation_type IN ('leverancier','beide') THEN 0 ELSE 1 END LIMIT 1", (vals["supplier"] or "",), one=True)
+        execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?",
+                (rel["id"] if rel else None, "handmatig gekozen" if rel else None, iid))
     if changed:
         execute("UPDATE invoices SET " + ", ".join(f"{k} = ?" for k in vals) + ", updated_at = ? WHERE id = ?",
                 list(vals.values()) + [now_iso(), iid])
         names = {"supplier": "leverancier", "invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum",
-                 "amount_incl": "bedrag incl.", "amount_excl": "bedrag excl.", "erp_ref": "inkooporder ERP", "description": "omschrijving"}
+                 "amount_incl": "bedrag incl.", "amount_excl": "bedrag excl.", "erp_ref": "inkoopnummer", "description": "omschrijving"}
         conn = get_db()
         log(conn, iid, "Gegevens aangepast: " + ", ".join(names[k] for k in changed), g.user["id"])
         conn.commit()
@@ -537,31 +779,51 @@ def save(iid):
     return redirect(url_for("crediteuren.detail", iid=iid))
 
 
+@bp.route("/<int:iid>/opnieuw-uitlezen", methods=["POST"])
+def reread_one(iid):
+    _load(iid)
+    if not can("crediteuren", 2):
+        abort(403)
+    done = reread(get_db(), _upload_dir(), iid, overwrite=True, user_id=g.user["id"])
+    flash("Opnieuw uitgelezen; bijgewerkt: " + ", ".join(done) if done else "Opnieuw uitgelezen; er is niets veranderd.", "ok")
+    return redirect(url_for("crediteuren.detail", iid=iid))
+
+
+@bp.route("/opnieuw-uitlezen", methods=["POST"])
+def reread_all():
+    if not can("crediteuren", 3):
+        abort(403)
+    conn = get_db()
+    n = 0
+    for r in conn.execute("SELECT id FROM invoices WHERE status NOT IN ('snelstart', 'afgewezen') ORDER BY id").fetchall():
+        if reread(conn, _upload_dir(), r["id"], overwrite=False, user_id=g.user["id"]):
+            n += 1
+    flash(f"Openstaande facturen opnieuw uitgelezen: {n} aangevuld (alleen lege velden en de leverancier uit de relaties).", "ok")
+    return redirect(url_for("crediteuren.index"))
+
+
 @bp.route("/<int:iid>/status", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def set_status(iid):
+    """Status direct kiezen: Verwerkt in Komdex, Verwerkt buiten Komdex om, Verwerkt in SnelStart, of terug naar Nieuw."""
     r = _load(iid)
-    action = request.form.get("action")
+    if not can("crediteuren", 2):
+        abort(403)
+    new = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
+    if new not in ("nieuw", "erp", "buiten", "snelstart") or new == r["status"]:
+        return redirect(url_for("crediteuren.detail", iid=iid))
     conn = get_db()
     now, uid = now_iso(), g.user["id"]
-    if action == "erp" and r["status"] == "nieuw":
-        conn.execute("UPDATE invoices SET status='erp', erp_at=?, erp_by=?, updated_at=? WHERE id=?", (now, uid, now, iid))
-        log(conn, iid, "Verwerkt in ERP", uid)
-    elif action == "snelstart" and r["status"] == "erp":
-        conn.execute("UPDATE invoices SET status='snelstart', snelstart_at=?, snelstart_by=?, updated_at=? WHERE id=?", (now, uid, now, iid))
-        log(conn, iid, "Verwerkt in SnelStart", uid)
-    elif action == "terug" and r["status"] in ("erp", "snelstart", "afgewezen"):
-        prev = {"erp": "nieuw", "snelstart": "erp", "afgewezen": "nieuw"}[r["status"]]
-        conn.execute("UPDATE invoices SET status=?, updated_at=? WHERE id=?", (prev, now, iid))
-        log(conn, iid, f"Teruggezet van '{STATUS[r['status']]}' naar '{STATUS[prev]}'", uid)
+    if new in ("erp", "buiten"):
+        conn.execute("UPDATE invoices SET status=?, erp_at=?, erp_by=?, updated_at=? WHERE id=?", (new, now, uid, now, iid))
+    elif new == "snelstart":
+        conn.execute("UPDATE invoices SET status='snelstart', snelstart_at=?, snelstart_by=?, erp_at=COALESCE(erp_at, ?),"
+                     " erp_by=COALESCE(erp_by, ?), updated_at=? WHERE id=?", (now, uid, now, uid, now, iid))
     else:
-        abort(400)
+        conn.execute("UPDATE invoices SET status='nieuw', updated_at=? WHERE id=?", (now, iid))
+    log(conn, iid, f"Status: {STATUS[new]}" + (f" (was {STATUS.get(r['status'], r['status'])})" if r["status"] != "nieuw" else ""), uid)
     conn.commit()
-    if action == "snelstart" or (action == "erp" and request.form.get("next") == "1"):
-        nxt = query("SELECT id FROM invoices WHERE status = ? AND question_to IS NULL AND id <> ? ORDER BY received_at, id LIMIT 1",
-                    ("nieuw" if action == "erp" else "erp", iid), one=True)
-        if nxt and request.form.get("next") == "1":
-            return redirect(url_for("crediteuren.detail", iid=nxt["id"]))
+    flash(f"Status: {STATUS[new]}.", "ok")
     return redirect(url_for("crediteuren.detail", iid=iid))
 
 

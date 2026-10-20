@@ -13,6 +13,10 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="btn">{{ icon('upload') }}PDF uploaden<input type="file" name="files" accept="application/pdf,.pdf" multiple hidden onchange="this.form.submit()"></label>
     </form>
+    {% if can('crediteuren', 3) %}
+    <form method="post" action="{{ url_for('crediteuren.reread_all') }}" onsubmit="return confirm('Alle openstaande facturen opnieuw uitlezen? Alleen lege velden en de leverancier (uit de relaties) worden aangevuld.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" title="Lege velden en leverancier aanvullen bij openstaande facturen">{{ icon('refresh') }}Opnieuw uitlezen</button></form>
+    {% endif %}
     {% if mail.configured %}
     <form method="post" action="{{ url_for('crediteuren.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn primary">{{ icon('refresh') }}Mailbox nu ophalen</button></form>
@@ -22,9 +26,9 @@
 </div>
 
 <div class="grid g4" style="margin-bottom:16px">
-  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="text-decoration:none;color:inherit"><div class="label">Nieuw</div><div class="value" style="color:#0059B3">{{ counts.nieuw }}</div><div class="sub">nog in het ERP te zetten</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="text-decoration:none;color:inherit"><div class="label">Nieuw</div><div class="value" style="color:#0059B3">{{ counts.nieuw }}</div><div class="sub">nog in Komdex te verwerken</div></a>
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='vraag') }}" style="text-decoration:none;color:inherit"><div class="label">Vraag open</div><div class="value" style="color:var(--warn)">{{ counts.vraag }}</div><div class="sub">{{ counts.mij }} wacht{{ 'en' if counts.mij != 1 }} op jou</div></a>
-  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Verwerkt in ERP</div><div class="value" style="color:#2E268F">{{ counts.erp }}</div><div class="sub">nog naar SnelStart</div></a>
+  <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Nog naar SnelStart</div><div class="value" style="color:#2E268F">{{ counts.erp }}</div><div class="sub">verwerkt in of buiten Komdex</div></a>
   <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" {% if counts.verval %}style="color:var(--bad)"{% endif %}>{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
 </div>
 
@@ -49,7 +53,7 @@
         <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div></td>
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>
       <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
-      <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
+      <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp','buiten') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
       <td><span class="badge {{ STATUS_BADGE[r.skey] }}">{{ r.label }}</span></td>
       <td class="hide-m small muted">{{ r.last_action or '' }}</td>
     </tr>
