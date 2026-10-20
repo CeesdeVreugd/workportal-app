@@ -222,6 +222,14 @@ def _close_vat(excl, vat):
     return any(abs(pct - t) < 0.15 for t in (21, 9, 6, 19, 20, 7))
 
 
+_DASHES = str.maketrans({"\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-", "\u2014": "-", "\u2212": "-",
+                         "\u00a0": " ", "\u2007": " ", "\u202f": " ", "\u00ad": ""})
+
+
+def _clean(v):
+    return (v or "").translate(_DASHES)
+
+
 def extract(data):
     """Leest factuurnummer, datums, bedragen en ons inkoopnummer uit een (tekst-)PDF. Geeft altijd een dict; ontbrekend = None."""
     out = {"invoice_no": None, "invoice_date": None, "due_date": None, "amount_incl": None, "amount_excl": None,
@@ -242,6 +250,11 @@ def extract(data):
         return out
     if not text.strip():
         return out
+    # andere streepjes (‐ ‑ – — −) en harde spaties gelijk maken, anders worden 15‑10‑2026 en 4288‑20260000 niet herkend
+    text = _clean(text)
+    for ws in words:
+        for w in ws:
+            w["text"] = _clean(w["text"])
     sep = r"[\s.:#\-]*"
     num = r"((?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])"   # met minstens één cijfer (niet "Klantnummer")
     out["invoice_no"] = _find([
@@ -398,30 +411,38 @@ def _name_has_core(name, core):
     from .relaties import _norm
     if not core:
         return False
-    full = _norm(name)
-    words = re.findall(r"[a-z0-9]+", (name or "").lower())
+    full = _yk(_norm(name))
+    words = re.findall(r"[a-z0-9]+", _yk((name or "").lower()))
     initials = "".join(w[0] for w in words if w not in ("de", "het", "van", "en", "bv", "b", "v", "nv"))
     if full.startswith(core) or (words and words[0] == core):
         return 2
     return 1 if initials.startswith(core) else 0   # afkorting telt minder zwaar
 
 
-def match_supplier(conn, text, mail_from=None):
+def _yk(v):
+    """ij en y gelijk behandelen (Waaijenberg = Waayenberg)."""
+    return (v or "").replace("ij", "y")
+
+
+def match_supplier(conn, text, mail_from=None, hint=None):
     """Zoekt de leverancier in de relaties op meerdere kenmerken: naam op de factuur, e-maildomein van de afzender,
     website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres.
     Geeft (id, naam, redenen) als het overtuigend is, anders None."""
-    from .relaties import name_key, _norm
+    from .relaties import name_key as _nk, _norm as _nm
+    name_key = lambda v: _yk(_nk(v))   # noqa: E731
+    _norm = lambda v: _yk(_nm(v))      # noqa: E731
     text = text or ""
     tkey = name_key(text)
     tnorm = _norm(text)
+    hkey = name_key(hint) if hint else ""   # naam van de afzender in de mail, bijv. "Digitale factuur van Waaijenberg Coatings BV"
     head_key = name_key("\n".join(text.splitlines()[:15]))   # kop van de factuur: daar staat de afzender
     tdom = {d for d in (_domain(x) for x in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|(?:https?://|www\.)[\w.-]+\.[a-z]{2,}"
                                                        r"|\b[\w-]+\.(?:nl|com|de|be|eu|net|org|co\.uk)\b", text, re.I)) if d}
     tpc = {re.sub(r"\s", "", m).upper() for m in re.findall(r"\b\d{4}\s?[A-Za-z]{2}\b", text)} - _OWN_POSTCODES
     tph = {d for d in (_digits_phone(m) for m in re.findall(r"(?:\+|00)?\d[\d\s\-().]{8,16}\d", text)) if d}
     mdom = _domain(mail_from)
-    mcore = _dom_core(mdom)
-    tcores = {cc for cc in (_dom_core(d) for d in tdom) if cc}
+    mcore = _yk(_dom_core(mdom) or "") or None
+    tcores = {_yk(cc) for cc in (_dom_core(d) for d in tdom) if cc}
     prev = None
     if mail_from:
         prev = conn.execute("SELECT supplier_id FROM invoices WHERE mail_from = ? AND supplier_id IS NOT NULL"
@@ -454,7 +475,11 @@ def match_supplier(conn, text, mail_from=None):
         tl = max([_name_has_core(c["name"], tc) for tc in tcores] or [0])
         if not (doms & tdom) and tl:
             score += 1.5 if tl == 2 else 1
-            why.append("website op de factuur past bij de naam")   # www.bmn-bv.nl en relatie "BMN ..."
+            long_core = tl == 2 and any(len(tc) >= 8 and _name_has_core(c["name"], tc) == 2 for tc in tcores)
+            why.append("website op de factuur is de naam" if long_core else "website op de factuur past bij de naam")
+        if hkey and len(nk) >= 5 and nk in hkey:
+            score += 3
+            why.append("naam afzender van de mail")
         if doms & tdom:
             score += 2
             why.append("website/e-mail op de factuur")
@@ -476,7 +501,8 @@ def match_supplier(conn, text, mail_from=None):
         if any(_name_has_core(c["name"], cc) == 2 for cc in ({mcore} | tcores) if cc):
             score += 0.7   # naam begint met het domein (bmn-bv.nl -> "BMN ..."): voorrang bij dubbele relaties
         strong = len([w for w in why if not w.startswith("verkorte")]) >= 2 or "e-maildomein afzender" in why \
-            or "e-maildomein afzender past bij de naam" in why \
+            or "e-maildomein afzender past bij de naam" in why or "website op de factuur is de naam" in why \
+            or ("naam afzender van de mail" in why and len(nk) >= 8) \
             or "eerdere factuur van dit e-mailadres" in why or "volledige naam op de factuur" in why \
             or (any(w.startswith("naam op de factuur") for w in why) and len(nk) >= 8)
         best.append((score, strong, c["id"], c["name"], why))
@@ -564,7 +590,7 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     if _bad_supplier(supplier):
         supplier = None
     supplier = supplier or x["supplier_guess"]
-    m = match_supplier(conn, x["text"], mail.get("from_addr"))
+    m = match_supplier(conn, x["text"], mail.get("from_addr"), hint=mail.get("from_name"))
     supplier_id = supplier_match = None
     if m:
         supplier_id, supplier, why = m
@@ -666,7 +692,7 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
         if x.get(k) is not None and (overwrite or r[k] in (None, "") or not by_hand) and x[k] != r[k]:
             upd[k] = x[k]
     if overwrite or not r["supplier_id"]:
-        m = match_supplier(conn, x["text"], r["mail_from"])
+        m = match_supplier(conn, x["text"], r["mail_from"], hint=r["supplier"])
         if m and m[0] != r["supplier_id"]:
             upd.update(supplier_id=m[0], supplier=m[1], supplier_match=", ".join(m[2]))
         elif not m and not r["supplier_id"] and x["supplier_guess"] and _bad_supplier(r["supplier"]):

@@ -615,3 +615,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V112 – Inkoopfacturen: datums zonder kopje ervoor
 - "Vervaldatum" als kopje met de datum eronder wordt gelezen (Gaasbeek: 13-11-2026).
 - Factuurdatum zonder kopje (losse datum in de kop, bijv. rechts naast het debiteurnummer): de eerste datum die geen verval-, lever-, order- of periodedatum is.
+
+## V113 – Inkoopfacturen: streepjes, ij/y en naam van de afzender
+- Sommige PDF's gebruiken een ander streepje (‑ – —) of een harde spatie: "15‑10‑2026" en "4288‑20260000" werden daardoor niet herkend (Heleon: datum leeg, inkoopnummer alleen "4288"). Alle streepjes en spaties worden nu eerst gelijkgemaakt.
+- Leverancier: website op de factuur die precies de naam is (waayenbergcoatings.nl ↔ "Waayenberg Coatings") telt als zeker; ook de naam van de afzender van de mail ("Digitale factuur van Waaijenberg Coatings BV") wordt gebruikt; ij en y gelden als gelijk.
