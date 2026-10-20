@@ -598,3 +598,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - "FACTUUR N° FLL A6665966" (ook met spatie en letters), datum na de plaatsnaam ("'s-Hertogenbosch, 02 oktober 2026"), "Vervaldag".
 - "Totaal BTW 21,00 %" wordt niet meer als totaalbedrag gezien; kolom "Totaal" naast "Excl. BTW"/"Bedrag BTW" wel (gecontroleerd met de btw).
 - Een kopje over twee kolommen ("BTW | Bedrag") telt niet meer als één kopje; waarden moeten echt onder het kopje staan.
+
+## V109 – Inkoopfacturen: IMS-opmaak
+- Bedrag op een totaalregel = het laatste bedrag op die regel; gewichten (KG), percentages en aantallen tellen niet mee ("gewicht/factuurbedrag 341,308 KG 1.719,54" → 1.719,54).
+- "btw 21,00 % over 1.421,11  298,43": grondslag (excl.) = bedrag na "over", btw = laatste bedrag.
+- "onze factuur / datum  1260695561 / 08.10.2026": factuurnummer én factuurdatum samen (gaat vóór een orderdatum elders op de factuur).

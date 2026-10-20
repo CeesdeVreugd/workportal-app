@@ -110,6 +110,26 @@ _DATE_VALUE = re.compile(r"^" + _DATE + r"$", re.I)
 _INVNO_LABEL = r"fact(?:uur)?\.?\s*(?:nr|nummer|no)\.?|invoice\s*(?:no|number|nr)\.?|rechnungs?\s*(?:nr|nummer)\.?"
 _DATE_LABEL = r"fact(?:uur)?\.?\s*datum|invoice\s*date|rechnungsdatum"
 _VATAMT_LABEL = r"btw-?bedrag|bedrag\s*btw|vat\s*amount|mwst[\s-]*betrag"
+_AMT_TOKEN = re.compile(r"(?<![\d.,])(-?\d{1,3}(?:\.\d{3})+,\d{2}|-?\d+,\d{2}|-?\d{1,3}(?:,\d{3})+\.\d{2}|-?\d+\.\d{2})(?!\d)"
+                        r"(?!\s*(?:%|kg\b|st\b|stuks|mtr|m\b|/))", re.I)
+
+
+def _line_amount(text, label, stop=None):
+    """Bedrag op dezelfde regel na het kopje: het laatste bedrag (gewicht, % en aantallen tellen niet mee).
+    stop: tekst waar een ander totaal begint (dan daar afkappen)."""
+    for m in re.finditer(r"(?:" + label + r")", text, re.I | re.M):
+        end = text.find("\n", m.end())
+        rest = text[m.end(): end if end >= 0 else len(text)]
+        if stop:
+            cut = re.search(stop, rest, re.I)
+            if cut:
+                rest = rest[:cut.start()]
+        nums = _AMT_TOKEN.findall(rest)
+        if nums:
+            return nums[-1]
+    return None
+
+
 _AMOUNT_ONLY = re.compile(r"^(?:€|eur)?\s*" + _AMOUNT + r"$", re.I)
 _LEGAL = re.compile(r"([A-Z0-9][\w&'.\-]*(?:\s+[\w&'.\-]+){0,5}?\s+(?:B\.?V\.?|N\.?V\.?|GmbH|V\.?O\.?F\.?|BVBA|Ltd\.?|AG|S\.?A\.?))(?=\s|$|,)")
 
@@ -231,9 +251,13 @@ def extract(data):
         r"rechnungs?\s*(?:nummer|nr\.?)" + sep + num,
         r"^\s*factuur" + sep + r"([A-Z]{0,4}[\-]?\d[\dA-Z\-/.]{2,20})",
     ], text)
+    combo = re.search(r"factuur(?:nummer|nr\.?)?\s*/\s*(?:factuur)?datum[\s:]*((?=[A-Z0-9\-]*\d)[A-Z0-9][A-Z0-9\-]{2,24})\s*/\s*" + _DATE, text, re.I)
+    if combo:
+        out["invoice_no"] = combo.group(1)
     if out["invoice_no"]:
         out["invoice_no"] = out["invoice_no"].rstrip(".-/")
-    out["invoice_date"] = parse_date(_find([
+    out["invoice_date"] = parse_date(combo.group(2)) if combo else None
+    out["invoice_date"] = out["invoice_date"] or parse_date(_find([
         r"factuur\s*datum" + sep + _DATE, r"invoice\s*date" + sep + _DATE, r"rechnungsdatum" + sep + _DATE,
         r"document\s*datum" + sep + _DATE, r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE, r"\bdate" + sep + _DATE,
         r"^[A-Za-z'’.\-\s]{2,40},\s*" + _DATE], text))   # "'s-Hertogenbosch, 02 oktober 2026"
@@ -241,8 +265,11 @@ def extract(data):
         r"verval\s*(?:datum|dag)" + sep + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
         r"betalen\s*(?:voor|vóór|uiterlijk)" + sep + _DATE, r"f[äa]llig(?:keit)?" + sep + _DATE], text))
     gap = r"[^\n\d€-]{0,25}"
-    incl = _find([r"(?:" + _INCL_LABEL + r")" + gap + _AMOUNT_SL], text)
-    excl = _find([r"(?:" + _EXCL_LABEL + r")" + gap + _AMOUNT_SL], text)
+    incl = _line_amount(text, _INCL_LABEL, r"\bexcl|exclusief|\bnetto")
+    excl = _line_amount(text, _EXCL_LABEL, r"\bincl|inclusief|te\s*betalen|eindbedrag|(?<!sub)totaal\s*(?:in\s*)?(?:eur|€)")
+    if not excl:   # "btw 21,00 % over 1.421,11  298,43": het bedrag na "over" is de grondslag (excl.)
+        om = re.search(r"\b(?:btw|vat|b\.t\.w\.)\b[^\n]*?\bover\s*(?:€|eur)?\s*" + _AMOUNT_SL, text, re.I)
+        excl = om.group(1) if om else None
     for ws in words:   # totalen als tabel: bedrag onder het kopje
         incl = incl or _below_amount(ws, _INCL_LABEL)
         excl = excl or _below_amount(ws, _EXCL_LABEL)
@@ -272,10 +299,14 @@ def extract(data):
         out["amount_incl"], out["amount_excl"] = out["amount_excl"], out["amount_incl"]
     # btw-bedrag: om een ontbrekend bedrag uit te rekenen, of een fout gevonden incl.-bedrag te herkennen
     vat = None
-    for vm in re.finditer(r"(?:" + _VAT_LABEL + r")[^\n\d€-]{0,20}" + _AMOUNT_SL + r"[ \t]*$", text, re.I | re.M):
-        v = parse_amount(vm.group(1))
-        line = text[text.rfind("\n", 0, vm.start()) + 1:vm.end()]
-        if v is not None and v > 0 and not re.search(r"basis|grondslag|nummer|nr\b|identific|excl|incl|totaal|total", line, re.I):
+    for line in text.splitlines():
+        if not re.search(r"(?<![a-z])(?:btw|b\.\s?t\.\s?w\.|vat|mwst)(?![a-z])", line, re.I):
+            continue
+        if re.search(r"basis|grondslag|nummer|\bnr\b|identific|excl|incl|totaal|total|eori|kvk|iban", line, re.I):
+            continue
+        nums = _AMT_TOKEN.findall(line)
+        v = parse_amount(nums[-1]) if nums else None
+        if v and v > 0:
             vat = v
             break
     if vat is None:
