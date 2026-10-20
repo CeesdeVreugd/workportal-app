@@ -949,7 +949,7 @@ def _poll(conn, upload_dir):
 # Outlook-kleuren van categorieën (Graph: preset0 .. preset24)
 CAT_PRESETS = {   # zoals de nieuwe Outlook ze toont (de Graph-namen wijken daar soms van af)
     "preset0": "#E74C3C", "preset1": "#F7630C", "preset2": "#F08C2E", "preset3": "#E6B800", "preset4": "#4CAF50",
-    "preset5": "#1ABC9C", "preset6": "#8A9A2B", "preset7": "#29A9D6", "preset8": "#9B59B6", "preset9": "#C2185B",
+    "preset5": "#1ABC9C", "preset6": "#8A9A2B", "preset7": "#33B5E5", "preset8": "#9B59B6", "preset9": "#C2185B",
     "preset10": "#9AA0A6", "preset11": "#4A6378", "preset12": "#9E9E9E", "preset13": "#616161", "preset14": "#212121",
     "preset15": "#A93226", "preset16": "#C0580A", "preset17": "#6D3B1F", "preset18": "#B7950B", "preset19": "#2E7D32",
     "preset20": "#117864", "preset21": "#5F6B1E", "preset22": "#1E3A8A", "preset23": "#5B2C6F", "preset24": "#B0559A",

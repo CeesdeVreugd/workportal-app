@@ -762,4 +762,4 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Voortgangsbalk met een 4e stap; filter "Af te ronden"; "Alles open" telt ze mee, "Afgerond" niet.
   - Wat al afgerond was blijft afgerond (migratie 29).
 - Status in het overzicht en op de kaart als losse stappen onder elkaar, elk in de kleur van zijn Outlook-categorie (Verwerkt in Komdex, Verwerkt in SnelStart, Vraag open, Vraag bij leverancier, Af te ronden …).
-- Categoriekleuren zoals de nieuwe Outlook ze toont: Perzik (oranje), Pruimenpaars (buiten Komdex om), Lichtgroen, Lichtblauw, Zilver.
+- Categoriekleuren zoals de nieuwe Outlook ze toont: Perzik (oranje), Pruimenpaars (buiten Komdex om), Lichtgroen, Hemelsblauw (vraag), Zilver.
