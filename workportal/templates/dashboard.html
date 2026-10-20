@@ -17,8 +17,6 @@
 
 {% if can('crediteuren') and navok('crediteuren') %}{% set cc = cred_counts() %}{% if cc.mij %}
 <a class="actionbar" href="{{ url_for('crediteuren.index', filter='mij') }}">{{ icon('invoice') }}<span><b>{{ cc.mij }} vraag{{ 'en' if cc.mij != 1 }} over inkoopfacturen</b> wacht{{ 'en' if cc.mij != 1 }} op jouw antwoord.</span><span class="go">Bekijken →</span></a>
-{% elif cc.nieuw %}
-<a class="actionbar" href="{{ url_for('crediteuren.index', filter='nieuw') }}" style="background:var(--accent-soft);color:var(--basic)">{{ icon('invoice') }}<span><b>{{ cc.nieuw }} nieuwe inkoopfactu{{ 'ren' if cc.nieuw != 1 else 'ur' }}</b> binnengekomen.</span><span class="go">Bekijken →</span></a>
 {% endif %}{% endif %}
 
 {% if d.annots %}

@@ -793,3 +793,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - filterknoppen op één regel om opzij te schuiven;
   - in de lijst staat de status (gekleurde stappen) onder de leverancier, zodat niets meer wordt afgekapt;
   - op de factuurkaart: voortgang onder elkaar, knop "Factuur bekijken" netjes uitgelijnd, het sleepblok (alleen nuttig op de computer) verborgen.
+
+## V150 (1.97.0)
+- Dashboard: de balk "… nieuwe inkoopfacturen binnengekomen" is weg (het menu toont al wat je zelf nog moet doen). De balk voor vragen die op jouw antwoord wachten blijft.
