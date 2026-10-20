@@ -603,3 +603,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Bedrag op een totaalregel = het laatste bedrag op die regel; gewichten (KG), percentages en aantallen tellen niet mee ("gewicht/factuurbedrag 341,308 KG 1.719,54" → 1.719,54).
 - "btw 21,00 % over 1.421,11  298,43": grondslag (excl.) = bedrag na "over", btw = laatste bedrag.
 - "onze factuur / datum  1260695561 / 08.10.2026": factuurnummer én factuurdatum samen (gaat vóór een orderdatum elders op de factuur).
+
+## V110 – Inkoopfacturen: toeslagen in het excl.-bedrag
+- Staan er na het nettobedrag nog toeslagen (milieu, tol, vracht), dan klopt "Nettobedrag" niet als excl. WorkPortal controleert nu: totaal − btw past bij het btw-tarief → dat is het excl.-bedrag (Westfalen: 224,58 + 15,00 + 5,00 = 244,58).
+- Grondslag na "van" op de btw-regel ("BTW 21 % van 244,58 51,36").
+- Vervaldatum uit "Betalingstermijn: tot 06.11.2026".

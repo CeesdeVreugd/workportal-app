@@ -262,13 +262,13 @@ def extract(data):
         r"document\s*datum" + sep + _DATE, r"^\s*datum" + sep + _DATE, r"\bdatum" + sep + _DATE, r"\bdate" + sep + _DATE,
         r"^[A-Za-z'’.\-\s]{2,40},\s*" + _DATE], text))   # "'s-Hertogenbosch, 02 oktober 2026"
     out["due_date"] = parse_date(_find([
-        r"verval\s*(?:datum|dag)" + sep + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
+        r"verval\s*(?:datum|dag)" + sep + _DATE, r"betal\w*\s*termijn[^\n]{0,20}?(?:tot|voor|vóór|uiterlijk)\s*" + _DATE, r"vervalt\s*op" + sep + _DATE, r"due\s*date" + sep + _DATE,
         r"betalen\s*(?:voor|vóór|uiterlijk)" + sep + _DATE, r"f[äa]llig(?:keit)?" + sep + _DATE], text))
     gap = r"[^\n\d€-]{0,25}"
     incl = _line_amount(text, _INCL_LABEL, r"\bexcl|exclusief|\bnetto")
     excl = _line_amount(text, _EXCL_LABEL, r"\bincl|inclusief|te\s*betalen|eindbedrag|(?<!sub)totaal\s*(?:in\s*)?(?:eur|€)")
     if not excl:   # "btw 21,00 % over 1.421,11  298,43": het bedrag na "over" is de grondslag (excl.)
-        om = re.search(r"\b(?:btw|vat|b\.t\.w\.)\b[^\n]*?\bover\s*(?:€|eur)?\s*" + _AMOUNT_SL, text, re.I)
+        om = re.search(r"\b(?:btw|vat|b\.t\.w\.)\b[^\n]*?\b(?:over|van)\s*(?:€|eur)?\s*" + _AMOUNT_SL, text, re.I)
         excl = om.group(1) if om else None
     for ws in words:   # totalen als tabel: bedrag onder het kopje
         incl = incl or _below_amount(ws, _INCL_LABEL)
@@ -317,8 +317,12 @@ def extract(data):
         out["amount_incl"] = round(ex + vat, 2)
     elif vat and inc and ex is None and _close_vat(inc - vat, vat):
         out["amount_excl"] = round(inc - vat, 2)
-    elif vat and ex and inc and abs(ex + vat - inc) > 0.02 and _close_vat(ex, vat):
-        out["amount_incl"] = round(ex + vat, 2)   # incl. verkeerd gelezen (bijv. een regelbedrag): excl. + btw klopt wel
+    elif vat and ex and inc and abs(ex + vat - inc) > 0.02:
+        if _close_vat(inc - vat, vat):
+            # excl. zonder toeslagen gelezen (bijv. "Nettobedrag" vóór milieu/tol): excl. = totaal - btw
+            out["amount_excl"] = round(inc - vat, 2)
+        elif _close_vat(ex, vat):
+            out["amount_incl"] = round(ex + vat, 2)   # incl. verkeerd gelezen (bijv. een regelbedrag): excl. + btw klopt wel
     # vervaldatum uit de betalingstermijn ("betaling binnen 30 dagen", "30 dagen netto")
     if not out["due_date"] and out["invoice_date"]:
         dm = re.search(r"(?:binnen|within|innerhalb)\s*(\d{1,3})\s*(?:dagen|days|tagen)|(\d{1,3})\s*(?:dagen|days|tage)\s*(?:netto|net|na\s*factuurdatum)", text, re.I)
