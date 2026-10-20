@@ -44,6 +44,10 @@
       {% if not cred.graph %}<span class="badge b-warn">Microsoft-koppeling niet ingesteld</span>
       {% elif cred.error %}<span class="badge b-bad">Laatste keer mislukt</span> {{ cred.error }}
       {% elif cred.last %}<span class="badge b-ok">Laatst opgehaald {{ cred.last|dt }}</span>{% else %}Nog niet opgehaald.{% endif %}
+      {% if cred.graph %}<br>Rechten Microsoft-koppeling:
+        {% for rname, why in [('Mail.Read', 'ophalen'), ('Mail.Send', 'mailen'), ('Mail.ReadWrite', 'naar map verplaatsen'), ('MailboxSettings.Read', 'kleuren categorieën')] %}
+        <span class="badge {{ 'b-ok' if rname in cred.roles or (rname == 'Mail.Read' and 'Mail.ReadWrite' in cred.roles) else 'b-warn' }}" title="{{ why }}">{{ rname }}</span>{% endfor %}
+        <a href="{{ url_for('beheer.settings', rechten=1) }}" class="small">opnieuw controleren</a>{% endif %}
       {% if cred.cat_err %}<br><span class="badge b-warn">Outlook-categorieën</span> {{ cred.cat_err }} – de categorieën worden wel getoond, maar grijs.{% endif %}
     </p>
     <div><button class="btn primary">Opslaan</button></div>

@@ -169,6 +169,13 @@ def settings():
             "folder": get_setting("cred_done_folder") or "01-Verwerkt", "cat_err": get_setting("cred_cat_err")}
     from .crediteuren import archive_owner
     cred["owner"] = archive_owner(get_db())
+    cred["roles"] = []
+    if cred["graph"]:
+        try:
+            from .mail import graph_roles, _graph_token
+            cred["roles"] = graph_roles(_graph_token(force=request.args.get("rechten") == "1"))
+        except Exception:  # noqa: BLE001
+            cred["roles"] = []
     cred["staff"] = query("SELECT u.id, u.name, GROUP_CONCAT(r.name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id"
                           " LEFT JOIN roles r ON r.id = ur.role_id WHERE u.active = 1 GROUP BY u.id ORDER BY u.name")
     return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(), cred=cred,

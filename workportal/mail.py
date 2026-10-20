@@ -400,6 +400,9 @@ class GraphError(RuntimeError):
 def _gcall(method, path, **kw):
     r = requests.request(method, "https://graph.microsoft.com/v1.0" + path,
                          headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=40, **kw)
+    if r.status_code == 403:   # net een recht toegevoegd in Entra? het bewaarde token kent dat nog niet: één keer vernieuwen
+        r = requests.request(method, "https://graph.microsoft.com/v1.0" + path,
+                             headers={"Authorization": f"Bearer {_graph_token(force=True)}"}, timeout=40, **kw)
     if r.status_code >= 400:
         raise GraphError(r.status_code, r.text)
     return r.json() if r.content else {}

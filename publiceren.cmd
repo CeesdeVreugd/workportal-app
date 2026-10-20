@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V134: inkoopfacturen - tellers Nog in Komdex en Nog in SnelStart"
+set "OMSCHRIJVING=WorkPortal V135: nieuwe Microsoft-rechten direct oppakken, rechtenoverzicht in Beheer"
 
 echo.
 echo ============================================

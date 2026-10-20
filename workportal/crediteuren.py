@@ -966,8 +966,12 @@ def sync_categories(conn, box, headers):
     import json
     import requests
     last = _setting(conn, "cred_cat_at", "")
-    if not last or (now_utc() - datetime.fromisoformat(last)).total_seconds() > 3600:
+    if not last or _setting(conn, "cred_cat_err", "") or (now_utc() - datetime.fromisoformat(last)).total_seconds() > 3600:
         r = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
+        if r.status_code == 403:   # recht net toegevoegd: met een vers token nog eens
+            from .mail import _graph_token
+            headers = {"Authorization": f"Bearer {_graph_token(force=True)}"}
+            r = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
         if r.status_code < 400:
             _set(conn, "cred_cat_colors", json.dumps({c.get("displayName"): c.get("color") for c in r.json().get("value", [])
                                                       if c.get("displayName")}, ensure_ascii=False))

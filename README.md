@@ -721,3 +721,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V134 (1.81.0)
 - Inkoopfacturen: de tellers bovenaan tellen nu per boeking: "Nog in Komdex" (nieuw + al in SnelStart) en "Nog in SnelStart" (nieuw + al in/buiten Komdex), met eronder hoeveel daarvan de andere stap al hebben. Eerder telde "Nieuw" een factuur niet meer mee zodra hij alleen in SnelStart was geboekt.
 - Filters "Nog in Komdex" en "Nog in SnelStart" tonen dezelfde facturen als de tellers.
+
+## V135 (1.82.0)
+- Microsoft-koppeling: wordt een recht geweigerd (403), dan haalt WorkPortal één keer een vers token op – een net toegekend recht (Mail.ReadWrite, MailboxSettings.Read) werkt dan meteen, zonder herstart.
+- Categoriekleuren: na een mislukte poging wordt het bij elke ophaalronde opnieuw geprobeerd (niet pas na een uur).
+- Beheer > Instellingen: overzicht welke rechten de koppeling heeft (Mail.Read, Mail.Send, Mail.ReadWrite, MailboxSettings.Read) met "opnieuw controleren".
