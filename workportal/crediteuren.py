@@ -94,7 +94,8 @@ def _find(patterns, text, group=1):
 _INCL_LABEL = (r"(?:totaal|total|eindtotaal)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:incl\.?|inclusief|including|inkl\.?)"
                r"|te\s*betalen|factuurbedrag|totaalbedrag|amount\s*due|gesamtbetrag|rechnungsbetrag")
 _EXCL_LABEL = (r"(?:totaal|total)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:excl\.?|exclusief|excluding|exkl\.?|net)"
-               r"|subtotaal|sub\s*total|netto\s*bedrag|nettobetrag|totaal\s*netto")
+               r"|btw[\s-]*(?:basis|grondslag)|basis\s*btw|grondslag|taxable\s*amount|netto\s*bedrag|nettobetrag|totaal\s*netto")
+_SUBTOTAL_LABEL = r"subtotaal|sub\s*total"   # alleen als er niets beters is (vracht/toeslagen staan er vaak nog onder)
 _PO_LABEL = (r"(?:uw|your|ihre?)\s*(?:referentie|ref(?:erence|erenz)?\.?|kenmerk|zeichen|order\s*(?:nummer|nr\.?|no\.?|number)?"
              r"|bestel(?:ling|nummer|nr\.?)?|bestellung|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)?)"
              r"|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)|purchase\s*order\s*(?:number|no\.?|nr\.?)?|p\.?o\.?\s*(?:number|nr\.?|no\.?|#)"
@@ -215,6 +216,9 @@ def extract(data):
     for ws in words:   # totalen als tabel: bedrag onder het kopje
         incl = incl or _below_amount(ws, _INCL_LABEL)
         excl = excl or _below_amount(ws, _EXCL_LABEL)
+    excl = excl or _find([r"(?:" + _SUBTOTAL_LABEL + r")" + gap + _AMOUNT_SL], text)
+    for ws in words:
+        excl = excl or _below_amount(ws, _SUBTOTAL_LABEL)
     if not incl:
         incl = _find([r"^\s*totaal[^\n\d€-]{0,15}" + _AMOUNT, r"^\s*total[^\n\d€-]{0,15}" + _AMOUNT], text)
     out["amount_incl"] = parse_amount(incl)
@@ -267,9 +271,11 @@ def match_supplier(conn, text, mail_from=None):
     """Zoekt de leverancier in de relaties op meerdere kenmerken: naam op de factuur, e-maildomein van de afzender,
     website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres.
     Geeft (id, naam, redenen) als het overtuigend is, anders None."""
-    from .relaties import name_key
+    from .relaties import name_key, _norm
     text = text or ""
     tkey = name_key(text)
+    tnorm = _norm(text)
+    head_key = name_key("\n".join(text.splitlines()[:15]))   # kop van de factuur: daar staat de afzender
     tdom = {d for d in (_domain(x) for x in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|(?:https?://|www\.)[\w.-]+\.[a-z]{2,}"
                                                        r"|\b[\w-]+\.(?:nl|com|de|be|eu|net|org|co\.uk)\b", text, re.I)) if d}
     tpc = {re.sub(r"\s", "", m).upper() for m in re.findall(r"\b\d{4}\s?[A-Za-z]{2}\b", text)} - _OWN_POSTCODES
@@ -286,9 +292,13 @@ def match_supplier(conn, text, mail_from=None):
             continue
         score, why = 0.0, []
         nk = name_key(c["name"])
-        if len(nk) >= 4 and nk in tkey:
+        full = _norm(c["name"])
+        if len(full) >= 8 and full in tnorm and full != nk:
+            score += 4
+            why.append("volledige naam op de factuur")   # bijv. "Fabory Nederland BV" letterlijk
+        elif len(nk) >= 4 and nk in tkey:
             score += 3
-            why.append("naam op de factuur")
+            why.append("naam op de factuur" + (" (kop)" if nk in head_key else ""))
         elif c["short_name"] and len(name_key(c["short_name"])) >= 5 and name_key(c["short_name"]) in tkey:
             score += 2
             why.append("verkorte naam op de factuur")
@@ -296,6 +306,10 @@ def match_supplier(conn, text, mail_from=None):
         if mdom and mdom in doms:
             score += 3
             why.append("e-maildomein afzender")
+        elif mdom and len(nk) >= 4 and re.sub(r"[^a-z0-9]", "", mdom.split(".")[0]) in (nk, nk[:len(re.sub(r"[^a-z0-9]", "", mdom.split(".")[0]))]) \
+                and len(re.sub(r"[^a-z0-9]", "", mdom.split(".")[0])) >= 4:
+            score += 3
+            why.append("e-maildomein afzender past bij de naam")   # verkoopnl@fabory.com en relatie "Fabory ..."
         if doms & tdom:
             score += 2
             why.append("website/e-mail op de factuur")
@@ -315,7 +329,8 @@ def match_supplier(conn, text, mail_from=None):
         if c["relation_type"] in ("leverancier", "beide"):
             score += 0.5
         strong = len([w for w in why if not w.startswith("verkorte")]) >= 2 or "e-maildomein afzender" in why \
-            or "eerdere factuur van dit e-mailadres" in why or ("naam op de factuur" in why and len(nk) >= 8)
+            or "eerdere factuur van dit e-mailadres" in why or "volledige naam op de factuur" in why \
+            or (any(w.startswith("naam op de factuur") for w in why) and len(nk) >= 8)
         best.append((score, strong, c["id"], c["name"], why))
     if not best:
         return None
@@ -367,6 +382,8 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
         prev = conn.execute("SELECT supplier FROM invoices WHERE mail_from = ? AND IFNULL(supplier,'') <> ''"
                             " ORDER BY id DESC LIMIT 1", (mail["from_addr"],)).fetchone()
         supplier = prev["supplier"] if prev else (mail.get("from_name") or None)
+    if _bad_supplier(supplier):
+        supplier = None
     supplier = supplier or x["supplier_guess"]
     m = match_supplier(conn, x["text"], mail.get("from_addr"))
     supplier_id = supplier_match = None
@@ -405,6 +422,11 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     return iid, True
 
 
+def _bad_supplier(v):
+    v = (v or "").strip()
+    return len(re.sub(r"[^A-Za-z]", "", v)) < 3 or bool(re.match(r"^(invoice|factuur|rechnung|faktura|creditnota|credit\s*note)\b", v, re.I))
+
+
 def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
     """Factuur opnieuw uitlezen (na verbeteringen in het uitlezen). overwrite=False: alleen lege velden aanvullen.
     De leverancier wordt gekoppeld aan de relaties als die herkend wordt en er nog geen koppeling is (of bij overwrite)."""
@@ -426,6 +448,8 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
         m = match_supplier(conn, x["text"], r["mail_from"])
         if m and m[0] != r["supplier_id"]:
             upd.update(supplier_id=m[0], supplier=m[1], supplier_match=", ".join(m[2]))
+        elif not m and not r["supplier_id"] and x["supplier_guess"] and _bad_supplier(r["supplier"]):
+            upd["supplier"] = x["supplier_guess"]   # bijv. "Invoice ." vervangen door de naam uit de kop
     if upd:
         conn.execute("UPDATE invoices SET " + ", ".join(f"{k} = ?" for k in upd) + ", updated_at = ? WHERE id = ?",
                      list(upd.values()) + [now_iso(), iid])

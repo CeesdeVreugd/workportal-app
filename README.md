@@ -568,3 +568,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Leverancier uit de relaties** (`match_supplier`): controleert naam op de factuur, e-maildomein afzender, website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres. Alleen bij een overtuigende match (≥2 kenmerken, het e-maildomein, of een lange unieke naam) wordt de relatie gekoppeld; bij twijfel tussen twee relaties niet. Eigen adres/De Vreugd wordt overgeslagen. Migratie 23: `invoices.supplier_id`, `invoices.supplier_match`.
 - Detailscherm: leverancier kiezen uit een lijst met leveranciers; groen "Uit de relaties · herkend op …" of oranje "Niet gevonden in de relaties". Knop **Opnieuw uitlezen** (per factuur, overschrijft) en in het overzicht (Beheer-recht: alleen lege velden en leverancier aanvullen bij openstaande facturen).
 - **Statussen:** Nieuw, Verwerkt in Komdex, Verwerkt buiten Komdex om (nieuw, status `buiten`), Verwerkt in SnelStart; direct te kiezen (ook terug). De knoppen "Verwerkt in ERP" + "en volgende →" zijn vervangen door een statuskeuze.
+
+## V104 – Inkoopfacturen: leverancier beter herkennen
+- Oorzaak (Fabory): de naamvergelijking haalde "Nederland" en "BV" weg, waardoor alleen "fabory" overbleef; een korte naam alleen telde niet als zeker, en de relatie heeft geen e-mail/website/postcode.
+- Nieuw: de **volledige naam** letterlijk op de factuur (bijv. "Fabory Nederland BV") telt als zeker; en een **e-maildomein dat bij de naam past** (verkoopnl@fabory.com ↔ "Fabory …") ook.
+- Een leveranciersnaam als "Invoice ." of "Factuur" wordt vervangen door de naam uit de kop van de factuur.
+- Bedrag excl.: "BTW basis" / "grondslag" gaat vóór "Subtotaal" (vracht/toeslagen staan vaak onder het subtotaal).
