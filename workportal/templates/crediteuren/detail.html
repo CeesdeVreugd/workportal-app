@@ -150,17 +150,11 @@
       <div class="notes">
         {% for n in internal %}{{ note_item(n) }}{% else %}<div class="empty">Nog geen interne vragen of opmerkingen.</div>{% endfor %}
       </div>
-      {% if edit and r.status not in ('snelstart', 'afgewezen') %}
-      <details class="cred-pop" style="margin-top:14px"><summary class="btn">Vraag stellen aan collega…</summary>
-        <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
-          <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
-          <div class="cred-actions"><button class="btn primary">Vraag versturen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
-          <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
-        </form></details>
-      {% endif %}
+      <div class="cred-tools">
+
       {% if edit or r.question_to == g.user.id %}
-      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:14px">
+      <details class="cred-pop cred-note" {{ 'open' if r.question_to == g.user.id }}><summary class="btn">{{ 'Antwoord geven…' if r.question_to == g.user.id else 'Opmerking plaatsen…' }}</summary>
+      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:12px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="f">{{ 'Je antwoord' if r.question_to == g.user.id else 'Interne opmerking of reactie' }}<textarea name="body" rows="3" required></textarea></label>
         <div class="cred-actions">
@@ -170,7 +164,18 @@
           <button class="btn primary">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
         </div>
       </form>
+      </details>
       {% endif %}
+      {% if edit and r.status not in ('snelstart', 'afgewezen') %}
+      <details class="cred-pop"><summary class="btn">Vraag stellen aan collega…</summary>
+        <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
+          <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
+          <div class="cred-actions"><button class="btn primary">Vraag versturen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
+          <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
+        </form></details>
+      {% endif %}
+      </div>
     </section>
 
     <section class="card" id="extern">

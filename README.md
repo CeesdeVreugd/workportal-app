@@ -682,3 +682,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V126 – Annuleren
 - Knop **Annuleren** bij een interne opmerking, een mail aan de leverancier (ook bij beantwoorden), een vraag aan een collega en bij afwijzen. Annuleren leegt het formulier (ook het bewaarde concept) en klapt het blok dicht; bij beantwoorden ga je terug naar de kaart.
 - Algemeen bruikbaar: `<button type="button" data-cancel [data-cancel-href]>`.
+
+## V127 (1.74.0)
+- Inkoopfacturen: interne opmerking zit nu achter de knop "Opmerking plaatsen…" (naast "Vraag stellen aan collega…"); bij een openstaande vraag aan jou staat "Antwoord geven…" direct open. Annuleren klapt hem weer dicht.
+- Terug-link (kruimelpad) boven aan de pagina's: pijltje netjes in lijn met de tekst.
