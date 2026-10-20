@@ -137,6 +137,11 @@
             {% if n.for_accounting %}<span class="badge b-purple">voor de boekhouding</span>
               {% if edit %}<form method="post" action="{{ url_for('crediteuren.note_done', iid=r.id, nid=n.id) }}" class="followup {{ 'done' if n.handled }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button title="Afvinken als verwerkt door de boekhouding">{{ icon('check') }} {{ 'Afgehandeld' if n.handled else 'Afhandelen' }}</button></form>{% endif %}
             {% endif %}
+            {% if edit and n.kind != 'afwijzing' and (n.kind in ('mail_uit', 'mail_in') or n.created_by == g.user.id or can('crediteuren', 3)) %}
+            <form method="post" action="{{ url_for('crediteuren.note_delete', iid=r.id, nid=n.id) }}" class="notedel"
+                  onsubmit="return confirm('{{ 'Deze mail' if n.kind in ('mail_uit', 'mail_in') else 'Dit bericht' }} uit het gesprek verwijderen?{{ ' De mail zelf blijft in Outlook staan' ~ (' en bijlagen blijven bij de kaart' if n.kind == 'mail_in' else '') ~ '.' if n.kind in ('mail_uit', 'mail_in') else '' }}')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="linkbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>
+            {% endif %}
           </div>
           {% if mm %}<div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ mm.to|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% if mm.pdf %} · met factuur-PDF{% endif %}{% else %}Van {{ mm['from'] }}{% if mm.files %} · bijlage: {{ mm.files|join(', ') }} (bij "Andere bijlagen"){% endif %}{% endif %} · <i>{{ mm.subject }}</i></div>{% endif %}
           <div class="notebody">{{ n.body }}</div>

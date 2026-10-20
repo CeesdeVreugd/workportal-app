@@ -1411,6 +1411,23 @@ def note_done(iid, nid):
     return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
 
 
+@bp.route("/<int:iid>/bericht/<int:nid>/verwijderen", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def note_delete(iid, nid):
+    """Mail of opmerking uit het gesprek halen (alleen in WorkPortal; de mail blijft in Outlook staan)."""
+    n = query("SELECT * FROM invoice_notes WHERE id = ? AND invoice_id = ?", (nid, iid), one=True) or abort(404)
+    mine = n["created_by"] == g.user["id"]
+    if n["kind"] == "afwijzing" or not (n["kind"] in ("mail_uit", "mail_in") or mine or can(MODULE, BEHEER)):
+        abort(403)
+    conn = get_db()
+    label = {"mail_uit": "mail aan leverancier", "mail_in": "reactie leverancier"}.get(n["kind"], n["kind"])
+    conn.execute("DELETE FROM invoice_notes WHERE id = ?", (nid,))
+    log(conn, iid, f"Uit het gesprek verwijderd: {label} van {n['created_at'][:16].replace('T', ' ')} ({(n['body'] or '')[:60]})", g.user["id"])
+    conn.commit()
+    flash("Verwijderd uit het gesprek.", "ok")
+    return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
+
+
 @bp.route("/<int:iid>/verwijderen", methods=["POST"])
 @require(MODULE, BEHEER)
 def delete(iid):

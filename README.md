@@ -658,3 +658,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Kwam de factuur per mail binnen, dan is de mail vanaf de kaart een **antwoord op die mail** (Graph `reply`, recht Mail.Send): onderwerp exact "RE: <onderwerp van de factuurmail>", en in Outlook hangt hij onder de binnengekomen mail. Geen code meer in het onderwerp.
 - Reacties van de leverancier in diezelfde mailwisseling (conversationId) komen in het gesprek van de kaart, ook zonder code. Bij geüploade facturen (geen mail) blijft de code `[WP-F…]` in het onderwerp nodig.
 - Migratie 26: `invoices.mail_conv` (wordt voor nieuwe mails bij binnenkomst opgeslagen, voor oudere bij het eerste antwoord opgehaald).
+
+## V122 – Mails uit het gesprek verwijderen
+- Prullenbak bij elke mail (verstuurd of reactie) in het gesprek, en bij je eigen opmerkingen (Beheer: alle opmerkingen; een afwijzing niet). Na bevestigen weg uit het gesprek, met een regel in het logboek.
+- Alleen in WorkPortal: de mail blijft in Outlook (factuur@) staan; bijlagen van een reactie blijven bij de kaart.
