@@ -1164,7 +1164,8 @@ def index():
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
             "last": _setting(conn, "cred_last_poll"), "error": _setting(conn, "cred_last_error"), "configured": mail_configured()}
     return render_template("crediteuren/index.html", items=items, flt=flt, q=q, counts=counts, FILTERS=FILTERS,
-                           STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()), soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
+                           STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()),
+                           step_color=_step_colors(get_db()), soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
 
 
 @bp.route("/uploaden", methods=["POST"])
@@ -1578,6 +1579,12 @@ def _ask_archive(conn, iid, actor):
 CAT_STEPS = [("komdex", "Verwerkt in Komdex"), ("buiten", "Verwerkt buiten Komdex om"),
              ("snelstart", "Verwerkt in SnelStart"), ("afgewezen", "Afgewezen")]
 _CAT_GUESS = {"komdex": r"komdex", "buiten": r"buiten", "snelstart": r"snel\s*start", "afgewezen": r"afgewezen|afwijz"}
+
+
+def _step_colors(conn):
+    """Kleur per stap, gelijk aan de Outlook-categorie die erbij hoort (anders Komdex groen, SnelStart oranje)."""
+    cols, cmap = category_colors(conn), category_map(conn)
+    return {"komdex": cols.get(cmap.get("komdex"), "#2E7D32"), "snelstart": cols.get(cmap.get("snelstart"), "#E67E22")}
 
 
 def category_map(conn):

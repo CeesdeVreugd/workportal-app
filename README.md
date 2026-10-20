@@ -731,3 +731,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Inkoopfacturen: krijgt een factuur in WorkPortal een status, dan krijgt de factuurmail in Outlook de bijbehorende categorie (Verwerkt in Komdex, Verwerkt buiten Komdex om, Verwerkt in SnelStart, Afgewezen). Terugzetten haalt de categorie weer weg. Categorieën die iemand zelf in Outlook heeft gegeven (en die niet in het lijstje staan) blijven staan.
 - Beheer > Instellingen: per status de Outlook-categorie kiezen uit de categorielijst van de mailbox (met kleur). Niet ingesteld: WorkPortal kiest op naam (bevat "Komdex", "buiten", "SnelStart", "afgewezen").
 - Gebeurt op de achtergrond, vóór het verplaatsen naar 01-Verwerkt. Recht: Mail.ReadWrite. Lukt het niet, dan staat de reden in het logboek van de factuur.
+
+## V137 (1.84.0)
+- Inkoopfacturen: de tellers "Nog in Komdex" en "Nog in SnelStart" hebben de kleur van de Outlook-categorie die bij die stap hoort (Beheer > Instellingen); zonder categorie Komdex groen en SnelStart oranje.
