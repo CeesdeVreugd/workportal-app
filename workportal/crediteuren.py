@@ -237,6 +237,7 @@ def _poll(conn, upload_dir):
         since = (now_utc() - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
         _set(conn, "cred_since", since)
     headers = {"Authorization": f"Bearer {_graph_token()}"}
+    refreshed = False
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/inbox/messages"
            f"?$filter=receivedDateTime ge {since} and hasAttachments eq true"
            f"&$select=id,subject,from,receivedDateTime&$orderby=receivedDateTime asc&$top=50")
@@ -245,12 +246,18 @@ def _poll(conn, upload_dir):
     while url and pages < 10:
         pages += 1
         r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code in (401, 403) and not refreshed:
+            # net een recht toegevoegd in Entra? Het bewaarde token kent dat nog niet: één keer een nieuw token halen
+            refreshed = True
+            headers = {"Authorization": f"Bearer {_graph_token(force=True)}"}
+            pages -= 1
+            continue
         if r.status_code >= 400:
             try:
                 msg = r.json().get("error", {}).get("message") or r.text[:200]
             except ValueError:
                 msg = r.text[:200]
-            raise RuntimeError(f"Mailbox {box} lezen mislukt ({r.status_code}): {msg}")
+            raise RuntimeError(f"Mailbox {box} lezen mislukt ({r.status_code}): {msg}" + _mail_hint(r.status_code, box))
         js = r.json()
         for m in js.get("value", []):
             mid = m["id"]
@@ -280,6 +287,22 @@ def _poll(conn, upload_dir):
             conn.commit()
         url = js.get("@odata.nextLink")
     return new, None
+
+
+def _mail_hint(status, box):
+    """Uitleg bij een geweigerde mailbox: ontbreekt het recht, of houdt Exchange de mailbox tegen?"""
+    if status not in (401, 403):
+        return ""
+    from .mail import graph_roles
+    roles = graph_roles()
+    have = ", ".join(roles) or "geen"
+    if not ({"Mail.Read", "Mail.ReadWrite", "Mail.ReadBasic.All"} & set(roles)):
+        return (f" — Oorzaak: de app-registratie heeft het toepassingsrecht Mail.Read nog niet (of zonder beheerderstoestemming)."
+                f" Nu aanwezig: {have}. Voeg in Entra bij de app-registratie onder API-machtigingen > Microsoft Graph >"
+                f" Toepassingsmachtigingen 'Mail.Read' toe en klik op 'Beheerderstoestemming verlenen'.")
+    return (f" — Mail.Read is aanwezig, maar Exchange weigert de mailbox {box}. Waarschijnlijk staat er een ApplicationAccessPolicy"
+            f" waarin {box} niet is opgenomen: voeg de mailbox toe aan de toegestane groep (zie README, Inkoopfacturen)."
+            f" Wijzigingen in Exchange kunnen tot een uur duren.")
 
 
 def scheduled_poll(conn, app, state):

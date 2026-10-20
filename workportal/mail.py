@@ -32,9 +32,21 @@ def mail_method():
     return None
 
 
-def _graph_token():
+def graph_roles(token=None):
+    """De toepassingsrechten (roles) in het Graph-token, bijv. ['Mail.Send', 'Sites.Selected']. Alleen uitlezen, niet controleren."""
+    import base64 as _b64
+    import json as _json
+    try:
+        part = (token or _graph_token()).split(".")[1]
+        part += "=" * (-len(part) % 4)
+        return sorted(_json.loads(_b64.urlsafe_b64decode(part)).get("roles") or [])
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _graph_token(force=False):
     with _token_lock:
-        if _token["value"] and _token["exp"] > time.time() + 60:
+        if not force and _token["value"] and _token["exp"] > time.time() + 60:
             return _token["value"]
         r = requests.post(
             f"https://login.microsoftonline.com/{os.environ['GRAPH_TENANT_ID']}/oauth2/v2.0/token",

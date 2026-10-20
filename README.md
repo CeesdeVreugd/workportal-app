@@ -556,3 +556,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Beheer > DC01 > "Meldingen": kies per persoon wie een melding krijgt als een nieuwe ordermap na 10 minuten nog in het actievenster staat, en of dat push + e-mail of alleen push is.
 - Instellingen `komdex_notify_users` (JSON-lijst met gebruikers-id's) en `komdex_notify_email`; zonder instelling blijft de standaard (rol verkoop/directie).
 - De melding noemt nu ook de reden (bijv. onbekend ordertype of klant niet herkend).
+
+## V102 – Inkoopfacturen: mailbox geweigerd (403)
+- Bij een geweigerde mailbox haalt WorkPortal eerst één keer een nieuw Graph-token (een net toegevoegd recht zit niet in een bewaard token, dat tot een uur geldig is).
+- Blijft het 403, dan zegt de melding welke rechten de app-registratie nu heeft en of Mail.Read ontbreekt of Exchange (ApplicationAccessPolicy) de mailbox tegenhoudt.
