@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import attachments as att_list %}
 {% block title %}{{ r.supplier or 'Factuur' }} {{ r.invoice_no or '' }}{% endblock %}
 {% block content %}
 {% set edit = can('crediteuren', 2) %}
@@ -38,6 +39,7 @@
     {% if pdf_url %}<iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
     <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=r.supplier or 'Factuur') }}">{{ icon('pdf') }}Factuur bekijken</a>
     {% else %}<div class="empty">Geen PDF.</div>{% endif %}
+    {% if attachments %}<div style="margin-top:14px"><h3 style="margin:0 0 4px;font-size:15px">Andere bijlagen uit de mail ({{ attachments|length }})</h3>{{ att_list(attachments) }}</div>{% endif %}
   </section>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
@@ -60,7 +62,6 @@
         <label class="f">Bedrag incl. btw<input type="text" inputmode="decimal" name="amount_incl" value="{{ r.amount_incl|num(2) if r.amount_incl is not none else '' }}"></label>
         <label class="f">Bedrag excl. btw<input type="text" inputmode="decimal" name="amount_excl" value="{{ r.amount_excl|num(2) if r.amount_excl is not none else '' }}"></label>
         <label class="f">Inkoopnummer<input type="text" name="erp_ref" value="{{ r.erp_ref or '' }}" placeholder="bijv. 4267-20260131"></label>
-        <label class="f">Omschrijving<input type="text" name="description" value="{{ r.description or '' }}"></label>
       </div>
       {% if edit %}<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Gegevens opslaan</button>
         <button class="btn ghost" formaction="{{ url_for('crediteuren.reread_one', iid=r.id) }}" formnovalidate title="De PDF opnieuw uitlezen en de leverancier opnieuw zoeken in de relaties">{{ icon('refresh') }}Opnieuw uitlezen</button></div>{% endif %}

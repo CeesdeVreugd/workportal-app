@@ -92,15 +92,24 @@ def _find(patterns, text, group=1):
 
 
 _INCL_LABEL = (r"(?:totaal|total|eindtotaal)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:incl\.?|inclusief|including|inkl\.?)"
-               r"|te\s*betalen|factuurbedrag|totaalbedrag|amount\s*due|gesamtbetrag|rechnungsbetrag")
+               r"|(?<!sub)(?<!sub )totaal\s*(?:in\s*)?(?:eur|euro|€)(?!\w)(?!\s*(?:excl|exclusief|ex\.))"
+               r"|te\s*betalen|factuurbedrag|totaalbedrag|amount\s*due|gesamtbetrag|rechnungsbetrag"
+               r"|(?<![a-z])incl\.?\s*(?:btw|vat)|inclusief\s*btw")
+_VAT_LABEL = r"(?:btw|vat|mwst|ust)\.?\s*(?:bedrag\s*)?(?:eur\s*)?(?:\d{1,2}(?:[,.]\d)?\s*%)?|\d{1,2}(?:[,.]\d)?\s*%\s*(?:btw|vat)"
 _EXCL_LABEL = (r"(?:totaal|total)\s*(?:€|eur)?\s*(?:bedrag\s*)?(?:excl\.?|exclusief|excluding|exkl\.?|net)"
-               r"|btw[\s-]*(?:basis|grondslag)|basis\s*btw|grondslag|taxable\s*amount|netto\s*bedrag|nettobetrag|totaal\s*netto")
+               r"|btw[\s-]*(?:basis|grondslag)|basis\s*btw|grondslag|taxable\s*amount|netto\s*bedrag|nettobetrag|totaal\s*netto"
+               r"|(?<![a-z])excl\.?\s*(?:btw|vat)|exclusief\s*btw")
 _SUBTOTAL_LABEL = r"subtotaal|sub\s*total"   # alleen als er niets beters is (vracht/toeslagen staan er vaak nog onder)
 _PO_LABEL = (r"(?:uw|your|ihre?)\s*(?:referentie|ref(?:erence|erenz)?\.?|kenmerk|zeichen|order\s*(?:nummer|nr\.?|no\.?|number)?"
              r"|bestel(?:ling|nummer|nr\.?)?|bestellung|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)?)"
              r"|inkoop\s*(?:order)?\s*(?:nummer|nr\.?)|purchase\s*order\s*(?:number|no\.?|nr\.?)?|p\.?o\.?\s*(?:number|nr\.?|no\.?|#)"
              r"|customer\s*(?:ref(?:erence)?|po)|bestellnummer|referentie|reference|kenmerk")
 _AMOUNT_SL = _AMOUNT.replace(r"(?:€|eur|euro)?\s*", r"(?:€|eur|euro)?[ \t]*", 1)   # bedrag op dezelfde regel
+_INVNO_VALUE = re.compile(r"^(?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24}$", re.I)
+_DATE_VALUE = re.compile(r"^" + _DATE + r"$", re.I)
+_INVNO_LABEL = r"fact(?:uur)?\.?\s*(?:nr|nummer|no)\.?|invoice\s*(?:no|number|nr)\.?|rechnungs?\s*(?:nr|nummer)\.?"
+_DATE_LABEL = r"fact(?:uur)?\.?\s*datum|invoice\s*date|rechnungsdatum"
+_VATAMT_LABEL = r"btw[\s-]*bedrag|bedrag\s*btw|vat\s*amount|mwst[\s-]*betrag"
 _AMOUNT_ONLY = re.compile(r"^(?:€|eur)?\s*" + _AMOUNT + r"$", re.I)
 _LEGAL = re.compile(r"([A-Z0-9][\w&'.\-]*(?:\s+[\w&'.\-]+){0,5}?\s+(?:B\.?V\.?|N\.?V\.?|GmbH|V\.?O\.?F\.?|BVBA|Ltd\.?|AG|S\.?A\.?))(?=\s|$|,)")
 
@@ -116,8 +125,10 @@ def _lines(words):
     return [(top, sorted(ws, key=lambda w: w["x0"])) for top, ws in rows]
 
 
-def _below_amount(words, label):
-    """Bedrag dat ónder een kopje staat (totaalregels als tabel: 'Totaal excl. btw' met het bedrag op de regel eronder)."""
+def _below_amount(words, label, value_re=None):
+    """Bedrag (of ander gegeven) dat ónder een kopje staat (totaalregels als tabel: 'Totaal excl. btw' met het bedrag
+    op de regel eronder), of direct rechts ervan op dezelfde regel."""
+    value_re = value_re or _AMOUNT_ONLY
     lines = _lines(words)
     pat = re.compile(label, re.I)
     for i, (top, ws) in enumerate(lines):
@@ -133,7 +144,7 @@ def _below_amount(words, label):
                 continue
             x0, x1 = min(w["x0"] for w in hit), max(w["x1"] for w in hit)
             # bedrag rechts op dezelfde regel
-            right = [w for w in ws if w["x0"] > x1 and _AMOUNT_ONLY.match(w["text"])]
+            right = [w for w in ws if w["x0"] > x1 and value_re.match(w["text"])]
             if right and right[0]["x0"] - x1 < 200:
                 return right[0]["text"]
             best = None
@@ -141,7 +152,7 @@ def _below_amount(words, label):
                 if top2 - top > 45:
                     break
                 for w in ws2:
-                    if not _AMOUNT_ONLY.match(w["text"]):
+                    if not value_re.match(w["text"]):
                         continue
                     if w["x1"] < x0 - 25 or w["x0"] > x1 + 25:
                         continue   # niet onder het kopje
@@ -172,10 +183,23 @@ def _supplier(text):
                     words = words[k:]
                     break
             return " ".join(words)[:80]
-    first = next((l.strip() for l in text.splitlines() if len(l.strip()) > 2 and not re.search(r"factuur|invoice|rechnung", l, re.I)), None)
-    if first:
-        first = re.split(r"\s+(?:kvk|btw|vat|iban|tel|telefoon|www\.)\b", first, flags=re.I)[0]
+    head = text.splitlines()[:15]
+    # geen naam met B.V. e.d. in de kop (logo als plaatje): dan de website als aanwijzing, bijv. "bmn-bv.nl"
+    for line in head:
+        wm = re.search(r"(?:www\.|https?://)([\w-]+(?:\.[\w-]+)+)", line, re.I) or re.search(r"[\w.+-]+@([\w-]+(?:\.[\w-]+)+)", line)
+        if wm and "vreugd" not in wm.group(1).lower():
+            return wm.group(1).lower()[:80]
+    addr = re.compile(r"\d{4}\s?[A-Z]{2}\b|@|www\.|^\s*[TFEM]\s|\btel\b|\bfax\b|iban|kvk|btw|^\W*\d|factuur|invoice|rechnung|vreugd|\|", re.I)
+    first = next((l.strip() for l in head if len(re.sub(r"[^A-Za-z]", "", l)) >= 3 and not addr.search(l)), None)
     return (first or "")[:80] or None
+
+
+def _close_vat(excl, vat):
+    """Past het btw-bedrag bij een gangbaar tarief (21%, 9%, 0%) over dit excl.-bedrag?"""
+    if not excl or excl <= 0:
+        return False
+    pct = vat / excl * 100
+    return any(abs(pct - t) < 0.15 for t in (21, 9, 6, 19, 20, 7))
 
 
 def extract(data):
@@ -216,6 +240,12 @@ def extract(data):
     for ws in words:   # totalen als tabel: bedrag onder het kopje
         incl = incl or _below_amount(ws, _INCL_LABEL)
         excl = excl or _below_amount(ws, _EXCL_LABEL)
+    for ws in words:   # factuurnummer/-datum in een tabel onderaan (bijv. "Fact.nr." met het nummer eronder)
+        if not out["invoice_no"]:
+            v = _below_amount(ws, _INVNO_LABEL, _INVNO_VALUE)
+            out["invoice_no"] = v.rstrip(".-/") if v else None
+        if not out["invoice_date"]:
+            out["invoice_date"] = parse_date(_below_amount(ws, _DATE_LABEL, _DATE_VALUE))
     excl = excl or _find([r"(?:" + _SUBTOTAL_LABEL + r")" + gap + _AMOUNT_SL], text)
     for ws in words:
         excl = excl or _below_amount(ws, _SUBTOTAL_LABEL)
@@ -230,6 +260,31 @@ def extract(data):
             out["amount_incl"] = max(nums)
     if out["amount_incl"] is not None and out["amount_excl"] is not None and out["amount_excl"] > out["amount_incl"] > 0:
         out["amount_incl"], out["amount_excl"] = out["amount_excl"], out["amount_incl"]
+    # btw-bedrag: om een ontbrekend bedrag uit te rekenen, of een fout gevonden incl.-bedrag te herkennen
+    vat = None
+    for vm in re.finditer(r"(?:" + _VAT_LABEL + r")[^\n\d€-]{0,20}" + _AMOUNT_SL + r"[ \t]*$", text, re.I | re.M):
+        v = parse_amount(vm.group(1))
+        line = text[text.rfind("\n", 0, vm.start()) + 1:vm.end()]
+        if v is not None and v > 0 and not re.search(r"basis|grondslag|nummer|nr\b|identific|excl|incl|totaal|total", line, re.I):
+            vat = v
+            break
+    if vat is None:
+        for ws in words:
+            vat = vat or parse_amount(_below_amount(ws, _VATAMT_LABEL))
+    ex, inc = out["amount_excl"], out["amount_incl"]
+    if vat and ex and inc is None and _close_vat(ex, vat):
+        out["amount_incl"] = round(ex + vat, 2)
+    elif vat and inc and ex is None and _close_vat(inc - vat, vat):
+        out["amount_excl"] = round(inc - vat, 2)
+    elif vat and ex and inc and abs(ex + vat - inc) > 0.02 and _close_vat(ex, vat):
+        out["amount_incl"] = round(ex + vat, 2)   # incl. verkeerd gelezen (bijv. een regelbedrag): excl. + btw klopt wel
+    # vervaldatum uit de betalingstermijn ("betaling binnen 30 dagen", "30 dagen netto")
+    if not out["due_date"] and out["invoice_date"]:
+        dm = re.search(r"(?:binnen|within|innerhalb)\s*(\d{1,3})\s*(?:dagen|days|tagen)|(\d{1,3})\s*(?:dagen|days|tage)\s*(?:netto|net|na\s*factuurdatum)", text, re.I)
+        if dm:
+            days = int(dm.group(1) or dm.group(2))
+            if 0 < days <= 120:
+                out["due_date"] = (datetime.strptime(out["invoice_date"], "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
     out["erp_ref"] = _po_ref(text)
     out["supplier_guess"] = _supplier(text)
     out["text"] = text
@@ -267,6 +322,29 @@ def _digits_phone(v):
     return d if len(d) >= 9 else None
 
 
+def _dom_core(d):
+    """Kern van een domein: bmn-bv.nl -> 'bmn', fabory.com -> 'fabory', lm-systems.nl -> 'lmsystems'."""
+    if not d:
+        return None
+    lab = d.split(".")[0].lower()
+    lab = re.sub(r"[-_.]?(bv|b-v|nv|nl|groep|group|holding|benelux|nederland|online|shop|webshop)$", "", lab)
+    core = re.sub(r"[^a-z0-9]", "", lab)
+    return core if len(core) >= 3 else None
+
+
+def _name_has_core(name, core):
+    """Begint de naam (of de afkorting van de naam) met de kern van het domein?"""
+    from .relaties import _norm
+    if not core:
+        return False
+    full = _norm(name)
+    words = re.findall(r"[a-z0-9]+", (name or "").lower())
+    initials = "".join(w[0] for w in words if w not in ("de", "het", "van", "en", "bv", "b", "v", "nv"))
+    if full.startswith(core) or (words and words[0] == core):
+        return 2
+    return 1 if initials.startswith(core) else 0   # afkorting telt minder zwaar
+
+
 def match_supplier(conn, text, mail_from=None):
     """Zoekt de leverancier in de relaties op meerdere kenmerken: naam op de factuur, e-maildomein van de afzender,
     website/e-mail op de factuur, postcode, telefoonnummer en eerdere facturen van hetzelfde adres.
@@ -281,6 +359,8 @@ def match_supplier(conn, text, mail_from=None):
     tpc = {re.sub(r"\s", "", m).upper() for m in re.findall(r"\b\d{4}\s?[A-Za-z]{2}\b", text)} - _OWN_POSTCODES
     tph = {d for d in (_digits_phone(m) for m in re.findall(r"(?:\+|00)?\d[\d\s\-().]{8,16}\d", text)) if d}
     mdom = _domain(mail_from)
+    mcore = _dom_core(mdom)
+    tcores = {cc for cc in (_dom_core(d) for d in tdom) if cc}
     prev = None
     if mail_from:
         prev = conn.execute("SELECT supplier_id FROM invoices WHERE mail_from = ? AND supplier_id IS NOT NULL"
@@ -306,10 +386,14 @@ def match_supplier(conn, text, mail_from=None):
         if mdom and mdom in doms:
             score += 3
             why.append("e-maildomein afzender")
-        elif mdom and len(nk) >= 4 and re.sub(r"[^a-z0-9]", "", mdom.split(".")[0]) in (nk, nk[:len(re.sub(r"[^a-z0-9]", "", mdom.split(".")[0]))]) \
-                and len(re.sub(r"[^a-z0-9]", "", mdom.split(".")[0])) >= 4:
-            score += 3
-            why.append("e-maildomein afzender past bij de naam")   # verkoopnl@fabory.com en relatie "Fabory ..."
+        elif mcore and _name_has_core(c["name"], mcore):
+            lvl = _name_has_core(c["name"], mcore)
+            score += 3 if lvl == 2 else 2
+            why.append("e-maildomein afzender past bij de naam" if lvl == 2 else "e-maildomein afzender past bij de afkorting")
+        tl = max([_name_has_core(c["name"], tc) for tc in tcores] or [0])
+        if not (doms & tdom) and tl:
+            score += 1.5 if tl == 2 else 1
+            why.append("website op de factuur past bij de naam")   # www.bmn-bv.nl en relatie "BMN ..."
         if doms & tdom:
             score += 2
             why.append("website/e-mail op de factuur")
@@ -328,12 +412,21 @@ def match_supplier(conn, text, mail_from=None):
             continue
         if c["relation_type"] in ("leverancier", "beide"):
             score += 0.5
+        if any(_name_has_core(c["name"], cc) == 2 for cc in ({mcore} | tcores) if cc):
+            score += 0.7   # naam begint met het domein (bmn-bv.nl -> "BMN ..."): voorrang bij dubbele relaties
         strong = len([w for w in why if not w.startswith("verkorte")]) >= 2 or "e-maildomein afzender" in why \
+            or "e-maildomein afzender past bij de naam" in why \
             or "eerdere factuur van dit e-mailadres" in why or "volledige naam op de factuur" in why \
             or (any(w.startswith("naam op de factuur") for w in why) and len(nk) >= 8)
         best.append((score, strong, c["id"], c["name"], why))
     if not best:
         return None
+    if len(best) > 1:
+        # bij gelijke stand (bijv. dubbele relatie uit Komdex): de relatie die al eerder facturen had iets voorrang
+        counts = {r["supplier_id"]: r["n"] for r in conn.execute(
+            f"SELECT supplier_id, COUNT(*) AS n FROM invoices WHERE supplier_id IN ({','.join('?' * len(best))}) GROUP BY supplier_id",
+            [b[2] for b in best])}
+        best = [(b[0] + (0.6 if counts.get(b[2]) else 0), b[1], b[2], b[3], b[4]) for b in best]
     best.sort(key=lambda b: -b[0])
     top = best[0]
     if not top[1]:
@@ -351,17 +444,41 @@ def _upload_dir(app=None):
     return d
 
 
-def _store_file(conn, upload_dir, invoice_id, data, filename, user_id=None):
+def _store_file(conn, upload_dir, invoice_id, data, filename, user_id=None, kind="invoice", mime="application/pdf"):
     sub = now_utc().strftime("%Y%m")
     os.makedirs(os.path.join(upload_dir, sub), exist_ok=True)
-    rel = f"{sub}/{uuid.uuid4().hex}.pdf"
+    ext = (os.path.splitext(filename or "")[1].lower() or ".pdf")[:10]
+    if not re.match(r"^\.[a-z0-9]{1,9}$", ext):
+        ext = ".bin"
+    rel = f"{sub}/{uuid.uuid4().hex}{ext}"
     with open(os.path.join(upload_dir, rel), "wb") as fh:
         fh.write(data)
     cur = conn.execute(
         "INSERT INTO files (entity, entity_id, kind, filename, stored_name, mime, size, caption, created_by, created_at)"
         " VALUES ('invoice',?,?,?,?,?,?,?,?,?)",
-        (invoice_id, "invoice", filename, rel, "application/pdf", len(data), None, user_id, now_iso()))
+        (invoice_id, kind, filename, rel, mime or "application/octet-stream", len(data), None, user_id, now_iso()))
     return cur.lastrowid
+
+
+def invoice_score(x, filename=""):
+    """Hoe erg lijkt een PDF op een factuur (en niet op algemene voorwaarden, een pakbon of een brochure)?"""
+    n = (filename or "").lower()
+    sc = 0
+    sc += 3 if x.get("invoice_no") else 0
+    sc += 3 if x.get("amount_incl") is not None else 0
+    sc += 1 if x.get("amount_excl") is not None else 0
+    sc += 1 if x.get("invoice_date") else 0
+    sc += 1 if x.get("erp_ref") else 0
+    if re.search(r"factuur|invoice|rechnung|faktura|nota", n):
+        sc += 3
+    if re.search(r"voorwaarden|conditions|terms|agb|bedingungen|leveringscond|privacy|brochure|catalog|pakbon|packing|delivery\s*note|offerte|quotation", n):
+        sc -= 6
+    txt = (x.get("text") or "")[:3000].lower()
+    if re.search(r"algemene\s+(verkoop|leverings)?\s*voorwaarden|general\s+terms|allgemeine\s+geschäftsbedingungen", txt) and not x.get("invoice_no"):
+        sc -= 4
+    if re.search(r"\b(factuur|invoice|rechnung)\b", txt):
+        sc += 1
+    return sc
 
 
 def log(conn, invoice_id, text, user_id=None):
@@ -369,13 +486,14 @@ def log(conn, invoice_id, text, user_id=None):
                  (invoice_id, user_id, text, now_iso()))
 
 
-def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=None, mail=None):
-    """Maakt een factuurkaart van een PDF. Geeft (id, nieuw?) terug; dubbele PDF's worden herkend."""
+def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=None, mail=None, extra=None, x=None):
+    """Maakt een factuurkaart van een PDF (bij mail: één kaart per mail, de overige bestanden als bijlage).
+    extra = [(naam, bytes, mime), ...]. Geeft (id, nieuw?) terug; dubbele PDF's worden herkend."""
     sha = hashlib.sha256(data).hexdigest()
     dup = conn.execute("SELECT id FROM invoices WHERE sha256 = ?", (sha,)).fetchone()
     if dup:
         return dup["id"], False
-    x = extract(data)
+    x = x or extract(data)
     mail = mail or {}
     supplier = None
     if mail.get("from_addr"):
@@ -406,9 +524,12 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
         conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
     fid = _store_file(conn, upload_dir, iid, data, safe_filename(filename) or "factuur.pdf", user_id)
     conn.execute("UPDATE invoices SET file_id = ? WHERE id = ?", (fid, iid))
+    for ename, edata, emime in (extra or []):
+        _store_file(conn, upload_dir, iid, edata, safe_filename(ename) or "bijlage", user_id, kind="attachment", mime=emime)
     if source == "mail":
         log(conn, iid, f"Binnengekomen per mail van {mail.get('from_name') or mail.get('from_addr') or 'onbekend'}"
-                       f" ({mail.get('subject') or 'geen onderwerp'})")
+                       f" ({mail.get('subject') or 'geen onderwerp'})"
+                       + (f"; {len(extra)} andere bijlage(n) bij deze kaart: " + ", ".join(e[0] for e in extra) if extra else ""))
     else:
         log(conn, iid, "Geüpload", user_id)
     labels = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum",
@@ -420,6 +541,37 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
         log(conn, iid, f"Leverancier herkend uit de relaties: {supplier} (op {supplier_match})")
     conn.commit()
     return iid, True
+
+
+def merge_mail_cards(conn, user_id=None):
+    """Kaarten die uit dezelfde mail komen (van vóór 'één kaart per mail') samenvoegen: de kaart die het meest op een
+    factuur lijkt blijft, de andere bestanden (bijv. algemene voorwaarden) worden bijlagen. Alleen kaarten die nog
+    'nieuw' zijn en waar niemand iets bij heeft gezet."""
+    rows = conn.execute("SELECT i.*, f.filename AS fname FROM invoices i LEFT JOIN files f ON f.id = i.file_id"
+                        " WHERE i.source = 'mail' AND i.mail_id LIKE '%:%'").fetchall()
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["mail_id"].split(":")[0], []).append(r)
+    merged = 0
+    for mid, cards in groups.items():
+        if len(cards) < 2:
+            continue
+        cards.sort(key=lambda r: (-invoice_score(dict(r), r["fname"] or ""), r["id"]))
+        best = cards[0]
+        for r in cards[1:]:
+            busy = r["status"] != "nieuw" or r["question_to"] or conn.execute(
+                "SELECT 1 FROM invoice_notes WHERE invoice_id = ? LIMIT 1", (r["id"],)).fetchone()
+            if busy:
+                continue
+            conn.execute("UPDATE files SET entity_id = ?, kind = 'attachment' WHERE entity = 'invoice' AND entity_id = ?",
+                         (best["id"], r["id"]))
+            conn.execute("DELETE FROM invoices WHERE id = ?", (r["id"],))
+            log(conn, best["id"], f"Samengevoegd: '{r['fname'] or 'bestand'}' uit dezelfde mail is nu een bijlage van deze kaart", user_id)
+            merged += 1
+        conn.execute("UPDATE invoices SET mail_id = ? WHERE id = ?", (mid, best["id"]))
+    if merged:
+        conn.commit()
+    return merged
 
 
 def _bad_supplier(v):
@@ -440,9 +592,16 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
     except OSError:
         return []
     x = extract(data)
+    # wat iemand zelf heeft aangepast blijft staan; de rest (automatisch uitgelezen) mag vervangen worden
+    labels = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum",
+              "amount_incl": "bedrag incl.", "amount_excl": "bedrag excl.", "erp_ref": ("inkoopnummer", "inkooporder ERP")}
+    manual = " ".join(l["action"] for l in conn.execute(
+        "SELECT action FROM invoice_log WHERE invoice_id = ? AND action LIKE 'Gegevens aangepast:%'", (iid,)))
     upd = {}
     for k in ("invoice_no", "invoice_date", "due_date", "amount_incl", "amount_excl", "erp_ref"):
-        if x.get(k) is not None and (overwrite or r[k] in (None, "")) and x[k] != r[k]:
+        lab = labels[k] if isinstance(labels[k], tuple) else (labels[k],)
+        by_hand = any(l in manual for l in lab)
+        if x.get(k) is not None and (overwrite or r[k] in (None, "") or not by_hand) and x[k] != r[k]:
             upd[k] = x[k]
     if overwrite or not r["supplier_id"]:
         m = match_supplier(conn, x["text"], r["mail_from"])
@@ -489,6 +648,10 @@ def poll_mailbox(conn, upload_dir):
 
 def _poll(conn, upload_dir):
     import requests
+    try:
+        merge_mail_cards(conn)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WorkPortal] Samenvoegen kaarten mislukt: {exc}", flush=True)
     from .mail import _graph_token
     box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
     since = _setting(conn, "cred_since")
@@ -527,18 +690,28 @@ def _poll(conn, upload_dir):
                               headers=headers, timeout=60)
             if ar.status_code >= 400:
                 raise RuntimeError(f"Bijlagen lezen mislukt ({ar.status_code})")
+            # één kaart per mail: de PDF die het meest op een factuur lijkt is de factuur, de rest zijn bijlagen
+            files = []
             for a in ar.json().get("value", []):
-                name = a.get("name") or "factuur.pdf"
                 if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
                     continue
-                if not (name.lower().endswith(".pdf") or (a.get("contentType") or "").lower() == "application/pdf"):
-                    continue
                 data = base64.b64decode(a.get("contentBytes") or "")
-                if not data.startswith(b"%PDF"):
+                if not data:
                     continue
+                name = a.get("name") or "bijlage"
+                files.append((name, data, (a.get("contentType") or "application/octet-stream")))
+            pdfs = [f for f in files if f[1].startswith(b"%PDF")]
+            if pdfs:
+                scored = []
+                for f in pdfs:
+                    fx = extract(f[1])
+                    scored.append((invoice_score(fx, f[0]), f, fx))
+                scored.sort(key=lambda t: -t[0])
+                main, mx = scored[0][1], scored[0][2]
+                extra = [f for f in files if f is not main]
                 received = (m.get("receivedDateTime") or "").replace("Z", "+00:00")
-                _, created = create_invoice(conn, upload_dir, data, name, source="mail", mail={
-                    "key": f"{mid}:{a.get('id')}", "from_addr": (frm.get("address") or "").lower(),
+                _, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail={
+                    "key": mid, "from_addr": (frm.get("address") or "").lower(),
                     "from_name": frm.get("name"), "subject": m.get("subject"), "received": received or None})
                 new += 1 if created else 0
             conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
@@ -764,11 +937,12 @@ def detail(iid):
     back = request.args.get("terug") or url_for("crediteuren.index")
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
+    attachments = query("SELECT * FROM files WHERE entity = 'invoice' AND entity_id = ? AND kind = 'attachment' ORDER BY id", (iid,))
     suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
                       " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
                       " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
-                           back=back, suppliers=suppliers)
+                           back=back, suppliers=suppliers, attachments=attachments)
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -786,7 +960,6 @@ def save(iid):
         "amount_incl": parse_amount(f.get("amount_incl")),
         "amount_excl": parse_amount(f.get("amount_excl")),
         "erp_ref": (f.get("erp_ref") or "").strip()[:60] or None,
-        "description": (f.get("description") or "").strip()[:300] or None,
     }
     changed = [k for k, v in vals.items() if (r[k] if not isinstance(v, float) else (r[k] if r[k] is None else round(r[k], 2))) != v]
     if (rel["id"] if rel else None) != r["supplier_id"]:
@@ -821,11 +994,13 @@ def reread_all():
     if not can("crediteuren", 3):
         abort(403)
     conn = get_db()
+    merged = merge_mail_cards(conn, g.user["id"])
     n = 0
     for r in conn.execute("SELECT id FROM invoices WHERE status NOT IN ('snelstart', 'afgewezen') ORDER BY id").fetchall():
         if reread(conn, _upload_dir(), r["id"], overwrite=False, user_id=g.user["id"]):
             n += 1
-    flash(f"Openstaande facturen opnieuw uitgelezen: {n} aangevuld (alleen lege velden en de leverancier uit de relaties).", "ok")
+    flash((f"{merged} losse kaart(en) uit dezelfde mail samengevoegd (nu bijlage). " if merged else "")
+          + f"Openstaande facturen opnieuw uitgelezen: {n} bijgewerkt. Wat iemand zelf had aangepast is blijven staan.", "ok")
     return redirect(url_for("crediteuren.index"))
 
 

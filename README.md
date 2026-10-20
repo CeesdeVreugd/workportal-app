@@ -579,3 +579,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Het veld Leverancier is een zoekveld in de relaties (zoekt in naam, plaats en e-mail; leveranciers bovenaan). Gekozen relatie = gekoppeld (`supplier_id`, "handmatig gekozen").
 - Staat de leverancier er niet in: "+ … toevoegen als nieuwe leverancier" maakt direct een relatie aan (type leverancier, met e-mail en website voor het herkennen van volgende facturen). Mag ook met alleen het recht Inkoopfacturen bewerken.
 - De oude keuzelijst van de browser (die ook namen toonde die niet begonnen met wat je typte) is weg.
+
+## V106 – Inkoopfacturen: één kaart per mail en beter uitlezen
+- **Eén kaart per mail.** De PDF die het meest op een factuur lijkt (factuurnummer, bedrag, bestandsnaam) wordt de factuur; algemene voorwaarden en andere bestanden komen als "Andere bijlagen uit de mail" op dezelfde kaart (openen in de viewer).
+  Bestaande losse kaarten uit dezelfde mail worden automatisch samengevoegd (bij het ophalen en bij "Opnieuw uitlezen"), zolang ze nog Nieuw zijn en er niets bij is gezet.
+- **Uitlezen:** "TOTAAL IN EUR", "excl. BTW"/"incl. BTW" als kolomkop, "BTW basis", factuurnummer/-datum in een tabel onderaan ("Fact.nr.", "Fact. datum"), btw-bedrag (ook als kolom) om een ontbrekend of verkeerd incl.-bedrag te berekenen, vervaldatum uit de betalingstermijn ("binnen 14 dagen", "30 dagen netto").
+- **Leverancier:** e-maildomein of website die bij de naam past (bmn-bv.nl ↔ "BMN …", ook als afkorting), en bij dubbele relaties voorrang voor de relatie waarvan de naam bij het domein past of die al eerder facturen had.
+- **Opnieuw uitlezen (overzicht):** werkt nu ook verkeerd uitgelezen waarden bij; wat iemand zelf heeft aangepast blijft staan.
+- Veld "Omschrijving" weg.

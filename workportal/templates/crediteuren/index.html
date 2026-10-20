@@ -14,8 +14,8 @@
       <label class="btn">{{ icon('upload') }}PDF uploaden<input type="file" name="files" accept="application/pdf,.pdf" multiple hidden onchange="this.form.submit()"></label>
     </form>
     {% if can('crediteuren', 3) %}
-    <form method="post" action="{{ url_for('crediteuren.reread_all') }}" onsubmit="return confirm('Alle openstaande facturen opnieuw uitlezen? Alleen lege velden en de leverancier (uit de relaties) worden aangevuld.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="btn" title="Lege velden en leverancier aanvullen bij openstaande facturen">{{ icon('refresh') }}Opnieuw uitlezen</button></form>
+    <form method="post" action="{{ url_for('crediteuren.reread_all') }}" onsubmit="return confirm('Alle openstaande facturen opnieuw uitlezen? Automatisch uitgelezen gegevens worden bijgewerkt; wat iemand zelf heeft aangepast blijft staan. Losse kaarten uit dezelfde mail worden samengevoegd.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" title="Openstaande facturen opnieuw uitlezen en losse kaarten uit dezelfde mail samenvoegen">{{ icon('refresh') }}Opnieuw uitlezen</button></form>
     {% endif %}
     {% if mail.configured %}
     <form method="post" action="{{ url_for('crediteuren.fetch') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
