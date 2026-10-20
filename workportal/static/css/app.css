@@ -131,7 +131,7 @@ form { margin: 0; }
 .fgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
 .fgrid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .fgrid .full { grid-column: 1 / -1; }
-label.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+label.f, div.f.lf { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
 input[type=text], input[type=url], input:not([type]), input[type=email], input[type=number], input[type=date], input[type=datetime-local], input[type=password], input[type=search], input[type=tel], select, textarea {
   font: 15px var(--font); color: var(--ink); background: #fff; border: 1px solid #D5DAE8; border-radius: 10px; padding: 0 12px; height: 44px; width: 100%; outline: none; }
 textarea { padding: 10px 12px; height: auto; min-height: 90px; resize: vertical; line-height: 1.45; }
@@ -512,7 +512,7 @@ select { text-overflow: ellipsis; }
   .btn.sm { height: 34px; padding: 0 10px; font-size: 13px; }
   input[type=text], input[type=url], input:not([type]), input[type=email], input[type=number], input[type=date], input[type=datetime-local],
   input[type=password], input[type=search], input[type=tel], select { height: 42px; font-size: 16px; }
-  label.f { font-size: 12.5px; gap: 4px; }
+  label.f, div.f.lf { font-size: 12.5px; gap: 4px; }
   .check { font-size: 14px; }
   .chip span { height: 38px; padding: 0 12px; font-size: 14px; }
   .table th { font-size: 12px; }
@@ -931,3 +931,5 @@ input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 .cred-st.on { border-color: var(--basic, #0A0A96); background: #EEF0FF; cursor: default; }
 .cred-st.on .dot { background: var(--basic, #0A0A96); border-color: var(--basic, #0A0A96); }
 @media (max-width: 699px) { .cred-status { grid-template-columns: 1fr; } }
+.f .hint svg { width: 14px; height: 14px; vertical-align: -2px; }
+div.f.lf .combo, div.f.lf .hint { font-weight: 400; }

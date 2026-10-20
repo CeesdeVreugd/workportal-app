@@ -19,7 +19,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from .db import query, execute, get_db
 from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
-from .util import now_iso, now_utc, to_float, safe_filename, fmt_eur
+from .util import now_iso, now_utc, to_float, to_int, safe_filename, fmt_eur
 
 bp = Blueprint("crediteuren", __name__, url_prefix="/inkoopfacturen")
 
@@ -764,8 +764,9 @@ def detail(iid):
     back = request.args.get("terug") or url_for("crediteuren.index")
     if not back.startswith("/") or back.startswith("//"):
         back = url_for("crediteuren.index")
-    suppliers = query("SELECT name FROM customers WHERE IFNULL(active, 1) = 1 AND relation_type IN ('leverancier', 'beide')"
-                      " ORDER BY name")
+    suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
+                      " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
+                      " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers)
 
@@ -775,8 +776,10 @@ def detail(iid):
 def save(iid):
     r = _load(iid)
     f = request.form
+    sup_id = to_int(f.get("supplier_id")) if "supplier_id" in f else r["supplier_id"]
+    rel = query("SELECT id, name FROM customers WHERE id = ?", (sup_id,), one=True) if sup_id else None
     vals = {
-        "supplier": (f.get("supplier") or "").strip()[:150] or None,
+        "supplier": rel["name"] if rel else ((f.get("supplier") or "").strip()[:150] or (None if "supplier_id" in f and r["supplier_id"] else r["supplier"])),
         "invoice_no": (f.get("invoice_no") or "").strip()[:60] or None,
         "invoice_date": f.get("invoice_date") or None,
         "due_date": f.get("due_date") or None,
@@ -786,11 +789,11 @@ def save(iid):
         "description": (f.get("description") or "").strip()[:300] or None,
     }
     changed = [k for k, v in vals.items() if (r[k] if not isinstance(v, float) else (r[k] if r[k] is None else round(r[k], 2))) != v]
-    if "supplier" in changed:
-        rel = query("SELECT id, name FROM customers WHERE lower(name) = lower(?) AND IFNULL(active, 1) = 1 ORDER BY"
-                    " CASE WHEN relation_type IN ('leverancier','beide') THEN 0 ELSE 1 END LIMIT 1", (vals["supplier"] or "",), one=True)
+    if (rel["id"] if rel else None) != r["supplier_id"]:
         execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?",
                 (rel["id"] if rel else None, "handmatig gekozen" if rel else None, iid))
+        if "supplier" not in changed:
+            changed.append("supplier")
     if changed:
         execute("UPDATE invoices SET " + ", ".join(f"{k} = ?" for k in vals) + ", updated_at = ? WHERE id = ?",
                 list(vals.values()) + [now_iso(), iid])

@@ -316,6 +316,7 @@
    - "+ nieuw toevoegen" opent een klein venster en maakt het item direct aan (data-add) */
 (function () {
   var ADD = {
+    leverancier: { title: "Nieuwe leverancier", label: "leverancier", fields: [["name", "Naam *", "text", true], ["city", "Plaats", "text"], ["email", "E-mail (facturen)", "email"], ["website", "Website", "text"]] },
     klant: { title: "Nieuwe klant", label: "klant", fields: [["name", "Naam *", "text", true], ["city", "Plaats", "text"], ["email", "E-mail", "email"], ["phone", "Telefoon", "tel"]] },
     locatie: { title: "Nieuwe locatie", label: "locatie", fields: [["name", "Naam *", "text", true], ["address", "Adres", "text"], ["postcode", "Postcode", "text"], ["city", "Plaats", "text"]] },
     machine: { title: "Nieuwe machine / installatie", label: "machine", fields: [["name", "Naam *", "text", true], ["serial", "Serienummer", "text"], ["year", "Bouwjaar", "text"]] },

@@ -574,3 +574,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Nieuw: de **volledige naam** letterlijk op de factuur (bijv. "Fabory Nederland BV") telt als zeker; en een **e-maildomein dat bij de naam past** (verkoopnl@fabory.com ↔ "Fabory …") ook.
 - Een leveranciersnaam als "Invoice ." of "Factuur" wordt vervangen door de naam uit de kop van de factuur.
 - Bedrag excl.: "BTW basis" / "grondslag" gaat vóór "Subtotaal" (vracht/toeslagen staan vaak onder het subtotaal).
+
+## V105 – Inkoopfacturen: zoekveld voor de leverancier
+- Het veld Leverancier is een zoekveld in de relaties (zoekt in naam, plaats en e-mail; leveranciers bovenaan). Gekozen relatie = gekoppeld (`supplier_id`, "handmatig gekozen").
+- Staat de leverancier er niet in: "+ … toevoegen als nieuwe leverancier" maakt direct een relatie aan (type leverancier, met e-mail en website voor het herkennen van volgende facturen). Mag ook met alleen het recht Inkoopfacturen bewerken.
+- De oude keuzelijst van de browser (die ook namen toonde die niet begonnen met wat je typte) is weg.

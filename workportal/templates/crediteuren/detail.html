@@ -46,9 +46,14 @@
       <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
       <fieldset {{ 'disabled' if not edit }} style="border:0;padding:0;margin:0">
       <div class="fgrid">
-        <label class="f">Leverancier<input type="text" name="supplier" value="{{ r.supplier or '' }}" list="supplierlist" autocomplete="off">
-          {% if r.supplier_id %}<span class="hint" style="color:var(--ok,#1E7A3C)">{{ icon('check') }} Uit de relaties{% if r.supplier_match %} · herkend op {{ r.supplier_match }}{% endif %} · <a href="{{ url_for('klanten.customer', cid=r.supplier_id) }}">relatie openen</a></span>
-          {% elif r.supplier %}<span class="hint" style="color:var(--warn,#8A4B08)">Niet gevonden in de relaties – kies de leverancier uit de lijst.</span>{% endif %}</label>
+        <div class="f lf"><span>Leverancier</span>
+          <select name="supplier_id" data-combo data-add="leverancier" data-placeholder="Zoek in de relaties…">
+            <option value="">{{ ('Niet gekoppeld: ' ~ r.supplier) if r.supplier and not r.supplier_id else '' }}</option>
+            {% for s in suppliers %}<option value="{{ s.id }}" data-s="{{ s.city or '' }} {{ s.email or '' }}" {{ 'selected' if s.id == r.supplier_id }}>{{ s.name }}{% if s.relation_type and s.relation_type not in ('leverancier', 'beide') %} ({{ s.relation_type }}){% endif %}</option>{% endfor %}
+          </select>
+          {% if r.supplier_id %}<span class="hint" style="color:var(--ok,#1E7A3C)">{{ icon('check') }} Uit de relaties{% if r.supplier_match %} · {{ 'herkend op ' if r.supplier_match != 'handmatig gekozen' }}{{ r.supplier_match }}{% endif %} · <a href="{{ url_for('klanten.customer', cid=r.supplier_id) }}">relatie openen</a></span>
+          {% elif r.supplier %}<span class="hint" style="color:var(--warn,#8A4B08)">“{{ r.supplier }}” is niet gevonden in de relaties – zoek de leverancier hierboven, of voeg hem toe.</span>{% endif %}
+        </div>
         <label class="f">Factuurnummer<input type="text" name="invoice_no" value="{{ r.invoice_no or '' }}"></label>
         <label class="f">Factuurdatum<input type="date" name="invoice_date" value="{{ r.invoice_date or '' }}"></label>
         <label class="f">Vervaldatum<input type="date" name="due_date" value="{{ r.due_date or '' }}"></label>
@@ -60,7 +65,6 @@
       {% if edit %}<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Gegevens opslaan</button>
         <button class="btn ghost" formaction="{{ url_for('crediteuren.reread_one', iid=r.id) }}" formnovalidate title="De PDF opnieuw uitlezen en de leverancier opnieuw zoeken in de relaties">{{ icon('refresh') }}Opnieuw uitlezen</button></div>{% endif %}
       </fieldset>
-      <datalist id="supplierlist">{% for s in suppliers %}<option value="{{ s.name }}">{% endfor %}</datalist>
     </form>
 
     {% if edit %}

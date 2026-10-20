@@ -209,7 +209,7 @@ def add_installation(cid):
 @bp.route("/api/snel/<kind>", methods=["POST"])
 def quick_add(kind):
     """Snel toevoegen vanuit een keuzelijst (bijv. bij een nieuw ticket): klant, locatie, machine of contactpersoon."""
-    if not (can("klanten", BEWERKEN) or can("service", BEWERKEN)):
+    if not (can("klanten", BEWERKEN) or can("service", BEWERKEN) or (kind == "leverancier" and can("crediteuren", BEWERKEN))):
         return jsonify({"error": "Je hebt geen rechten om dit toe te voegen."}), 403
     js = request.get_json(silent=True) or {}
     v = lambda k: (str(js.get(k) or "").strip() or None)
@@ -217,7 +217,7 @@ def quick_add(kind):
     if not name:
         return jsonify({"error": "Vul een naam in."}), 400
     cid = to_int(js.get("customer_id"))
-    if kind != "klant":
+    if kind not in ("klant", "leverancier"):
         if not cid or not query("SELECT 1 FROM customers WHERE id = ?", (cid,), one=True):
             return jsonify({"error": "Kies eerst een klant."}), 400
     if kind == "klant":
@@ -228,6 +228,15 @@ def quick_add(kind):
         new_id = execute("INSERT INTO customers (name, city, email, phone, relation_type, active, created_at, updated_at)"
                          " VALUES (?,?,?,?, 'klant', 1, ?, ?)", (name, v("city"), v("email"), v("phone"), now, now))
         audit("aangemaakt (snel)", "customer", new_id, name)
+        return jsonify({"id": new_id, "label": name})
+    if kind == "leverancier":
+        dup = query("SELECT id, name FROM customers WHERE lower(name) = lower(?)", (name,), one=True)
+        if dup:
+            return jsonify({"id": dup["id"], "label": dup["name"], "existing": True})
+        now = now_iso()
+        new_id = execute("INSERT INTO customers (name, city, email, website, relation_type, active, created_at, updated_at)"
+                         " VALUES (?,?,?,?, 'leverancier', 1, ?, ?)", (name, v("city"), v("email"), v("website"), now, now))
+        audit("aangemaakt (snel, leverancier)", "customer", new_id, name)
         return jsonify({"id": new_id, "label": name})
     if kind == "locatie":
         new_id = execute("INSERT INTO locations (customer_id, name, address, postcode, city) VALUES (?,?,?,?,?)",
