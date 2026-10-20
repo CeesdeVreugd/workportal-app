@@ -37,7 +37,8 @@
 
 {% if r.question_to %}
 <div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
-  {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}</div>
+  {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}
+  {% if can('crediteuren', 2) %}<form method="post" action="{{ url_for('crediteuren.question_cancel', iid=r.id) }}" style="display:inline;margin-left:8px" onsubmit="return confirm('Vraag aan {{ r.question_name }} intrekken?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Vraag intrekken</button></form>{% endif %}</div>
 {% endif %}
 
 <div class="grid g2 stack cred-grid">
@@ -45,7 +46,11 @@
     <div class="card-head"><h2>Factuur (PDF)</h2>
       {% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=(r.supplier or 'Factuur') ~ ' ' ~ (r.invoice_no or '')) }}">Openen</a> · <a href="{{ pdf_url }}?download=1">Downloaden</a></div>{% endif %}
     </div>
-    {% if pdf_url %}<iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
+    {% if pdf_url %}
+    <div class="dragfile hide-m" draggable="true" data-dragfile="{{ pdf_url }}?download=1" data-dragname="{{ drag_name }}" data-dragmime="application/pdf"
+         title="Sleep dit naar Komdex, de Verkenner of een mail">
+      <span class="attico att-pdf">PDF</span><span class="grow"><b>{{ drag_name }}</b><small>Sleep naar Komdex (of naar je bureaublad / een map)</small></span><span class="draghandle" aria-hidden="true">⠿</span></div>
+    <iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
     <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=r.supplier or 'Factuur') }}">{{ icon('pdf') }}Factuur bekijken</a>
     {% else %}<div class="empty">Geen PDF.</div>{% endif %}
     {% if attachments %}<div style="margin-top:14px"><h3 style="margin:0 0 4px;font-size:15px">Andere bijlagen uit de mail ({{ attachments|length }})</h3>{{ att_list(attachments) }}</div>{% endif %}
@@ -100,13 +105,6 @@
       {% endif %}
       <div class="cred-actions" style="margin-top:12px">
         {% if r.status != 'snelstart' and r.status != 'afgewezen' %}
-        <details class="cred-pop"><summary class="btn">Vraag stellen aan…</summary>
-          <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
-            <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
-            <div><button class="btn primary">Vraag versturen</button></div>
-            <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
-          </form></details>
         <details class="cred-pop"><summary class="btn danger">Afwijzen</summary>
           <form method="post" action="{{ url_for('crediteuren.reject', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="f">Reden *<textarea name="reason" rows="3" required placeholder="Bijv. uren niet afgesproken, prijs klopt niet met offerte"></textarea></label>
@@ -121,10 +119,7 @@
     </section>
     {% endif %}
 
-    <section class="card" id="gesprek">
-      <div class="card-head"><h2>Gesprek</h2></div>
-      <div class="notes">
-        {% for n in notes %}
+{% macro note_item(n) %}
         <article class="note {{ 'cred-acc' if n.for_accounting }} {{ 'cred-done' if n.handled }}">
           <div class="notehead">
             {% set mm = metas.get(n.id) %}
@@ -147,7 +142,40 @@
           <div class="notebody">{{ n.body }}</div>
           {% if edit and n.kind == 'mail_in' %}<div class="noteactions"><a class="btn sm" href="{{ url_for('crediteuren.detail', iid=r.id, mail=1, antwoord=n.id) }}#mailform">{{ icon('mail') }}Beantwoorden</a></div>{% endif %}
         </article>
-        {% else %}<div class="empty">Nog geen opmerkingen.</div>{% endfor %}
+{% endmacro %}
+    {% set internal = notes|rejectattr('kind', 'in', ['mail_uit', 'mail_in'])|list %}
+    {% set external = notes|selectattr('kind', 'in', ['mail_uit', 'mail_in'])|list %}
+    <section class="card" id="gesprek">
+      <div class="card-head"><h2>Intern – vragen en opmerkingen</h2><span class="small muted">alleen voor collega's</span></div>
+      <div class="notes">
+        {% for n in internal %}{{ note_item(n) }}{% else %}<div class="empty">Nog geen interne vragen of opmerkingen.</div>{% endfor %}
+      </div>
+      {% if edit and r.status not in ('snelstart', 'afgewezen') %}
+      <details class="cred-pop" style="margin-top:14px"><summary class="btn">Vraag stellen aan collega…</summary>
+        <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
+          <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
+          <div><button class="btn primary">Vraag versturen</button></div>
+          <p class="hint">Je collega krijgt een melding met een link naar deze factuur.</p>
+        </form></details>
+      {% endif %}
+      {% if edit or r.question_to == g.user.id %}
+      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:14px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="f">{{ 'Je antwoord' if r.question_to == g.user.id else 'Interne opmerking of reactie' }}<textarea name="body" rows="3" required></textarea></label>
+        <div class="cred-actions">
+          <label class="check"><input type="checkbox" name="for_accounting" value="1"> Voor de boekhouding</label>
+          {% if r.question_to and r.question_to != g.user.id %}<label class="check"><input type="checkbox" name="close_question" value="1"> Vraag hiermee afsluiten</label>{% endif %}
+          <button class="btn primary" style="margin-left:auto">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
+        </div>
+      </form>
+      {% endif %}
+    </section>
+
+    <section class="card" id="extern">
+      <div class="card-head"><h2>Extern – leverancier</h2><span class="small muted">mail met de leverancier</span></div>
+      <div class="notes">
+        {% for n in external %}{{ note_item(n) }}{% else %}<div class="empty">Nog geen mail met de leverancier.</div>{% endfor %}
       </div>
       {% if edit %}
       <details class="cred-mail" id="mailform" style="margin-top:14px" {{ 'open' if request.args.get('mail') }}>
@@ -157,7 +185,9 @@
           {% if reply_note %}<input type="hidden" name="reply_to" value="{{ reply_note.id }}">
           <div class="hint" style="margin:0 0 8px">Antwoord op de reactie van {{ reply_note.created_at|dt }} · <a href="{{ url_for('crediteuren.detail', iid=r.id, mail=1) }}#mailform">nieuwe mail in plaats daarvan</a></div>{% endif %}
           <div class="fgrid">
-            <label class="f">Aan *<input type="text" name="to" value="{{ mail_to }}" required placeholder="naam@leverancier.nl"></label>
+            <label class="f">Aan *<input type="text" name="to" id="mailto" value="{{ mail_to }}" required placeholder="naam@leverancier.nl">
+              {% if not reply_note and mail_options|length > 1 %}<span class="mailopts">{% for lab, adr in mail_options %}<button type="button" class="chipbtn" onclick="document.getElementById('mailto').value=this.dataset.a" data-a="{{ adr }}" title="{{ adr }}">{{ lab }}</button>{% endfor %}</span>
+              {% elif not reply_note and r.mail_from %}<span class="hint">Afzender van de factuurmail</span>{% endif %}</label>
             <label class="f">Cc<input type="text" name="cc" placeholder="optioneel, meerdere met komma"></label>
           </div>
           {% if reply_note %}
@@ -177,20 +207,9 @@
             <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
             <button class="btn primary" style="margin-left:auto">{{ icon('mail') }}Versturen</button>
           </div>
-          <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier, dan komt zijn antwoord (met bijlagen) hier in het gesprek – wie er ook reageert.</p>
+          <p class="hint">Verstuurd vanuit {{ cred_box }}, met je naam en "Crediteurenadministratie" in de handtekening. Reageert de leverancier, dan komt zijn antwoord (met bijlagen) hier – wie er ook reageert.</p>
         </form>
       </details>
-      {% endif %}
-      {% if edit or r.question_to == g.user.id %}
-      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:14px">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="f">{{ 'Je antwoord' if r.question_to == g.user.id else 'Reactie of opmerking' }}<textarea name="body" rows="3" required></textarea></label>
-        <div class="cred-actions">
-          <label class="check"><input type="checkbox" name="for_accounting" value="1"> Voor de boekhouding</label>
-          {% if r.question_to and r.question_to != g.user.id %}<label class="check"><input type="checkbox" name="close_question" value="1"> Vraag hiermee afsluiten</label>{% endif %}
-          <button class="btn primary" style="margin-left:auto">{{ 'Antwoord plaatsen' if r.question_to == g.user.id else 'Plaatsen' }}</button>
-        </div>
-      </form>
       {% endif %}
     </section>
 

@@ -667,3 +667,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Onder elke reactie van een leverancier in het gesprek: **Beantwoorden**. Het mailformulier opent met "Antwoord aan <naam>", Aan = de afzender van die reactie, onderwerp "RE: …" van die mail (vast), PDF standaard niet mee.
 - Verstuurd als antwoord op dát bericht (Graph `reply`), dus in dezelfde mailwisseling in Outlook; ook de volgende reactie komt weer op de kaart. In het gesprek staat bij de verstuurde mail waarop hij een antwoord was.
 - Reacties bewaren nu het bericht-id (`msg_id` in `mail_meta`); bij oudere reacties zonder id wordt geantwoord op de oorspronkelijke factuurmail.
+
+## V124 – Inkoopfacturen: vraag intrekken, slepen, intern/extern
+- Verwijder je een vraag aan een collega uit het gesprek, dan verdwijnt ook "Vraag open bij …" (en de melding bij die collega). Nieuwe knop **Vraag intrekken** in de gele balk.
+- **Slepen naar Komdex:** boven de PDF een blok met de bestandsnaam ("Leverancier Factuurnummer.pdf"); sleep dat naar Komdex, de Verkenner, het bureaublad of een mail. Werkt in Chrome en Edge (DownloadURL). Ook "Andere bijlagen" zijn te slepen. Pakt Komdex het niet direct, sleep dan eerst naar het bureaublad.
+- Mail aan leverancier: Aan is standaard het adres waar de factuurmail vandaan kwam; knopjes om te wisselen naar het adres van de relatie of de vorige ontvanger.
+- Gesprek gesplitst in **Intern – vragen en opmerkingen** (collega's, vraag stellen, voor de boekhouding) en **Extern – leverancier** (mails, beantwoorden, mail leverancier).

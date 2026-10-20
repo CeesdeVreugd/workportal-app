@@ -821,7 +821,7 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
             from .notify import notify_user
             notify_user(conn, last["created_by"], f"Reactie van {who}",
                         f"Op je mail over factuur {inv['supplier'] or ''} {inv['invoice_no'] or ''}".strip() + ": " + (body[:140] or "(bijlage)"),
-                        url=f"/inkoopfacturen/{iid}#gesprek", email=False)
+                        url=f"/inkoopfacturen/{iid}#extern", email=False)
         except Exception as exc:  # pragma: no cover
             print(f"[WorkPortal] Melding reactie leverancier mislukt: {exc}", flush=True)
 
@@ -962,6 +962,12 @@ def _status_key(r):
     if r["status"] in OPEN and r["question_to"]:
         return "vraag"
     return r["status"]
+
+
+def _drag_name(r):
+    """Bestandsnaam bij slepen: "Leverancier Factuurnummer.pdf" (zonder tekens die Windows niet toestaat)."""
+    name = " ".join(x for x in ((r["supplier"] or "").strip(), (r["invoice_no"] or "").strip()) if x) or "Factuur"
+    return re.sub(r'[\\/:*?"<>|]+', "-", name)[:120].strip(" .") + ".pdf"
 
 
 def _label(r):
@@ -1152,8 +1158,14 @@ def detail(iid):
     import json
     rel = query("SELECT email FROM customers WHERE id = ?", (r["supplier_id"],), one=True) if r["supplier_id"] else None
     prev_to = next((json.loads(n["mail_meta"]).get("to") for n in reversed(notes) if n["kind"] == "mail_uit" and n["mail_meta"]), None)
-    sender = r["mail_from"] if r["mail_from"] and not re.search(r"no-?reply|donotreply|noreply|mailer|postmaster", r["mail_from"], re.I) else ""
-    mail_to = ", ".join(prev_to) if prev_to else ((rel["email"] if rel and rel["email"] else "") or sender)
+    # standaard: terug naar het adres waar de factuurmail vandaan kwam; anders het adres van de relatie
+    sender = r["mail_from"] or ""
+    mail_to = sender or ", ".join(prev_to or []) or (rel["email"] if rel and rel["email"] else "")
+    mail_options = []
+    for lab, adr in (("afzender factuurmail", sender), ("relatie", rel["email"] if rel and rel["email"] else ""),
+                     ("vorige mail", ", ".join(prev_to or []))):
+        if adr and adr.lower() not in [a.lower() for _, a in mail_options]:
+            mail_options.append((lab, adr))
     mail_subject = f"Factuur {r['invoice_no'] or ''} – De Vreugd Productietechniek".replace("Factuur  ", "Factuur ")
     reply_note = None
     if request.args.get("antwoord"):
@@ -1168,7 +1180,8 @@ def detail(iid):
                       " name", (r["supplier_id"] or 0,))
     return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
-                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX), reply_note=reply_note)
+                           metas=metas, cred_box=_setting(get_db(), "cred_mailbox", DEFAULT_MAILBOX), reply_note=reply_note,
+                           drag_name=_drag_name(r), mail_options=mail_options)
 
 
 @bp.route("/<int:iid>/gegevens", methods=["POST"])
@@ -1245,7 +1258,7 @@ def mail_supplier(iid):
     bad = [a for a in to + cc if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
     body = (f.get("body") or "").replace("\r\n", "\n").strip()
     subject = (f.get("subject") or "").strip() or f"Factuur {r['invoice_no'] or ''}".strip()
-    back = url_for("crediteuren.detail", iid=iid) + "#gesprek"
+    back = url_for("crediteuren.detail", iid=iid) + "#extern"
     if not to or bad or not body:
         flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
         return redirect(back)
@@ -1293,7 +1306,7 @@ def mail_supplier(iid):
                               "reply_to": rn["id"] if rn else None}, ensure_ascii=False)))
     log(conn, iid, f"Mail aan leverancier ({', '.join(to)}): {subject[:80]}", g.user["id"])
     conn.commit()
-    flash(f"Mail verstuurd aan {', '.join(to)}. De reactie komt hier in het gesprek.", "ok")
+    flash(f"Mail verstuurd aan {', '.join(to)}. De reactie komt hier bij Extern – leverancier.", "ok")
     return redirect(back)
 
 
@@ -1427,6 +1440,21 @@ def note_done(iid, nid):
     return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
 
 
+@bp.route("/<int:iid>/vraag-intrekken", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def question_cancel(iid):
+    """Open vraag aan een collega intrekken (de melding 'Vraag open bij …' verdwijnt)."""
+    r = _load(iid)
+    if r["question_to"]:
+        conn = get_db()
+        conn.execute("UPDATE invoices SET question_to = NULL, question_by = NULL, question_at = NULL, updated_at = ? WHERE id = ?",
+                     (now_iso(), iid))
+        log(conn, iid, f"Vraag aan {r['question_name'] or 'collega'} ingetrokken", g.user["id"])
+        conn.commit()
+        flash("Vraag ingetrokken.", "ok")
+    return redirect(url_for("crediteuren.detail", iid=iid))
+
+
 @bp.route("/<int:iid>/bericht/<int:nid>/verwijderen", methods=["POST"])
 @require(MODULE, BEWERKEN)
 def note_delete(iid, nid):
@@ -1438,10 +1466,15 @@ def note_delete(iid, nid):
     conn = get_db()
     label = {"mail_uit": "mail aan leverancier", "mail_in": "reactie leverancier"}.get(n["kind"], n["kind"])
     conn.execute("DELETE FROM invoice_notes WHERE id = ?", (nid,))
+    if n["kind"] == "vraag":
+        # de vraag is weg, dus de factuur wacht ook niet meer op die collega
+        conn.execute("UPDATE invoices SET question_to = NULL, question_by = NULL, question_at = NULL WHERE id = ? AND question_to = ?",
+                     (iid, n["to_user"]))
+        label = "vraag aan collega"
     log(conn, iid, f"Uit het gesprek verwijderd: {label} van {n['created_at'][:16].replace('T', ' ')} ({(n['body'] or '')[:60]})", g.user["id"])
     conn.commit()
     flash("Verwijderd uit het gesprek.", "ok")
-    return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
+    return redirect(url_for("crediteuren.detail", iid=iid) + ("#extern" if n["kind"] in ("mail_uit", "mail_in") else "#gesprek"))
 
 
 @bp.route("/<int:iid>/verwijderen", methods=["POST"])

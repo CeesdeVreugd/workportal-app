@@ -12,7 +12,7 @@
 {%- endmacro %}
 {% macro attachments(files, del_name=None) -%}
 <div class="attlist">{% for f in files %}{% set ext = (f.filename or '').rpartition('.')[2].lower() %}{% set view = ext in ('pdf', 'docx', 'docm', 'dotx', 'xlsx', 'xlsm', 'csv') %}
-<div class="attrow"><a class="attmain" href="{{ url_for('main.file', fid=f.id, name=f.filename) if view else url_for('main.file', fid=f.id, download=1) }}"{% if ext == 'pdf' %} data-pdf="{{ f.filename }}"{% endif %}>
+<div class="attrow" draggable="true" data-dragfile="{{ url_for('main.file', fid=f.id, download=1) }}" data-dragname="{{ f.filename }}" data-dragmime="{{ f.mime or 'application/octet-stream' }}"><a class="attmain" href="{{ url_for('main.file', fid=f.id, name=f.filename) if view else url_for('main.file', fid=f.id, download=1) }}"{% if ext == 'pdf' %} data-pdf="{{ f.filename }}"{% endif %}>
   <span class="attico att-{{ ext if ext in ('pdf','docx','doc','xlsx','xls','csv','dwg','dxf','step','stp','zip','txt') else 'file' }}">{{ ext[:4]|upper or '?' }}</span>
   <span class="grow"><span class="attname">{{ f.caption or f.filename }}</span><span class="attmeta">{{ 'Openen' if view else 'Downloaden' }}{% if f.size %} · {{ (f.size / 1048576)|num(1) ~ ' MB' if f.size >= 1048576 else ((f.size / 1024)|round|int ~ ' kB') }}{% endif %}</span></span></a>
   {% if view %}<a class="iconbtn" href="{{ url_for('main.file', fid=f.id, download=1) }}" title="Downloaden" aria-label="Downloaden">{{ icon('download') }}</a>{% endif %}

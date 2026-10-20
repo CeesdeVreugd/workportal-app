@@ -864,3 +864,23 @@
   document.addEventListener("focusin", function (e) { if (isField(e.target)) document.body.classList.add("kb-open"); });
   document.addEventListener("focusout", function () { setTimeout(function () { if (!isField(document.activeElement)) document.body.classList.remove("kb-open"); }, 100); });
 })();
+
+/* Bestand naar buiten slepen (Komdex, Verkenner, bureaublad, Outlook): <el draggable="true" data-dragfile="url" data-dragname="naam.pdf">.
+   Chrome/Edge maken van "DownloadURL" een echt bestand op de plek waar je het loslaat. */
+(function () {
+  document.addEventListener("dragstart", function (e) {
+    var el = e.target.closest && e.target.closest("[data-dragfile]");
+    if (!el || !e.dataTransfer) return;
+    var url = new URL(el.getAttribute("data-dragfile"), location.href).href;
+    var name = (el.getAttribute("data-dragname") || "bestand.pdf").replace(/[:]/g, "-");
+    var mime = el.getAttribute("data-dragmime") || "application/octet-stream";
+    try { e.dataTransfer.setData("DownloadURL", mime + ":" + name + ":" + url); } catch (x) {}
+    try { e.dataTransfer.setData("text/uri-list", url); e.dataTransfer.setData("text/plain", url); } catch (x) {}
+    e.dataTransfer.effectAllowed = "copy";
+    el.classList.add("dragging");
+  });
+  document.addEventListener("dragend", function (e) {
+    var el = e.target.closest && e.target.closest("[data-dragfile]");
+    if (el) el.classList.remove("dragging");
+  });
+})();
