@@ -117,12 +117,12 @@
       {% if r.status != 'afgewezen' %}
       <form method="post" action="{{ url_for('crediteuren.set_status', iid=r.id) }}" class="cred-status {{ ('locked-part' if archive_me else 'locked') if r.ext_question }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="cred-st full {{ 'on' if r.status == 'nieuw' }}" name="status" value="nieuw" {{ 'disabled' if r.status == 'nieuw' }}>
+        <button class="cred-st full {{ 'on' if r.status == 'nieuw' }}" name="status" value="nieuw" {{ 'disabled' if r.status == 'nieuw' or (route and not komdex_ok) }}>
           <span class="dot">{% if r.status == 'nieuw' %}{{ icon('check') }}{% endif %}</span><span><b>Nieuw</b><small>nog niets mee gedaan</small></span></button>
-        <div class="cred-or full"><span>Komdex – één van de twee (nog eens tikken = uit)</span></div>
+        <div class="cred-or full"><span>Komdex – één van de twee (nog eens tikken = uit){{ ' · alleen boekhouder of beheerder' if not komdex_ok }}</span></div>
         {% for key, rkey, label, sub in [('erp', 'komdex', 'Verwerkt in Komdex', 'inkoop afgeboekt in Komdex'), ('buiten', 'buiten', 'Verwerkt buiten Komdex om', 'geen inkooporder, bijv. kosten')] %}
         {% set cur = route == rkey %}
-        <button class="cred-st {{ 'on' if cur }}" name="status" value="{{ key }}" title="{{ 'Nog eens tikken om uit te zetten' if cur else '' }}">
+        <button class="cred-st {{ 'on' if cur }}" name="status" value="{{ key }}" {{ 'disabled' if not komdex_ok }} title="{{ 'Alleen de boekhouder of een beheerder' if not komdex_ok else ('Nog eens tikken om uit te zetten' if cur else '') }}">
           <span class="dot">{% if cur %}{{ icon('check') }}{% endif %}</span><span><b>{{ label }}</b><small>{{ sub }}</small></span></button>
         {% endfor %}
         <div class="cred-or full"><span>SnelStart – mag ook eerst</span></div>

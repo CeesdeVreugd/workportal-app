@@ -426,10 +426,10 @@ def graph_wellknown_id(box, name):
         return None
 
 
-def graph_conversation(box, conv_id):
-    """Alle berichten (alle mappen, ook Verzonden items) uit één mailwisseling: [{id, parentFolderId}]."""
+def graph_conversation(box, conv_id, fields="id,parentFolderId"):
+    """Alle berichten (alle mappen, ook Verzonden items) uit één mailwisseling: [{id, parentFolderId, …}]."""
     esc = conv_id.replace("'", "''")
-    js = _gcall("GET", f"/users/{box}/messages", params={"$filter": f"conversationId eq '{esc}'", "$select": "id,parentFolderId", "$top": "100"})
+    js = _gcall("GET", f"/users/{box}/messages", params={"$filter": f"conversationId eq '{esc}'", "$select": fields, "$top": "100"})
     return js.get("value") or []
 
 

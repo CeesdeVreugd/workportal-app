@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V145: inkoopfacturen - boekhouder kan Verwerkt in SnelStart zetten bij open vraag leverancier"
+set "OMSCHRIJVING=WorkPortal V146: inkoopfacturen - categorie op de hele mailwisseling, Komdex alleen boekhouder of beheerder"
 
 echo.
 echo ============================================

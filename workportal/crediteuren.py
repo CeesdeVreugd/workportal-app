@@ -1356,7 +1356,7 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=_may_archive(get_db()), archive_owner_name=_owner_name(get_db()), cat_colors=category_colors(get_db()),
+                           archive_me=_may_archive(get_db()), archive_owner_name=_owner_name(get_db()), komdex_ok=_may_komdex(get_db()), cat_colors=category_colors(get_db()),
                            cat_hide=set(category_map(get_db()).values()))
 
 
@@ -1750,28 +1750,53 @@ def apply_categories(conn, iid, box):
     mid = r["mail_id"].split(":")[0]
     if not graph_configured():
         cur = json.loads(r["mail_categories"] or "[]")
-    else:
-        try:
-            cur = _gcall("GET", f"/users/{box}/messages/{mid}", params={"$select": "categories"}).get("categories") or []
-        except GraphError as e:
-            log(conn, iid, "Outlook-categorie niet gezet: " + ("recht Mail.ReadWrite ontbreekt" if e.status == 403 else
-                                                               "mail niet gevonden" if e.status == 404 else str(e)[:120]))
+        new = [c for c in cur if c not in managed] + sorted(want)
+        if set(new) != set(cur):
+            print(f"[WorkPortal] OUTLOOK-CATEGORIE (Microsoft-koppeling niet ingesteld): factuur {iid} -> {new}", flush=True)
+            conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (json.dumps(new, ensure_ascii=False), iid))
+            log(conn, iid, "Outlook-categorie: " + (", ".join(sorted(want)) or "weggehaald"))
+            conn.commit()
+        return
+    from .mail import graph_message, graph_conversation, graph_wellknown_id
+    try:
+        # alle mails die bij deze factuur horen: de factuurmail, de reacties en de hele mailwisseling (ook Verzonden items)
+        msgs = {}
+        convs = [r["mail_conv"]] if r["mail_conv"] else []
+        ids = [mid] + [json.loads(n["mail_meta"]).get("msg_id") for n in conn.execute(
+            "SELECT mail_meta FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_in' AND mail_meta IS NOT NULL", (iid,))]
+        for m_id in [x for x in ids if x]:
+            gm = graph_message(box, m_id, fields="id,categories,conversationId,parentFolderId")
+            if gm:
+                msgs[gm["id"]] = gm
+                if gm.get("conversationId") and gm["conversationId"] not in convs:
+                    convs.append(gm["conversationId"])
+        for c in convs:
+            for m in graph_conversation(box, c, fields="id,categories,parentFolderId"):
+                msgs.setdefault(m["id"], m)
+        if not msgs:
+            log(conn, iid, "Outlook-categorie niet gezet: mail niet gevonden")
             conn.commit()
             return
-    new = [c for c in cur if c not in managed] + sorted(want)
-    if set(new) == set(cur):
-        return
-    try:
-        if graph_configured():
-            _gcall("PATCH", f"/users/{box}/messages/{mid}", json={"categories": new})
-        else:
-            print(f"[WorkPortal] OUTLOOK-CATEGORIE (Microsoft-koppeling niet ingesteld): factuur {iid} -> {new}", flush=True)
+        skip = {x for x in (graph_wellknown_id(box, "deleteditems"), graph_wellknown_id(box, "drafts")) if x}
+        changed, main_cats = 0, None
+        for m_id, m in msgs.items():
+            if m.get("parentFolderId") in skip:
+                continue
+            cur = m.get("categories") or []
+            new = [c for c in cur if c not in managed] + sorted(want)
+            if m_id == mid:
+                main_cats = new
+            if set(new) != set(cur):
+                _gcall("PATCH", f"/users/{box}/messages/{m_id}", json={"categories": new})
+                changed += 1
     except GraphError as e:
         log(conn, iid, "Outlook-categorie niet gezet: " + ("recht Mail.ReadWrite ontbreekt" if e.status == 403 else str(e)[:120]))
         conn.commit()
         return
-    conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (json.dumps(new, ensure_ascii=False), iid))
-    log(conn, iid, "Outlook-categorie: " + (", ".join(sorted(want)) or "weggehaald"))
+    if main_cats is not None:
+        conn.execute("UPDATE invoices SET mail_categories = ? WHERE id = ?", (json.dumps(main_cats, ensure_ascii=False), iid))
+    if changed:
+        log(conn, iid, "Outlook-categorie: " + (", ".join(sorted(want)) or "weggehaald") + f" ({changed} mail{'s' if changed != 1 else ''})")
     conn.commit()
 
 
@@ -1870,6 +1895,8 @@ def set_status(iid):
         abort(403)
     act = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
     why = _blocked(r, finishing=False)
+    if not why and (act in ("erp", "buiten") or (act == "nieuw" and r["route"])) and not _may_komdex(get_db()):
+        why = "Komdex zetten of terugzetten mag alleen de boekhouder of een beheerder van inkoopfacturen."
     if why and act == "snelstart" and _may_archive(get_db()):
         why = None   # de boekhouder mag SnelStart wel zetten terwijl de vraag bij de leverancier loopt (afronden blijft geblokkeerd)
     if why:
@@ -1916,6 +1943,13 @@ def _blocked(r, finishing=False):
     if finishing and r["question_to"]:
         return f"Er staat nog een vraag open bij {r['question_name'] or 'een collega'}. Afronden kan als die beantwoord of ingetrokken is."
     return None
+
+
+def _may_komdex(conn):
+    """'Verwerkt in Komdex' / 'buiten Komdex om' zetten (of weer uitzetten): alleen de boekhouder en wie beheerrechten
+    op inkoopfacturen heeft (Beheer > Rechten)."""
+    o = archive_owner(conn)
+    return can("crediteuren", 3) or (o is not None and g.user["id"] == o)
 
 
 @bp.route("/<int:iid>/vraag-leverancier-afronden", methods=["POST"])

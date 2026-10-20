@@ -773,3 +773,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V145 (1.92.0)
 - Inkoopfacturen: staat er een vraag bij de leverancier open, dan kan de boekhouder (Beheer > Instellingen) wel "Verwerkt in SnelStart" zetten; de andere statussen en afronden blijven geblokkeerd tot de vraag is afgerond.
+
+## V146 (1.93.0)
+- Inkoopfacturen: de Outlook-categorie komt nu op álle mails die bij de factuur horen: de factuurmail, de reacties van de leverancier en onze verzonden mails (de hele mailwisseling, ook Verzonden items; niet in Verwijderde items/Concepten).
+- "Verwerkt in Komdex" en "Verwerkt buiten Komdex om" (zetten, uitzetten of terug naar Nieuw) mag alleen de boekhouder (Beheer > Instellingen) of wie beheerrechten op inkoopfacturen heeft (Beheer > Rechten). Voor anderen zijn die knoppen grijs; ook op de server tegengehouden.
