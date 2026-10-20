@@ -1356,7 +1356,7 @@ def detail(iid):
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
                            next_lane=request.args.get("baan"), STATUS=STATUS,
                            archive_folder=_archive_folder(get_db()),
-                           archive_me=_may_archive(get_db()), archive_owner_name=_owner_name(get_db()), komdex_ok=_may_komdex(get_db()), cat_colors=category_colors(get_db()),
+                           archive_me=_may_archive(get_db()), archive_owner_name=_owner_name(get_db()), ss_ok=_may_snelstart(get_db()), cat_colors=category_colors(get_db()),
                            cat_hide=set(category_map(get_db()).values()))
 
 
@@ -1895,8 +1895,9 @@ def set_status(iid):
         abort(403)
     act = request.form.get("status") or {"terug": "nieuw"}.get(request.form.get("action"), request.form.get("action"))
     why = _blocked(r, finishing=False)
-    if not why and (act in ("erp", "buiten") or (act == "nieuw" and r["route"])) and not _may_komdex(get_db()):
-        why = "Komdex zetten of terugzetten mag alleen de boekhouder of een beheerder van inkoopfacturen."
+    if (act == "snelstart" or (act == "nieuw" and r["snelstart_at"])) and not _may_snelstart(get_db()):
+        flash("Verwerkt in SnelStart zetten of terugzetten mag alleen de boekhouder of een beheerder van inkoopfacturen.", "error")
+        return redirect(url_for("crediteuren.detail", iid=iid))
     if why and act == "snelstart" and _may_archive(get_db()):
         why = None   # de boekhouder mag SnelStart wel zetten terwijl de vraag bij de leverancier loopt (afronden blijft geblokkeerd)
     if why:
@@ -1945,9 +1946,9 @@ def _blocked(r, finishing=False):
     return None
 
 
-def _may_komdex(conn):
-    """'Verwerkt in Komdex' / 'buiten Komdex om' zetten (of weer uitzetten): alleen de boekhouder en wie beheerrechten
-    op inkoopfacturen heeft (Beheer > Rechten)."""
+def _may_snelstart(conn):
+    """'Verwerkt in SnelStart' zetten (of weer uitzetten): alleen de boekhouder en wie beheerrechten op inkoopfacturen
+    heeft (Beheer > Rechten)."""
     o = archive_owner(conn)
     return can("crediteuren", 3) or (o is not None and g.user["id"] == o)
 

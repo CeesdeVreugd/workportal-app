@@ -777,3 +777,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V146 (1.93.0)
 - Inkoopfacturen: de Outlook-categorie komt nu op álle mails die bij de factuur horen: de factuurmail, de reacties van de leverancier en onze verzonden mails (de hele mailwisseling, ook Verzonden items; niet in Verwijderde items/Concepten).
 - "Verwerkt in Komdex" en "Verwerkt buiten Komdex om" (zetten, uitzetten of terug naar Nieuw) mag alleen de boekhouder (Beheer > Instellingen) of wie beheerrechten op inkoopfacturen heeft (Beheer > Rechten). Voor anderen zijn die knoppen grijs; ook op de server tegengehouden.
+
+## V147 (1.94.0)
+- Correctie op V146: niet Komdex maar **Verwerkt in SnelStart** (zetten, uitzetten, of terug naar Nieuw als SnelStart al gezet was) mag alleen de boekhouder of wie beheerrechten op inkoopfacturen heeft. Komdex / buiten Komdex om kan weer iedereen met bewerkrechten.
