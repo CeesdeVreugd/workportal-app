@@ -1142,15 +1142,37 @@ def _notify(user_id, title, body, iid):
 
 
 def open_counts():
-    """Voor menu en dashboard."""
+    """Voor menu en dashboard. 'todo' = wat de ingelogde gebruiker zelf nog moet doen:
+    vragen aan hem/haar; de boekhouder: nog boeken in SnelStart + af te ronden; anderen met bewerkrecht: nog in Komdex."""
     if not getattr(g, "user", None) or not can(MODULE):
         return {}
+    uid = g.user["id"]
     r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR ext_question = 1)) AS vraag,"
-              " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
-              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij FROM invoices", (g.user["id"],), one=True)
-    return {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
+              " SUM(status IN ('nieuw','erp','buiten')) AS erp,"
+              " SUM(status IN ('nieuw','ss_eerst') AND ext_question = 0 AND question_to IS NULL) AS komdex_todo,"
+              " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NULL) AS ss_todo,"
+              " SUM(" + SQL_FINISH.replace("i.", "") + " AND ext_question = 0 AND question_to IS NULL) AS fin_todo,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND question_to = ?) AS mij FROM invoices", (uid,), one=True)
+    out = {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
+    owner = archive_owner(get_db())
+    parts = []
+    if out["mij"]:
+        parts.append(f"{out['mij']} vraag{'en' if out['mij'] != 1 else ''} aan jou")
+    todo = out["mij"]
+    if owner and uid == owner:
+        todo += (r["ss_todo"] or 0) + (r["fin_todo"] or 0)
+        if r["ss_todo"]:
+            parts.append(f"{r['ss_todo']} nog boeken in SnelStart")
+        if r["fin_todo"]:
+            parts.append(f"{r['fin_todo']} af te ronden")
+    elif can(MODULE, BEWERKEN):
+        todo += r["komdex_todo"] or 0
+        if r["komdex_todo"]:
+            parts.append(f"{r['komdex_todo']} nog verwerken in Komdex")
+    out["todo"] = todo
+    out["todo_title"] = "Voor jou: " + ", ".join(parts) if parts else ""
+    return out
 
 
 # ------------------------------------------------------------------ routes

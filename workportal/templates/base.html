@@ -60,7 +60,7 @@
       {% if can('calculatie') or can('nacalculatie') or can('crediteuren') %}<div class="navhead">Calculatie &amp; financiën</div>{% endif %}
       {% if can('calculatie') %}{{ navlink('calculatie.index', 'Calculatie', 'calculatie', 'calculatie.') }}{% endif %}
       {% if can('nacalculatie') %}{{ navlink('nacalc.index', 'Na-calculatie', 'nacalculatie', 'nacalc.') }}{% endif %}
-      {% if can('crediteuren') %}{% set cc = cred_counts() %}<a href="{{ url_for('crediteuren.index') }}" class="{{ 'active' if ep.startswith('crediteuren.') }}">{{ icon('invoice') }}<span>Inkoopfacturen</span>{% if cc.mij %}<span class="navbadge" title="Vragen voor jou">{{ cc.mij }}</span>{% elif cc.nieuw %}<span class="navbadge" style="background:var(--accent)" title="Nieuwe facturen">{{ cc.nieuw }}</span>{% endif %}</a>{% endif %}
+      {% if can('crediteuren') %}{% set cc = cred_counts() %}<a href="{{ url_for('crediteuren.index') }}" class="{{ 'active' if ep.startswith('crediteuren.') }}">{{ icon('invoice') }}<span>Inkoopfacturen</span>{% if cc.todo %}<span class="navbadge" title="{{ cc.todo_title }}">{{ cc.todo }}</span>{% endif %}</a>{% endif %}
       {% if can('kennis') %}<div class="navhead">Kennis</div>{{ navlink('kennis.index', 'Kenniscentrum', 'kennis', 'kennis.') }}{% endif %}
       {% if can('beheer') %}<div class="navhead">Systeem</div>{{ navlink('beheer.users', 'Beheer', 'beheer', 'beheer.') }}{% endif %}
     </div>

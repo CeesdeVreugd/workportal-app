@@ -780,3 +780,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V147 (1.94.0)
 - Correctie op V146: niet Komdex maar **Verwerkt in SnelStart** (zetten, uitzetten, of terug naar Nieuw als SnelStart al gezet was) mag alleen de boekhouder of wie beheerrechten op inkoopfacturen heeft. Komdex / buiten Komdex om kan weer iedereen met bewerkrechten.
+
+## V148 (1.95.0)
+- Menu: het getal bij Inkoopfacturen is nu wat de ingelogde gebruiker zelf nog moet doen (met uitleg bij aanwijzen):
+  - iedereen: vragen die aan jou gesteld zijn;
+  - de boekhouder (Beheer > Instellingen): + nog boeken in SnelStart + af te ronden;
+  - anderen met bewerkrecht: + nog verwerken in Komdex (zonder open vraag).
