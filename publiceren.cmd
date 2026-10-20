@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V150: dashboard - balk nieuwe inkoopfacturen weg"
+set "OMSCHRIJVING=WorkPortal V151: inkoopfacturen - status niet meer dubbel op de computer"
 
 echo.
 echo ============================================

@@ -1072,6 +1072,7 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
   .pagehead .actions .stchips.row { justify-content: flex-start; }
   .grid.g4 .kpi .sub { font-size: 12.5px; }
 }
+.show-m.stchips.row-m { display: none; }
 @media (max-width: 900px) { .show-m.stchips.row-m { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 6px; } }
 @media (max-width: 699px) {
   .cred-acts .btn svg { flex: none; width: 18px; height: 18px; }

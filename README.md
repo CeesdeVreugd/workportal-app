@@ -796,3 +796,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V150 (1.97.0)
 - Dashboard: de balk "… nieuwe inkoopfacturen binnengekomen" is weg (het menu toont al wat je zelf nog moet doen). De balk voor vragen die op jouw antwoord wachten blijft.
+
+## V151 (1.98.0)
+- Inkoopfacturen: op de computer stond de status sinds V149 dubbel (ook naast de leverancier). Opgelost: op de computer alleen in de kolom Status, op telefoon/tablet onder de leverancier.
