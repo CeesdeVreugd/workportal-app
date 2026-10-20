@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V110: inkoopfacturen - excl. inclusief toeslagen (totaal min btw), betalingstermijn tot datum"
+set "OMSCHRIJVING=WorkPortal V111: inkoopfacturen - vervaldatum standaard factuurdatum + 30 dagen"
 
 echo.
 echo ============================================

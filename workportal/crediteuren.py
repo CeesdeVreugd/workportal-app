@@ -330,6 +330,10 @@ def extract(data):
             days = int(dm.group(1) or dm.group(2))
             if 0 < days <= 120:
                 out["due_date"] = (datetime.strptime(out["invoice_date"], "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
+    # geen vervaldatum of betalingstermijn gevonden: factuurdatum + 30 dagen
+    if not out["due_date"] and out["invoice_date"]:
+        out["due_date"] = (datetime.strptime(out["invoice_date"], "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d")
+        out["due_assumed"] = True
     out["erp_ref"] = _po_ref(text)
     out["supplier_guess"] = _supplier(text)
     out["text"] = text
@@ -581,7 +585,8 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
               "amount_excl": "bedrag excl.", "amount_incl": "bedrag incl.", "erp_ref": "inkoopnummer"}
     found = [k for k in labels if x.get(k)]
     if found:
-        log(conn, iid, "Gegevens automatisch uitgelezen: " + ", ".join(labels[k] for k in found))
+        log(conn, iid, "Gegevens automatisch uitgelezen: " + ", ".join(
+            labels[k] + (" (niet op de factuur: factuurdatum + 30 dagen)" if k == "due_date" and x.get("due_assumed") else "") for k in found))
     if supplier_id:
         log(conn, iid, f"Leverancier herkend uit de relaties: {supplier} (op {supplier_match})")
     conn.commit()

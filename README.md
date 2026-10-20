@@ -608,3 +608,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Staan er na het nettobedrag nog toeslagen (milieu, tol, vracht), dan klopt "Nettobedrag" niet als excl. WorkPortal controleert nu: totaal − btw past bij het btw-tarief → dat is het excl.-bedrag (Westfalen: 224,58 + 15,00 + 5,00 = 244,58).
 - Grondslag na "van" op de btw-regel ("BTW 21 % van 244,58 51,36").
 - Vervaldatum uit "Betalingstermijn: tot 06.11.2026".
+
+## V111 – Vervaldatum standaard 30 dagen
+- Staat er geen vervaldatum of betalingstermijn op de factuur, dan wordt de vervaldatum factuurdatum + 30 dagen (in het logboek: "niet op de factuur: factuurdatum + 30 dagen"). Een gevonden vervaldatum of termijn gaat altijd voor.
