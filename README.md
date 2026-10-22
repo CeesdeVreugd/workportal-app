@@ -824,3 +824,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - **Afhankelijkheden:** pypdf 3.17.4 → ≥ 6.12.2 (meerdere bekende DoS-lekken), pdfminer.six ≥ 20251230 vastgezet, defusedxml toegevoegd.
 - `/health` geeft geen versienummer meer prijs. Pushmelding-links alleen binnen WorkPortal.
 - Beheer > Instellingen waarschuwt bij een te korte SECRET_KEY / KOMDEX_KEY / PA_SECRET of als APP_URL geen https is.
+
+## V155 (2.2.0)
+- Inloggen: wordt er met een inlogcode een **nieuw apparaat** aan een account gekoppeld, dan krijgt de gebruiker direct een mail met datum/tijd, apparaat (bijv. "Safari op iPhone") en IP-adres, en de vraag contact op te nemen met de beheerder als hij dit niet was. Opnieuw verifiëren op een bekend apparaat geeft geen mail. Ook vastgelegd in het auditlog ("nieuw apparaat").
+- Mijn account: apparaten met leesbare naam en koppeldatum.

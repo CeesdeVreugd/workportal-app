@@ -172,6 +172,40 @@ def login():
                            next=request.args.get("next", ""), can_back=bool(device or known_tokens()))
 
 
+def device_label(ua):
+    """Leesbare omschrijving van een apparaat uit de user-agent, bijv. 'Safari op iPhone'."""
+    ua = ua or ""
+    os_ = ("iPhone" if "iPhone" in ua else "iPad" if "iPad" in ua else "Android" if "Android" in ua else
+           "Windows" if "Windows" in ua else "Mac" if "Macintosh" in ua else "Linux" if "Linux" in ua else "onbekend systeem")
+    br = ("Edge" if "Edg/" in ua else "Opera" if "OPR/" in ua else "Firefox" if "Firefox/" in ua else
+          "Chrome" if ("Chrome/" in ua or "CriOS/" in ua) else "Safari" if "Safari/" in ua else "")
+    if not br and os_ == "onbekend systeem":
+        return "Onbekend apparaat"
+    return f"{br or 'Browser'} op {os_}"
+
+
+def _new_device_mail(user):
+    """Er is een nieuw apparaat aan dit account gekoppeld: de gebruiker een mail sturen, zodat misbruik meteen opvalt."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    try:
+        when = datetime.now(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y om %H:%M")
+        what = device_label(request.user_agent.string)
+        ip = request.remote_addr or "onbekend"
+        from flask import current_app
+        app_url = (current_app.config.get("APP_URL") or request.host_url or "").rstrip("/")
+        send_mail(user["email"], "Nieuw apparaat gekoppeld aan je WorkPortal-account",
+                  f"Hallo {user['name']},\n\n"
+                  f"Op {when} is er met een inlogcode een nieuw apparaat gekoppeld aan je WorkPortal-account:\n\n"
+                  f"Apparaat: {what}\nIP-adres: {ip}\n\n"
+                  f"Was jij dit? Dan hoef je niets te doen.\n\n"
+                  f"Was jij dit niet? Neem dan direct contact op met de beheerder. Je kunt onbekende apparaten zelf verwijderen"
+                  f" via Mijn account: {app_url}/account")
+        audit("nieuw apparaat", "user", user["id"], f"{what} · {ip}")
+    except Exception as exc:  # noqa: BLE001 - inloggen mag hier nooit op vastlopen
+        print(f"[WorkPortal] Mail nieuw apparaat mislukt: {exc}", flush=True)
+
+
 def _mask(email):
     if "@" not in email:
         return email
@@ -222,6 +256,7 @@ def code():
             did = execute("INSERT INTO devices (user_id, token_hash, verified_at, user_agent, created_at) VALUES (?,?,?,?,?)",
                           (user["id"], hash_secret(token), now_iso(), (request.user_agent.string or "")[:250], now_iso()))
             has_pin = False
+            _new_device_mail(user)
         session.pop("login_email", None)
         nxt = session.pop("login_next", "")
         g.user = user

@@ -19,8 +19,8 @@
     <p class="muted small">Elk apparaat heeft een eigen pincode. Verwijder apparaten die je niet meer gebruikt.</p>
     <div class="rows">
     {% for d in devices %}
-      <div class="rowitem"><div class="grow"><div class="t">{{ 'Dit apparaat' if g.device and d.id == g.device.id else 'Apparaat #' ~ d.id }}</div>
-        <div class="s">{{ (d.user_agent or '')[:70] }}<br>Laatst gebruikt {{ d.last_used|dt }} · geverifieerd {{ d.verified_at|dt }}</div></div>
+      <div class="rowitem"><div class="grow"><div class="t">{{ device_label(d.user_agent) }}{{ ' · dit apparaat' if g.device and d.id == g.device.id }}</div>
+        <div class="s">Gekoppeld {{ d.created_at|dt }}<br>Laatst gebruikt {{ d.last_used|dt }} · geverifieerd {{ d.verified_at|dt }}</div></div>
         {% if not (g.device and d.id == g.device.id) %}
         <form method="post" action="{{ url_for('main.remove_device', did=d.id) }}" data-confirm="Apparaat verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>
         {% endif %}
