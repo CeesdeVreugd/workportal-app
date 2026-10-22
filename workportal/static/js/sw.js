@@ -20,6 +20,7 @@ self.addEventListener("push", function (event) {
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
   var url = (event.notification.data && event.notification.data.url) || "/";
+  if (typeof url !== "string" || url.charAt(0) !== "/" || url.charAt(1) === "/" || url.indexOf("\\") >= 0) url = "/";   // alleen binnen WorkPortal
   event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
     for (var i = 0; i < list.length; i++) {
       if ("focus" in list[i]) { list[i].navigate(url); return list[i].focus(); }

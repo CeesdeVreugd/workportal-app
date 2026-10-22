@@ -389,9 +389,17 @@ def receive(conn, folders):
 
 
 def _key_ok():
+    """Sleutel van het Komdex-script controleren; na 20 foute pogingen per kwartier vanaf hetzelfde adres altijd nee."""
+    from .util import rate_limited
     key = os.environ.get("KOMDEX_KEY", "")
     given = request.headers.get("X-WorkPortal-Key", "")
-    return bool(key) and hmac.compare_digest(key.encode(), given.encode())
+    if rate_limited("komdex-fout", 20, hit=False):
+        return False
+    ok = bool(key) and hmac.compare_digest(key.encode(), given.encode())
+    if not ok:
+        rate_limited("komdex-fout", 20)
+        print(f"[WorkPortal] Komdex-API: ongeldige sleutel vanaf {request.remote_addr}", flush=True)
+    return ok
 
 
 @bp.route("/api/komdex/orderbon", methods=["POST"])

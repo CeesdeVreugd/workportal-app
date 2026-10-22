@@ -73,17 +73,20 @@
   </form>
   <section class="card">
     <h2>Koppelingen &amp; status</h2>
+    {% for w in status.security %}<div class="result warn" style="margin:8px 0">{{ icon('lock') if false else '' }}<b>Veiligheid:</b> {{ w }}</div>{% endfor %}
     <dl class="dl">
       <dt>App-adres</dt><dd>{{ status.app_url or 'APP_URL niet ingesteld' }}</dd>
       <dt>E-mail</dt><dd><span class="badge {{ 'b-ok' if status.smtp else 'b-warn' }}">{{ status.mail_method if status.smtp else 'Niet ingesteld – codes in containerlog' }}</span></dd>
       <dt>SharePoint-projecten</dt><dd><a href="{{ url_for('beheer.sharepoint') }}">Koppeling beheren</a></dd>
       <dt>SharePoint-flow</dt><dd><span class="badge {{ 'b-ok' if status.sharepoint else 'b-warn' }}">{{ 'Ingesteld' if status.sharepoint else 'Niet ingesteld' }}</span></dd>
+      <dt>SnelStart</dt><dd><span class="badge {{ 'b-ok' if status.snelstart else 'b-warn' }}">{{ 'Sleutels ingesteld' if status.snelstart else 'Niet ingesteld (SNELSTART_SUBSCRIPTION_KEY, SNELSTART_CLIENT_KEY)' }}</span></dd>
       <dt>Na-calculatie-flow</dt><dd><span class="badge {{ 'b-ok' if status.nacalc else 'b-warn' }}">{{ 'Ingesteld' if status.nacalc else 'Niet ingesteld (upload werkt wel)' }}</span></dd>
       <dt>Database</dt><dd>{{ (status.db_size / 1024 / 1024)|num(1) }} MB · {{ status.data_dir }}</dd>
       <dt>Laatste back-ups</dt><dd style="font-weight:400">{% for b in status.backups %}{{ b }}<br>{% else %}Nog geen (elke nacht om 02:00){% endfor %}</dd>
     </dl>
     <div class="actions" style="margin-top:14px">
       <form method="post" action="{{ url_for('beheer.testmail') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Testmail naar mij</button></form>
+      <form method="post" action="{{ url_for('beheer.snelstart_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">SnelStart-verbinding testen</button></form>
       <a class="btn sm" href="{{ url_for('beheer.download_backup') }}">{{ icon('download') }}Database-back-up downloaden</a>
     </div>
   </section>

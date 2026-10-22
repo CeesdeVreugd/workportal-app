@@ -160,7 +160,7 @@ def settings():
     values = {k: get_setting(k) for k in keys}
     status = {
         "smtp": smtp_configured(), "mail_method": mail_method(), "sharepoint": sharepoint_configured(), "nacalc": nacalc_configured(),
-        "app_url": os.environ.get("APP_URL", ""), "admin": os.environ.get("ADMIN_EMAIL", ""),
+        "app_url": os.environ.get("APP_URL", ""), "snelstart": _ss_configured(), "security": _security_warnings(), "admin": os.environ.get("ADMIN_EMAIL", ""),
         "data_dir": current_app.config["DATA_DIR"],
         "backups": sorted(os.listdir(current_app.config["BACKUP_DIR"]))[-5:] if os.path.isdir(current_app.config["BACKUP_DIR"]) else [],
         "db_size": os.path.getsize(current_app.config["DB_PATH"]) if os.path.exists(current_app.config["DB_PATH"]) else 0,
@@ -427,6 +427,38 @@ def testmail():
     ok = send_mail(g.user["email"], "WorkPortal testmail", "Deze testmail laat zien dat e-mail vanuit WorkPortal werkt.")
     flash("Testmail verstuurd naar " + g.user["email"] + "." if ok else "Versturen mislukt; zie het containerlog.",
           "ok" if ok else "error")
+    return redirect(url_for("beheer.settings"))
+
+
+def _security_warnings():
+    """Zwakke instellingen die de beheerder moet weten (alleen namen/lengtes, nooit de waarden zelf)."""
+    out = []
+    sk = os.environ.get("SECRET_KEY") or os.environ.get("SESSION_SECRET") or ""
+    if sk and len(sk) < 32:
+        out.append("SECRET_KEY is korter dan 32 tekens: kies een lange willekeurige waarde (bijv. 64 tekens).")
+    kk = os.environ.get("KOMDEX_KEY") or ""
+    if kk and len(kk) < 24:
+        out.append("KOMDEX_KEY is korter dan 24 tekens: kies een lange willekeurige sleutel (en zet dezelfde in het Komdex-script).")
+    if not (os.environ.get("APP_URL") or "").startswith("https://"):
+        out.append("APP_URL begint niet met https:// – dan worden de inlogcookies niet als 'secure' gemarkeerd.")
+    pa = os.environ.get("PA_SECRET") or ""
+    if pa and len(pa) < 24:
+        out.append("PA_SECRET is korter dan 24 tekens.")
+    return out
+
+
+def _ss_configured():
+    from . import snelstart
+    return snelstart.configured()
+
+
+@bp.route("/snelstart-test", methods=["POST"])
+@require("beheer", BEHEER)
+def snelstart_test():
+    from . import snelstart
+    ok, msg = snelstart.test()
+    audit("snelstart-test", "settings", None, msg[:200])
+    flash(msg, "ok" if ok else "error")
     return redirect(url_for("beheer.settings"))
 
 

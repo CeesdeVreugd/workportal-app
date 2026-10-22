@@ -18,4 +18,6 @@ urllib3==2.6.3
 gunicorn==23.0.0
 tzdata
 pdfplumber==0.11.9
-pypdf==3.17.4
+pdfminer.six>=20251230
+defusedxml==0.7.1
+pypdf>=6.12.2,<7

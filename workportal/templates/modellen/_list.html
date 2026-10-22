@@ -22,7 +22,7 @@
   <div class="rowitem{{ ' m3d-extra' if loop.index > 3 }}"{{ ' hidden' if loop.index > 3 }}><span class="ficon cube">{{ icon('cube') }}</span>
     <div class="grow"><div class="t">{{ f.filename }}</div><div class="s">{{ size(f.size) }} · {{ f.created_at|date }}{{ ' · bij project' if f.entity == 'project' and entity == 'ticket' }}</div></div>
     <a class="btn sm primary" href="{{ url_for('modellen.view_local', fid=f.id) }}">{{ icon('cube') }}Bekijk 3D</a>
-    {% if can('modellen3d', 3) and f.entity == entity %}<form method="post" action="{{ url_for('modellen.delete', fid=f.id) }}" onsubmit="return confirm('{{ f.filename }} verwijderen?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
+    {% if can('modellen3d', 3) and f.entity == entity %}<form method="post" action="{{ url_for('modellen.delete', fid=f.id) }}" onsubmit="return confirm({{ (f.filename ~ ' verwijderen?')|tojson|forceescape }})"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
 {% endfor %}
 </div>
 {% if all_local|length > 3 %}<button type="button" class="btn sm ghost m3d-more" onclick="var l=this.previousElementSibling,o=this.getAttribute('aria-expanded')==='true';l.querySelectorAll('.m3d-extra').forEach(function(r){r.hidden=o});this.setAttribute('aria-expanded',!o);this.textContent=o?this.dataset.more:'Minder tonen'" data-more="Toon alle {{ all_local|length }} (nog {{ all_local|length - 3 }})" aria-expanded="false">Toon alle {{ all_local|length }} (nog {{ all_local|length - 3 }})</button>{% endif %}

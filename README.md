@@ -799,3 +799,28 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V151 (1.98.0)
 - Inkoopfacturen: op de computer stond de status sinds V149 dubbel (ook naast de leverancier). Opgelost: op de computer alleen in de kolom Status, op telefoon/tablet onder de leverancier.
+
+## V152 (1.99.0)
+- SnelStart B2B-API voorbereid (alleen lezen): nieuwe module `snelstart.py` (token met de koppelingssleutel, abonnementssleutel in de header, token wordt bewaard en vernieuwd).
+- docker-compose / Portainer: `SNELSTART_SUBSCRIPTION_KEY` (Primaire sleutel uit het Developer Portal) en `SNELSTART_CLIENT_KEY` (SnelStart Web > Koppelingen > Maatwerk). Optioneel `SNELSTART_API_BASE` (standaard https://b2bapi.snelstart.nl/v2).
+- Beheer > Instellingen > Koppelingen & status: regel "SnelStart" en knop **SnelStart-verbinding testen** (logt in en leest de administratiegegevens en één relatie; er wordt niets gewijzigd).
+
+## V153 (2.0.0)
+- Inkoopfacturen: stuurt een collega een factuur door naar factuur@ (afzender is een eigen adres, of onderwerp begint met FW/Fwd/Doorst./TR/WG), dan haalt WorkPortal de oorspronkelijke afzender uit de doorgestuurde mail ("Van: … <adres>" / "From: …"):
+  - dat adres wordt de afzender van de factuurkaart (leverancier herkennen, standaard "Aan" bij mailen); de collega staat erbij als "doorgestuurd door";
+  - mailen naar de leverancier gaat dan als nieuwe mail aan dat adres met onderwerp "RE: <oorspronkelijk onderwerp>" (niet als antwoord op de doorgestuurde mail, anders kreeg de collega hem);
+  - de naam van de collega wordt nooit meer als leverancier gebruikt.
+- Bestaande kaarten van doorgestuurde mails: "Opnieuw uitlezen" herkent de doorgestuurde afzender alsnog.
+- Database-migratie 31: invoices.mail_fwd_by.
+
+## V154 (2.1.0) – veiligheidsronde
+- **Bestanden serveren:** alleen PDF, JPG/PNG/GIF/WebP/BMP en platte tekst openen nog in de browser, en alleen als de inhoud echt zo'n bestand is. Al het andere (HTML, SVG, Office, onbekend) gaat altijd als download (`application/octet-stream`), met een `sandbox`-CSP. Zo kan een geüpload of gemaild bestand (bijv. een bijlage van een "leverancier") nooit als webpagina binnen WorkPortal draaien. Geldt ook voor bestanden uit SharePoint-mappen.
+- **Doorsturen (open redirect):** alle `terug=`/`next=`/`naar=`-adressen via één controle (`safe_path`): geen `//andere-site`, `/\andere-site`, `javascript:` of stuurtekens. Daarnaast een vangnet op elke `Location`-header.
+- **Beveiligingsheaders:** Content-Security-Policy op pagina's (scripts/stijlen alleen van WorkPortal zelf, geen externe verbindingen behalve PDOK-adreszoeker en Google Fonts), HSTS bij https, Permissions-Policy, Cross-Origin-Opener-Policy, `Cache-Control: no-store` op ingelogde pagina's; bestanden `private` gecachet.
+- **Inloggen:** rem per IP-adres (inlogcodes aanvragen 20, codes invoeren 25, pincodes 30 per kwartier); codevergelijking in constante tijd.
+- **Komdex-API:** na 20 foute sleutels per kwartier vanaf hetzelfde adres wordt alles geweigerd (ook de goede sleutel) en het wordt gelogd.
+- **Uitvoer:** bevestigingsvensters met namen (bestandsnaam 3D-model, gebruikersnaam) via `tojson` – geen JavaScript-injectie via een naam. Excel-viewer: kleurwaarden uit het bestand worden gecontroleerd. Word-viewer: XML via defusedxml.
+- **Container draait niet meer als root:** gebruiker `wp` (uid 10001); `/data` wordt bij de eerste start eenmalig aan die gebruiker gegeven (kan bij veel bestanden even duren).
+- **Afhankelijkheden:** pypdf 3.17.4 → ≥ 6.12.2 (meerdere bekende DoS-lekken), pdfminer.six ≥ 20251230 vastgezet, defusedxml toegevoegd.
+- `/health` geeft geen versienummer meer prijs. Pushmelding-links alleen binnen WorkPortal.
+- Beheer > Instellingen waarschuwt bij een te korte SECRET_KEY / KOMDEX_KEY / PA_SECRET of als APP_URL geen https is.

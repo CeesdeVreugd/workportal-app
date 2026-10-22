@@ -116,10 +116,20 @@ def _file_row(fid):
 @bp.route("/bestanden/<int:fid>")
 @bp.route("/bestanden/<int:fid>/<path:name>")
 def file(fid, name=None):
+    from .util import inline_type, SANDBOX_CSP
     row = _file_row(fid)
-    download = request.args.get("download") == "1"
-    return send_file(file_path(row), mimetype=row["mime"] or None, download_name=row["filename"],
+    path = file_path(row)
+    with open(path, "rb") as fh:
+        head = fh.read(16)
+    mt = inline_type(row["mime"], head)   # alleen PDF/foto/tekst inline; de rest altijd als download
+    download = request.args.get("download") == "1" or mt is None
+    resp = send_file(path, mimetype=mt or "application/octet-stream", download_name=row["filename"],
                      as_attachment=download, max_age=3600)
+    resp.cache_control.public = False
+    resp.cache_control.private = True
+    if not mt or mt != "application/pdf":
+        resp.headers["Content-Security-Policy"] = SANDBOX_CSP
+    return resp
 
 
 # ---------------------------------------------------------------- push
@@ -156,9 +166,8 @@ def _viewer_src():
     src = request.args.get("src") or ""
     if not src.startswith("/") or src.startswith("//") or "\\" in src:
         abort(400)
-    back = request.args.get("terug") or ""
-    if not back.startswith("/") or back.startswith("//"):
-        back = url_for("main.dashboard")
+    from .util import safe_path
+    back = safe_path(request.args.get("terug"), url_for("main.dashboard"))
     u = urlsplit(src)
     try:
         endpoint, args = current_app.url_map.bind("localhost").match(u.path, "GET")
@@ -234,9 +243,8 @@ def pdfview():
     src = request.args.get("src") or ""
     if not src.startswith("/") or src.startswith("//") or "\\" in src:
         abort(400)
-    back = request.args.get("terug") or ""
-    if not back.startswith("/") or back.startswith("//"):
-        back = url_for("main.dashboard")
+    from .util import safe_path
+    back = safe_path(request.args.get("terug"), url_for("main.dashboard"))
     title = (request.args.get("titel") or "PDF")[:150]
     pr = None  # afdrukknop als het een bestand uit een project-/ordermap is en Printix is ingesteld
     try:

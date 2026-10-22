@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "1.98.0"
+VERSION = "2.1.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -125,11 +125,37 @@ def create_app(test_config=None, start_scheduler=True):
             return render_template("mobiel_uit.html", module=dict(MODULES).get(mod, mod)), 200
         return None
 
+    CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; "
+           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; "
+           "img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://api.pdok.nl; "
+           "worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; "
+           "frame-ancestors 'self'")
+
     @app.after_request
     def _headers(resp):
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("Referrer-Policy", "same-origin")
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        resp.headers.setdefault("Permissions-Policy", "camera=(self), geolocation=(self), microphone=(), payment=(), usb=(), "
+                                                      "interest-cohort=()")
+        resp.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        if resp.mimetype == "text/html":   # PDF's e.d. niet: anders weigert de PDF-weergave van de browser
+            resp.headers.setdefault("Content-Security-Policy", CSP)
+        if request.is_secure:
+            resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        # pagina's met gegevens niet in de browser- of proxycache laten staan
+        if resp.mimetype == "text/html" and getattr(g, "user", None):
+            resp.headers["Cache-Control"] = "no-store"
+        # doorsturen alleen binnen WorkPortal (vangnet tegen 'open redirects' via terug=/next=)
+        loc = resp.headers.get("Location")
+        if loc:
+            from urllib.parse import urlsplit
+            u = urlsplit(loc)
+            if u.scheme or u.netloc:
+                if u.scheme not in ("http", "https") or (u.netloc != request.host and not u.netloc.endswith(".sharepoint.com")):
+                    resp.headers["Location"] = "/"
+            elif loc.startswith("//") or "\\" in loc or not loc.startswith("/"):
+                resp.headers["Location"] = "/"
         return resp
 
     @app.route("/sw.js")
@@ -174,7 +200,7 @@ def create_app(test_config=None, start_scheduler=True):
 
     @app.route("/health")
     def health():
-        return {"status": "ok", "version": VERSION}
+        return {"status": "ok"}   # geen versienummer naar buiten (helpt aanvallers bij het zoeken naar lekken)
 
     @app.errorhandler(403)
     def e403(e):

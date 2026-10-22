@@ -9,7 +9,7 @@
   <div>
     <div class="crumbs"><a href="{{ back }}">{{ icon('back') }}Inkoopfacturen</a></div>
     <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}</h1>
-    <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
+    <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_fwd_by %} (doorgestuurd door {{ r.mail_fwd_by }}){% endif %}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
   </div>
   <div class="actions">{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="stchips row">{% for t, col in r.chips %}<span class="stchip lg" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span></div>
 </div>
@@ -46,7 +46,7 @@
 {% if r.question_to %}
 <div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
   {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}
-  {% if can('crediteuren', 2) %}<form method="post" action="{{ url_for('crediteuren.question_cancel', iid=r.id) }}" style="display:inline;margin-left:8px" onsubmit="return confirm('Vraag aan {{ r.question_name }} intrekken?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Vraag intrekken</button></form>{% endif %}</div>
+  {% if can('crediteuren', 2) %}<form method="post" action="{{ url_for('crediteuren.question_cancel', iid=r.id) }}" style="display:inline;margin-left:8px" onsubmit="return confirm({{ ('Vraag aan ' ~ (r.question_name or '') ~ ' intrekken?')|tojson|forceescape }})"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Vraag intrekken</button></form>{% endif %}</div>
 {% endif %}
 
 <div class="grid g2 stack cred-grid">
@@ -226,7 +226,7 @@
           <div class="fgrid">
             <label class="f">Aan *<input type="text" name="to" id="mailto" value="{{ mail_to }}" required placeholder="naam@leverancier.nl">
               {% if not reply_note and not reply_all and mail_options|length > 1 %}<span class="mailopts">{% for lab, adr in mail_options %}<button type="button" class="chipbtn" onclick="document.getElementById('mailto').value=this.dataset.a" data-a="{{ adr }}" title="{{ adr }}">{{ lab }}</button>{% endfor %}</span>
-              {% elif not reply_note and not reply_all and r.mail_from %}<span class="hint">Afzender van de factuurmail</span>{% endif %}</label>
+              {% elif not reply_note and not reply_all and r.mail_from %}<span class="hint">{{ 'Leverancier uit de doorgestuurde mail' if r.mail_fwd_by else 'Afzender van de factuurmail' }}</span>{% endif %}</label>
             <label class="f">Cc<input type="text" name="cc" value="{{ reply_all.cc if reply_all else '' }}" placeholder="optioneel, meerdere met komma"></label>
           </div>
           {% if reply_note %}
@@ -235,7 +235,7 @@
           {% elif reply_all %}
           <div class="f lf"><span>Onderwerp</span><div class="mailsubj">{{ reply_all.subject }}</div>
             <span class="hint">Blijft in dezelfde mailwisseling als de laatste mail.</span></div>
-          {% elif r.source == 'mail' and r.mail_id %}
+          {% elif r.source == 'mail' and r.mail_id and not r.mail_fwd_by %}
           <div class="f lf"><span>Onderwerp</span><div class="mailsubj">RE: {{ r.mail_subject or '' }}</div>
             <span class="hint">Antwoord op de binnengekomen factuurmail: hetzelfde onderwerp, zodat het in Outlook onder die mail hangt (ook de reactie van de leverancier).</span></div>
           {% else %}

@@ -29,6 +29,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       # Komdex: sleutel voor het script dat nieuwe ordermappen doorgeeft (scripts/komdex-orders.ps1)
       KOMDEX_KEY: ${KOMDEX_KEY:-}
+      # SnelStart B2B-API (alleen lezen): abonnementssleutel (Developer Portal) en koppelingssleutel (SnelStart Web > Koppelingen > Maatwerk)
+      SNELSTART_SUBSCRIPTION_KEY: ${SNELSTART_SUBSCRIPTION_KEY:-}
+      SNELSTART_CLIENT_KEY: ${SNELSTART_CLIENT_KEY:-}
       # Links onder de iconen in de mailhandtekening (optioneel)
       SIGNATURE_LINKEDIN: ${SIGNATURE_LINKEDIN:-}
       SIGNATURE_YOUTUBE: ${SIGNATURE_YOUTUBE:-}

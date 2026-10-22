@@ -12,6 +12,10 @@ import posixpath
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+try:   # veilig XML inlezen (geen entity-bommen of externe verwijzingen uit een kwaadaardig .docx)
+    from defusedxml.ElementTree import fromstring as _safe_fromstring
+except ImportError:  # pragma: no cover
+    _safe_fromstring = ET.fromstring
 
 MAX_BYTES = 20 * 1048576
 MAX_UNZIPPED = 250 * 1048576
@@ -64,7 +68,7 @@ def on(el):
 def twips(v, default=0):
     try:
         return int(float(v))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
 
 
@@ -129,8 +133,8 @@ class Doc:
         if b"<!DOCTYPE" in raw[:2000] or b"<!ENTITY" in raw[:5000]:
             raise ValueError("Dit document kan niet veilig gelezen worden.")
         try:
-            return ET.fromstring(raw)
-        except ET.ParseError:
+            return _safe_fromstring(raw)
+        except Exception:
             return None
 
     def _rels(self, part):

@@ -19,7 +19,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from .db import query, execute, get_db
 from .permissions import require, can, LEZEN, BEWERKEN, BEHEER
-from .util import now_iso, now_utc, to_float, to_int, safe_filename, fmt_eur
+from .util import now_iso, now_utc, to_float, to_int, safe_filename, fmt_eur, safe_path
 
 bp = Blueprint("crediteuren", __name__, url_prefix="/inkoopfacturen")
 
@@ -408,6 +408,42 @@ _GENERIC_DOMAINS = {"gmail.com", "hotmail.com", "hotmail.nl", "outlook.com", "ou
 _OWN_POSTCODES = {"6669NA"}
 
 
+OWN_DOMAINS = {"devreugd-pt.nl"}
+_FWD_SUBJ = re.compile(r"^\s*((fw|fwd|doorst|tr|wg|wtr)\s*:\s*)+", re.I)
+
+
+def _own_addr(a):
+    return (a or "").lower().split("@")[-1] in OWN_DOMAINS
+
+
+def forwarded_sender(text):
+    """Afzender uit een doorgestuurde mail halen ("Van: Naam <adres>" / "From: …" in de tekst): (adres, naam, onderwerp)
+    of None. Eigen adressen (een collega die het eerder doorstuurde) worden overgeslagen."""
+    lines = (text or "").replace("\r", "").split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^\s*\**\s*(van|from|de|von)\s*:\s*\**\s*(.+)$", line, re.I)
+        if not m:
+            continue
+        val = m.group(2).strip()
+        em = re.search(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", val)
+        if not em and i + 1 < len(lines):   # adres soms op de volgende regel
+            em = re.search(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", lines[i + 1])
+        if not em:
+            continue
+        addr = em.group(0).lower()
+        if _own_addr(addr):
+            continue
+        name = re.sub(r"<[^>]*>|\[mailto:[^\]]*\]|mailto:\S+", "", val).replace(addr, "").strip(" \"'<>[]()") or None
+        subj = None
+        for l2 in lines[i + 1:i + 8]:
+            ms = re.match(r"^\s*\**\s*(onderwerp|subject|objet|betreff)\s*:\s*\**\s*(.+)$", l2, re.I)
+            if ms:
+                subj = ms.group(2).strip()
+                break
+        return addr, name, subj
+    return None
+
+
 def _domain(v):
     v = str(v or "").strip().lower()
     if not v:
@@ -623,7 +659,9 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     x = x or extract(data)
     mail = mail or {}
     supplier = None
-    if mail.get("from_addr") and not _domain(mail["from_addr"]):
+    if mail.get("from_addr") and _own_addr(mail["from_addr"]):
+        supplier = None   # van een collega (niet herkend als doorgestuurd): naam uit de factuur halen
+    elif mail.get("from_addr") and not _domain(mail["from_addr"]):
         supplier = mail.get("from_name") or None   # gedeeld afzenderadres (facturatieplatform): naam uit de mail, niet de vorige factuur
     elif mail.get("from_addr"):
         prev = conn.execute("SELECT supplier FROM invoices WHERE mail_from = ? AND IFNULL(supplier,'') <> ''"
@@ -653,12 +691,16 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
         conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
     if mail.get("conv"):
         conn.execute("UPDATE invoices SET mail_conv = ? WHERE id = ?", (mail["conv"], iid))
+    if mail.get("fwd_by"):
+        conn.execute("UPDATE invoices SET mail_fwd_by = ? WHERE id = ?", (mail["fwd_by"], iid))
     fid = _store_file(conn, upload_dir, iid, data, safe_filename(filename) or "factuur.pdf", user_id)
     conn.execute("UPDATE invoices SET file_id = ? WHERE id = ?", (fid, iid))
     for ename, edata, emime in (extra or []):
         _store_file(conn, upload_dir, iid, edata, safe_filename(ename) or "bijlage", user_id, kind="attachment", mime=emime)
     if source == "mail":
-        log(conn, iid, f"Binnengekomen per mail van {mail.get('from_name') or mail.get('from_addr') or 'onbekend'}"
+        log(conn, iid, (f"Binnengekomen per mail, doorgestuurd door {mail.get('fwd_name') or mail.get('fwd_by')}; oorspronkelijk van "
+                        if mail.get("fwd_by") else "Binnengekomen per mail van ")
+                       + f"{mail.get('from_name') or mail.get('from_addr') or 'onbekend'}"
                        f" ({mail.get('subject') or 'geen onderwerp'})"
                        + (f"; {len(extra)} andere bijlage(n) bij deze kaart: " + ", ".join(e[0] for e in extra) if extra else ""))
     else:
@@ -711,12 +753,37 @@ def _bad_supplier(v):
     return len(re.sub(r"[^A-Za-z]", "", v)) < 3 or bool(re.match(r"^(invoice|factuur|rechnung|faktura|creditnota|credit\s*note)\b", v, re.I))
 
 
+def _fix_forward(conn, iid, r):
+    """Oudere kaart van een door een collega doorgestuurde mail: de leverancier uit de doorgestuurde mail halen."""
+    if not mail_configured():
+        return False
+    import requests
+    from .mail import _graph_token
+    box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    try:
+        rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{r['mail_id'].split(':')[0]}?$select=body",
+                          headers={"Authorization": f"Bearer {_graph_token()}", "Prefer": 'outlook.body-content-type="text"'}, timeout=30)
+        fs = forwarded_sender((rb.json().get("body") or {}).get("content") or "") if rb.status_code < 400 else None
+    except Exception:  # noqa: BLE001
+        return False
+    if not fs:
+        return False
+    conn.execute("UPDATE invoices SET mail_fwd_by = ?, mail_from = ? WHERE id = ?", (r["mail_from"], fs[0], iid))
+    log(conn, iid, f"Doorgestuurde mail herkend: leverancier {fs[1] or ''} <{fs[0]}> (doorgestuurd door {r['mail_from']})")
+    conn.commit()
+    return True
+
+
 def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
     """Factuur opnieuw uitlezen (na verbeteringen in het uitlezen). overwrite=False: alleen lege velden aanvullen.
     De leverancier wordt gekoppeld aan de relaties als die herkend wordt en er nog geen koppeling is (of bij overwrite)."""
     r = conn.execute("SELECT i.*, f.stored_name FROM invoices i LEFT JOIN files f ON f.id = i.file_id WHERE i.id = ?", (iid,)).fetchone()
     if not r or not r["stored_name"]:
         return []
+    if r["source"] == "mail" and r["mail_id"] and not r["mail_fwd_by"] and _own_addr(r["mail_from"]):
+        if _fix_forward(conn, iid, r):
+            r = conn.execute("SELECT i.*, f.stored_name FROM invoices i LEFT JOIN files f ON f.id = i.file_id WHERE i.id = ?", (iid,)).fetchone()
+            overwrite = True
     from .util import file_path
     try:
         with open(file_path(r), "rb") as fh:
@@ -931,9 +998,20 @@ def _poll(conn, upload_dir):
                 main, mx = scored[0][1], scored[0][2]
                 extra = [f for f in files if f is not main]
                 received = (m.get("receivedDateTime") or "").replace("Z", "+00:00")
-                _, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail={
-                    "key": mid, "conv": m.get("conversationId"), "from_addr": (frm.get("address") or "").lower(),
-                    "from_name": frm.get("name"), "subject": m.get("subject"), "received": received or None})
+                maildata = {"key": mid, "conv": m.get("conversationId"), "from_addr": (frm.get("address") or "").lower(),
+                            "from_name": frm.get("name"), "subject": m.get("subject"), "received": received or None}
+                if _own_addr(maildata["from_addr"]) or _FWD_SUBJ.match(m.get("subject") or ""):
+                    # door een collega doorgestuurd: de leverancier staat in de doorgestuurde mail
+                    try:
+                        rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=body",
+                                          headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
+                        fs = forwarded_sender((rb.json().get("body") or {}).get("content") or "") if rb.status_code < 400 else None
+                    except Exception:  # noqa: BLE001
+                        fs = None
+                    if fs:
+                        maildata.update(fwd_by=maildata["from_addr"], fwd_name=maildata["from_name"],
+                                        from_addr=fs[0], from_name=fs[1] or fs[0])
+                _, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail=maildata)
                 new += 1 if created else 0
             conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
                          (mid, m.get("receivedDateTime")))
@@ -1336,15 +1414,13 @@ def detail(iid):
                          f" AND status IN ({','.join('?' * len(want))}) ORDER BY received_at, id LIMIT 1", [iid, *want], one=True) \
             or query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL"
                      f" AND status IN ({','.join('?' * len(OPEN))}) ORDER BY received_at, id LIMIT 1", [iid, *OPEN], one=True)
-    back = request.args.get("terug") or url_for("crediteuren.index")
-    if not back.startswith("/") or back.startswith("//"):
-        back = url_for("crediteuren.index")
+    back = safe_path(request.args.get("terug"), url_for("crediteuren.index"))
     attachments = query("SELECT * FROM files WHERE entity = 'invoice' AND entity_id = ? AND kind = 'attachment' ORDER BY id", (iid,))
     import json
     rel = query("SELECT email FROM customers WHERE id = ?", (r["supplier_id"],), one=True) if r["supplier_id"] else None
     prev_to = next((json.loads(n["mail_meta"]).get("to") for n in reversed(notes) if n["kind"] == "mail_uit" and n["mail_meta"]), None)
     # standaard: terug naar het adres waar de factuurmail vandaan kwam; anders het adres van de relatie
-    sender = r["mail_from"] or ""
+    sender = r["mail_from"] if r["mail_from"] and not _own_addr(r["mail_from"]) else ""
     mail_to = sender or ", ".join(prev_to or []) or (rel["email"] if rel and rel["email"] else "")
     mail_options = []
     for lab, adr in (("afzender factuurmail", sender), ("relatie", rel["email"] if rel and rel["email"] else ""),
@@ -1352,6 +1428,8 @@ def detail(iid):
         if adr and adr.lower() not in [a.lower() for _, a in mail_options]:
             mail_options.append((lab, adr))
     mail_subject = f"Factuur {r['invoice_no'] or ''} – De Vreugd Productietechniek".replace("Factuur  ", "Factuur ")
+    if r["mail_fwd_by"] and r["mail_subject"]:
+        mail_subject = "RE: " + _FWD_SUBJ.sub("", r["mail_subject"]).strip()
     reply_note = None
     if request.args.get("antwoord"):
         reply_note = next((n for n in notes if n["kind"] == "mail_in" and str(n["id"]) == request.args.get("antwoord")), None)
@@ -1487,7 +1565,8 @@ def mail_supplier(iid):
     if not to or bad or not body:
         flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
         return redirect(back)
-    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
+    # doorgestuurd door een collega: niet op die doorgestuurde mail antwoorden (dan krijgt de collega hem), maar een nieuwe mail
+    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" and not r["mail_fwd_by"] else ""
     orig_subject = r["mail_subject"] or ""
     # antwoord op een reactie van de leverancier: op dát bericht antwoorden (blijft in dezelfde mailwisseling)
     rn = query("SELECT * FROM invoice_notes WHERE id = ? AND invoice_id = ? AND kind = 'mail_in'",
@@ -1514,6 +1593,8 @@ def mail_supplier(iid):
     if in_thread:
         subject = "RE: " + orig_subject.strip()   # zoals Graph 'reply' het zelf doet; Outlook zet het antwoord onder de vorige mail
     else:
+        if r["mail_fwd_by"] and not f.get("subject"):
+            subject = "RE: " + _FWD_SUBJ.sub("", r["mail_subject"] or subject).strip()
         subject = MAIL_TAG.sub("", subject).strip() + f" [WP-F{iid}]"
     atts = []
     if f.get("attach_pdf") and r["file_id"]:
@@ -1568,7 +1649,8 @@ def archive_mails(conn, iid, box, folder):
         conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
         conn.commit()
         return 0, None
-    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
+    # doorgestuurd door een collega: niet op die doorgestuurde mail antwoorden (dan krijgt de collega hem), maar een nieuwe mail
+    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" and not r["mail_fwd_by"] else ""
     notes = conn.execute("SELECT id, mail_meta FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_in' AND mail_meta IS NOT NULL",
                          (iid,)).fetchall()
     try:
@@ -1862,9 +1944,7 @@ def categories_refresh():
     if not (can("crediteuren", 3) or can("beheer", 3)):
         abort(403)
     conn = get_db()
-    back = request.form.get("terug") or url_for("crediteuren.index")
-    if not back.startswith("/") or back.startswith("//"):
-        back = url_for("crediteuren.index")
+    back = safe_path(request.form.get("terug"), url_for("crediteuren.index"))
     if not mail_configured():
         flash("De Microsoft-koppeling is niet ingesteld.", "error")
         return redirect(back)
@@ -2017,9 +2097,7 @@ def mail_archive(iid):
             log(conn, iid, "Afgerond door de boekhouder; mail blijft in het postvak", g.user["id"])
             conn.commit()
             flash("Factuur afgerond.", "ok")
-    nxt = request.form.get("naar") or ""
-    if not nxt.startswith("/") or nxt.startswith("//"):
-        nxt = url_for("crediteuren.detail", iid=iid)
+    nxt = safe_path(request.form.get("naar"), url_for("crediteuren.detail", iid=iid))
     return redirect(nxt)
 
 
@@ -2030,7 +2108,7 @@ def reject(iid):
     reason = (request.form.get("reason") or "").strip()
     if not reason:
         flash("Geef een reden voor het afwijzen.", "error")
-        return redirect(request.form.get("terug") or url_for("crediteuren.detail", iid=iid))
+        return redirect(safe_path(request.form.get("terug"), url_for("crediteuren.detail", iid=iid)))
     if r["status"] == "snelstart":
         abort(400)
     if _blocked(r):
@@ -2046,8 +2124,8 @@ def reject(iid):
     conn.commit()
 
     flash("Factuur afgewezen.", "success")
-    back = request.form.get("terug") or ""
-    if back.startswith("/") and not back.startswith("//"):
+    back = safe_path(request.form.get("terug"), "")
+    if back:
         return redirect(back)
     return redirect(url_for("crediteuren.detail", iid=iid))
 

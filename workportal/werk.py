@@ -151,7 +151,8 @@ def new():
         audit("aangemaakt", "project", pid, f"{k['lower']} {_f('number')}")
         flash(f"{k['label']} aangemaakt.", "ok")
         nxt = request.form.get("next")
-        target = nxt if nxt and nxt.startswith("/") else url_for(f"{request.blueprint}.detail", pid=pid)
+        from .util import safe_path
+        target = safe_path(nxt, "") or url_for(f"{request.blueprint}.detail", pid=pid)
         if make:
             r = make_folder(pid, target)
             if r:
@@ -859,10 +860,14 @@ def project_file(pid):
     except sp.GraphError as exc:
         abort(404 if exc.status == 404 else 502)
     name = meta.get("name") or "bestand"
-    mime = (meta.get("file") or {}).get("mimeType") or "application/octet-stream"
-    inline = request.args.get("download") != "1" and (mime.startswith("image/") or mime in ("application/pdf", "text/plain"))
+    from .util import inline_type, SANDBOX_CSP
+    mt = inline_type((meta.get("file") or {}).get("mimeType"))   # geen SVG/HTML inline vanuit SharePoint
+    inline = request.args.get("download") != "1" and mt is not None
+    mime = mt or "application/octet-stream"
     headers = {"Content-Disposition": f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(name)}",
                "Cache-Control": "private, max-age=300"}
+    if mime != "application/pdf":
+        headers["Content-Security-Policy"] = SANDBOX_CSP
     if meta.get("size"):
         headers["Content-Length"] = str(meta["size"])
     return Response(stream_with_context(r.iter_content(64 * 1024)), mimetype=mime, headers=headers)

@@ -665,6 +665,10 @@ MIGRATIONS = [
       SELECT n.kind FROM invoice_notes n WHERE n.invoice_id = invoices.id AND n.kind IN ('mail_uit', 'mail_in')
       ORDER BY n.created_at DESC, n.id DESC LIMIT 1) = 'mail_uit';
     """,
+    # 31 - inkoopfacturen: door een collega doorgestuurde factuurmail (mail_from = de leverancier uit de doorgestuurde mail)
+    """
+    ALTER TABLE invoices ADD COLUMN mail_fwd_by TEXT;
+    """,
 ]
 
 

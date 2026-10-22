@@ -316,7 +316,8 @@ def klantmap(cid):
         return redirect(url_for("klanten.customer", cid=cid))
     pid = to_int(request.values.get("project"))
     prow = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True) if pid else None
-    nxt = request.values.get("next") or (werk_url("detail", prow, pid=pid) if prow else url_for("klanten.customer", cid=cid))
+    from .util import safe_path
+    nxt = safe_path(request.values.get("next"), "") or (werk_url("detail", prow, pid=pid) if prow else url_for("klanten.customer", cid=cid))
     if not nxt.startswith("/"):
         nxt = url_for("klanten.customer", cid=cid)
     conn = get_db()
@@ -374,7 +375,8 @@ def klantmap_unlink(cid):
 @require("klanten", BEWERKEN)
 def snelstart(cid):
     c = query("SELECT * FROM customers WHERE id = ?", (cid,), one=True) or abort(404)
-    nxt = request.values.get("next") or url_for("klanten.customer", cid=cid)
+    from .util import safe_path
+    nxt = safe_path(request.values.get("next"), "") or url_for("klanten.customer", cid=cid)
     if not nxt.startswith("/"):
         nxt = url_for("klanten.customer", cid=cid)
     if request.method == "POST":

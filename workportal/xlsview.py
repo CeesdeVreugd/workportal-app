@@ -67,7 +67,8 @@ def fmt_value(v, number_format="General"):
 def _color(c):
     """openpyxl-kleur naar #rrggbb (alleen echte RGB-kleuren; themakleuren laten we weg)."""
     try:
-        if c is not None and c.type == "rgb" and isinstance(c.rgb, str) and len(c.rgb) in (6, 8):
+        if c is not None and c.type == "rgb" and isinstance(c.rgb, str) and len(c.rgb) in (6, 8) \
+                and re.fullmatch(r"[0-9A-Fa-f]{6,8}", c.rgb):
             rgb = c.rgb[-6:]
             if c.rgb[:2] == "00" and len(c.rgb) == 8 and rgb == "000000":
                 return None

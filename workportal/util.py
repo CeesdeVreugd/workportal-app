@@ -312,6 +312,55 @@ def files_for(entity, entity_id, kind=None):
     return query("SELECT * FROM files WHERE entity=? AND entity_id=? ORDER BY id", (entity, entity_id))
 
 
+# ---------------------------------------------------------------- veilig serveren en doorsturen
+
+# Alleen deze bestandssoorten mogen in de browser zelf openen (inline); de inhoud moet er ook echt bij passen.
+# Al het andere (HTML, SVG, scripts, Office …) wordt als download aangeboden, zodat een geüpload of gemaild
+# bestand nooit als webpagina binnen WorkPortal kan draaien.
+_INLINE_SIG = {"application/pdf": (b"%PDF",), "image/jpeg": (b"\xff\xd8\xff",), "image/png": (b"\x89PNG",),
+               "image/gif": (b"GIF87a", b"GIF89a"), "image/webp": (b"RIFF",), "image/bmp": (b"BM",), "text/plain": None}
+SANDBOX_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+
+
+def inline_type(mime, head=None):
+    """Veilig inline-type voor dit bestand, of None (dan downloaden). head = eerste bytes (None = niet controleren)."""
+    m = (mime or "").split(";")[0].strip().lower()
+    if m not in _INLINE_SIG:
+        return None
+    sig = _INLINE_SIG[m]
+    if sig and head is not None and not any(head.startswith(x) for x in sig):
+        return None
+    return "text/plain; charset=utf-8" if m == "text/plain" else m
+
+
+_rl = {}
+_rl_lock = __import__("threading").Lock()
+
+
+def rate_limited(bucket, limit, window_s=900, hit=True):
+    """Eenvoudige rem per IP-adres (in het geheugen; er draait één worker). True = te veel pogingen."""
+    import time
+    key = (bucket, request.remote_addr or "?")
+    now = time.time()
+    with _rl_lock:
+        times = [t for t in _rl.get(key, []) if now - t < window_s]
+        if hit:
+            times.append(now)
+        _rl[key] = times
+        if len(_rl) > 5000:   # opruimen
+            for k in [k for k, v in _rl.items() if not v or now - v[-1] > window_s][:2000]:
+                _rl.pop(k, None)
+        return len(times) > limit
+
+
+def safe_path(target, default="/"):
+    """Alleen een pad binnen WorkPortal (geen //andere-site, /\\andere-site of javascript:)."""
+    t = (target or "").strip()
+    if not t.startswith("/") or t.startswith("//") or "\\" in t or any(ord(ch) < 32 for ch in t):
+        return default
+    return t
+
+
 def file_path(row):
     return os.path.join(upload_dir(), row["stored_name"])
 

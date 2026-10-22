@@ -1,3 +1,4 @@
+import hmac
 import secrets
 from datetime import timedelta
 
@@ -118,9 +119,8 @@ def load_logged_in_user():
 
 
 def _safe_next(target):
-    if target and target.startswith("/") and not target.startswith("//"):
-        return target
-    return url_for("main.dashboard")
+    from .util import safe_path
+    return safe_path(target, url_for("main.dashboard"))
 
 
 def _unlock(user_id, device_id):
@@ -144,6 +144,10 @@ def login():
         return redirect(url_for("auth.pin", next=request.args.get("next")))
 
     if request.method == "POST":
+        from .util import rate_limited
+        if rate_limited("login", 20):
+            flash("Te veel pogingen vanaf dit adres. Wacht een kwartier en probeer het opnieuw.", "error")
+            return render_template("auth/login.html", email=""), 429
         email = (request.form.get("email") or "").strip().lower()
         session["login_email"] = email
         session["login_next"] = request.form.get("next") or ""
@@ -181,6 +185,10 @@ def code():
     if not email:
         return redirect(url_for("auth.login"))
     if request.method == "POST":
+        from .util import rate_limited
+        if rate_limited("code", 25):
+            flash("Te veel pogingen vanaf dit adres. Wacht een kwartier en probeer het opnieuw.", "error")
+            return render_template("auth/code.html", masked=_mask(email)), 429
         entered = "".join(ch for ch in (request.form.get("code") or "") if ch.isdigit())
         user = query("SELECT * FROM users WHERE email = ? AND active = 1", (email,), one=True)
         row = None
@@ -190,7 +198,7 @@ def code():
         if not row or parse_iso(row["expires_at"]) < now_utc() or row["attempts"] >= MAX_CODE_ATTEMPTS:
             flash("Deze code is verlopen of ongeldig. Vraag een nieuwe code aan.", "error")
             return render_template("auth/code.html", masked=_mask(email))
-        if hash_secret(entered) != row["code_hash"]:
+        if not hmac.compare_digest(hash_secret(entered), row["code_hash"]):
             execute("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?", (row["id"],))
             left = MAX_CODE_ATTEMPTS - row["attempts"] - 1
             flash(f"Onjuiste code. Nog {left} poging(en)." if left > 0 else "Te veel pogingen. Vraag een nieuwe code aan.", "error")
@@ -269,6 +277,10 @@ def pin():
     if not user:
         return redirect(url_for("auth.login", ander=1))
     if request.method == "POST":
+        from .util import rate_limited
+        if rate_limited("pin", 30):
+            flash("Te veel pogingen vanaf dit adres. Wacht een kwartier en probeer het opnieuw.", "error")
+            return render_template("auth/pin.html", user=user, next="", others=known_devices()), 429
         entered = (request.form.get("pin") or "").strip()
         if check_pin(entered, device["pin_hash"]):
             _unlock(user["id"], device["id"])

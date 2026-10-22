@@ -221,7 +221,8 @@ def calc_delete(cid):
         abort(403)
     execute("DELETE FROM calc_saves WHERE id = ?", (cid,))
     flash("Berekening verwijderd.", "ok")
-    return redirect(request.form.get("terug") or url_for("kennis.tools"))
+    from .util import safe_path
+    return redirect(safe_path(request.form.get("terug"), url_for("kennis.tools")))
 
 
 def calcs_for(project_id=None, ticket_id=None):

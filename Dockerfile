@@ -14,7 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN sed -i "s/\r$//" docker-entrypoint.sh && chmod +x docker-entrypoint.sh && mkdir -p /data
+RUN sed -i "s/\r$//" docker-entrypoint.sh && chmod +x docker-entrypoint.sh && mkdir -p /data \
+    && (getent passwd wp >/dev/null || useradd --system --uid 10001 --no-create-home --home-dir /app --shell /usr/sbin/nologin wp)
 # 3D-viewer: STEP/IGES-lezer (occt-import-js, OpenCascade WASM) eenmalig ophalen en zelf hosten
 RUN python scripts/fetch_3d_libs.py
 

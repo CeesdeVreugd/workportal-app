@@ -220,7 +220,8 @@ def delete(fid):
     execute("DELETE FROM files WHERE id = ?", (fid,))
     audit("3D-model verwijderd", f["entity"], f["entity_id"], f["filename"])
     flash(f"{f['filename']} verwijderd.", "ok")
-    return redirect(request.form.get("next") if (request.form.get("next") or "").startswith("/") else _back(f["entity"], f["entity_id"]))
+    from .util import safe_path
+    return redirect(safe_path(request.form.get("next"), "") or _back(f["entity"], f["entity_id"]))
 
 
 # ---------------------------------------------------------------- viewer + bestanden leveren
@@ -254,7 +255,8 @@ def view_sp(pid):
         abort(400)
     if not rel or not is_model(rel) or not p["sp_item_id"]:
         abort(404)
-    back = request.args.get("terug") if (request.args.get("terug") or "").startswith("/") else _back("project", pid)
+    from .util import safe_path
+    back = safe_path(request.args.get("terug"), "") or _back("project", pid)
     size, cache_key, version = None, None, None
     try:  # versie van het bestand, zodat een gewijzigde STEP opnieuw wordt gedownload
         meta = sp.file_meta(get_db(), pid, rel)
