@@ -1285,7 +1285,7 @@ def index():
         "komdex": "i.status IN ('nieuw','ss_eerst')",        # nog te verwerken in Komdex (SnelStart gedaan of nog niet)
         "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (i.question_to IS NOT NULL OR i.ext_question = 1)",
         "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
-        "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1)",
+        "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0)",
         "afgewezen": "i.status = 'afgewezen'",
         "klaar": "i.status = 'snelstart' AND NOT (" + SQL_FINISH + ")",
         "alle": "1=1",
@@ -1300,7 +1300,7 @@ def index():
         params += [f"%{q}%"] * 5
     rows = query(
         "SELECT i.*, q.name AS question_name, (SELECT name FROM users WHERE id = i.rejected_by) AS rejected_name,"
-        " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1) AS acc_notes,"
+        " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0) AS acc_notes,"
         " (SELECT n.kind FROM invoice_notes n WHERE n.invoice_id = i.id AND n.kind IN ('mail_uit', 'mail_in')"
         "   ORDER BY n.created_at DESC, n.id DESC LIMIT 1) AS last_mail,"
         " (SELECT l.action || ' · ' || IFNULL(u.name, 'systeem') FROM invoice_log l LEFT JOIN users u ON u.id = l.user_id"
@@ -1318,7 +1318,7 @@ def index():
               " FROM invoices", (uid,), one=True)
     counts = {k: (c[k] or 0) for k in c.keys()}
     counts["boekhouding"] = query("SELECT COUNT(DISTINCT n.invoice_id) AS n FROM invoice_notes n JOIN invoices i ON i.id = n.invoice_id"
-                                  " WHERE n.for_accounting = 1 AND i.status <> 'snelstart'", one=True)["n"] or 0
+                                  " WHERE n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0 AND i.status <> 'snelstart'", one=True)["n"] or 0
     items = []
     scol = _step_colors(get_db())
     for r in rows:
@@ -2191,6 +2191,10 @@ def comment(iid):
 def note_done(iid, nid):
     n = query("SELECT * FROM invoice_notes WHERE id = ? AND invoice_id = ?", (nid, iid), one=True) or abort(404)
     execute("UPDATE invoice_notes SET handled = ? WHERE id = ?", (0 if n["handled"] else 1, nid))
+    if n["for_accounting"]:
+        conn = get_db()
+        log(conn, iid, "Opmerking voor de boekhouding " + ("weer open gezet" if n["handled"] else "afgehandeld"), g.user["id"])
+        conn.commit()
     return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
 
 

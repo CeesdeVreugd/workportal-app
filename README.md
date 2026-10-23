@@ -828,3 +828,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V155 (2.2.0)
 - Inloggen: wordt er met een inlogcode een **nieuw apparaat** aan een account gekoppeld, dan krijgt de gebruiker direct een mail met datum/tijd, apparaat (bijv. "Safari op iPhone") en IP-adres, en de vraag contact op te nemen met de beheerder als hij dit niet was. Opnieuw verifiëren op een bekend apparaat geeft geen mail. Ook vastgelegd in het auditlog ("nieuw apparaat").
 - Mijn account: apparaten met leesbare naam en koppeldatum.
+
+## V156 (2.3.0)
+- Inkoopfacturen: een opmerking voor de boekhouding die op **afgehandeld** staat, telt niet meer mee. De factuur verdwijnt dan uit het filter "Voor de boekhouding" (en de teller), en het paarse label "boekhouding" in de lijst gaat weg. Weer openzetten brengt hem terug. Afhandelen/openzetten komt in het logboek.
