@@ -156,19 +156,15 @@ def api_printers():
                                  for p in printix.allowed_printers(conn)]})
 
 
-def _viewer_src():
-    """Leest het bestand achter src (een link naar een bestand in WorkPortal) voor de Excel- en Word-viewer.
-    Geeft (naam, data, foutmelding, terug-url, download-url)."""
+def _src_data(src, depth=0):
+    """Bestand achter een WorkPortal-link lezen: (naam, data, foutmelding). Ook een bijlage uit een .eml (mail in een mail)."""
     from urllib.parse import urlsplit, parse_qs
     from flask import current_app
     import requests
     from werkzeug.exceptions import HTTPException
     from . import sharepoint as sp
-    src = request.args.get("src") or ""
-    if not src.startswith("/") or src.startswith("//") or "\\" in src:
+    if not src.startswith("/") or src.startswith("//") or "\\" in src or depth > 3:
         abort(400)
-    from .util import safe_path
-    back = safe_path(request.args.get("terug"), url_for("main.dashboard"))
     u = urlsplit(src)
     try:
         endpoint, args = current_app.url_map.bind("localhost").match(u.path, "GET")
@@ -201,8 +197,26 @@ def _viewer_src():
         else:
             with open(file_path(row), "rb") as fh:
                 data = fh.read()
+    elif endpoint == "main.eml_attachment":
+        from .emlview import attachment
+        _n, outer, error = _src_data((qs.get("src") or [""])[0], depth + 1)
+        if outer is not None:
+            try:
+                name, data, _m = attachment(outer, to_int((qs.get("i") or [""])[0], -1))
+            except ValueError:
+                abort(404)
     else:
         abort(400)
+    return name, data, error
+
+
+def _viewer_src():
+    """Leest het bestand achter src (een link naar een bestand in WorkPortal) voor de viewers.
+    Geeft (naam, data, foutmelding, terug-url, download-url)."""
+    from .util import safe_path
+    src = request.args.get("src") or ""
+    back = safe_path(request.args.get("terug"), url_for("main.dashboard"))
+    name, data, error = _src_data(src)
     dl = src + ("&" if "?" in src else "?") + "download=1"
     return name, data, error, back, dl
 

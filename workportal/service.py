@@ -130,6 +130,9 @@ def new():
         save_uploads("ticket", tid)
         if getattr(g, "upload_skipped", 0):
             flash(f"{g.upload_skipped} bestand(en) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
+        n_att = _save_mail_attachments(tid)
+        if n_att:
+            flash(f"{n_att} bijlage(n) uit de mail ook los bij het ticket gezet.", "ok")
         audit("aangemaakt", "ticket", tid, number)
         flash(f"Ticket {number} aangemaakt.", "ok")
         target = url_for("service.detail", tid=tid)
@@ -387,6 +390,37 @@ def mail_customer(tid):
     audit("mail aan klant", "ticket", tid, f"{', '.join(to)}: {subject[:80]}")
     flash(f"Mail verstuurd aan {', '.join(to)}. Het antwoord van de klant komt hier bij Notities klant.", "ok")
     return redirect(back)
+
+
+def _save_mail_attachments(tid):
+    """Bijlagen uit een gesleepte .eml ook los bij het ticket zetten (foto's als foto). Plaatjes die alleen in de
+    tekst/handtekening staan (logo's) niet."""
+    import re as _r
+    from .emlview import _parse, _attachments, attachment
+    from .util import save_bytes, ALLOWED_EXT, IMAGE_EXT
+    n = 0
+    for up in request.files.getlist("photos"):
+        if not up or not (up.filename or "").lower().endswith(".eml"):
+            continue
+        up.stream.seek(0)
+        raw = up.read()
+        try:
+            msg = _parse(raw)
+            body = msg.get_body(preferencelist=("html",))
+            used = set(_r.findall(r'(?i)cid:([^"\'>\s]+)', body.get_content())) if body is not None else set()
+            for i, name, size, ctype, cid in _attachments(msg):
+                if (cid and cid in used) or not size:
+                    continue
+                ext = _os.path.splitext(name)[1].lower()
+                if ext not in ALLOWED_EXT and ext not in IMAGE_EXT and ctype != "message/rfc822":
+                    continue
+                aname, data, mime = attachment(raw, i)
+                kind = "photo" if ext in IMAGE_EXT and mime.startswith("image/") else "attachment"
+                save_bytes("ticket", tid, data, safe_filename(aname), kind=kind, mime=mime)
+                n += 1
+        except Exception as exc:  # noqa: BLE001 - de mail zelf staat er al als bijlage
+            print(f"[WorkPortal] Bijlagen uit mail halen mislukt: {exc}", flush=True)
+    return n
 
 
 def _dropped_mail():

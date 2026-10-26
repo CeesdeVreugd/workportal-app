@@ -848,3 +848,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V159 (2.5.1)
 - Slepen naar buiten (foto's, factuur-PDF, bijlagen): er wordt alleen nog het bestand meegegeven, geen link of afbeelding. Outlook plakte eerder een kapotte afbeelding ("Foto") in de tekst van de mail; nu wordt het een bijlage.
+
+## V160 (2.6.0)
+- E-mailviewer: alle bijlagen worden getoond. Eerder vielen foto's weg die Outlook een Content-ID geeft (alleen plaatjes die echt in de tekst/handtekening staan worden nu overgeslagen) en werden meegestuurde mails (doorsturen als bijlage) niet getoond.
+  - Meegestuurde mail opent zelf weer in de viewer (met eigen bijlagen); Excel/Word-bijlagen openen in de Excel-/Word-viewer; PDF/foto openen; de rest downloaden. Alles ook naar buiten te slepen.
+  - Outlook-"winmail.dat": melding dat de bijlagen daarin zitten (openen in Outlook).
+- Nieuw ticket met een gesleepte .eml: de bijlagen uit de mail komen ook los bij het ticket (foto's als foto), logo's uit de handtekening niet.

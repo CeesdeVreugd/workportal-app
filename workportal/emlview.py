@@ -34,49 +34,81 @@ def _parse(data):
         raise ValueError("Deze mail kan niet worden gelezen.") from exc
 
 
+def _parts(msg):
+    """Alle 'bladeren' van de mail in vaste volgorde; een meegestuurde mail (message/rfc822) is zelf één bijlage."""
+    out = []
+
+    def walk(p):
+        if p.get_content_type() == "message/rfc822":
+            out.append(p)
+        elif p.is_multipart():
+            for sub in p.iter_parts():
+                walk(sub)
+        else:
+            out.append(p)
+    walk(msg)
+    return out
+
+
+def _payload(part):
+    if part.get_content_type() == "message/rfc822":
+        try:
+            inner = part.get_content()
+            return inner.as_bytes() if hasattr(inner, "as_bytes") else bytes(inner)
+        except Exception:  # noqa: BLE001
+            try:
+                return part.get_payload(0).as_bytes()
+            except Exception:  # noqa: BLE001
+                return b""
+    try:
+        return part.get_payload(decode=True) or b""
+    except Exception:  # noqa: BLE001
+        return b""
+
+
+def _name(part):
+    name = part.get_filename()
+    if name:
+        return name
+    ctype = part.get_content_type()
+    if ctype == "message/rfc822":
+        try:
+            subj = str(part.get_content().get("Subject") or "").strip()
+        except Exception:  # noqa: BLE001
+            subj = ""
+        return (re.sub(r'[\\/:*?"<>|]+', "_", subj)[:80] or "doorgestuurde mail") + ".eml"
+    return "bijlage." + (ctype.split("/")[-1] if ctype else "bin")
+
+
 def _attachments(msg):
     """[(volgnummer, naam, grootte, mime, content-id)] van alle onderdelen die geen hoofdtekst zijn."""
-    out = []
     body_ids = set()
     for pref in (("html",), ("plain",)):
         b = msg.get_body(preferencelist=pref)
         if b is not None:
             body_ids.add(id(b))
-    for i, part in enumerate(msg.walk()):
-        if part.is_multipart() or id(part) in body_ids:
+    out = []
+    for i, part in enumerate(_parts(msg)):
+        if id(part) in body_ids:
             continue
-        name = part.get_filename()
-        disp = (part.get_content_disposition() or "").lower()
         ctype = part.get_content_type()
-        if not name and disp != "attachment" and not part.get("Content-ID"):
-            if ctype in ("text/plain", "text/html"):
-                continue
-        try:
-            payload = part.get_payload(decode=True) or b""
-        except Exception:  # noqa: BLE001
-            payload = b""
-        if ctype == "message/rfc822" and not payload:
-            try:
-                payload = part.get_payload(0).as_bytes()
-            except Exception:  # noqa: BLE001
-                payload = b""
+        disp = (part.get_content_disposition() or "").lower()
+        if not part.get_filename() and disp != "attachment" and not part.get("Content-ID") and ctype in ("text/plain", "text/html"):
+            continue   # tekstdeel (bijv. de platte-tekstversie naast HTML)
         cid = (part.get("Content-ID") or "").strip().strip("<>")
-        out.append((i, name or (("bijlage." + ctype.split("/")[-1]) if ctype else "bijlage"), len(payload), ctype, cid,
-                    disp == "inline" and not name))
+        out.append((i, _name(part), len(_payload(part)), ctype, cid))
     return out
 
 
 def attachment(data, idx):
     """(naam, bytes, mime) van bijlage nummer idx, of ValueError."""
     msg = _parse(data)
-    for i, part in enumerate(msg.walk()):
-        if i == idx and not part.is_multipart():
-            payload = part.get_payload(decode=True) or b""
-            if part.get_content_type() == "message/rfc822" and not payload:
-                payload = part.get_payload(0).as_bytes()
-            name = part.get_filename() or ("bijlage." + part.get_content_type().split("/")[-1])
-            return name, payload, part.get_content_type()
-    raise ValueError("Bijlage niet gevonden.")
+    parts = _parts(msg)
+    if not 0 <= idx < len(parts):
+        raise ValueError("Bijlage niet gevonden.")
+    part = parts[idx]
+    ctype = part.get_content_type()
+    return _name(part), _payload(part), ("message/rfc822" if ctype == "message/rfc822" else ctype)
 
 
 def _clean_html(raw, cids):
@@ -108,7 +140,7 @@ def render(data):
     atts = _attachments(msg)
     cids = {}
     budget = MAX_INLINE_IMG
-    for i, name, size, ctype, cid, _inline in atts:
+    for i, name, size, ctype, cid in atts:
         if cid and ctype.startswith("image/") and size <= budget:
             try:
                 _, payload, _ = attachment(data, i)
@@ -118,10 +150,10 @@ def render(data):
                 pass
     part_html = msg.get_body(preferencelist=("html",))
     part_text = msg.get_body(preferencelist=("plain",))
-    html_doc, text, remote = None, "", False
+    html_doc, text, remote, raw_html = None, "", False, ""
     if part_html is not None:
         try:
-            raw = part_html.get_content()
+            raw = raw_html = part_html.get_content()
             remote = bool(re.search(r'(?i)src\s*=\s*["\']?https?:', raw))
             html_doc = _clean_html(raw, cids)
         except Exception:  # noqa: BLE001
@@ -133,11 +165,15 @@ def render(data):
             text = ""
     if html_doc is None and not text:
         text = "(Deze mail heeft geen leesbare tekst.)"
-    shown = [a for a in atts if not (a[4] and a[4] in cids)]   # ingesloten plaatjes niet nog eens als bijlage
+    # ingesloten plaatjes (die echt in de tekst staan) niet nog eens als bijlage; Outlook geeft ook gewone
+    # bijlagen een Content-ID, die blijven dus gewoon in de lijst
+    used = set(re.findall(r'(?i)cid:([^"\'>\s]+)', raw_html))
+    shown = [a for a in atts if not (a[4] and a[4] in used and a[4] in cids)]
     return {
         "subject": str(msg.get("Subject") or "(geen onderwerp)"),
         "from": _addr(msg.get("From")), "to": _addr(msg.get("To")), "cc": _addr(msg.get("Cc")),
         "date": when, "html": html_doc, "text": text.replace("\r\n", "\n").strip(), "remote_images": remote,
-        "attachments": [{"i": i, "name": name, "size": size, "mime": ctype} for i, name, size, ctype, _c, _in in shown],
+        "attachments": [{"i": i, "name": name, "size": size, "mime": ctype} for i, name, size, ctype, _c in shown],
+        "tnef": any(a[3] == "application/ms-tnef" for a in atts),
         "escape": html.escape,
     }

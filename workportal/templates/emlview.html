@@ -47,13 +47,24 @@
           {% if mail.date %}<dt>Datum</dt><dd>{{ mail.date }}</dd>{% endif %}
         </dl>
         {% if mail.attachments %}<div class="ev-atts">
-          {% for a in mail.attachments %}{% set ext = (a.name or '').rpartition('.')[2].lower() %}
+          {% for a in mail.attachments %}{% set ext = (a.name or '').rpartition('.')[2].lower() %}{% set asrc = url_for('main.eml_attachment', src=src, i=a.i) %}
+          {% if ext == 'eml' or a.mime == 'message/rfc822' %}
+          <a class="ev-att" href="{{ url_for('main.emlview', src=asrc, terug=request.full_path) }}" title="Meegestuurde mail openen"
+             draggable="true" data-dragfile="{{ asrc }}" data-dragname="{{ a.name }}" data-dragmime="message/rfc822">
+            {{ icon('mail') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
+          {% elif ext in ('xlsx', 'xlsm', 'csv', 'docx', 'docm') %}
+          <a class="ev-att" href="{{ url_for('main.xlsview' if ext in ('xlsx','xlsm','csv') else 'main.docview', src=asrc, terug=request.full_path, titel=a.name) }}"
+             draggable="true" data-dragfile="{{ asrc }}" data-dragname="{{ a.name }}" data-dragmime="{{ a.mime }}">
+            {{ icon('download') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
+          {% else %}
           <a class="ev-att" href="{{ url_for('main.eml_attachment', src=src, i=a.i, open=1 if ext in ('pdf','jpg','jpeg','png','gif','webp') else None) }}" {% if ext not in ('pdf','jpg','jpeg','png','gif','webp') %}download{% else %}target="_blank" rel="noopener"{% endif %}
              draggable="true" data-dragfile="{{ url_for('main.eml_attachment', src=src, i=a.i) }}" data-dragname="{{ a.name }}" data-dragmime="{{ a.mime }}">
             {{ icon('download') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
+          {% endif %}
           {% endfor %}
         </div>{% endif %}
       </section>
+      {% if mail.tnef %}<div class="ev-note">Deze mail heeft een Outlook-bijlage "winmail.dat": de echte bijlagen zitten daarin. Download de mail en open hem in Outlook.</div>{% endif %}
       {% if mail.html and mail.remote_images %}<div class="ev-note">Afbeeldingen van internet worden niet geladen (privacy en veiligheid).</div>{% endif %}
       <section class="ev-card ev-body">
         {% if mail.html %}<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Inhoud van de mail" srcdoc="{{ mail.html }}"></iframe>
