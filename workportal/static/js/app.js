@@ -880,6 +880,9 @@
     try { e.dataTransfer.setData("DownloadURL", mime + ":" + name + ":" + url); } catch (x) {}
     var pic = el.querySelector("img");
     if (pic && e.dataTransfer.setDragImage) { try { e.dataTransfer.setDragImage(pic, 20, 20); } catch (x) {} }
+    // Komdex (en andere programma's) pakken het bestand via de link op: die alleen bij bestanden zonder foto meegeven
+    // (bij een foto plakt Outlook anders een kapotte afbeelding in de mail)
+    if (!pic) { try { e.dataTransfer.setData("text/uri-list", url); } catch (x) {} }
     e.dataTransfer.effectAllowed = "copy";
     el.classList.add("dragging");
   });

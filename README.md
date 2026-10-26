@@ -854,3 +854,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Meegestuurde mail opent zelf weer in de viewer (met eigen bijlagen); Excel/Word-bijlagen openen in de Excel-/Word-viewer; PDF/foto openen; de rest downloaden. Alles ook naar buiten te slepen.
   - Outlook-"winmail.dat": melding dat de bijlagen daarin zitten (openen in Outlook).
 - Nieuw ticket met een gesleepte .eml: de bijlagen uit de mail komen ook los bij het ticket (foto's als foto), logo's uit de handtekening niet.
+
+## V161 (2.6.1)
+- Slepen: bij bestanden zonder foto (factuur-PDF, bijlagen) gaat de link weer mee naast het bestand, zoals voor V159 – Komdex pakt de factuur daarmee op. Foto's blijven alleen als bestand (anders plakt Outlook een kapotte afbeelding).

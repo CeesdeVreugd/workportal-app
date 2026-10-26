@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V160: e-mailviewer - alle bijlagen (ook foto's en meegestuurde mails), mailbijlagen los bij nieuw ticket"
+set "OMSCHRIJVING=WorkPortal V161: factuur slepen naar Komdex werkt weer"
 
 echo.
 echo ============================================
