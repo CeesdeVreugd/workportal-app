@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V158: e-mailviewer (.eml) en foto's naar buiten slepen"
+set "OMSCHRIJVING=WorkPortal V159: foto slepen naar Outlook geeft het bestand (geen kapotte afbeelding)"
 
 echo.
 echo ============================================

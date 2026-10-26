@@ -845,3 +845,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Veilig: de inhoud van de mail staat in een afgeschermd venster (geen scripts, geen toegang tot WorkPortal), afbeeldingen van internet worden niet geladen (ook geen verborgen leesbevestigingen); ingesloten afbeeldingen wel.
   - Outlook-.msg wordt (nog) niet weergegeven: downloaden en openen in Outlook.
 - **Foto's naar buiten slepen:** foto's bij tickets, bezoeken, notities e.d. kun je nu als bestand slepen naar een Outlook-mail, een map of het bureaublad (Chrome/Edge).
+
+## V159 (2.5.1)
+- Slepen naar buiten (foto's, factuur-PDF, bijlagen): er wordt alleen nog het bestand meegegeven, geen link of afbeelding. Outlook plakte eerder een kapotte afbeelding ("Foto") in de tekst van de mail; nu wordt het een bijlage.

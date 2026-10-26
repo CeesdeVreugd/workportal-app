@@ -875,8 +875,11 @@
     var url = new URL(el.getAttribute("data-dragfile"), location.href).href;
     var name = (el.getAttribute("data-dragname") || "bestand.pdf").replace(/[:]/g, "-");
     var mime = el.getAttribute("data-dragmime") || "application/octet-stream";
+    // alleen het bestand meegeven: geen link of <img> (anders plakt Outlook een kapotte afbeelding/link in de mail)
+    try { e.dataTransfer.clearData(); } catch (x) {}
     try { e.dataTransfer.setData("DownloadURL", mime + ":" + name + ":" + url); } catch (x) {}
-    try { e.dataTransfer.setData("text/uri-list", url); e.dataTransfer.setData("text/plain", url); } catch (x) {}
+    var pic = el.querySelector("img");
+    if (pic && e.dataTransfer.setDragImage) { try { e.dataTransfer.setDragImage(pic, 20, 20); } catch (x) {} }
     e.dataTransfer.effectAllowed = "copy";
     el.classList.add("dragging");
   });
