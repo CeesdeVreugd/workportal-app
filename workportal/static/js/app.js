@@ -281,7 +281,7 @@
     var a = e.target.closest && e.target.closest("a[href]");
     if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1 || a.hasAttribute("data-full")) return;
     var href = a.getAttribute("href") || "";
-    if (href.charAt(0) !== "/" || /[?&]download=1/.test(href) || /^\/(excel|word)\?/.test(href)) return;
+    if (href.charAt(0) !== "/" || /[?&]download=1/.test(href) || /^\/(excel|word|mail)\?/.test(href)) return;
     var name = a.getAttribute("data-xls"), view = "excel";
     if (name === null && a.getAttribute("data-doc") !== null) { name = a.getAttribute("data-doc"); view = "word"; }
     if (name === null) {
@@ -290,12 +290,13 @@
       var p = m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : (/^\/bestanden\/\d+\//.test(path) ? decodeURIComponent(path) : "");
       if (/\.(xlsx|xlsm|xltx|xltm|csv)$/i.test(p)) view = "excel";
       else if (/\.(docx|docm|dotx|dotm)$/i.test(p)) view = "word";
+      else if (/\.eml$/i.test(p)) view = "mail";
       else return;
       name = p.split("/").pop();
     }
     e.preventDefault();
     location.href = "/" + view + "?src=" + encodeURIComponent(href) + "&terug=" + encodeURIComponent(location.pathname + location.search + location.hash) +
-      "&titel=" + encodeURIComponent(name || a.textContent.trim() || (view === "word" ? "Word" : "Excel"));
+      "&titel=" + encodeURIComponent(name || a.textContent.trim() || (view === "word" ? "Word" : view === "mail" ? "E-mail" : "Excel"));
   });
 
   // PDF's openen in de WorkPortal-viewer met terug-knop (links met data-pdf)

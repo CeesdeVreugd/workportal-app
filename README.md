@@ -839,3 +839,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Ticket: twee blokken – **Notities intern** en **Notities klant**. Bij Notities klant mail je de klant vanuit het ticket (knop "Mail klant"; daarna "Antwoord allen" op de laatste mail), met bijlagen en "kopie naar mij". Onderwerp = het ticketnummer met [WP-T..], zodat het antwoord van de klant vanzelf (met bijlagen) bij het ticket komt; de toegewezen monteur en de verzender krijgen een melding.
 - Beheer > Instellingen: mailbox voor service-mails (standaard de werkvoorbereiding-afzender) en "antwoorden van klanten ophalen" (elke 5 minuten; alleen mails met het ticketnummer, er wordt niets in de mailbox veranderd). De mailbox moet in de toegestane groep van de Microsoft-koppeling staan (Mail.Send + Mail.Read).
 - Database-migratie 32: ticket_notes.kind/mail_meta, tickets.mail_conv.
+
+## V158 (2.5.0)
+- **E-mailviewer (.eml):** een .eml-bestand (bijlage bij een ticket, factuur, notitie, of in een project-/ordermap) opent in WorkPortal: onderwerp, van/aan/cc/datum, de tekst (HTML-mails netjes opgemaakt) en de bijlagen (PDF/foto openen, andere downloaden, of naar buiten slepen). Met terug- en downloadknop.
+  - Veilig: de inhoud van de mail staat in een afgeschermd venster (geen scripts, geen toegang tot WorkPortal), afbeeldingen van internet worden niet geladen (ook geen verborgen leesbevestigingen); ingesloten afbeeldingen wel.
+  - Outlook-.msg wordt (nog) niet weergegeven: downloaden en openen in Outlook.
+- **Foto's naar buiten slepen:** foto's bij tickets, bezoeken, notities e.d. kun je nu als bestand slepen naar een Outlook-mail, een map of het bureaublad (Chrome/Edge).

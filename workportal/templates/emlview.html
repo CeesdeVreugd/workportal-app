@@ -1,0 +1,83 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+<style>
+  .ev-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #E9ECF3; padding: 14px 12px calc(14px + env(safe-area-inset-bottom)); gap: 12px; overflow: auto; }
+  .ev-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(20,22,58,.12); max-width: 960px; width: 100%; margin: 0 auto; }
+  .ev-head { padding: 16px 18px; }
+  .ev-head h1 { font-size: 20px; margin: 0 0 10px; color: #0A0A96; line-height: 1.25; overflow-wrap: anywhere; }
+  .ev-meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 14px; color: #14163A; }
+  .ev-meta dt { color: #5A5F80; } .ev-meta dd { margin: 0; overflow-wrap: anywhere; }
+  .ev-atts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .ev-att { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #D5DAE8; border-radius: 10px; text-decoration: none; color: #14163A; font-size: 13.5px; background: #F7F8FC; max-width: 100%; }
+  .ev-att svg { width: 16px; height: 16px; flex: none; color: #0A0A96; }
+  .ev-att span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev-att small { color: #5A5F80; }
+  .ev-body { flex: 1; min-height: 60vh; display: flex; flex-direction: column; overflow: hidden; }
+  .ev-body iframe { flex: 1; width: 100%; min-height: 60vh; border: 0; border-radius: 10px; background: #fff; }
+  .ev-text { padding: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 15px; color: #14163A; margin: 0; }
+  .ev-note { font-size: 12.5px; color: #8A4B08; background: #FEF3E2; padding: 6px 12px; border-radius: 8px; max-width: 960px; width: 100%; margin: 0 auto; }
+  .ev-err { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 24px; }
+</style>
+</head>
+<body class="v3d-body">
+<div class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" id="ev-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b>{{ title }}</b><span>E-mail · alleen lezen</span></div>
+    <a class="iconbtn light" href="{{ dl }}" download aria-label="Downloaden" title="Mail downloaden (openen in Outlook)">{{ icon('download') }}</a>
+  </header>
+  <main class="ev-wrap">
+    {% if error or not mail %}
+      <div class="ev-err"><p>{{ error or 'Deze mail kan niet worden getoond.' }}</p><a class="btn primary" href="{{ dl }}" download>{{ icon('download') }}Bestand downloaden</a></div>
+    {% else %}
+      <section class="ev-card ev-head">
+        <h1>{{ mail.subject }}</h1>
+        <dl class="ev-meta">
+          <dt>Van</dt><dd>{{ mail['from'] or '–' }}</dd>
+          {% if mail.to %}<dt>Aan</dt><dd>{{ mail.to }}</dd>{% endif %}
+          {% if mail.cc %}<dt>Cc</dt><dd>{{ mail.cc }}</dd>{% endif %}
+          {% if mail.date %}<dt>Datum</dt><dd>{{ mail.date }}</dd>{% endif %}
+        </dl>
+        {% if mail.attachments %}<div class="ev-atts">
+          {% for a in mail.attachments %}{% set ext = (a.name or '').rpartition('.')[2].lower() %}
+          <a class="ev-att" href="{{ url_for('main.eml_attachment', src=src, i=a.i, open=1 if ext in ('pdf','jpg','jpeg','png','gif','webp') else None) }}" {% if ext not in ('pdf','jpg','jpeg','png','gif','webp') %}download{% else %}target="_blank" rel="noopener"{% endif %}
+             draggable="true" data-dragfile="{{ url_for('main.eml_attachment', src=src, i=a.i) }}" data-dragname="{{ a.name }}" data-dragmime="{{ a.mime }}">
+            {{ icon('download') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
+          {% endfor %}
+        </div>{% endif %}
+      </section>
+      {% if mail.html and mail.remote_images %}<div class="ev-note">Afbeeldingen van internet worden niet geladen (privacy en veiligheid).</div>{% endif %}
+      <section class="ev-card ev-body">
+        {% if mail.html %}<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Inhoud van de mail" srcdoc="{{ mail.html }}"></iframe>
+        {% else %}<pre class="ev-text">{{ mail.text }}</pre>{% endif %}
+      </section>
+    {% endif %}
+  </main>
+</div>
+<script>
+(function () {
+  var back = document.getElementById("ev-back");
+  back.addEventListener("click", function (e) {
+    if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+  });
+})();
+</script>
+<script>
+document.addEventListener("dragstart", function (e) {   // bijlage naar buiten slepen (Outlook, map, bureaublad)
+  var el = e.target.closest && e.target.closest("[data-dragfile]");
+  if (!el || !e.dataTransfer) return;
+  var url = new URL(el.getAttribute("data-dragfile"), location.href).href;
+  try { e.dataTransfer.setData("DownloadURL", (el.getAttribute("data-dragmime") || "application/octet-stream") + ":" + (el.getAttribute("data-dragname") || "bijlage").replace(/:/g, "-") + ":" + url); } catch (x) {}
+  e.dataTransfer.effectAllowed = "copy";
+});
+</script>
+</body>
+</html>

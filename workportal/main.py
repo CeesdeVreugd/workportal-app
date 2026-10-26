@@ -1,10 +1,11 @@
+import io
 import os
 from flask import Blueprint, render_template, request, g, send_file, abort, jsonify, url_for
 
 from .db import query, execute, get_db
 from .notify import vapid_keys, push_user
 from .permissions import can
-from .util import file_path, now_iso, now_utc, iso
+from .util import file_path, now_iso, now_utc, iso, to_int
 
 bp = Blueprint("main", __name__)
 
@@ -235,6 +236,42 @@ def docview():
             error = str(exc)
     title = (request.args.get("titel") or name or "Word")[:150]
     return render_template("docview.html", doc=doc, error=error, back=back, title=title, dl=dl)
+
+
+@bp.route("/mail")
+def emlview():
+    """E-mail (.eml) lezen binnen WorkPortal, met terug-knop. src = link naar het bestand in WorkPortal."""
+    from .emlview import render
+    name, data, error, back, dl = _viewer_src()
+    mail = None
+    if data is not None:
+        try:
+            mail = render(data)
+        except ValueError as exc:
+            error = str(exc)
+    title = ((mail or {}).get("subject") or request.args.get("titel") or name or "E-mail")[:150]
+    return render_template("emlview.html", mail=mail, error=error, back=back, title=title, dl=dl, src=request.args.get("src"))
+
+
+@bp.route("/mail/bijlage")
+def eml_attachment():
+    """Bijlage uit een .eml (altijd als download, of PDF/foto inline in een afgeschermd venster)."""
+    from .emlview import attachment
+    from .util import inline_type, SANDBOX_CSP, safe_filename
+    name, data, error, back, dl = _viewer_src()
+    if data is None:
+        abort(404)
+    try:
+        aname, payload, mime = attachment(data, to_int(request.args.get("i"), -1))
+    except ValueError:
+        abort(404)
+    mt = inline_type(mime, payload[:16]) if request.args.get("open") == "1" else None
+    resp = send_file(io.BytesIO(payload), mimetype=mt or "application/octet-stream", as_attachment=mt is None,
+                     download_name=safe_filename(aname))
+    resp.headers["Cache-Control"] = "private, no-store"
+    if mt != "application/pdf":
+        resp.headers["Content-Security-Policy"] = SANDBOX_CSP
+    return resp
 
 
 @bp.route("/pdf")

@@ -1102,3 +1102,5 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .tdrop-ext { width: 40px; height: 40px; border-radius: 6px; background: #E9ECF5; color: #3A3F60; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
 .tdrop-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .tdrop-list .linkbtn { font-size: 20px; padding: 0 6px; }
+.att-eml, .att-msg { background: #0F6CBD; }
+.photo[draggable="true"] { cursor: grab; } .photo.dragging { opacity: .5; }
