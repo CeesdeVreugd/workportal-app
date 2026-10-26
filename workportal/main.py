@@ -267,6 +267,19 @@ def emlview():
     return render_template("emlview.html", mail=mail, error=error, back=back, title=title, dl=dl, src=request.args.get("src"))
 
 
+@bp.route("/afbeelding")
+def imgview():
+    """Foto (bijv. een bijlage uit een mail) bekijken binnen WorkPortal, met terug- en downloadknop."""
+    from .util import safe_path
+    src = request.args.get("src") or ""
+    if not src.startswith("/") or src.startswith("//") or "\\" in src:
+        abort(400)
+    back = safe_path(request.args.get("terug"), url_for("main.dashboard"))
+    title = (request.args.get("titel") or "Afbeelding")[:150]
+    dl = src + ("&" if "?" in src else "?") + "download=1"
+    return render_template("imgview.html", src=src, back=back, title=title, dl=dl)
+
+
 @bp.route("/mail/bijlage")
 def eml_attachment():
     """Bijlage uit een .eml (altijd als download, of PDF/foto inline in een afgeschermd venster)."""
@@ -279,7 +292,7 @@ def eml_attachment():
         aname, payload, mime = attachment(data, to_int(request.args.get("i"), -1))
     except ValueError:
         abort(404)
-    mt = inline_type(mime, payload[:16]) if request.args.get("open") == "1" else None
+    mt = inline_type(mime, payload[:16]) if request.args.get("open") == "1" and request.args.get("download") != "1" else None
     resp = send_file(io.BytesIO(payload), mimetype=mt or "application/octet-stream", as_attachment=mt is None,
                      download_name=safe_filename(aname))
     resp.headers["Cache-Control"] = "private, no-store"

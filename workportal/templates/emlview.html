@@ -57,7 +57,8 @@
              draggable="true" data-dragfile="{{ asrc }}" data-dragname="{{ a.name }}" data-dragmime="{{ a.mime }}">
             {{ icon('download') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
           {% else %}
-          <a class="ev-att" href="{{ url_for('main.eml_attachment', src=src, i=a.i, open=1 if ext in ('pdf','jpg','jpeg','png','gif','webp') else None) }}" {% if ext not in ('pdf','jpg','jpeg','png','gif','webp') %}download{% else %}target="_blank" rel="noopener"{% endif %}
+          {% set osrc = url_for('main.eml_attachment', src=src, i=a.i, open=1) %}
+          <a class="ev-att" href="{{ url_for('main.pdfview', src=osrc, terug=request.full_path, titel=a.name) if ext == 'pdf' else (url_for('main.imgview', src=osrc, terug=request.full_path, titel=a.name) if ext in ('jpg','jpeg','png','gif','webp','bmp') else url_for('main.eml_attachment', src=src, i=a.i)) }}" {% if ext not in ('pdf','jpg','jpeg','png','gif','webp','bmp') %}download{% endif %}
              draggable="true" data-dragfile="{{ url_for('main.eml_attachment', src=src, i=a.i) }}" data-dragname="{{ a.name }}" data-dragmime="{{ a.mime }}">
             {{ icon('download') }}<span>{{ a.name }}</span><small>{{ (a.size / 1048576)|num(1) ~ ' MB' if a.size >= 1048576 else ((a.size / 1024)|round|int ~ ' kB') }}</small></a>
           {% endif %}

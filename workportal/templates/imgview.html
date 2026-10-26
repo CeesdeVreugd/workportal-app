@@ -1,0 +1,38 @@
+{% from "partials/icons.html" import icon %}<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A96">
+<title>{{ title }} – WorkPortal - DVP</title>
+<link rel="icon" href="/favicon.ico?v={{ VERSION }}" sizes="any">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer3d.css') }}?v={{ VERSION }}">
+<style>
+  .iv-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #1B1D33; padding: 12px; overflow: auto; }
+  .iv-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.4); background: #fff; }
+  .iv-wrap img.zoom { max-width: none; max-height: none; cursor: zoom-out; }
+  .iv-wrap img:not(.zoom) { cursor: zoom-in; }
+</style>
+</head>
+<body class="v3d-body">
+<div class="v3d-app">
+  <header class="v3d-head">
+    <a class="iconbtn light" id="iv-back" href="{{ back }}" aria-label="Terug">{{ icon('back') }}</a>
+    <div class="v3d-titles"><b>{{ title }}</b><span>Afbeelding</span></div>
+    <a class="iconbtn light" href="{{ dl }}" download aria-label="Downloaden" title="Downloaden">{{ icon('download') }}</a>
+  </header>
+  <main class="iv-wrap"><img src="{{ src }}" alt="{{ title }}" id="iv-img"></main>
+</div>
+<script>
+(function () {
+  var back = document.getElementById("iv-back");
+  back.addEventListener("click", function (e) {
+    if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+  });
+  var im = document.getElementById("iv-img");
+  im.addEventListener("click", function () { im.classList.toggle("zoom"); });
+})();
+</script>
+</body>
+</html>

@@ -857,3 +857,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V161 (2.6.1)
 - Slepen: bij bestanden zonder foto (factuur-PDF, bijlagen) gaat de link weer mee naast het bestand, zoals voor V159 – Komdex pakt de factuur daarmee op. Foto's blijven alleen als bestand (anders plakt Outlook een kapotte afbeelding).
+
+## V162 (2.6.2)
+- E-mailviewer: een PDF-bijlage opent in de PDF-viewer en een foto in een nieuwe fotoviewer (klik = inzoomen), allebei met terug- en downloadknop, in hetzelfde venster. Excel/Word en meegestuurde mails openden al in hun viewer.
