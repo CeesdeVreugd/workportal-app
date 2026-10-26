@@ -1089,3 +1089,16 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
   .pagehead .actions { justify-content: flex-start; }
 }
 @media (max-width: 699px) { .dragfile { display: none; } }
+/* sleepvak bij een nieuw ticket */
+.tdrop { position: relative; display: flex; align-items: center; gap: 14px; padding: 18px 16px; border: 2px dashed #C9CEDD; border-radius: 14px; background: #F7F8FC; cursor: pointer; transition: border-color .15s, background .15s; }
+.tdrop:hover, .tdrop.over { border-color: var(--primary, #0A0A96); background: #EEF1FB; }
+.tdrop > input[type=file] { position: absolute !important; inset: 0 !important; opacity: 0 !important; cursor: pointer; width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; border: 0 !important; font-size: 0 !important; }
+.tdrop-ic svg { width: 26px; height: 26px; color: var(--primary, #0A0A96); display: block; }
+.tdrop b { display: block; font-size: 14.5px; }
+.tdrop small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.tdrop-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.tdrop-list li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line, #E3E6EF); border-radius: 10px; background: #fff; }
+.tdrop-list img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex: none; }
+.tdrop-ext { width: 40px; height: 40px; border-radius: 6px; background: #E9ECF5; color: #3A3F60; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+.tdrop-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.tdrop-list .linkbtn { font-size: 20px; padding: 0 6px; }

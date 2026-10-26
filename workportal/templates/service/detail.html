@@ -15,6 +15,7 @@
     <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>
     {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
     <a class="btn" href="#notities" onclick="var f=document.getElementById('noteform');f.classList.remove('hidden');setTimeout(function(){f.querySelector('textarea').focus()},50)">{{ icon('edit') }}Notitie</a>
+    <a class="btn" href="#klant" onclick="var d=document.getElementById('mailform');if(d){d.open=true;setTimeout(function(){var b=d.querySelector('textarea');if(b)b.focus()},60)}">{{ icon('mail') }}Mail klant</a>
     <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
     {% if t.status != 'afgerond' %}<form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" data-confirm="Ticket {{ t.number }} afsluiten?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" name="status" value="afgerond">{{ icon('check') }}Ticket afsluiten</button></form>{% endif %}
     {% endif %}
@@ -46,7 +47,7 @@
       <dt>{{ 'Order' if t.project_kind == 'order' else 'Project' }}</dt><dd>{% if t.project_id %}<a href="{{ werk_url('detail', t.project_kind or 'project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} · <a href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }} Map</a>{% endif %}{% else %}–{% endif %}</dd>
       <dt>Gemeld door</dt><dd>{{ t.reported_by or '–' }}</dd>
       <dt>Toegewezen</dt><dd>{{ t.assignee or '–' }}</dd>
-      <dt>Gepland</dt><dd>{{ t.planned_date|date or '–' }}</dd>
+      {% if t.planned_date %}<dt>Gepland</dt><dd>{{ t.planned_date|date }}</dd>{% endif %}
     </dl>
     {% if t.description %}<h3 style="margin-top:16px">Melding</h3><div class="prose">{{ t.description }}</div>{% endif %}
   </section>
@@ -66,7 +67,8 @@
 </div>
 
 <section class="card" id="notities">
-  <div class="card-head"><h2>Notities ({{ notes|length }})</h2>{% if edit %}<button class="btn sm" type="button" onclick="var f=document.getElementById('noteform');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Notitie</button>{% endif %}</div>
+  {% set inotes = notes|selectattr('kind', 'equalto', 'intern')|list %}{% set knotes = notes|rejectattr('kind', 'equalto', 'intern')|list %}
+  <div class="card-head"><h2>Notities intern ({{ inotes|length }})</h2>{% if edit %}<button class="btn sm" type="button" onclick="var f=document.getElementById('noteform');f.classList.toggle('hidden');f.querySelector('textarea').focus()">{{ icon('plus') }}Notitie</button>{% endif %}</div>
   {% if edit %}
   <form id="noteform" method="post" enctype="multipart/form-data" action="{{ url_for('service.note_save', tid=t.id) }}" class="form noteform hidden" data-draft="tnote-{{ t.id }}-{{ g.user.id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -77,7 +79,7 @@
   </form>
   {% endif %}
   <div class="notes">
-  {% for n in notes %}
+  {% for n in inotes %}
     <article class="note" id="notitie{{ n.id }}">
       <div class="notehead"><b>{{ n.author or 'Onbekend' }}</b><span class="small muted">{{ n.created_at|dt }}{% if n.updated_at %} · bewerkt{% endif %}</span></div>
       <div class="notebody">{{ n.body }}</div>
@@ -93,8 +95,56 @@
       </details>
       {% endif %}
     </article>
-  {% else %}{% if not edit %}<div class="empty">Nog geen notities.</div>{% endif %}{% endfor %}
+  {% else %}{% if not edit %}<div class="empty">Nog geen interne notities.</div>{% endif %}{% endfor %}
   </div>
+</section>
+
+<section class="card" id="klant">
+  <div class="card-head"><h2>Notities klant ({{ knotes|length }})</h2><span class="small muted">mail met de klant · {{ svc_box or 'geen mailbox ingesteld' }}</span></div>
+  <div class="notes">
+  {% for n in knotes|reverse %}{% set mm = metas.get(n.id) or {} %}
+    <article class="note {{ 'note-in' if n.kind == 'mail_in' else 'note-out' }}" id="notitie{{ n.id }}">
+      <div class="notehead">
+        {% if n.kind == 'mail_in' %}<span class="badge b-purple">{{ icon('mail') }} van de klant</span><b>{{ mm.from_name or mm['from'] or 'Klant' }}</b>
+        {% else %}<span class="badge b-blue">{{ icon('mail') }} mail aan klant</span><b>{{ n.author or 'Onbekend' }}</b>{% endif %}
+        <span class="small muted">{{ n.created_at|dt }}</span>
+        {% if edit and (n.created_by == g.user.id or can('service', 3) or n.kind == 'mail_in') %}
+        <form method="post" action="{{ url_for('service.note_delete', tid=t.id, nid=n.id) }}" style="margin-left:auto" onsubmit="return confirm('Deze mail uit het ticket verwijderen? De mail zelf blijft in Outlook staan.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="linkbtn" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>
+        {% endif %}
+      </div>
+      <div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ (mm.to or [])|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% else %}Van {{ mm['from'] }}{% endif %} · <i>{{ (mm.subject or '')|replace('[WP-T' ~ t.id ~ ']', '')|trim }}</i></div>
+      <div class="notebody" style="white-space:pre-line">{{ n.body }}</div>
+      {% set nf = nfiles.get(n.id, []) %}{% if nf %}<div style="margin-top:8px">{{ photos(nf) }}</div>{% endif %}
+    </article>
+  {% else %}<div class="empty">Nog geen mail met de klant.</div>{% endfor %}
+  </div>
+  {% if edit %}
+  <details class="cred-mail" id="mailform" style="margin-top:14px">
+    <summary class="btn">{{ icon('mail') }}{{ 'Antwoord allen' if mail.reply_all else 'Mail klant' }}</summary>
+    <form method="post" action="{{ url_for('service.mail_customer', tid=t.id) }}" enctype="multipart/form-data" class="form" style="margin-top:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if mail.reply_all %}<input type="hidden" name="reply_all" value="1">
+      <div class="hint" style="margin:0 0 8px">Antwoord aan iedereen op de laatste mail ({{ mail.last.created_at|dt }}).</div>{% endif %}
+      <div class="fgrid">
+        <label class="f">Aan *<input type="text" name="to" value="{{ mail.to }}" required placeholder="naam@klant.nl">
+          {% if not mail.reply_all %}<span class="hint">{{ 'Contactpersoon van dit ticket' if t.contact_email else ('E-mailadres van de klant' if t.customer_email else 'Vul het adres van de klant in') }}</span>{% endif %}</label>
+        <label class="f">Cc<input type="text" name="cc" value="{{ mail.cc }}" placeholder="optioneel, meerdere met komma"></label>
+      </div>
+      <label class="f">Onderwerp<input type="text" name="subject" value="{{ mail.subject }}" {{ 'readonly' if mail.reply_all }}>
+        <span class="hint">Het ticketnummer staat erin, zodat het antwoord van de klant hier vanzelf terugkomt.</span></label>
+      <label class="f">Bericht *<textarea name="body" rows="7" required>Beste {{ t.contact or 'heer/mevrouw' }},
+
+</textarea></label>
+      <label class="f">Bijlagen<input type="file" name="mailfiles" multiple></label>
+      <div class="cred-actions">
+        <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>
+        <button type="button" class="btn ghost" style="margin-left:auto" data-cancel>Annuleren</button>
+        <button class="btn primary">{{ icon('mail') }}Versturen</button>
+      </div>
+      <p class="hint">Verstuurd vanuit {{ svc_box or '–' }}, met je naam en "Werkvoorbereiding" in de handtekening.</p>
+    </form>
+  </details>
+  {% endif %}
 </section>
 
 <section class="card" id="bezoeken">

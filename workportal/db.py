@@ -669,6 +669,13 @@ MIGRATIONS = [
     """
     ALTER TABLE invoices ADD COLUMN mail_fwd_by TEXT;
     """,
+    # 32 - tickets: mailen met de klant vanuit het ticket; notities intern (kind 'intern') en klant ('mail_uit'/'mail_in')
+    """
+    ALTER TABLE ticket_notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'intern';
+    ALTER TABLE ticket_notes ADD COLUMN mail_meta TEXT;
+    ALTER TABLE tickets ADD COLUMN mail_conv TEXT;
+    CREATE INDEX idx_tickets_conv ON tickets(mail_conv);
+    """,
 ]
 
 

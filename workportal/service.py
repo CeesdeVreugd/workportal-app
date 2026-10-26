@@ -109,22 +109,27 @@ def index():
 @require("service", BEWERKEN)
 def new():
     if request.method == "POST":
-        if not _f("title"):
+        mail = _dropped_mail()   # gesleepte mail (.eml): onderwerp, afzender en tekst overnemen als die nog leeg zijn
+        title = _f("title") or (mail or {}).get("subject")
+        if not title:
             flash("Vul een korte omschrijving in.", "error")
             return render_template("service/form.html", t=request.form, **_lookups(to_int(request.form.get("customer_id"))))
         now = now_iso()
         cid, lk = _links()
         number = next_number("tickets", "T")
-        status = _f("status") or ("ingepland" if _f("planned_date") else "nieuw")
+        status = "nieuw"   # plannen gebeurt bij de bezoeken
         tid = execute(
             "INSERT INTO tickets (number, type, priority, status, title, description, customer_id, location_id, installation_id,"
             " project_id, contact_id, reported_by, assigned_to, planned_date, created_by, created_at, updated_at)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (number, _f("type") or "storing", _f("priority") or "normaal", status, _f("title"), _f("description"),
+            (number, _f("type") or "storing", _f("priority") or "normaal", status, title[:200],
+             _f("description") or (mail or {}).get("body"),
              cid, lk["location_id"], lk["installation_id"], lk["project_id"],
-             lk["contact_id"], _f("reported_by"), to_int(request.form.get("assigned_to")),
-             _f("planned_date"), g.user["id"], now, now))
+             lk["contact_id"], _f("reported_by") or (mail or {}).get("from"), to_int(request.form.get("assigned_to")),
+             None, g.user["id"], now, now))
         save_uploads("ticket", tid)
+        if getattr(g, "upload_skipped", 0):
+            flash(f"{g.upload_skipped} bestand(en) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
         audit("aangemaakt", "ticket", tid, number)
         flash(f"Ticket {number} aangemaakt.", "ok")
         target = url_for("service.detail", tid=tid)
@@ -147,8 +152,11 @@ def detail(tid):
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'ticket' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 30", (tid,))
     from .kennis import calcs_for
+    import json
+    metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
+    mail = _mail_defaults(t, notes, metas)
     return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, nfiles=nfiles, files=files_for("ticket", tid),
-                           toolcalcs=calcs_for(ticket_id=tid),
+                           toolcalcs=calcs_for(ticket_id=tid), metas=metas, mail=mail, svc_box=svc_mailbox(),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
 
@@ -161,8 +169,7 @@ def edit(tid):
             flash("Vul een korte omschrijving in.", "error")
         else:
             cid, lk = _links()
-            if (_f("planned_date") or None) != (t["planned_date"] or None) or \
-                    to_int(request.form.get("assigned_to")) != t["assigned_to"]:
+            if to_int(request.form.get("assigned_to")) != t["assigned_to"]:
                 execute("UPDATE tickets SET alert_sent_at = NULL WHERE id = ?", (tid,))
             execute("UPDATE tickets SET type=?, priority=?, status=?, title=?, description=?, customer_id=?, location_id=?,"
                     " installation_id=?, project_id=?, contact_id=?, reported_by=?, assigned_to=?, planned_date=?, updated_at=?"
@@ -170,7 +177,7 @@ def edit(tid):
                     (_f("type") or t["type"], _f("priority") or "normaal", _f("status") or t["status"], _f("title"),
                      _f("description"), cid, lk["location_id"], lk["installation_id"], lk["project_id"],
                      lk["contact_id"], _f("reported_by"), to_int(request.form.get("assigned_to")),
-                     _f("planned_date"), now_iso(), tid))
+                     t["planned_date"], now_iso(), tid))
             save_uploads("ticket", tid)
             audit("gewijzigd", "ticket", tid)
             flash("Ticket opgeslagen.", "ok")
@@ -193,10 +200,12 @@ def note_save(tid, nid=None):
         n = query("SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?", (nid, tid), one=True) or abort(404)
         if n["created_by"] != g.user["id"] and not can("service", BEHEER):
             abort(403)
+        if n["kind"] != "intern":
+            abort(400)   # verstuurde of ontvangen mails worden niet bewerkt
         execute("UPDATE ticket_notes SET body = ?, updated_at = ? WHERE id = ?", (body, now, nid))
     else:
-        nid = execute("INSERT INTO ticket_notes (ticket_id, body, created_by, created_at) VALUES (?,?,?,?)",
-                      (tid, body, g.user["id"], now))
+        nid = execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at) VALUES (?,?,?,?,?)",
+                      (tid, "intern", body, g.user["id"], now))
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
         audit("notitie toegevoegd", "ticket", tid, body[:80])
     save_uploads("ticket_note", nid)
@@ -210,12 +219,12 @@ def note_save(tid, nid=None):
 @require("service", BEWERKEN)
 def note_delete(tid, nid):
     n = query("SELECT * FROM ticket_notes WHERE id = ? AND ticket_id = ?", (nid, tid), one=True) or abort(404)
-    if n["created_by"] != g.user["id"] and not can("service", BEHEER):
+    if n["created_by"] != g.user["id"] and not can("service", BEHEER) and n["kind"] != "mail_in":
         abort(403)
     for f in files_for("ticket_note", nid):
         delete_file(f["id"])
     execute("DELETE FROM ticket_notes WHERE id = ?", (nid,))
-    return redirect(url_for("service.detail", tid=tid) + "#notities")
+    return redirect(url_for("service.detail", tid=tid) + ("#klant" if n["kind"] != "intern" else "#notities"))
 
 
 @bp.route("/<int:tid>/status", methods=["POST"])
@@ -269,6 +278,264 @@ def delete(tid):
     audit("verwijderd", "ticket", tid, t["number"])
     flash(f"Ticket {t['number']} verwijderd.", "ok")
     return redirect(url_for("service.index"))
+
+
+# ---------------------------------------------------------------- mailen met de klant (zoals bij inkoopfacturen)
+
+import json as _json
+import re as _re
+import os as _os
+
+MAIL_TAG = _re.compile(r"\[WP-T(\d+)\]")
+_RE_PREFIX = _re.compile(r"^\s*((re|aw|antw|fw|fwd|wg|tr)\s*:\s*)+", _re.I)
+
+
+def svc_mailbox(conn=None):
+    """Mailbox waaruit klanten vanuit een ticket gemaild worden (Beheer > Instellingen)."""
+    from .util import get_setting as _gs
+    if conn is not None:
+        r = conn.execute("SELECT value FROM settings WHERE key = 'svc_mailbox'").fetchone()
+        v = r["value"] if r else ""
+        if not v:
+            r = conn.execute("SELECT value FROM settings WHERE key = 'cert_sender'").fetchone()
+            v = r["value"] if r else ""
+        return (v or _os.environ.get("MAIL_FROM", "")).strip().lower()
+    return ((_gs("svc_mailbox") or _gs("cert_sender") or _os.environ.get("MAIL_FROM", "")) or "").strip().lower()
+
+
+def _mail_defaults(t, notes, metas):
+    """Aan/Cc/onderwerp voor het mailformulier. Was er al mail: 'Antwoord allen' op de laatste mail."""
+    box = svc_mailbox()
+    mails = [n for n in reversed(notes) if n["kind"] in ("mail_in", "mail_uit") and n["id"] in metas]   # oud -> nieuw
+    out = {"to": t["contact_email"] or t["customer_email"] or "", "cc": "", "subject": f"Ticket {t['number']}",
+           "reply_all": False, "last": None}
+    if mails:
+        last = mails[-1]
+        m = metas[last["id"]]
+        if last["kind"] == "mail_uit":
+            to, cc = list(m.get("to") or []), list(m.get("cc") or [])
+        else:
+            to = [m.get("from")] if m.get("from") else []
+            cc = list(m.get("to") or []) + list(m.get("cc") or [])
+        seen, t2, c2 = {box}, [], []
+        for lst, o in ((to, t2), (cc, c2)):
+            for a in lst:
+                if a and a.lower() not in seen:
+                    seen.add(a.lower())
+                    o.append(a)
+        subj = _RE_PREFIX.sub("", MAIL_TAG.sub("", m.get("subject") or "").strip()) or out["subject"]
+        out.update(to=", ".join(t2) or out["to"], cc=", ".join(c2), subject="RE: " + subj, reply_all=True, last=last)
+    return out
+
+
+@bp.route("/<int:tid>/mailen", methods=["POST"])
+@require("service", BEWERKEN)
+def mail_customer(tid):
+    """Mail aan de klant vanuit het ticket. Onderwerp: het ticketnummer (met [WP-T..] zodat het antwoord hier terugkomt)."""
+    from .mail import send_mail_with_files, reply_in_thread
+    from .util import ALLOWED_EXT, IMAGE_EXT
+    t = _ticket(tid)
+    f = request.form
+    split = lambda v: [a.strip() for a in _re.split(r"[;,\s]+", v or "") if a.strip()]   # noqa: E731
+    to, cc = split(f.get("to")), split(f.get("cc"))
+    if f.get("cc_me") and g.user["email"] and g.user["email"] not in cc:
+        cc.append(g.user["email"])
+    bad = [a for a in to + cc if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
+    body = (f.get("body") or "").replace("\r\n", "\n").strip()
+    back = url_for("service.detail", tid=tid) + "#klant"
+    box = svc_mailbox()
+    if not to or bad or not body:
+        flash("Vul een geldig e-mailadres en een bericht in." + (f" Niet geldig: {', '.join(bad)}" if bad else ""), "error")
+        return redirect(back)
+    if not box:
+        flash("Er is nog geen mailbox voor service ingesteld (Beheer > Instellingen).", "error")
+        return redirect(back)
+    atts = []
+    for up in request.files.getlist("mailfiles"):
+        if up and up.filename:
+            ext = _os.path.splitext(up.filename)[1].lower()
+            if ext in ALLOWED_EXT or ext in IMAGE_EXT:
+                data = up.read()
+                if data:
+                    atts.append((safe_filename(up.filename), data, up.mimetype or "application/octet-stream"))
+    notes = query("SELECT * FROM ticket_notes WHERE ticket_id = ? AND kind IN ('mail_in', 'mail_uit') ORDER BY id", (tid,))
+    last_in = next((n for n in reversed(notes) if n["kind"] == "mail_in" and n["mail_meta"]
+                    and _json.loads(n["mail_meta"]).get("msg_id")), None)
+    signer = "werkvoorbereiding:" + (g.user["name"] or "")
+    if f.get("reply_all") and last_in:
+        lm = _json.loads(last_in["mail_meta"])
+        subject = "RE: " + _RE_PREFIX.sub("", lm.get("subject") or "").strip()
+        ok, err = reply_in_thread(box, lm["msg_id"], to, body, atts, cc=cc or None, signer=signer)
+    else:
+        subject = _RE_PREFIX.sub("", MAIL_TAG.sub("", (f.get("subject") or "").strip())).strip() or f"Ticket {t['number']}"
+        if f.get("reply_all") and notes:
+            subject = "RE: " + subject
+        subject = f"{subject} [WP-T{tid}]"
+        ok, err = send_mail_with_files(box, to, subject, body, atts, cc=cc or None, signer=signer)
+    if not ok:
+        flash(f"Mail versturen is niet gelukt: {err}", "error")
+        return redirect(back)
+    now = now_iso()
+    nid = execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
+                  (tid, "mail_uit", body[:8000], g.user["id"], now,
+                   _json.dumps({"to": to, "cc": cc, "subject": subject, "from": box, "files": [a[0] for a in atts]},
+                               ensure_ascii=False)))
+    from .util import save_bytes
+    for name, data, mime in atts:
+        save_bytes("ticket_note", nid, data, name, kind="attachment", mime=mime)
+    execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
+    audit("mail aan klant", "ticket", tid, f"{', '.join(to)}: {subject[:80]}")
+    flash(f"Mail verstuurd aan {', '.join(to)}. Het antwoord van de klant komt hier bij Notities klant.", "ok")
+    return redirect(back)
+
+
+def _dropped_mail():
+    """Eerste gesleepte/gekozen .eml-bestand uitlezen: {'subject', 'from', 'body'} of None. Het bestand zelf wordt
+    gewoon als bijlage bewaard (save_uploads); de stroom wordt teruggezet."""
+    from email import policy
+    from email.parser import BytesParser
+    for up in request.files.getlist("photos"):
+        if up and (up.filename or "").lower().endswith(".eml"):
+            raw = up.read()
+            up.stream.seek(0)
+            try:
+                msg = BytesParser(policy=policy.default).parsebytes(raw)
+                part = msg.get_body(preferencelist=("plain", "html"))
+                text = part.get_content() if part else ""
+                if part is not None and part.get_content_type() == "text/html":
+                    text = _re.sub(r"<(br|/p|/div)[^>]*>", "\n", text, flags=_re.I)
+                    text = _re.sub(r"<[^>]+>", "", text)
+                    import html as _h
+                    text = _h.unescape(text)
+                text = _re.sub(r"\n{3,}", "\n\n", text.replace("\r\n", "\n")).strip()
+                from email.utils import parseaddr
+                nm, ad = parseaddr(str(msg.get("From") or ""))
+                frm = (f"{nm} ({ad})" if nm and ad else (nm or ad or "")).strip()
+                return {"subject": _RE_PREFIX.sub("", str(msg.get("Subject") or "")).strip()[:200] or None,
+                        "from": frm[:150] or None, "body": text[:8000] or None}
+            except Exception:  # noqa: BLE001 - onleesbare mail: alleen als bijlage bewaren
+                return None
+    return None
+
+
+def _save_file_conn(conn, upload_dir, entity, eid, data, name, mime):
+    """Bestand opslaan buiten een request (planner)."""
+    import uuid
+    ext = _os.path.splitext(name)[1].lower() or ".bin"
+    sub = now_utc().strftime("%Y%m")
+    _os.makedirs(_os.path.join(upload_dir, sub), exist_ok=True)
+    rel = f"{sub}/{uuid.uuid4().hex}{ext}"
+    with open(_os.path.join(upload_dir, rel), "wb") as fh:
+        fh.write(data)
+    conn.execute("INSERT INTO files (entity, entity_id, kind, filename, stored_name, mime, size, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                 (entity, eid, "attachment", name, rel, mime, len(data), now_iso()))
+
+
+def poll_replies(conn, upload_dir):
+    """Antwoorden van klanten uit de service-mailbox ophalen: alleen mails met [WP-T..] in het onderwerp of uit dezelfde
+    mailwisseling als een ticket. Er wordt niets in de mailbox veranderd. Geeft het aantal opgeslagen antwoorden."""
+    import base64
+    import requests
+    from datetime import timedelta
+    from .crediteuren import _reply_text
+    from .mail import _graph_token
+    box = svc_mailbox(conn)
+    if not box:
+        return 0
+    row = conn.execute("SELECT value FROM settings WHERE key = 'svc_since'").fetchone()
+    since = (row["value"] if row else "") or (now_utc() - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    headers = {"Authorization": f"Bearer {_graph_token()}"}
+    url = (f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/inbox/messages?$filter=receivedDateTime ge {since}"
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId&$orderby=receivedDateTime asc&$top=50")
+    n, newest, pages = 0, since, 0
+    while url and pages < 10:
+        pages += 1
+        r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Service-mailbox {box} lezen mislukt ({r.status_code})")
+        js = r.json()
+        for m in js.get("value", []):
+            newest = max(newest, m.get("receivedDateTime") or newest)
+            mid = m["id"]
+            if conn.execute("SELECT 1 FROM ticket_notes WHERE kind = 'mail_in' AND mail_meta LIKE ?", (f'%"{mid}"%',)).fetchone():
+                continue
+            tag = MAIL_TAG.search(m.get("subject") or "")
+            tid = int(tag.group(1)) if tag else None
+            if tid and not conn.execute("SELECT 1 FROM tickets WHERE id = ?", (tid,)).fetchone():
+                tid = None
+            if not tid and m.get("conversationId"):
+                hit = conn.execute("SELECT id FROM tickets WHERE mail_conv = ? ORDER BY id DESC LIMIT 1", (m["conversationId"],)).fetchone()
+                tid = hit["id"] if hit else None
+            if not tid:
+                continue
+            frm = (m.get("from") or {}).get("emailAddress") or {}
+            if (frm.get("address") or "").lower() == box:
+                continue   # eigen verzonden mail
+            rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
+                              headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
+            js2 = rb.json() if rb.status_code < 400 else {}
+            body = _reply_text((js2.get("uniqueBody") or {}).get("content") or (js2.get("body") or {}).get("content") or "")
+            rc = lambda k: [((x.get("emailAddress") or {}).get("address") or "").lower() for x in (js2.get(k) or [])]   # noqa: E731
+            names = []
+            cur = conn.execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_at, mail_meta) VALUES (?,?,?,?,?)",
+                               (tid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()),
+                                _json.dumps({"from": (frm.get("address") or "").lower(), "from_name": frm.get("name") or "",
+                                             "subject": m.get("subject") or "", "msg_id": mid, "to": [a for a in rc("toRecipients") if a],
+                                             "cc": [a for a in rc("ccRecipients") if a]}, ensure_ascii=False)))
+            nid = cur.lastrowid
+            if m.get("hasAttachments"):
+                ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
+                for a in (ar.json().get("value", []) if ar.status_code < 400 else []):
+                    if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
+                        continue
+                    data = base64.b64decode(a.get("contentBytes") or "")
+                    if data:
+                        nm = safe_filename(a.get("name") or "bijlage")
+                        _save_file_conn(conn, upload_dir, "ticket_note", nid, data, nm, a.get("contentType") or "application/octet-stream")
+                        names.append(nm)
+                if names:
+                    meta = _json.loads(conn.execute("SELECT mail_meta FROM ticket_notes WHERE id = ?", (nid,)).fetchone()["mail_meta"])
+                    meta["files"] = names
+                    conn.execute("UPDATE ticket_notes SET mail_meta = ? WHERE id = ?", (_json.dumps(meta, ensure_ascii=False), nid))
+            conn.execute("UPDATE tickets SET mail_conv = COALESCE(mail_conv, ?), updated_at = ? WHERE id = ?",
+                         (m.get("conversationId"), now_iso(), tid))
+            t = conn.execute("SELECT number, assigned_to FROM tickets WHERE id = ?", (tid,)).fetchone()
+            who = frm.get("name") or frm.get("address") or "klant"
+            conn.execute("INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?,?,?,?,?,?)",
+                         (None, "reactie klant per mail", "ticket", tid, who, now_iso()))
+            conn.commit()
+            n += 1
+            try:
+                from .notify import notify_user
+                last = conn.execute("SELECT created_by FROM ticket_notes WHERE ticket_id = ? AND kind = 'mail_uit' AND created_by IS NOT NULL"
+                                    " ORDER BY id DESC LIMIT 1", (tid,)).fetchone()
+                for uid in {x for x in (t["assigned_to"], last["created_by"] if last else None) if x}:
+                    notify_user(conn, uid, f"Reactie op ticket {t['number']}", f"{who}: " + (body[:140] or "(bijlage)"),
+                                url=f"/service/{tid}#klant", email=False)
+            except Exception as exc:  # pragma: no cover
+                print(f"[WorkPortal] Melding reactie ticket mislukt: {exc}", flush=True)
+        url = js.get("@odata.nextLink")
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_since', ?)", (newest,))
+    conn.commit()
+    return n
+
+
+def scheduled_poll(conn, app, state):
+    """Vanuit de planner: elke 5 minuten de service-mailbox op antwoorden van klanten controleren."""
+    from .mail import graph_configured
+    r = conn.execute("SELECT value FROM settings WHERE key = 'svc_mail_on'").fetchone()
+    if not r or r["value"] != "1" or not graph_configured():
+        return
+    t = now_utc().timestamp()
+    if t - state.get("svc_poll", 0) < 300:
+        return
+    state["svc_poll"] = t
+    try:
+        poll_replies(conn, app.config["UPLOAD_DIR"])
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', '')")
+    except Exception as exc:  # noqa: BLE001
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', ?)", (str(exc)[:300],))
+    conn.commit()
 
 
 # ---------------------------------------------------------------- bezoeken

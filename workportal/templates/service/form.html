@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import opt %}
+{% from "partials/icons.html" import icon %}
 {% block title %}{{ 'Ticket bewerken' if edit else 'Nieuw ticket' }}{% endblock %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a>{% if edit %} / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a>{% endif %}</div>
@@ -18,12 +19,17 @@
     <label class="f">Gemeld door<input type="text" name="reported_by" value="{{ t.reported_by or '' }}"></label>
     <label class="f">Prioriteit<select name="priority">{% for k, l in PRIOS %}{{ opt(k, l, t.priority or 'normaal') }}{% endfor %}</select></label>
     <label class="f">Toegewezen aan<select name="assigned_to" data-combo><option value="">–</option>{% for u in users %}{{ opt(u.id, u.name, t.assigned_to) }}{% endfor %}</select></label>
-    <label class="f">Geplande datum<input type="date" name="planned_date" value="{{ t.planned_date or '' }}"></label>
     {% if edit %}<label class="f">Status<select name="status">{% for k, l in STATUSES %}{{ opt(k, l, t.status) }}{% endfor %}</select></label>{% endif %}
     <label class="f full">Melding / toelichting<textarea name="description" rows="4">{{ t.description or '' }}</textarea></label>
-    <label class="f full">Foto's of bijlagen<input type="file" name="photos" multiple accept="image/*,.pdf" data-preview="prev"></label>
+    <div class="f full"><span>Foto's, bestanden of een mail</span>
+      <label class="tdrop" data-tdrop>
+        <input type="file" name="photos" multiple accept="image/*,.pdf,.eml,.msg,.docx,.doc,.xlsx,.xls,.xlsm,.txt,.csv,.zip,.dwg,.dxf,.step,.stp,.rtf,.odt">
+        <span class="tdrop-ic">{{ icon('upload') }}</span>
+        <span><b>Sleep foto's, bestanden of een mail hierheen</b><small>of klik om te kiezen · een mail (.eml) vult de omschrijving en melder vanzelf in als die nog leeg zijn</small></span>
+      </label>
+      <ul class="tdrop-list" hidden></ul>
+    </div>
   </div>
-  <div class="photos" id="prev"></div>
   <div class="actions"><button class="btn primary">Opslaan</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) if edit else url_for('service.index') }}">Annuleren</a></div>
 </form>
 {% endblock %}

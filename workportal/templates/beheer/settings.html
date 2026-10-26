@@ -22,6 +22,14 @@
     <p class="hint" style="margin-top:0">Wat uit staat, is op een telefoon niet te zien en niet te openen. Op pc en tablet blijft alles zoals de rechten het toestaan.</p>
     <input type="hidden" name="mobile_form" value="1">
     <div class="chips">{% for key, label in phone_modules %}<label class="chip"><input type="checkbox" name="mobile_on" value="{{ key }}" {{ 'checked' if key not in mobile_off }}><span>{{ label.replace(' (gebruikers & rechten)', '').replace(' (gebruiken)', '') }}</span></label>{% endfor %}</div>
+    <h3 style="margin-top:14px">Service: mailen met klanten vanuit een ticket</h3>
+    <input type="hidden" name="svc_form" value="1">
+    <div class="fgrid">
+      <label class="f">Mailbox voor service-mails<input type="email" name="svc_mailbox" value="{{ svc.box }}" placeholder="{{ svc.default or 'service@devreugd-pt.nl' }}">
+        <span class="hint">Leeg = {{ svc.default or 'de standaard afzender' }}. De mailbox moet in de toegestane groep van de Microsoft-koppeling staan.</span></label>
+      <label class="check full"><input type="checkbox" name="svc_mail_on" value="1" {{ 'checked' if svc.on }}> Antwoorden van klanten elke 5 minuten uit deze mailbox ophalen (alleen mails met het ticketnummer; er wordt niets in de mailbox veranderd)</label>
+    </div>
+    {% if svc.error %}<p class="small" style="color:var(--bad);margin:0">Laatste keer ophalen mislukt: {{ svc.error }}</p>{% endif %}
     <h3 style="margin-top:14px">Inkoopfacturen uit de mailbox</h3>
     <p class="hint" style="margin-top:0">WorkPortal leest elke 5 minuten de PDF-bijlagen uit deze mailbox en maakt er factuurkaarten van. Alleen als de boekhouding het bevestigt, wordt de mail van een afgeronde factuur naar de map hieronder verplaatst.</p>
     <input type="hidden" name="cred_form" value="1">

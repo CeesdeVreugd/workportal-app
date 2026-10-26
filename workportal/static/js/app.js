@@ -261,7 +261,7 @@
 
   // Bestandskiezer altijd in het Nederlands (de standaardknop volgt de taal van de browser)
   document.querySelectorAll('input[type="file"]').forEach(function (inp) {
-    if (inp.hidden || inp.closest(".addphoto")) return;
+    if (inp.hidden || inp.closest(".addphoto") || inp.closest("[data-tdrop]")) return;
     var wrapEl = document.createElement("span"); wrapEl.className = "filepick";
     var b = document.createElement("span"); b.className = "btn sm"; b.textContent = inp.multiple ? "Bestanden kiezen" : "Bestand kiezen";
     var n = document.createElement("span"); n.className = "fp-name muted small"; n.textContent = "Geen bestand gekozen";
@@ -901,5 +901,50 @@
     var href = b.getAttribute("data-cancel-href");
     if (href) { location.href = href; return; }
     var d = b.closest("details"); if (d) d.open = false;
+  });
+})();
+
+/* Sleepvak bij een ticket (foto's, bestanden, mails): bestanden verzamelen in het invoerveld, met lijstje en verwijderknop.
+   Een .eml vult het onderwerp in als de korte omschrijving nog leeg is. */
+(function () {
+  document.querySelectorAll("[data-tdrop]").forEach(function (zone) {
+    var inp = zone.querySelector("input[type=file]"), list = zone.parentNode.querySelector(".tdrop-list");
+    var canDT = (function () { try { return !!new DataTransfer(); } catch (e) { return false; } })();
+    var files = [];
+    function sync() {
+      if (canDT) { var dt = new DataTransfer(); files.forEach(function (f) { dt.items.add(f); }); inp.files = dt.files; }
+      list.innerHTML = ""; list.hidden = !files.length;
+      files.forEach(function (f, i) {
+        var li = document.createElement("li");
+        var isImg = /^image\//.test(f.type);
+        if (isImg) { var im = document.createElement("img"); im.src = URL.createObjectURL(f); im.alt = ""; li.appendChild(im); }
+        else { var ic = document.createElement("span"); ic.className = "tdrop-ext"; ic.textContent = (f.name.split(".").pop() || "").toUpperCase().slice(0, 4); li.appendChild(ic); }
+        var nm = document.createElement("span"); nm.className = "tdrop-name"; nm.textContent = f.name; li.appendChild(nm);
+        var x = document.createElement("button"); x.type = "button"; x.className = "linkbtn"; x.setAttribute("aria-label", "Weghalen"); x.textContent = "×";
+        x.addEventListener("click", function () { files.splice(i, 1); sync(); });
+        li.appendChild(x); list.appendChild(li);
+      });
+      var title = zone.form && zone.form.elements.title;
+      var mail = files.filter(function (f) { return /\.eml$/i.test(f.name); })[0];
+      if (title) {
+        if (mail) title.removeAttribute("required"); else title.setAttribute("required", "");
+        if (mail && !title.value && mail.text) {
+          mail.text().then(function (t) {
+            var m = t.slice(0, 20000).match(/^Subject:\s*(.*(?:\r?\n[ \t].*)*)/mi);
+            if (m && !title.value && !/=\?/.test(m[1])) title.value = m[1].replace(/\r?\n[ \t]+/g, " ").replace(/^\s*((re|fw|fwd|wg|aw)\s*:\s*)+/i, "").trim().slice(0, 200);
+          }).catch(function () {});
+        }
+      }
+    }
+    function add(list2) { for (var i = 0; i < list2.length; i++) files.push(list2[i]); sync(); }
+    inp.addEventListener("change", function () { var picked = Array.prototype.slice.call(inp.files); if (canDT) add(picked); else { files = picked; sync(); } });
+    ["dragenter", "dragover"].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (ev) { zone.addEventListener(ev, function () { zone.classList.remove("over"); }); });
+    zone.addEventListener("drop", function (e) {
+      e.preventDefault();
+      var dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length) { add(dt.files); return; }
+      alert("Dit kon niet worden toegevoegd. Een mail uit Outlook: sleep hem eerst naar het bureaublad (of 'Opslaan als') en sleep dat bestand hierheen.");
+    });
   });
 })();

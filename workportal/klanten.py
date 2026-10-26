@@ -160,9 +160,11 @@ def add_location(cid):
     elif lid:
         execute("UPDATE locations SET name=?, address=?, postcode=?, city=? WHERE id=? AND customer_id=?",
                 (_f("name"), _f("address"), _f("postcode"), _f("city"), lid, cid))
+        flash("Locatie opgeslagen.", "ok")
     else:
         execute("INSERT INTO locations (customer_id, name, address, postcode, city) VALUES (?,?,?,?,?)",
                 (cid, _f("name"), _f("address"), _f("postcode"), _f("city")))
+        flash("Locatie toegevoegd.", "ok")
     return redirect(url_for("klanten.customer", cid=cid) + "#locaties")
 
 
@@ -176,9 +178,11 @@ def add_contact(cid):
     elif ctid:
         execute("UPDATE contacts SET name=?, function=?, phone=?, email=?, location_id=? WHERE id=? AND customer_id=?",
                 (_f("name"), _f("function"), _f("phone"), _f("email"), loc, ctid, cid))
+        flash("Contactpersoon opgeslagen.", "ok")
     else:
         execute("INSERT INTO contacts (customer_id, location_id, name, function, phone, email) VALUES (?,?,?,?,?,?)",
                 (cid, loc, _f("name"), _f("function"), _f("phone"), _f("email")))
+        flash("Contactpersoon toegevoegd.", "ok")
     return redirect(url_for("klanten.customer", cid=cid) + "#contacten")
 
 
@@ -199,6 +203,7 @@ def add_installation(cid):
     else:
         iid = execute("INSERT INTO installations (name, serial, year, location_id, project_id, service_interval_months,"
                       " next_service, notes, alert, bring, customer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)", vals + (cid,))
+        flash("Installatie toegevoegd.", "ok")
     if iid:
         save_uploads("installation", iid, field="files")
     if request.form.get("back") == "installatie" and iid:

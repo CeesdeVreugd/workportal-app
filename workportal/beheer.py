@@ -142,6 +142,9 @@ def settings():
         if request.form.get("mobile_form") == "1":
             on = set(request.form.getlist("mobile_on"))
             set_setting("mobile_off", json.dumps([m for m in PHONE_MODULES if m not in on]))
+        if request.form.get("svc_form") == "1":
+            set_setting("svc_mailbox", (request.form.get("svc_mailbox") or "").strip().lower())
+            set_setting("svc_mail_on", "1" if request.form.get("svc_mail_on") else "0")
         if request.form.get("cred_form") == "1":
             set_setting("cred_mail_on", "1" if request.form.get("cred_mail_on") else "0")
             set_setting("cred_mailbox", (request.form.get("cred_mailbox") or "").strip().lower() or "factuur@devreugd-pt.nl")
@@ -167,6 +170,8 @@ def settings():
     }
     from .util import mobile_off
     from .crediteuren import mail_configured
+    svc = {"box": get_setting("svc_mailbox") or "", "on": get_setting("svc_mail_on") == "1",
+           "error": get_setting("svc_last_error") or "", "default": get_setting("cert_sender") or os.environ.get("MAIL_FROM", "")}
     cred = {"on": get_setting("cred_mail_on") == "1", "box": get_setting("cred_mailbox") or "factuur@devreugd-pt.nl",
             "since": (get_setting("cred_since") or "")[:10], "last": get_setting("cred_last_poll"),
             "error": get_setting("cred_last_error"), "graph": mail_configured(),
@@ -184,7 +189,7 @@ def settings():
             cred["roles"] = []
     cred["staff"] = query("SELECT u.id, u.name, GROUP_CONCAT(r.name, ', ') AS roles FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id"
                           " LEFT JOIN roles r ON r.id = ur.role_id WHERE u.active = 1 GROUP BY u.id ORDER BY u.name")
-    return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(), cred=cred,
+    return render_template("beheer/settings.html", v=values, status=status, mobile_off=mobile_off(), cred=cred, svc=svc,
                            phone_modules=[(k, dict(MODULES)[k]) for k in PHONE_MODULES])
 
 

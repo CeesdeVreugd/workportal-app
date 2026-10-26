@@ -831,3 +831,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V156 (2.3.0)
 - Inkoopfacturen: een opmerking voor de boekhouding die op **afgehandeld** staat, telt niet meer mee. De factuur verdwijnt dan uit het filter "Voor de boekhouding" (en de teller), en het paarse label "boekhouding" in de lijst gaat weg. Weer openzetten brengt hem terug. Afhandelen/openzetten komt in het logboek.
+
+## V157 (2.4.0) – ticketbeheer
+- Relaties: een nieuwe machine/installatie (en locatie, contactpersoon) toevoegen geeft nu een bevestiging, waardoor het formulier niet meer als "concept" blijft staan.
+- Nieuw ticket: geen geplande datum meer (plannen gebeurt bij de bezoeken); ook bij Bewerken weg. Een bestaande plandatum blijft bewaard en wordt alleen nog getoond als hij er is.
+- Nieuw ticket: sleepvak voor foto's, bestanden en mails (.eml/.msg). Een gesleepte .eml vult de korte omschrijving (onderwerp), "Gemeld door" (afzender) en de toelichting (tekst) in als die nog leeg zijn; de mail zelf wordt als bijlage bewaard.
+- Ticket: twee blokken – **Notities intern** en **Notities klant**. Bij Notities klant mail je de klant vanuit het ticket (knop "Mail klant"; daarna "Antwoord allen" op de laatste mail), met bijlagen en "kopie naar mij". Onderwerp = het ticketnummer met [WP-T..], zodat het antwoord van de klant vanzelf (met bijlagen) bij het ticket komt; de toegewezen monteur en de verzender krijgen een melding.
+- Beheer > Instellingen: mailbox voor service-mails (standaard de werkvoorbereiding-afzender) en "antwoorden van klanten ophalen" (elke 5 minuten; alleen mails met het ticketnummer, er wordt niets in de mailbox veranderd). De mailbox moet in de toegestane groep van de Microsoft-koppeling staan (Mail.Send + Mail.Read).
+- Database-migratie 32: ticket_notes.kind/mail_meta, tickets.mail_conv.
