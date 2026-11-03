@@ -1634,9 +1634,10 @@ def mail_supplier(iid):
 DONE_FOLDER = "01-Verwerkt"
 
 
-def archive_mails(conn, iid, box, folder):
+def archive_mails(conn, iid, box, folder, back=False):
     """Afgeronde factuur: de factuurmail met alle mails uit dezelfde mailwisseling(en) (ook reacties en onze verzonden mails)
     naar de map 'folder' in de factuurmailbox. Bewaarde bericht-id's worden bijgewerkt (verplaatsen geeft een nieuw id).
+    back=True: per ongeluk afgerond en teruggezet -> de mails uit 'folder' weer naar Postvak IN.
     Geeft (aantal, foutmelding of None)."""
     import json
     from .mail import graph_configured, graph_message, graph_folder_id, graph_conversation, graph_move, graph_wellknown_id, GraphError
@@ -1644,13 +1645,14 @@ def archive_mails(conn, iid, box, folder):
     if not r:
         return 0, None
     if not graph_configured():
-        print(f"[WorkPortal] MAILS VERPLAATSEN (Microsoft-koppeling niet ingesteld): factuur {iid} -> map '{folder}'", flush=True)
-        log(conn, iid, f"Mails verplaatst naar map '{folder}' (testmodus, geen Microsoft-koppeling)")
-        conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
+        print(f"[WorkPortal] MAILS {'TERUGZETTEN' if back else 'VERPLAATSEN'} (Microsoft-koppeling niet ingesteld): factuur {iid}"
+              f" {'uit' if back else 'naar'} map '{folder}'", flush=True)
+        log(conn, iid, f"Mails teruggezet uit map '{folder}' naar Postvak IN (testmodus)" if back
+            else f"Mails verplaatst naar map '{folder}' (testmodus, geen Microsoft-koppeling)")
+        conn.execute("UPDATE invoices SET mail_archive = ? WHERE id = ?", (None if back else "verplaatst", iid))
         conn.commit()
         return 0, None
-    # doorgestuurd door een collega: niet op die doorgestuurde mail antwoorden (dan krijgt de collega hem), maar een nieuwe mail
-    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" and not r["mail_fwd_by"] else ""
+    orig = (r["mail_id"] or "").split(":")[0] if r["source"] == "mail" else ""
     notes = conn.execute("SELECT id, mail_meta FROM invoice_notes WHERE invoice_id = ? AND kind = 'mail_in' AND mail_meta IS NOT NULL",
                          (iid,)).fetchall()
     try:
@@ -1667,6 +1669,7 @@ def archive_mails(conn, iid, box, folder):
             return 0, None
         fid = graph_folder_id(box, folder)
         skip = {fid} | {x for x in (graph_wellknown_id(box, "deleteditems"), graph_wellknown_id(box, "drafts")) if x}
+        inbox = graph_wellknown_id(box, "inbox") if back else None
         msgs = {}
         for c in convs:
             for m in graph_conversation(box, c):
@@ -1675,10 +1678,13 @@ def archive_mails(conn, iid, box, folder):
             msgs.setdefault(mid, None)
         moved, newid = 0, {}
         for mid, parent in msgs.items():
-            if parent in skip:   # al in de map, of in Verwijderde items / Concepten: laten staan
+            if back:
+                if parent != fid or not inbox:   # alleen wat in de Verwerkt-map staat terug naar Postvak IN
+                    continue
+            elif parent in skip:   # al in de map, of in Verwijderde items / Concepten: laten staan
                 continue
             try:
-                nid = graph_move(box, mid, fid)
+                nid = graph_move(box, mid, inbox if back else fid)
             except GraphError as e:
                 if e.status == 404:   # al verplaatst of verwijderd
                     continue
@@ -1694,17 +1700,23 @@ def archive_mails(conn, iid, box, folder):
             if m.get("msg_id") in newid:
                 m["msg_id"] = newid[m["msg_id"]]
                 conn.execute("UPDATE invoice_notes SET mail_meta = ? WHERE id = ?", (json.dumps(m, ensure_ascii=False), n["id"]))
-        log(conn, iid, f"Mail{'s' if moved != 1 else ''} verplaatst naar map '{folder}' ({moved})" if moved
-            else f"Mail stond al in map '{folder}'")
-        conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
+        if back:
+            log(conn, iid, f"Mail{'s' if moved != 1 else ''} teruggezet uit map '{folder}' naar Postvak IN ({moved})" if moved
+                else f"Geen mails meer in map '{folder}'")
+            conn.execute("UPDATE invoices SET mail_archive = NULL WHERE id = ?", (iid,))
+        else:
+            log(conn, iid, f"Mail{'s' if moved != 1 else ''} verplaatst naar map '{folder}' ({moved})" if moved
+                else f"Mail stond al in map '{folder}'")
+            conn.execute("UPDATE invoices SET mail_archive = 'verplaatst' WHERE id = ?", (iid,))
         conn.commit()
         return moved, None
     except GraphError as e:
         err = (f"recht Mail.ReadWrite ontbreekt in de Microsoft-koppeling" if e.status == 403 else str(e))
     except Exception as e:  # pragma: no cover - netwerk
         err = str(e)[:300]
-    log(conn, iid, f"Mails niet verplaatst naar '{folder}': {err}")
-    conn.execute("UPDATE invoices SET mail_archive = 'mislukt' WHERE id = ?", (iid,))
+    log(conn, iid, (f"Mails niet teruggezet uit '{folder}': " if back else f"Mails niet verplaatst naar '{folder}': ") + err)
+    if not back:
+        conn.execute("UPDATE invoices SET mail_archive = 'mislukt' WHERE id = ?", (iid,))
     conn.commit()
     return 0, err
 
@@ -1926,6 +1938,8 @@ def _bg(iid, *jobs):
                             apply_categories(conn, iid, box)
                         elif job == "verplaatsen":
                             archive_mails(conn, iid, box, _archive_folder(conn))
+                        elif job == "terugzetten":
+                            archive_mails(conn, iid, box, _archive_folder(conn), back=True)
                     except Exception as exc:  # pragma: no cover
                         print(f"[WorkPortal] {job} mislukt (factuur {iid}): {exc}", flush=True)
             finally:
@@ -2033,6 +2047,15 @@ def set_status(iid):
     conn.commit()
     if new == "snelstart" and r["status"] != "snelstart":
         _ask_archive(conn, iid, uid)
+    elif r["status"] == "snelstart" and new != "snelstart":
+        # per ongeluk afgerond en teruggezet: mails weer uit 'Verwerkt' naar Postvak IN, opnieuw afronden later
+        if r["source"] == "mail" and r["mail_archive"] in ("verplaatst", "bezig"):
+            conn.execute("UPDATE invoices SET mail_archive = 'terug' WHERE id = ?", (iid,))
+            conn.commit()
+            _bg(iid, "categorie", "terugzetten")
+        else:
+            conn.execute("UPDATE invoices SET mail_archive = NULL WHERE id = ?", (iid,))
+            conn.commit()
 
     # na het wijzigen een venster: door naar de volgende factuur of op deze kaart blijven
     lane = "komdex" if act in ("erp", "buiten") else ("snelstart" if act == "snelstart" else "")

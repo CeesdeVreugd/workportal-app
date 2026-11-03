@@ -19,7 +19,7 @@ def _f(name):
 
 
 CUSTOMER_FIELDS = ["name", "short_name", "debtor_no", "relation_type", "relation_group", "address", "postcode",
-                   "city", "phone", "email", "website", "notes", "alert"]
+                   "city", "phone", "email", "website", "notes", "alert", "language"]
 
 
 def customer_options(include_id=None):
@@ -75,6 +75,9 @@ def _customer_values():
     vals = {f: _f(f) for f in CUSTOMER_FIELDS}
     if vals["relation_type"] not in TYPE_LABELS:
         vals["relation_type"] = None
+    from .talen import LANG_LABELS
+    if vals["language"] not in LANG_LABELS:
+        vals["language"] = "nl"
     return vals
 
 

@@ -18,6 +18,7 @@
     <button type="button" class="btn ghost sm" data-clear="sig">Wissen</button></div>
   <label class="check"><input type="checkbox" name="mail" value="1" {{ 'checked' if mail_to }}> Werkbon mailen naar</label>
   <input type="email" name="mail_to" value="{{ mail_to }}" placeholder="e-mailadres klant">
+  {% if t.customer_language and t.customer_language != 'nl' %}<span class="hint">Werkbon en mail gaan in het {{ LANG_LABELS.get(t.customer_language, t.customer_language) }} (taal van de relatie).</span>{% endif %}
   {% if sharepoint %}<label class="check"><input type="checkbox" name="sharepoint" value="1" checked> Werkbon in SharePoint (projectmap) plaatsen</label>{% endif %}
   <label class="check"><input type="checkbox" name="close" value="1"> Ticket afronden</label>
   <div class="actions"><button class="btn primary">Ondertekenen &amp; afronden</button></div>

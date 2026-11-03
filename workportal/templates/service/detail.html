@@ -59,8 +59,10 @@
       {% for k, l in STATUSES %}<button class="btn sm {{ 'primary' if t.status == k }}" name="status" value="{{ k }}">{{ l }}</button>{% endfor %}
     </form>
     {% else %}<p>{{ ticket_status(t.status) }}</p>{% endif %}
-    <h3 style="margin-top:20px">Foto's &amp; bijlagen</h3>
-    {% call photos(files) %}
+    <h3 style="margin-top:20px" id="bijlagen">Foto's &amp; bijlagen ticket</h3>
+    {% set mv = [] %}{% for v in visits %}{% set _ = mv.append((v.id, 'Bezoek ' ~ (v.date|date) ~ (' (afgetekend)' if v.signed_at or v.closed_at else ''))) %}{% endfor %}
+    {% if edit %}{% set call_args = {'del_route': 'service.file_delete', 'del_args': {'tid': t.id}, 'moves': mv, 'move_route': 'service.file_to_visit'} %}{% else %}{% set call_args = {} %}{% endif %}
+    {% call photos(files, **call_args) %}
       {% if edit %}<form method="post" action="{{ url_for('service.add_photos', tid=t.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" multiple data-autosubmit></label></form>{% endif %}
     {% endcall %}
   </section>
@@ -101,6 +103,11 @@
 
 <section class="card" id="klant">
   <div class="card-head"><h2>Notities klant ({{ knotes|length }})</h2><span class="small muted">mail met de klant · {{ svc_box or 'geen mailbox ingesteld' }}</span></div>
+  {% if edit and svc_box %}<div class="svcstate small {{ 'bad' if svc_state.error or not svc_state.on }}">
+    {% if svc_state.error %}Antwoorden ophalen mislukt: {{ svc_state.error }}
+    {% elif not svc_state.on %}Antwoorden van klanten worden niet automatisch opgehaald (Beheer &gt; Instellingen).
+    {% else %}Antwoorden worden elke 5 minuten opgehaald{% if svc_state.last %} · laatst {{ svc_state.last|dt }}{% endif %}.{% endif %}
+    <form method="post" action="{{ url_for('service.mail_fetch', tid=t.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('refresh') }}Nu ophalen</button></form></div>{% endif %}
   <div class="notes">
   {% for n in knotes|reverse %}{% set mm = metas.get(n.id) or {} %}
     <article class="note {{ 'note-in' if n.kind == 'mail_in' else 'note-out' }}" id="notitie{{ n.id }}">
@@ -156,6 +163,7 @@
       {% if v.signed_at or v.closed_at or v.sent_at %}<div class="vbadges">
         {% if v.signed_at %}<span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% elif v.closed_at %}<span class="badge b-ok" title="{{ v.closed_note or '' }}">Afgerond zonder handtekening</span>{% endif %}
         {% if v.sent_at %}<span class="badge b-blue" title="{{ v.sent_to }}">{{ icon('mail') }}Verstuurd {{ v.sent_at|dt }}</span>{% endif %}
+        {% if v.amended_at %}<span class="badge b-warn">Aangevuld {{ v.amended_at|dt }}</span>{% endif %}
         {% if v.signed_at and v.sharepoint_status %}<span class="badge">{{ v.sharepoint_status }}</span>{% endif %}
       </div>{% endif %}
       <div class="vbar">
@@ -164,7 +172,8 @@
         <a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}">{{ icon('edit') }}Bewerken</a>
         {% endif %}
         <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
-        {% if edit and (v.signed_at or v.closed_at) %}<a class="btn sm" href="{{ url_for('service.visit_send', tid=t.id, vid=v.id) }}">{{ icon('mail') }}Versturen</a>{% endif %}
+        {% if edit and (v.signed_at or v.closed_at) %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}" title="Foto's toevoegen of gegevens aanvullen">{{ icon('edit') }}Aanvullen</a>
+        <a class="btn sm" href="{{ url_for('service.visit_send', tid=t.id, vid=v.id) }}">{{ icon('mail') }}Versturen</a>{% endif %}
         {% if edit and (not v.signed_at or can('service', 3)) %}<form class="vdel" method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=v.id) }}" data-confirm="{{ 'Dit bezoek is ondertekend door ' ~ v.signed_name ~ '. Toch verwijderen, met werkbon en foto\'s?' if v.signed_at else 'Bezoek van ' ~ (v.date|date) ~ ' met foto\'s verwijderen?' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Bezoek verwijderen" title="Bezoek verwijderen">{{ icon('trash') }}</button></form>{% endif %}
         {% if not v.signed_at and not v.closed_at and edit %}
         <details class="cred-pop vclose"><summary class="btn sm ghost">Afronden zonder handtekening</summary>
@@ -179,7 +188,10 @@
       {% if v.findings %}<div><b class="small muted">Bevindingen</b><div class="prose">{{ v.findings }}</div></div>{% endif %}
       {% if v.work_done %}<div><b class="small muted">Uitgevoerd</b><div class="prose">{{ v.work_done }}</div></div>{% endif %}
       {% if v.materials %}<div><b class="small muted">Materialen</b><div class="prose">{{ v.materials }}</div></div>{% endif %}
-      {% set vf = vfiles[v.id]|rejectattr('kind','equalto','signature')|list %}{% if vf %}<div style="width:100%">{{ photos(vf) }}</div>{% endif %}
+      {% set vf = vfiles[v.id]|rejectattr('kind','equalto','signature')|list %}{% if vf %}
+      {% set vdel = edit and (not (v.signed_at or v.closed_at) or can('service', 3)) %}
+      <details class="vfiles" style="width:100%"><summary>{{ icon('image') }} Foto's &amp; bijlagen van dit bezoek ({{ vf|length }}) – staan op de werkbon</summary>
+        {% if vdel %}{{ photos(vf, del_route='service.file_delete', del_args={'tid': t.id}) }}{% else %}{{ photos(vf) }}{% endif %}</details>{% endif %}
     </div>
   {% else %}<div class="empty">Nog geen bezoeken vastgelegd.</div>{% endfor %}
   </div>

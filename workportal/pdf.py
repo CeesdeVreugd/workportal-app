@@ -43,7 +43,7 @@ def esc(s):
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>"))
 
 
-def _doc(buf, title, doc_no):
+def _doc(buf, title, doc_no, page_word="Pagina"):
     doc = BaseDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=30 * mm,
                           bottomMargin=18 * mm, title=title, author="De Vreugd Productietechniek")
     # geen zijmarge in het frame: tekst en tabellen beginnen allemaal precies op de linkermarge (lijn met het logo)
@@ -70,7 +70,7 @@ def _doc(buf, title, doc_no):
             canvas.drawImage(payoff, 18 * mm, 7.6 * mm, width=48 * mm, height=48 * mm * 191 / 3174, mask="auto")
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
-        canvas.drawRightString(w - 18 * mm, 9 * mm, f"Pagina {d.page}")
+        canvas.drawRightString(w - 18 * mm, 9 * mm, f"{page_word} {d.page}")
         canvas.restoreState()
 
     doc.addPageTemplates([PageTemplate(id="p", frames=[frame], onPage=deco)])
@@ -238,6 +238,10 @@ def pressure_test_pdf(t, project, readings, reading_photos, general_photos, sign
         img = _img(signature_path, 70 * mm, 28 * mm)
         if img:
             sig.append(img)
+    if visit.get("amended_at") and (visit.get("signed_at") or visit.get("closed_at")):
+        sig.append(Paragraph(f"<i>Aangevuld na het {'aftekenen' if visit.get('signed_at') else 'afronden'} op "
+                             f"{fmt_dt(visit.get('amended_at'))}"
+                             + (f" door {esc(visit.get('amended_name'))}" if visit.get("amended_name") else "") + ".</i>", S["body"]))
     story.append(KeepTogether(sig))
     doc.build(story)
     return buf.getvalue()
@@ -245,40 +249,48 @@ def pressure_test_pdf(t, project, readings, reading_photos, general_photos, sign
 
 # ---------------------------------------------------------------- werkbon
 
-def visit_pdf(ticket, visit, photos, signature_path):
+def visit_pdf(ticket, visit, photos, signature_path, lang="nl"):
+    from .talen import tr
+    L = tr(lang)
     buf = io.BytesIO()
-    doc = _doc(buf, "Werkbon", ticket["number"])
+    doc = _doc(buf, L["doc"], ticket["number"], {"nl": "Pagina", "en": "Page", "de": "Seite", "fr": "Page"}.get(lang, "Pagina"))
     W = doc.width
-    story = [Paragraph("WERKBON SERVICE & ONDERHOUD", S["eyebrow"]),
+    story = [Paragraph(L["eyebrow"], S["eyebrow"]),
              Paragraph(esc(ticket["title"]), S["h1"])]
+    ttype = ticket.get("type") or ""
     pairs = [
-        ("Ticket", ticket["number"]), ("Type", {"onderhoud": "Service & onderhoud"}.get(ticket.get("type") or "", (ticket.get("type") or "").capitalize())),
-        ("Klant", ticket.get("customer") or "–"), ("Locatie", ticket.get("location") or "–"),
-        ("Installatie", ticket.get("installation") or "–"), ("Serienummer", ticket.get("serial") or "–"),
-        ("Datum bezoek", fmt_date(visit["date"])), ("Monteur(s)", visit.get("technicians") or "–"),
-        ("Gewerkte uren", fmt_num(visit.get("hours"), 2)), ("Reistijd (uur)", fmt_num(visit.get("travel_hours"), 2)),
-        ("Kilometers", fmt_num(visit.get("km"), 0)), ("Project", ticket.get("project_no") or "–"),
+        (L["ticket"], ticket["number"]), (L["type"], L["types"].get(ttype, ttype.capitalize())),
+        (L["customer"], ticket.get("customer") or "–"), (L["location"], ticket.get("location") or "–"),
+        (L["installation"], ticket.get("installation") or "–"), (L["serial"], ticket.get("serial") or "–"),
+        (L["date"], fmt_date(visit["date"])), (L["techs"], visit.get("technicians") or "–"),
+        (L["hours"], fmt_num(visit.get("hours"), 2)), (L["travel"], fmt_num(visit.get("travel_hours"), 2)),
+        (L["km"], fmt_num(visit.get("km"), 0)), (L["project"], ticket.get("project_no") or "–"),
     ]
     story += [Spacer(1, 4), _kv_table(pairs, W)]
     if ticket.get("description"):
-        story += [Paragraph("Melding", S["h2"]), Paragraph(esc(ticket["description"]), S["body"])]
-    story += [Paragraph("Bevindingen", S["h2"]), Paragraph(esc(visit.get("findings") or "–"), S["body"]),
-              Paragraph("Uitgevoerde werkzaamheden", S["h2"]), Paragraph(esc(visit.get("work_done") or "–"), S["body"]),
-              Paragraph("Gebruikte materialen", S["h2"]), Paragraph(esc(visit.get("materials") or "–"), S["body"])]
+        story += [Paragraph(L["report"], S["h2"]), Paragraph(esc(ticket["description"]), S["body"])]
+    story += [Paragraph(L["findings"], S["h2"]), Paragraph(esc(visit.get("findings") or "–"), S["body"]),
+              Paragraph(L["work"], S["h2"]), Paragraph(esc(visit.get("work_done") or "–"), S["body"]),
+              Paragraph(L["materials"], S["h2"]), Paragraph(esc(visit.get("materials") or "–"), S["body"])]
     grid = _photo_grid(photos, W)
     if grid:
-        story += [KeepTogether([Paragraph("Foto's", S["h2"]), grid])]
+        story += [KeepTogether([Paragraph(L["photos"], S["h2"]), grid])]
     if not visit.get("signed_at") and visit.get("closed_at"):
-        sig = [Paragraph("Voor akkoord klant", S["h2"]),
-               Paragraph(f"Niet ondertekend – afgerond op {fmt_dt(visit.get('closed_at'))}"
+        sig = [Paragraph(L["approval"], S["h2"]),
+               Paragraph(esc(L["not_signed"].format(d=fmt_dt(visit.get("closed_at"))))
                          + (f": {esc(visit.get('closed_note'))}" if visit.get("closed_note") else ""), S["body"])]
     else:
-        sig = [Paragraph("Voor akkoord klant", S["h2"]),
-               Paragraph(f"Naam: <b>{esc(visit.get('signed_name') or '')}</b> · {fmt_dt(visit.get('signed_at'))}", S["body"])]
+        sig = [Paragraph(L["approval"], S["h2"]),
+               Paragraph(f"{esc(L['name'])}: <b>{esc(visit.get('signed_name') or '')}</b> · {fmt_dt(visit.get('signed_at'))}", S["body"])]
     if signature_path:
         img = _img(signature_path, 70 * mm, 28 * mm)
         if img:
             sig.append(img)
+    if visit.get("amended_at") and (visit.get("signed_at") or visit.get("closed_at")):
+        txt = L["amended_signed" if visit.get("signed_at") else "amended_closed"].format(d=fmt_dt(visit.get("amended_at")))
+        if visit.get("amended_name"):
+            txt += L["by"].format(n=visit.get("amended_name"))
+        sig.append(Paragraph(f"<i>{esc(txt)}.</i>", S["body"]))
     story.append(KeepTogether(sig))
     doc.build(story)
     return buf.getvalue()

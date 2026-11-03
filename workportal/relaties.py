@@ -31,6 +31,8 @@ RELATION_TYPES = [
 ]
 TYPE_LABELS = dict(RELATION_TYPES)
 
+from .talen import norm_lang
+
 HEADERS = {
     "id": "komdex_id", "relatieid": "komdex_id",
     "verkortenaam": "short_name", "zoeknaam": "short_name",
@@ -44,6 +46,7 @@ HEADERS = {
     "website": "website", "www": "website",
     "relatietype": "type",
     "relatiegroep": "group", "groep": "group", "branche": "group",
+    "taal": "language", "language": "language", "correspondentietaal": "language", "landtaal": "language",
 }
 
 # Velden die uit Komdex komen (het klantnummer SnelStart en notities horen bij de app)
@@ -184,6 +187,7 @@ def parse_relations(data: bytes):
             "relation_type": rtype,
             "relation_group": group,
             "active": 1 if active else 0,
+            "language": norm_lang(rec.get("language")),
             "_row": rn,
         })
         if shift:
@@ -325,5 +329,10 @@ def apply(records, decisions):
                 stats["dubbel"].append(rec["name"])
             _insert(db, rec, now)
             stats["nieuw"] += 1
+    # taal (alleen als de export een kolom Taal heeft en die gevuld is; Komdex is dan leidend)
+    for rec in records:
+        if rec.get("language"):
+            db.execute("UPDATE customers SET language = ? WHERE komdex_id = ? AND IFNULL(language, '') <> ?",
+                       (rec["language"], rec["komdex_id"], rec["language"]))
     db.commit()
     return stats

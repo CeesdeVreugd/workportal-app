@@ -9,7 +9,12 @@
   {% if v.sent_at %}· <span class="badge b-blue">Al verstuurd naar {{ v.sent_to }} op {{ v.sent_at|dt }}</span>{% endif %}</p>
 <form method="post" class="card form" style="max-width:760px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <p style="margin:0"><a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}">{{ icon('pdf') }}Werkbon bekijken</a></p>
+  <input type="hidden" name="taal" value="{{ lang }}">
+  <div class="row" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+    <label class="f" style="min-width:180px">Taal werkbon en mail<select data-taal onchange="var f=this.form,u=new URL(location.href);u.searchParams.set('taal',this.value);['to','cc'].forEach(function(n){u.searchParams.set(n,f.elements[n].value)});u.searchParams.set('cc_me',f.elements.cc_me.checked?'1':'');location.href=u">{% for k, l in LANGS %}<option value="{{ k }}" {{ 'selected' if k == lang }}>{{ l }}</option>{% endfor %}</select>
+      <span class="hint">{% if cust_lang is defined %}Taal van de relatie: {{ LANG_LABELS[cust_lang] }}{% if lang != cust_lang %} · andere taal gekozen{% endif %}. Wisselen zet onderwerp en tekst opnieuw.{% endif %}</span></label>
+    <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id, taal=lang) }}" data-pdf="Werkbon {{ t.number }}">{{ icon('pdf') }}Werkbon bekijken</a>
+  </div>
   <label class="f">Aan<input type="text" name="to" value="{{ form.to or '' }}" placeholder="naam@klant.nl" inputmode="email"><span class="hint">Meerdere adressen scheiden met een komma.{% if not form.to %} Geen e-mailadres bekend bij de klant of contactpersoon.{% endif %}</span></label>
   <label class="f">CC<input type="text" name="cc" value="{{ form.cc or '' }}" inputmode="email"></label>
   <label class="check"><input type="checkbox" name="cc_me" value="1" {{ 'checked' if form.cc_me }}> Kopie aan mij ({{ g.user.email }})</label>

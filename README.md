@@ -860,3 +860,29 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V162 (2.6.2)
 - E-mailviewer: een PDF-bijlage opent in de PDF-viewer en een foto in een nieuwe fotoviewer (klik = inzoomen), allebei met terug- en downloadknop, in hetzelfde venster. Excel/Word en meegestuurde mails openden al in hun viewer.
+
+## V163 (2.7.0)
+- Inkoopfacturen: ook als de boekhouder zelf de laatste stap zet (bijv. Verwerkt in SnelStart), gaat de factuur eerst naar **Af te ronden**. Afronden kan alleen nog met de knop op de kaart: "Definitief afronden en mail naar 01-Verwerkt" of "Definitief afronden, mail laten staan". Het venster na een statuswijziging rondt niets meer af.
+- Wordt een afgeronde factuur teruggezet (bijv. SnelStart of Komdex uit, of terug naar Nieuw), dan worden de mails die in 01-Verwerkt stonden automatisch teruggezet naar Postvak IN (logboek: "teruggezet uit map …"). Later opnieuw afronden verplaatst ze weer.
+- Hersteld: mails van door een collega doorgestuurde facturen werden niet naar 01-Verwerkt verplaatst.
+
+## V164 (2.8.0)
+- Service: een bezoek dat al is afgetekend (of afgerond zonder handtekening) kan nog worden **aangevuld**: knop "Aanvullen" bij het bezoek → foto's toevoegen en bevindingen, werkzaamheden, materialen, uren e.d. aanpassen.
+  - Vastgelegd: het bezoek krijgt het label "Aangevuld <datum>", de historie zegt wat er is aangevuld, en op de werkbon staat onder de handtekening "Aangevuld na het aftekenen op … door …" (de handtekening hoort bij de eerdere versie). Werkbon daarna eventueel opnieuw versturen.
+  - Een afgetekend bezoek opnieuw laten tekenen of verwijderen via dit scherm kan niet (verwijderen blijft voor beheer via het ticket).
+- Database-migratie 33: visits.amended_at/amended_by.
+
+## V165 (2.9.0)
+- Service, ticket: foto's en bijlagen bij het ticket kunnen worden **verwijderd** (kruisje op de foto / prullenbak bij de bijlage) en **naar een bezoek worden verplaatst** (deel-knop → kies het bezoek); dan komen ze op de werkbon.
+- Foto's van een bezoek staan niet meer los op de ticketpagina, maar ingeklapt onder het bezoek ("Foto's & bijlagen van dit bezoek – staan op de werkbon"). Verwijderen kan daar zolang het bezoek niet is afgetekend; daarna alleen met Beheer (het bezoek krijgt dan het label Aangevuld).
+- Relaties: veld **Taal werkbonnen en mails** (Nederlands, English, Deutsch, Français). Werkbon-PDF, bestandsnaam, onderwerp en tekst van de werkbonmail (ook na het tekenen) gaan in die taal. Bij Versturen kan een andere taal worden gekozen.
+  - Komdex-import: heeft de export een kolom "Taal" (of Language), dan wordt die overgenomen (Engels/EN/English → en, enz.). De huidige export heeft die kolom niet; stel de taal dan in bij de relatie.
+- Database-migratie 34: customers.language.
+
+## V166 (2.9.1)
+- Service: antwoorden van klanten op een ticketmail kwamen niet altijd binnen.
+  - Ophalen staat nu standaard aan (de instelling kon uit raken bij het opslaan van Beheer > Instellingen) en kijkt bij de eerste keer 14 dagen terug, zodat gemiste antwoorden alsnog binnenkomen.
+  - Er wordt in alle mappen van de service-mailbox gezocht, niet alleen in Postvak IN (voor als een regel of collega de mail al verplaatst heeft).
+  - Valt [WP-T..] uit het onderwerp weg, dan wordt het ticketnummer (T-2026-0006) gebruikt.
+  - Bij Notities klant staat of het ophalen werkt (laatste keer of de foutmelding) met een knop **Nu ophalen**.
+- Database-migratie 35: svc_mail_on aan, svc_since opnieuw.

@@ -5,7 +5,8 @@
 {% from "partials/alert.html" import alert_box %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / bezoek</div>
-<h1>{{ 'Bezoek bewerken' if vid else 'Bezoek vastleggen' }}</h1>
+<h1>{{ 'Bezoek aanvullen' if done else ('Bezoek bewerken' if vid else 'Bezoek vastleggen') }}</h1>
+{% if done %}<div class="result warn" style="max-width:900px;margin-bottom:12px"><b>Dit bezoek is al {{ 'afgetekend door ' ~ v.signed_name if v.signed_at else 'afgerond' }}.</b> Je kunt nog foto's toevoegen en gegevens aanvullen; op de werkbon komt te staan dat het bezoek na het aftekenen is aangevuld (en wanneer).</div>{% endif %}
 {{ alert_box(t.customer_alert, t.inst_alert, t.inst_bring, t.installation) }}
 <p class="muted">{{ t.title }}{% if t.customer %} · {{ t.customer }}{% endif %}{% if t.installation %} · {{ t.installation }}{% endif %}</p>
 <form method="post" enctype="multipart/form-data" class="card form visitform" style="max-width:900px" data-draft="bezoek-{{ t.id }}-{{ vid or 'nieuw' }}-{{ g.user.id }}">
@@ -27,12 +28,17 @@
     <label class="f">Kilometers<input type="text" inputmode="numeric" name="km" value="{{ v.km|num(0) if v.km else '' }}"></label>
   </div>
   <div class="actions">
+    {% if done %}
+    <button class="btn primary" name="next" value="">Aanvulling opslaan</button>
+    <a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) }}#bezoek{{ vid }}">Annuleren</a>
+    {% else %}
     <button class="btn primary" name="next" value="">Opslaan</button>
     <button class="btn" name="next" value="tekenen">Opslaan &amp; laten tekenen</button>
     <button class="btn" name="next" value="afronden" onclick="return confirm('Bezoek opslaan en afronden zonder handtekening? Het ticket wordt afgesloten.')">Afronden zonder handtekening</button>
+    {% endif %}
   </div>
 </form>
-{% if vid %}
+{% if vid and not done %}
 <form method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=vid) }}" data-confirm="Dit bezoek met foto's verwijderen?" style="max-width:900px;margin-top:12px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <button class="btn danger sm">Bezoek verwijderen</button>

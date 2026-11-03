@@ -28,7 +28,7 @@ def _f(name):
 
 def _ticket(tid):
     t = query(
-        "SELECT t.*, c.name AS customer, c.email AS customer_email, l.name AS location,"
+        "SELECT t.*, c.name AS customer, c.email AS customer_email, c.language AS customer_language, l.name AS location,"
         " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.postcode,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.postcode,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
         " i.name AS installation,"
         " i.serial AS serial, i.alert AS inst_alert, i.bring AS inst_bring, c.alert AS customer_alert, p.number AS project_no, p.name AS project_name, p.sharepoint_path, p.sp_item_id AS project_sp, p.sp_missing AS project_sp_missing, p.kind AS project_kind, p.work_description AS project_work, p.bon_file_id AS project_bon,"
@@ -159,7 +159,7 @@ def detail(tid):
     metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
     mail = _mail_defaults(t, notes, metas)
     return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, nfiles=nfiles, files=files_for("ticket", tid),
-                           toolcalcs=calcs_for(ticket_id=tid), metas=metas, mail=mail, svc_box=svc_mailbox(),
+                           toolcalcs=calcs_for(ticket_id=tid), metas=metas, mail=mail, svc_box=svc_mailbox(), svc_state=_svc_state(),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
 
@@ -268,6 +268,56 @@ def add_photos(tid):
     return redirect(url_for("service.detail", tid=tid))
 
 
+def _ticket_file(tid, fid):
+    """Bestand dat bij dit ticket hoort: rechtstreeks, of bij een bezoek van dit ticket. (rij, bezoek of None)"""
+    f = query("SELECT * FROM files WHERE id = ?", (fid,), one=True) or abort(404)
+    if f["entity"] == "ticket" and f["entity_id"] == tid:
+        return f, None
+    if f["entity"] == "visit":
+        v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (f["entity_id"], tid), one=True)
+        if v:
+            return f, v
+    abort(404)
+
+
+@bp.route("/<int:tid>/bestand/<int:fid>/verwijderen", methods=["POST"])
+@require("service", BEWERKEN)
+def file_delete(tid, fid):
+    _ticket(tid)
+    f, v = _ticket_file(tid, fid)
+    if f["kind"] == "signature":
+        abort(403)
+    if v is not None and (v["signed_at"] or v["closed_at"]) and not can("service", BEHEER):
+        flash("Deze foto staat op een afgetekende werkbon. Alleen iemand met Beheer-rechten op Service kan hem verwijderen.", "error")
+        return redirect(url_for("service.detail", tid=tid) + f"#bezoek{v['id']}")
+    delete_file(fid)
+    execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now_iso(), tid))
+    if v is not None and (v["signed_at"] or v["closed_at"]):
+        execute("UPDATE visits SET amended_at = ?, amended_by = ? WHERE id = ?", (now_iso(), g.user["id"], v["id"]))
+    audit("bijlage verwijderd", "ticket", tid, (f["filename"] or "") + (f" (bezoek {v['date']})" if v is not None else ""))
+    flash(f"{f['caption'] or f['filename']} verwijderd.", "ok")
+    return redirect(url_for("service.detail", tid=tid) + (f"#bezoek{v['id']}" if v is not None else "#bijlagen"))
+
+
+@bp.route("/<int:tid>/bestand/<int:fid>/naar-bezoek", methods=["POST"])
+@require("service", BEWERKEN)
+def file_to_visit(tid, fid):
+    """Foto/bijlage die bij het ticket is gezet, alsnog bij een bezoek (en dus op de werkbon) zetten."""
+    _ticket(tid)
+    f, cur = _ticket_file(tid, fid)
+    vid = to_int(request.form.get("vid"))
+    v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
+    if f["kind"] == "signature" or cur is not None:
+        abort(400)
+    execute("UPDATE files SET entity = 'visit', entity_id = ? WHERE id = ?", (vid, fid))
+    if v["signed_at"] or v["closed_at"]:
+        execute("UPDATE visits SET amended_at = ?, amended_by = ? WHERE id = ?", (now_iso(), g.user["id"], vid))
+    execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now_iso(), tid))
+    audit("bijlage naar bezoek", "ticket", tid, f"{f['filename']} → bezoek {v['date']}")
+    flash(f"{f['caption'] or f['filename']} staat nu bij het bezoek van {fmt_date(v['date'])}.", "ok")
+    return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
+
+
 @bp.route("/<int:tid>/verwijderen", methods=["POST"])
 @require("service", BEHEER)
 def delete(tid):
@@ -290,7 +340,13 @@ import re as _re
 import os as _os
 
 MAIL_TAG = _re.compile(r"\[WP-T(\d+)\]")
+TICKET_NO = _re.compile(r"\bT-\d{4}-\d{3,5}\b", _re.I)
 _RE_PREFIX = _re.compile(r"^\s*((re|aw|antw|fw|fwd|wg|tr)\s*:\s*)+", _re.I)
+
+
+def _svc_state():
+    from .util import get_setting as _gs
+    return {"on": _gs("svc_mail_on") == "1", "error": _gs("svc_last_error") or "", "last": _gs("svc_last_poll") or ""}
 
 
 def svc_mailbox(conn=None):
@@ -465,7 +521,7 @@ def _save_file_conn(conn, upload_dir, entity, eid, data, name, mime):
                  (entity, eid, "attachment", name, rel, mime, len(data), now_iso()))
 
 
-def poll_replies(conn, upload_dir):
+def poll_replies(conn, upload_dir, lookback_days=None):
     """Antwoorden van klanten uit de service-mailbox ophalen: alleen mails met [WP-T..] in het onderwerp of uit dezelfde
     mailwisseling als een ticket. Er wordt niets in de mailbox veranderd. Geeft het aantal opgeslagen antwoorden."""
     import base64
@@ -477,9 +533,12 @@ def poll_replies(conn, upload_dir):
     if not box:
         return 0
     row = conn.execute("SELECT value FROM settings WHERE key = 'svc_since'").fetchone()
-    since = (row["value"] if row else "") or (now_utc() - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    since = (row["value"] if row else "") or (now_utc() - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if lookback_days:   # handmatig ophalen: ook wat eerder is gemist (dubbele worden overgeslagen)
+        since = min(since, (now_utc() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     headers = {"Authorization": f"Bearer {_graph_token()}"}
-    url = (f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/inbox/messages?$filter=receivedDateTime ge {since}"
+    # alle mappen (niet alleen Postvak IN): een regel of iemand kan de mail al hebben verplaatst
+    url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
            f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId&$orderby=receivedDateTime asc&$top=50")
     n, newest, pages = 0, since, 0
     while url and pages < 10:
@@ -499,6 +558,11 @@ def poll_replies(conn, upload_dir):
                 tid = None
             if not tid and m.get("conversationId"):
                 hit = conn.execute("SELECT id FROM tickets WHERE mail_conv = ? ORDER BY id DESC LIMIT 1", (m["conversationId"],)).fetchone()
+                tid = hit["id"] if hit else None
+            if not tid:   # [WP-T..] weggevallen, maar het ticketnummer staat nog in het onderwerp
+                num = TICKET_NO.search(m.get("subject") or "")
+                hit = conn.execute("SELECT id FROM tickets WHERE number = ? AND EXISTS (SELECT 1 FROM ticket_notes n WHERE"
+                                   " n.ticket_id = tickets.id AND n.kind = 'mail_uit')", (num.group(0).upper(),)).fetchone() if num else None
                 tid = hit["id"] if hit else None
             if not tid:
                 continue
@@ -549,9 +613,36 @@ def poll_replies(conn, upload_dir):
             except Exception as exc:  # pragma: no cover
                 print(f"[WorkPortal] Melding reactie ticket mislukt: {exc}", flush=True)
         url = js.get("@odata.nextLink")
-    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_since', ?)", (newest,))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_since', ?)", (max(newest, row["value"] if row and row["value"] else ""),))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_poll', ?)", (now_iso(),))
     conn.commit()
     return n
+
+
+@bp.route("/<int:tid>/mail-ophalen", methods=["POST"])
+@require("service", BEWERKEN)
+def mail_fetch(tid):
+    """Nu de service-mailbox controleren op antwoorden (ook van de afgelopen 14 dagen, voor wat gemist is)."""
+    from flask import current_app
+    from .mail import graph_configured
+    _ticket(tid)
+    back = url_for("service.detail", tid=tid) + "#klant"
+    if not graph_configured():
+        flash("De Microsoft-koppeling is niet ingesteld; antwoorden kunnen niet worden opgehaald.", "error")
+        return redirect(back)
+    conn = get_db()
+    try:
+        n = poll_replies(conn, current_app.config["UPLOAD_DIR"], lookback_days=14)
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', '')")
+        conn.commit()
+    except Exception as exc:  # noqa: BLE001
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', ?)", (str(exc)[:300],))
+        conn.commit()
+        flash(f"Ophalen mislukt: {exc}", "error")
+        return redirect(back)
+    mine = conn.execute("SELECT COUNT(*) FROM ticket_notes WHERE ticket_id = ? AND kind = 'mail_in'", (tid,)).fetchone()[0]
+    flash(f"Mailbox gecontroleerd: {n} nieuwe reactie(s) opgehaald" + (f", dit ticket heeft er nu {mine}." if n else "."), "ok")
+    return redirect(back)
 
 
 def scheduled_poll(conn, app, state):
@@ -582,9 +673,7 @@ def visit(tid, vid=None):
     v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) if vid else None
     if vid and not v:
         abort(404)
-    if v and (v["signed_at"] or v["closed_at"]):
-        flash("Dit bezoek is afgerond en kan niet meer worden gewijzigd.", "info")
-        return redirect(url_for("service.detail", tid=tid))
+    done = bool(v and (v["signed_at"] or v["closed_at"]))   # afgetekend/afgerond: nog aanvullen, wel vastgelegd
     if request.method == "POST":
         vals = (_f("date") or local(now_utc()).strftime("%Y-%m-%d"), _f("technicians"),
                 to_float(request.form.get("hours"), 0), to_float(request.form.get("travel_hours"), 0),
@@ -592,6 +681,16 @@ def visit(tid, vid=None):
         if v:
             execute("UPDATE visits SET date=?, technicians=?, hours=?, travel_hours=?, km=?, findings=?, work_done=?, materials=?"
                     " WHERE id=?", vals + (vid,))
+            if done:
+                changed = [lab for k, lab, new in (("findings", "bevindingen", vals[5]), ("work_done", "werkzaamheden", vals[6]),
+                                                   ("materials", "materialen", vals[7]), ("hours", "uren", vals[2]),
+                                                   ("date", "datum", vals[0]), ("technicians", "monteurs", vals[1]))
+                           if (v[k] or None) != (new or None) and not (k == "hours" and float(v[k] or 0) == float(new or 0))]
+                n_new = len([f for f in request.files.getlist("photos") if f and f.filename])
+                if changed or n_new:
+                    execute("UPDATE visits SET amended_at = ?, amended_by = ? WHERE id = ?", (now_iso(), g.user["id"], vid))
+                    audit("bezoek aangevuld na afronden", "ticket", tid,
+                          ", ".join(changed + ([f"{n_new} foto('s)"] if n_new else [])))
         else:
             vid = execute("INSERT INTO visits (date, technicians, hours, travel_hours, km, findings, work_done, materials,"
                           " ticket_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -603,6 +702,9 @@ def visit(tid, vid=None):
             flash(f"{g.upload_skipped} foto('s) waren leeg of onleesbaar en zijn niet opgeslagen. Voeg ze opnieuw toe.", "error")
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now_iso(), tid))
         audit("bezoek opgeslagen", "ticket", tid, vals[0])
+        if done:
+            flash("Aanvulling opgeslagen. Op de werkbon staat dat het bezoek na het aftekenen is aangevuld.", "ok")
+            return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
         if request.form.get("next") == "tekenen":
             return redirect(url_for("service.sign", tid=tid, vid=vid))
         if request.form.get("next") == "afronden":
@@ -612,7 +714,7 @@ def visit(tid, vid=None):
         flash("Bezoek opgeslagen.", "ok")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
     v = v or {"date": local(now_utc()).strftime("%Y-%m-%d"), "technicians": g.user["name"]}
-    return render_template("service/visit.html", t=t, v=v, vid=vid, files=files_for("visit", vid) if vid else [])
+    return render_template("service/visit.html", t=t, v=v, vid=vid, done=done, files=files_for("visit", vid) if vid else [])
 
 
 def _close_visit(tid, vid, note, close_ticket):
@@ -672,12 +774,14 @@ def sign(tid, vid):
         if request.form.get("close"):
             execute("UPDATE tickets SET status = 'afgerond', closed_at = ?, updated_at = ? WHERE id = ?", (now_iso(), now_iso(), tid))
         audit("werkbon ondertekend", "ticket", tid, name)
+        from .talen import tr
+        L = tr(_lang(t))
         pdf, fname = _werkbon(tid, vid)
         msgs = ["Werkbon ondertekend."]
         to = _f("mail_to")
         if request.form.get("mail") and to:
-            ok = send_mail(to, f"Werkbon {t['number']} – De Vreugd Productietechniek",
-                           f"Beste {name},\n\nIn de bijlage vindt u de werkbon van ons bezoek.",
+            ok = send_mail(to, L["subject_short"].format(nr=t["number"]),
+                           L["greet"].format(n=name) + "\n\n" + L["body_short"] + "\n\n" + L["questions"],
                            attachments=[(fname, pdf, "application/pdf")], signer="werkvoorbereiding")
             msgs.append("Werkbon gemaild naar " + to + "." if ok else "Mailen is mislukt.")
         if request.form.get("sharepoint") and _sp_available(t):
@@ -702,8 +806,12 @@ def visit_send(tid, vid):
     t = _ticket(tid)
     v = query("SELECT * FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
     back = url_for("service.detail", tid=tid) + f"#bezoek{vid}"
+    from .talen import tr
     default_to = t["contact_email"] or t["customer_email"] or ""
-    greet = v["signed_name"] or t["contact"] or "relatie"
+    lang = _lang(t, request.values.get("taal"))
+    L = tr(lang)
+    who = v["signed_name"] or t["contact"]
+    greet_line = L["greet"].format(n=who) if who else L["greet_none"]
     if request.method == "POST":
         to = [a.strip() for a in _re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
         cc = [a.strip() for a in _re.split(r"[;,\s]+", request.form.get("cc") or "") if a.strip()]
@@ -713,23 +821,23 @@ def visit_send(tid, vid):
         want_sp = bool(request.form.get("sharepoint")) and _sp_available(t)
         if (not to and not want_sp) or bad:
             flash("Vul een geldig e-mailadres in" + (f" (ongeldig: {', '.join(bad)})" if bad else "") + ", of kies SharePoint.", "error")
-            return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t))
-        pdf, fname = _werkbon(tid, vid)
+            return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang)
+        pdf, fname = _werkbon(tid, vid, lang)
         msgs = []
         if to:
             from .mail import send_mail_with_files
             import os as _os
             sender = get_setting("cert_sender") or _os.environ.get("CERT_MAIL_FROM") or _os.environ.get("MAIL_FROM") or ""
-            ok, err = send_mail_with_files(sender, to, (request.form.get("subject") or "").strip() or f"Werkbon {t['number']}",
+            ok, err = send_mail_with_files(sender, to, (request.form.get("subject") or "").strip() or L["subject"].format(nr=t["number"], title=t["title"]),
                                            (request.form.get("body") or "").strip(), [(fname, pdf, "application/pdf")],
                                            cc=cc or None, signer="werkvoorbereiding")
             if ok:
                 execute("UPDATE visits SET sent_at = ?, sent_to = ? WHERE id = ?", (now_iso(), ", ".join(to)[:300], vid))
-                audit("werkbon verstuurd", "ticket", tid, f"{v['date']} aan {', '.join(to)}"[:300])
+                audit("werkbon verstuurd", "ticket", tid, (f"{v['date']} aan {', '.join(to)}" + (f" ({lang})" if lang != "nl" else ""))[:300])
                 msgs.append("Werkbon gemaild naar " + ", ".join(to) + ".")
             else:
                 flash(f"Mailen is mislukt: {err}", "error")
-                return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t))
+                return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang)
         if want_sp:
             res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_werkbon"), fname, pdf)
             if res is None:
@@ -740,12 +848,13 @@ def visit_send(tid, vid):
             msgs.append(msg + ".")
         flash(" ".join(msgs), "ok")
         return redirect(back)
-    form = {"to": default_to, "cc_me": "1",
-            "subject": f"Werkbon {t['number']} – {t['title']}",
-            "body": f"Beste {greet},\n\nIn de bijlage vindt u de werkbon van ons bezoek op {fmt_date(v['date'])}."
-                    + ("" if v["signed_at"] else "\nDe werkbon is niet ter plaatse ondertekend.")
-                    + "\n\nHeeft u vragen, neem dan gerust contact met ons op."}
-    return render_template("service/send.html", t=t, v=v, form=form, sharepoint=_sp_available(t))
+    form = {"to": request.args.get("to", default_to), "cc": request.args.get("cc", ""), "cc_me": request.args.get("cc_me", "1"),
+            "subject": L["subject"].format(nr=t["number"], title=t["title"]),
+            "body": greet_line + "\n\n" + L["body"].format(d=fmt_date(v["date"]))
+                    + ("" if v["signed_at"] else "\n" + L["unsigned"])
+                    + "\n\n" + L["questions"]}
+    return render_template("service/send.html", t=t, v=v, form=form, sharepoint=_sp_available(t), lang=lang,
+                           cust_lang=_lang(t))
 
 
 def _sp_available(t):
@@ -759,13 +868,24 @@ def _sp_folder(t, sub):
     return f"{base}/{sub}"
 
 
-def _werkbon(tid, vid):
+def _lang(t, override=None):
+    """Taal van de werkbon: gekozen (?taal=), anders die van de relatie, anders Nederlands."""
+    from .talen import LANG_LABELS
+    for c in (override, t["customer_language"] if "customer_language" in t.keys() else None):
+        if c in LANG_LABELS:
+            return c
+    return "nl"
+
+
+def _werkbon(tid, vid, lang=None):
+    from .talen import tr
     t = dict(_ticket(tid))
-    v = dict(query("SELECT * FROM visits WHERE id = ?", (vid,), one=True))
+    lang = _lang(t, lang)
+    v = dict(query("SELECT v.*, u.name AS amended_name FROM visits v LEFT JOIN users u ON u.id = v.amended_by WHERE v.id = ?", (vid,), one=True))
     photos = [(file_path(f), f["caption"]) for f in files_for("visit", vid, "photo")]
     sigs = files_for("visit", vid, "signature")
-    pdf = visit_pdf(t, v, photos, file_path(sigs[-1]) if sigs else None)
-    fname = safe_filename(f"Werkbon {t['number']} {v['date']}.pdf")
+    pdf = visit_pdf(t, v, photos, file_path(sigs[-1]) if sigs else None, lang)
+    fname = safe_filename(f"{tr(lang)['file']} {t['number']} {v['date']}.pdf")
     return pdf, fname
 
 
@@ -773,6 +893,6 @@ def _werkbon(tid, vid):
 @require("service", LEZEN)
 def werkbon(tid, vid):
     _ticket(tid)
-    pdf, fname = _werkbon(tid, vid)
+    pdf, fname = _werkbon(tid, vid, request.args.get("taal"))
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{fname}"'})

@@ -10,23 +10,30 @@
 {%- set m = {'concept':('Concept',''),'verstuurd':('Verstuurd','b-blue'),'akkoord':('Akkoord','b-ok'),'verloren':('Niet doorgegaan','b-bad')} -%}
 {%- set v = m.get(s, (s, '')) -%}<span class="badge {{ v[1] }}">{{ v[0] }}</span>
 {%- endmacro %}
-{% macro attachments(files, del_name=None) -%}
+{% macro attachments(files, del_name=None, del_route=None, del_args={}, moves=[], move_route=None) -%}
 <div class="attlist">{% for f in files %}{% set ext = (f.filename or '').rpartition('.')[2].lower() %}{% set view = ext in ('pdf', 'docx', 'docm', 'dotx', 'xlsx', 'xlsm', 'csv', 'eml') %}
 <div class="attrow" draggable="true" data-dragfile="{{ url_for('main.file', fid=f.id, download=1) }}" data-dragname="{{ f.filename }}" data-dragmime="{{ f.mime or 'application/octet-stream' }}"><a class="attmain" href="{{ url_for('main.file', fid=f.id, name=f.filename) if view else url_for('main.file', fid=f.id, download=1) }}"{% if ext == 'pdf' %} data-pdf="{{ f.filename }}"{% endif %}>
   <span class="attico att-{{ ext if ext in ('pdf','docx','doc','xlsx','xls','csv','dwg','dxf','step','stp','zip','txt','eml','msg') else 'file' }}">{{ ext[:4]|upper or '?' }}</span>
   <span class="grow"><span class="attname">{{ f.caption or f.filename }}</span><span class="attmeta">{{ 'Openen' if view else 'Downloaden' }}{% if f.size %} · {{ (f.size / 1048576)|num(1) ~ ' MB' if f.size >= 1048576 else ((f.size / 1024)|round|int ~ ' kB') }}{% endif %}</span></span></a>
   {% if view %}<a class="iconbtn" href="{{ url_for('main.file', fid=f.id, download=1) }}" title="Downloaden" aria-label="Downloaden">{{ icon('download') }}</a>{% endif %}
-  {% if del_name %}<label class="attdel" title="Bij opslaan verwijderen"><input type="checkbox" name="{{ del_name }}" value="{{ f.id }}"> verwijderen</label>{% endif %}</div>
+  {% if del_name %}<label class="attdel" title="Bij opslaan verwijderen"><input type="checkbox" name="{{ del_name }}" value="{{ f.id }}"> verwijderen</label>{% endif %}
+  {% if moves and move_route %}{{ filemove(f, moves, move_route, del_args) }}{% endif %}
+  {% if del_route %}<form method="post" action="{{ url_for(del_route, fid=f.id, **del_args) }}" data-confirm="{{ (f.caption or f.filename) ~ ' verwijderen?' }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn danger" title="Verwijderen" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
 {% endfor %}</div>
 {%- endmacro %}
-{% macro photos(files, can_delete=False, back='') -%}
+{% macro filemove(f, moves, move_route, args) -%}
+<details class="cred-pop filemove"><summary class="iconbtn" title="Naar een bezoek verplaatsen" aria-label="Naar een bezoek verplaatsen">{{ icon('share') }}</summary>
+<form method="post" action="{{ url_for(move_route, fid=f.id, **args) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<span class="small muted">Verplaatsen naar bezoek</span>{% for vid, label in moves %}<button class="btn sm" name="vid" value="{{ vid }}">{{ label }}</button>{% endfor %}</form></details>
+{%- endmacro %}
+{% macro photos(files, can_delete=False, back='', del_route=None, del_args={}, moves=[], move_route=None) -%}
 <div class="photos" data-gallery>
 {%- for f in files if f.kind == 'photo' -%}
-<div class="photo" draggable="true" data-dragfile="{{ url_for('main.file', fid=f.id, download=1) }}" data-dragname="{{ f.filename or 'foto.jpg' }}" data-dragmime="{{ f.mime or 'image/jpeg' }}" title="Sleep de foto naar een mail, map of het bureaublad"><a href="{{ url_for('main.file', fid=f.id) }}" target="_blank" data-full="{{ url_for('main.file', fid=f.id) }}" data-dl="{{ url_for('main.file', fid=f.id, download=1) }}" data-name="{{ f.caption or f.filename }}" data-info="{{ f.created_at|dt }}"><img src="{{ url_for('main.file', fid=f.id) }}" alt="{{ f.caption or 'Foto' }}" loading="lazy"></a>{% if f.caption %}<div class="cap">{{ f.caption }}</div>{% endif %}</div>
+<div class="photo" draggable="true" data-dragfile="{{ url_for('main.file', fid=f.id, download=1) }}" data-dragname="{{ f.filename or 'foto.jpg' }}" data-dragmime="{{ f.mime or 'image/jpeg' }}" title="Sleep de foto naar een mail, map of het bureaublad"><a href="{{ url_for('main.file', fid=f.id) }}" target="_blank" data-full="{{ url_for('main.file', fid=f.id) }}" data-dl="{{ url_for('main.file', fid=f.id, download=1) }}" data-name="{{ f.caption or f.filename }}" data-info="{{ f.created_at|dt }}"><img src="{{ url_for('main.file', fid=f.id) }}" alt="{{ f.caption or 'Foto' }}" loading="lazy"></a>{% if f.caption %}<div class="cap">{{ f.caption }}</div>{% endif %}{% if del_route %}<form method="post" action="{{ url_for(del_route, fid=f.id, **del_args) }}" data-confirm="Deze foto verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="photo-x" title="Foto verwijderen" aria-label="Foto verwijderen">×</button></form>{% endif %}{% if moves and move_route %}<div class="photo-mv">{{ filemove(f, moves, move_route, del_args) }}</div>{% endif %}</div>
 {%- endfor -%}
 {{ caller() if caller }}
 </div>
 {%- set others = files|selectattr('kind','equalto','attachment')|list -%}
-{%- if others %}{{ attachments(others) }}{% endif -%}
+{%- if others %}{{ attachments(others, del_route=del_route, del_args=del_args, moves=moves, move_route=move_route) }}{% endif -%}
 {%- endmacro %}
 {% macro opt(value, label, current) -%}<option value="{{ value }}" {{ 'selected' if (current|string) == (value|string) }}>{{ label }}</option>{%- endmacro %}

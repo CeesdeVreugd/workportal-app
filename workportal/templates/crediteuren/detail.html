@@ -75,8 +75,8 @@
       <span class="cred-arch-txt"><b>{{ 'Mail verplaatsen is niet gelukt – opnieuw proberen?' if r.mail_archive == 'mislukt' else 'Af te ronden door de boekhouder' }}</b>
         Komdex en SnelStart zijn klaar.{% if r.source == 'mail' %} Rond de factuur af; mag de mail (met de onderliggende mails) naar de map <b>{{ archive_folder }}</b>?{% endif %}
         {% if r.mail_archive == 'mislukt' %}<span class="muted">Zie het logboek voor de reden.</span>{% endif %}</span>
-      <span class="cred-arch-btns">{% if r.source == 'mail' %}<button class="btn sm ghost" name="verplaatsen" value="0">Afronden, mail laten staan</button>
-        <button class="btn sm primary" name="verplaatsen" value="1">Afronden en mail verplaatsen</button>{% else %}<button class="btn sm primary">Afronden</button>{% endif %}</span>
+      <span class="cred-arch-btns">{% if r.source == 'mail' %}<button class="btn sm ghost" name="verplaatsen" value="0">Definitief afronden, mail laten staan</button>
+        <button class="btn sm primary" name="verplaatsen" value="1">Definitief afronden en mail naar {{ archive_folder }}</button>{% else %}<button class="btn sm primary">Definitief afronden</button>{% endif %}</span>
     </form>
     {% elif r.to_finish %}
     <div class="cred-arch-ask"><span class="cred-arch-ic">{{ icon('check') }}</span><span class="cred-arch-txt"><b>Af te ronden door {{ archive_owner_name }}</b> Komdex en SnelStart zijn klaar; {{ archive_owner_name }} rondt de factuur af{{ ' en zet de mail in ' ~ archive_folder if r.source == 'mail' }}.</span></div>
@@ -276,7 +276,8 @@
   <div class="cdd-icon">{{ icon('check') }}</div>
   <h2>{{ changed_msg }}</h2>
   <p class="muted">Status van deze factuur: <b>{{ r.label }}</b></p>
-  {% set ask_arch = edit and archive_me and r.to_finish and not r.ext_question and not r.question_to %}
+  {# afronden gebeurt nooit meer vanuit dit venster: altijd eerst 'af te ronden', daarna met de knop op de kaart #}
+  {% set ask_arch = false %}
   {% if ask_arch %}<form method="post" action="{{ url_for('crediteuren.mail_archive', iid=r.id) }}" class="cdd-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="cdd-arch"><input type="checkbox" name="afronden" value="1" checked

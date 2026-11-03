@@ -676,6 +676,21 @@ MIGRATIONS = [
     ALTER TABLE tickets ADD COLUMN mail_conv TEXT;
     CREATE INDEX idx_tickets_conv ON tickets(mail_conv);
     """,
+    # 33 - bezoeken: na aftekenen/afronden nog aanvullen (foto's, tekst); vastleggen wanneer en door wie
+    """
+    ALTER TABLE visits ADD COLUMN amended_at TEXT;
+    ALTER TABLE visits ADD COLUMN amended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    """,
+    # 34 - relaties: taal voor werkbonnen en mails aan de klant (nl/en/de/fr)
+    """
+    ALTER TABLE customers ADD COLUMN language TEXT DEFAULT 'nl';
+    """,
+    # 35 - service: antwoorden van klanten ophalen staat standaard aan (stond na opslaan van Instellingen soms uit);
+    #      opnieuw 14 dagen terugkijken zodat gemiste antwoorden alsnog binnenkomen
+    """
+    INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_mail_on', '1');
+    DELETE FROM settings WHERE key = 'svc_since';
+    """,
 ]
 
 

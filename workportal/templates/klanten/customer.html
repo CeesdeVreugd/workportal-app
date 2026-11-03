@@ -25,6 +25,7 @@
       <dt>Telefoon</dt><dd>{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% else %}–{% endif %}</dd>
       <dt>E-mail</dt><dd>{% if c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}–{% endif %}</dd>
       <dt>Website</dt><dd>{% if c.website %}<a href="{{ c.website if c.website.startswith('http') else 'https://' ~ c.website }}" target="_blank" rel="noopener">{{ c.website }}</a>{% else %}–{% endif %}</dd>
+      <dt>Taal werkbonnen</dt><dd>{{ LANG_LABELS.get(c.language or 'nl', 'Nederlands') }}</dd>
       {% if sp_on %}<dt>Klantmap SharePoint</dt><dd>{% if sp_folder %}{{ icon('folder') }} {{ sp_folder.name }}{% if can('klanten', 2) %} · <a href="{{ url_for('klanten.klantmap', cid=c.id) }}">wijzigen</a>{% endif %}{% elif can('klanten', 2) %}<a href="{{ url_for('klanten.klantmap', cid=c.id) }}">Klantmap koppelen</a>{% else %}–{% endif %}</dd>{% endif %}
       <dt>Notities</dt><dd class="prose" style="font-weight:400">{{ c.notes or '–' }}</dd>
     </dl>
