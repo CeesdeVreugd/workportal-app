@@ -27,9 +27,12 @@
     <div class="fgrid">
       <label class="f">Mailbox voor service-mails<input type="email" name="svc_mailbox" value="{{ svc.box }}" placeholder="{{ svc.default or 'service@devreugd-pt.nl' }}">
         <span class="hint">Leeg = {{ svc.default or 'de standaard afzender' }}. De mailbox moet in de toegestane groep van de Microsoft-koppeling staan.</span></label>
-      <label class="check full"><input type="checkbox" name="svc_mail_on" value="1" {{ 'checked' if svc.on }}> Antwoorden van klanten elke 5 minuten uit deze mailbox ophalen (alleen mails met het ticketnummer; er wordt niets in de mailbox veranderd)</label>
+      <label class="check full"><input type="checkbox" name="svc_mail_on" value="1" {{ 'checked' if svc.on }}> Antwoorden van klanten elke 5 minuten uit deze mailbox ophalen (alleen mails met het ticketnummer)</label>
+      <label class="check full"><input type="checkbox" name="svc_move" value="1" {{ 'checked' if svc.move }}> Opgehaalde mails (en een gesleepte mail waar een ticket van gemaakt is) direct verplaatsen naar de map hieronder; gelezen of ongelezen blijft zoals het is</label>
+      <label class="f">Map voor ticketmails<input type="text" name="svc_folder" value="{{ svc.folder }}" placeholder="03 - WorkPortal"><span class="hint">Leeg = 03 - WorkPortal. Bestaat de map nog niet, dan wordt hij onder Postvak IN aangemaakt.</span></label>
     </div>
     {% if svc.error %}<p class="small" style="color:var(--bad);margin:0">Laatste keer ophalen mislukt: {{ svc.error }}</p>{% endif %}
+    {% if svc.move_err %}<p class="small" style="color:var(--bad);margin:0">Verplaatsen naar de map mislukt: {{ svc.move_err }}</p>{% endif %}
     <h3 style="margin-top:14px">Inkoopfacturen uit de mailbox</h3>
     <p class="hint" style="margin-top:0">WorkPortal leest elke 5 minuten de PDF-bijlagen uit deze mailbox en maakt er factuurkaarten van. Alleen als de boekhouding het bevestigt, wordt de mail van een afgeronde factuur naar de map hieronder verplaatst.</p>
     <input type="hidden" name="cred_form" value="1">

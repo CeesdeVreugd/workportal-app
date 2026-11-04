@@ -145,6 +145,8 @@ def settings():
         if request.form.get("svc_form") == "1":
             set_setting("svc_mailbox", (request.form.get("svc_mailbox") or "").strip().lower())
             set_setting("svc_mail_on", "1" if request.form.get("svc_mail_on") else "0")
+            set_setting("svc_move", "1" if request.form.get("svc_move") else "0")
+            set_setting("svc_folder", (request.form.get("svc_folder") or "").strip()[:100])
         if request.form.get("cred_form") == "1":
             set_setting("cred_mail_on", "1" if request.form.get("cred_mail_on") else "0")
             set_setting("cred_mailbox", (request.form.get("cred_mailbox") or "").strip().lower() or "factuur@devreugd-pt.nl")
@@ -171,6 +173,7 @@ def settings():
     from .util import mobile_off
     from .crediteuren import mail_configured
     svc = {"box": get_setting("svc_mailbox") or "", "on": get_setting("svc_mail_on") == "1",
+           "move": (get_setting("svc_move") or "1") != "0", "folder": get_setting("svc_folder") or "", "move_err": get_setting("svc_move_err") or "",
            "error": get_setting("svc_last_error") or "", "default": get_setting("cert_sender") or os.environ.get("MAIL_FROM", "")}
     cred = {"on": get_setting("cred_mail_on") == "1", "box": get_setting("cred_mailbox") or "factuur@devreugd-pt.nl",
             "since": (get_setting("cred_since") or "")[:10], "last": get_setting("cred_last_poll"),

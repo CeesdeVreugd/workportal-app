@@ -130,6 +130,8 @@ def new():
         save_uploads("ticket", tid)
         if getattr(g, "upload_skipped", 0):
             flash(f"{g.upload_skipped} bestand(en) waren leeg of onleesbaar en zijn niet opgeslagen.", "error")
+        if mail and mail.get("message_id"):
+            _file_dropped_mail(tid, mail["message_id"])
         n_att = _save_mail_attachments(tid)
         if n_att:
             flash(f"{n_att} bijlage(n) uit de mail ook los bij het ticket gezet.", "ok")
@@ -549,6 +551,75 @@ def _save_mail_attachments(tid):
     return n
 
 
+SVC_FOLDER = "03 - WorkPortal"
+
+
+def svc_folder(conn=None):
+    """Map in de service-mailbox voor alle mails die bij een ticket horen ('' = niet verplaatsen)."""
+    if conn is not None:
+        on = conn.execute("SELECT value FROM settings WHERE key = 'svc_move'").fetchone()
+        nm = conn.execute("SELECT value FROM settings WHERE key = 'svc_folder'").fetchone()
+        on, nm = (on["value"] if on else "1"), (nm["value"] if nm else "")
+    else:
+        on, nm = (get_setting("svc_move") or "1"), (get_setting("svc_folder") or "")
+    return "" if on == "0" else (nm or SVC_FOLDER)
+
+
+def _move_to_folder(box, mid, folder, cache):
+    """Bericht naar de WorkPortal-map; geeft het nieuwe id (of None). Fouten worden onthouden, niet opgegooid."""
+    from .mail import graph_folder_id, graph_move, GraphError
+    try:
+        if "fid" not in cache:
+            cache["fid"] = graph_folder_id(box, folder)
+        return graph_move(box, mid, cache["fid"])
+    except GraphError as e:
+        cache["err"] = "recht Mail.ReadWrite ontbreekt" if e.status == 403 else ("bericht niet gevonden" if e.status == 404 else str(e)[:200])
+    except Exception as e:  # noqa: BLE001  pragma: no cover - netwerk
+        cache["err"] = str(e)[:200]
+    return None
+
+
+def _file_dropped_mail(tid, message_id):
+    """Ticket gemaakt van een gesleepte mail: staat die mail in de service-mailbox, dan naar de WorkPortal-map en het
+    mailgesprek aan het ticket koppelen (zodat antwoorden in dezelfde wisseling ook bij het ticket komen)."""
+    from .mail import graph_configured, _gcall
+    box, folder = svc_mailbox(), svc_folder()
+    if not (graph_configured() and box):
+        return
+    try:
+        esc = message_id.replace("'", "''")
+        js = _gcall("GET", f"/users/{box}/messages", params={"$filter": f"internetMessageId eq '{esc}'", "$select": "id,conversationId"})
+        for m in js.get("value") or []:
+            if m.get("conversationId"):
+                execute("UPDATE tickets SET mail_conv = COALESCE(mail_conv, ?) WHERE id = ?", (m["conversationId"], tid))
+            if folder:
+                _move_to_folder(box, m["id"], folder, {})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WorkPortal] Gesleepte mail niet gevonden/verplaatst: {exc}", flush=True)
+
+
+def move_existing_ticket_mails(conn):
+    """Eenmalig: reacties die al bij een ticket staan, ook naar de WorkPortal-map (bewaarde id's worden bijgewerkt)."""
+    box, folder = svc_mailbox(conn), svc_folder(conn)
+    if not (box and folder):
+        return 0
+    cache, n = {}, 0
+    for row in conn.execute("SELECT id, mail_meta FROM ticket_notes WHERE kind = 'mail_in' AND mail_meta LIKE '%msg_id%'").fetchall():
+        meta = _json.loads(row["mail_meta"])
+        if meta.get("folder") == folder or not meta.get("msg_id"):
+            continue
+        nid = _move_to_folder(box, meta["msg_id"], folder, cache)
+        if cache.get("err") == "recht Mail.ReadWrite ontbreekt":
+            raise RuntimeError(cache["err"])
+        if nid:
+            meta.update(msg_id=nid, folder=folder)
+            conn.execute("UPDATE ticket_notes SET mail_meta = ? WHERE id = ?", (_json.dumps(meta, ensure_ascii=False), row["id"]))
+            n += 1
+        cache.pop("err", None)
+    conn.commit()
+    return n
+
+
 def _dropped_mail():
     """Eerste gesleepte/gekozen .eml-bestand uitlezen: {'subject', 'from', 'body'} of None. Het bestand zelf wordt
     gewoon als bijlage bewaard (save_uploads); de stroom wordt teruggezet."""
@@ -572,7 +643,8 @@ def _dropped_mail():
                 nm, ad = parseaddr(str(msg.get("From") or ""))
                 frm = (f"{nm} ({ad})" if nm and ad else (nm or ad or "")).strip()
                 return {"subject": _RE_PREFIX.sub("", str(msg.get("Subject") or "")).strip()[:200] or None,
-                        "from": frm[:150] or None, "body": text[:8000] or None}
+                        "from": frm[:150] or None, "body": text[:8000] or None,
+                        "message_id": str(msg.get("Message-ID") or "").strip()[:300] or None}
             except Exception:  # noqa: BLE001 - onleesbare mail: alleen als bijlage bewaren
                 return None
     return None
@@ -619,7 +691,8 @@ def poll_replies(conn, upload_dir, lookback_days=None):
             pass
     own_domain = box.rpartition("@")[2]
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
-           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId&$orderby=receivedDateTime asc&$top=50")
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId,internetMessageId&$orderby=receivedDateTime asc&$top=50")
+    folder, mcache = svc_folder(conn), {}
     n, newest, pages = 0, since, 0
     while url and pages < 10:
         pages += 1
@@ -630,7 +703,9 @@ def poll_replies(conn, upload_dir, lookback_days=None):
         for m in js.get("value", []):
             newest = max(newest, m.get("receivedDateTime") or newest)
             mid = m["id"]
-            if conn.execute("SELECT 1 FROM ticket_notes WHERE kind = 'mail_in' AND mail_meta LIKE ?", (f'%"{mid}"%',)).fetchone():
+            imid = (m.get("internetMessageId") or "")[:300]
+            if conn.execute("SELECT 1 FROM ticket_notes WHERE kind = 'mail_in' AND (mail_meta LIKE ? OR (? <> '' AND mail_meta LIKE ?))",
+                            (f'%"{mid}"%', imid, f'%"{imid}"%')).fetchone():
                 continue
             tag = MAIL_TAG.search(m.get("subject") or "")
             tid = int(tag.group(1)) if tag else None
@@ -660,7 +735,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
             cur = conn.execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_at, mail_meta) VALUES (?,?,?,?,?)",
                                (tid, "mail_in", body or "(geen tekst)", (m.get("receivedDateTime") or now_iso()),
                                 _json.dumps({"from": (frm.get("address") or "").lower(), "from_name": frm.get("name") or "",
-                                             "subject": m.get("subject") or "", "msg_id": mid, "to": [a for a in rc("toRecipients") if a],
+                                             "subject": m.get("subject") or "", "msg_id": mid, "imid": imid, "to": [a for a in rc("toRecipients") if a],
                                              "cc": [a for a in rc("ccRecipients") if a]}, ensure_ascii=False)))
             nid = cur.lastrowid
             if m.get("hasAttachments"):
@@ -685,6 +760,13 @@ def poll_replies(conn, upload_dir, lookback_days=None):
                          (None, "reactie klant per mail", "ticket", tid, who, now_iso()))
             conn.commit()
             n += 1
+            if folder:   # netjes: alles van WorkPortal in één map (gelezen of ongelezen blijft zoals het is)
+                newid = _move_to_folder(box, mid, folder, mcache)
+                if newid:
+                    meta = _json.loads(conn.execute("SELECT mail_meta FROM ticket_notes WHERE id = ?", (nid,)).fetchone()["mail_meta"])
+                    meta.update(msg_id=newid, folder=folder)
+                    conn.execute("UPDATE ticket_notes SET mail_meta = ? WHERE id = ?", (_json.dumps(meta, ensure_ascii=False), nid))
+                    conn.commit()
             try:
                 from .notify import notify_user
                 last = conn.execute("SELECT created_by FROM ticket_notes WHERE ticket_id = ? AND kind = 'mail_uit' AND created_by IS NOT NULL"
@@ -697,6 +779,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
         url = js.get("@odata.nextLink")
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_since', ?)", (max(newest, row["value"] if row and row["value"] else ""),))
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_poll', ?)", (now_iso(),))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_move_err', ?)", (mcache.get("err", ""),))
     conn.commit()
     return n
 
@@ -740,6 +823,10 @@ def scheduled_poll(conn, app, state):
     try:
         poll_replies(conn, app.config["UPLOAD_DIR"])
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', '')")
+        done = conn.execute("SELECT value FROM settings WHERE key = 'svc_move_backfill'").fetchone()
+        if svc_folder(conn) and not (done and done["value"] == svc_folder(conn)):
+            move_existing_ticket_mails(conn)
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_move_backfill', ?)", (svc_folder(conn),))
     except Exception as exc:  # noqa: BLE001
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_last_error', ?)", (str(exc)[:300],))
     conn.commit()

@@ -955,3 +955,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Na afronden: melding (en mail) aan wie het heeft ingepland en de toegewezen collega; op het ticket staat het bezoek met "Ingevuld door de externe monteur" en de knop **Gecontroleerd, werkbon versturen**. Pas daarna gaat de werkbon (in de taal van de klant) naar de klant.
   - Veiligheid: sleutel van 256 bits, alleen de hash staat in de database; geen toegang tot de rest van WorkPortal; mislukte pogingen worden afgeremd; pagina wordt niet bewaard of geïndexeerd.
 - Database-migratie 40.
+
+## V179 (2.12.1)
+- Service-mailbox netjes: elke mail die WorkPortal bij een ticket ophaalt (reacties van klanten en externe monteurs) wordt direct verplaatst naar de map **03 - WorkPortal**; gelezen of ongelezen blijft zoals het is.
+  - Ook de mail waar je een ticket van maakt (gesleepte .eml) wordt, als hij in de service-mailbox staat, naar die map verplaatst en het mailgesprek aan het ticket gekoppeld.
+  - Reacties die al bij tickets staan, worden bij de eerste ophaalronde na het bijwerken ook verplaatst.
+  - Beheer > Instellingen: aan/uit en de naam van de map. Bestaat de map niet, dan komt hij onder Postvak IN.
+  - Bewaarde bericht-id's worden bijgewerkt, zodat "Antwoord allen" in hetzelfde mailgesprek blijft werken; geen dubbele reacties na verplaatsen.
