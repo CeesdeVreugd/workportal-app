@@ -934,3 +934,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V174 (2.10.6)
 - Bezoek plannen met een externe monteur: vinkje **Externe monteur mailen** (standaard aan). Hij krijgt een mail dat hij is ingepland, met datum, ticket, klant, adres, installatie, contactpersoon bij de klant en de melding, en (als de klant is gemaild) dat de klant is geïnformeerd en zijn naam en telefoonnummer heeft. Taal: die van zijn bedrijf. Kopie aan jezelf; antwoorden komen bij het ticket. Op het ticket komt een interne notitie dat hij is gemaild.
+
+## V175 (2.10.7)
+- Ticket: de **status wijzig je bovenaan** door op het statuslabel te tikken (keuzelijst). Het losse blok "Status" is weg.
+- Bij Gegevens staat het eerstvolgende geplande bezoek.
+- (Sinds V173: bij het plannen van een bezoek gaat het ticket automatisch op Ingepland.)

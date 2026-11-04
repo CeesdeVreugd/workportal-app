@@ -8,7 +8,11 @@
 <div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / {{ t.number }}</div>
 <div class="pagehead">
   <div><div class="eyebrow">{{ t.number }} · {{ TYPES.get(t.type, t.type) }}</div><h1>{{ t.title }}</h1>
-    <p>{{ ticket_status(t.status) }} {{ prio(t.priority) }} · aangemaakt {{ t.created_at|dt }}</p></div>
+    <p class="tstatusline">{% if can('service', 2) %}<details class="stpick"><summary title="Status wijzigen">{{ ticket_status(t.status) }}<span class="caret" aria-hidden="true">▾</span></summary>
+      <form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" data-no-disable><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span class="small muted">Status wijzigen</span>
+        {% for k, l in STATUSES %}<button class="stopt {{ 'cur' if t.status == k }}" name="status" value="{{ k }}" {{ 'disabled' if t.status == k }}>{{ ticket_status(k) }}</button>{% endfor %}
+      </form></details>{% else %}{{ ticket_status(t.status) }}{% endif %} {{ prio(t.priority) }} · aangemaakt {{ t.created_at|dt }}</p></div>
   <div class="actions">
     {% if t.project_sp and not t.project_sp_missing %}<a class="btn" href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }}{{ 'Ordermap' if t.project_kind == 'order' else 'Projectmap' }}</a>{% endif %}
     {% if edit %}
@@ -48,19 +52,12 @@
       <dt>{{ 'Order' if t.project_kind == 'order' else 'Project' }}</dt><dd>{% if t.project_id %}<a href="{{ werk_url('detail', t.project_kind or 'project', pid=t.project_id) }}">{{ t.project_no }}</a>{% if t.project_sp and not t.project_sp_missing %} · <a href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }} Map</a>{% endif %}{% else %}–{% endif %}</dd>
       <dt>Gemeld door</dt><dd>{{ t.reported_by or '–' }}</dd>
       <dt>Toegewezen</dt><dd>{{ t.assignee or '–' }}</dd>
-      {% if t.planned_date %}<dt>Gepland</dt><dd>{{ t.planned_date|date }}</dd>{% endif %}
+      {% if plans %}<dt>Gepland bezoek</dt><dd><a href="#plan{{ plans[0].id }}">{{ plans[0].date|longdate }}</a></dd>{% elif t.planned_date %}<dt>Gepland</dt><dd>{{ t.planned_date|date }}</dd>{% endif %}
     </dl>
     {% if t.description %}<h3 style="margin-top:16px">Melding</h3><div class="prose">{{ t.description }}</div>{% endif %}
   </section>
   <section class="card">
-    <h2>Status</h2>
-    {% if edit %}
-    <form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" class="chips" data-no-disable>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% for k, l in STATUSES %}<button class="btn sm {{ 'primary' if t.status == k }}" name="status" value="{{ k }}">{{ l }}</button>{% endfor %}
-    </form>
-    {% else %}<p>{{ ticket_status(t.status) }}</p>{% endif %}
-    <h3 style="margin-top:20px" id="bijlagen">Foto's &amp; bijlagen ticket</h3>
+    <h3 style="margin-top:0" id="bijlagen">Foto's &amp; bijlagen ticket</h3>
     {% set mv = [] %}{% for v in visits %}{% set _ = mv.append((v.id, 'Bezoek ' ~ (v.date|date) ~ (' (afgetekend)' if v.signed_at or v.closed_at else ''))) %}{% endfor %}
     {% if edit %}{% set call_args = {'del_route': 'service.file_delete', 'del_args': {'tid': t.id}, 'moves': mv, 'move_route': 'service.file_to_visit'} %}{% else %}{% set call_args = {} %}{% endif %}
     {% call photos(files, **call_args) %}

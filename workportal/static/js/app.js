@@ -996,3 +996,8 @@ document.addEventListener("change", function (e) {
   form.querySelectorAll(".kind-intern").forEach(function (x) { x.hidden = ext; });
   form.querySelectorAll(".kind-extern").forEach(function (x) { x.hidden = !ext; });
 });
+
+/* Statuskeuze (en andere kleine uitklapmenu's) sluiten bij klikken ernaast */
+document.addEventListener("click", function (e) {
+  document.querySelectorAll("details.stpick[open]").forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
