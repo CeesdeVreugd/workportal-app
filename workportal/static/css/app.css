@@ -1139,3 +1139,20 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .rowitem.plan > .grow { flex: 1 1 220px; min-width: 0; }
 @media (max-width: 640px) { .rowitem.plan > .actions { width: 100%; } .rowitem.plan > .actions .btn.primary { flex: 1; } }
 .planmail .f { margin-top: 8px; }
+/* V169: adres zoeken ook buitenland; knoppen relatiepagina op de telefoon */
+.addr-row .addr-land { width: auto; flex: 0 0 auto; max-width: 130px; }
+@media (max-width: 640px) {
+  .addr-row { flex-wrap: wrap; }
+  .addr-row .addr-land { flex: 1 1 100%; max-width: none; }
+  .addr-row input { flex: 1 1 60%; }
+}
+.subform { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.subform h3 { margin: 0 0 8px; }
+.card-head { flex-wrap: wrap; }
+.card-head > .actions { margin: 0; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .card-head h2 { flex: 1 1 auto; min-width: 0; }
+  .card-head > .btn, .card-head > .actions { flex: 0 0 auto; }
+  .card-head > .actions .btn { white-space: nowrap; }
+  .pagehead > .actions { width: 100%; }
+}

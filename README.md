@@ -901,3 +901,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Start: blok "Mijn planning" (komende 14 dagen en wat over datum is).
   - Service > Planning: overzicht per week (ook "Mijn planning"), met wat over datum is en nog niet is uitgevoerd.
 - Database-migratie 37: visit_plans en visit_plan_users.
+
+## V169 (2.10.1)
+- Relaties:
+  - Aparte knoppen **+ Locatie** en **+ Contactpersoon**; het formulier verschijnt pas na een klik.
+  - Kop en knoppen van de blokken netjes uitgelijnd op de telefoon.
+  - **Adres zoeken in het buitenland**: keuze Nederland/Buitenland bij "Adres zoeken". Vindt Nederland niets, dan zoekt WorkPortal vanzelf in het buitenland. Buitenlandse adressen komen via WorkPortal van OpenStreetMap (Photon, alleen de zoektekst wordt verstuurd); bij Plaats komt het land erbij (bijv. "Lyon, Frankrijk").

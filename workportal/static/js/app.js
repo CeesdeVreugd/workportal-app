@@ -452,8 +452,9 @@
   document.querySelectorAll("select[data-combo]").forEach(enhance);
 })();
 
-/* Adres zoeken (PDOK Locatieserver, Nederlandse adressen): <div data-addr-search></div> in een formulier
-   met velden address, postcode en city. Typ postcode + huisnummer of straat + plaats en klik Zoek adres. */
+/* Adres zoeken: <div data-addr-search></div> in een formulier met velden address, postcode en city.
+   Nederland: PDOK Locatieserver (vanuit de browser). Buitenland: via WorkPortal (/klanten/api/adres, OpenStreetMap).
+   Vindt Nederland niets, dan wordt automatisch ook in het buitenland gezocht. */
 (function () {
   var BASE = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/";
   function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
@@ -461,35 +462,59 @@
     if (!box || box.dataset.ready) return; box.dataset.ready = "1";
     var form = box.closest("form");
     box.classList.add("addr-search");
-    box.innerHTML = '<label class="f">Adres zoeken<span class="addr-row"><input type="search" placeholder="Postcode + huisnummer, of straat en plaats" autocomplete="off">' +
-      '<button type="button" class="btn sm">Zoek adres</button></span></label><ul class="combo-list" hidden></ul><p class="hint" hidden></p>';
+    box.innerHTML = '<label class="f">Adres zoeken<span class="addr-row"><select class="addr-land" aria-label="Land"><option value="nl">Nederland</option><option value="int">Buitenland</option></select>' +
+      '<input type="search" placeholder="Postcode + huisnummer, of straat en plaats" autocomplete="off">' +
+      '<button type="button" class="btn sm">Zoek</button></span></label><ul class="combo-list" hidden></ul><p class="hint" hidden></p>';
     var inp = box.querySelector("input"), btn = box.querySelector("button"), list = box.querySelector("ul"), hint = box.querySelector(".hint");
+    var land = box.querySelector(".addr-land");
     var f = function (n) { return form && form.querySelector('[name="' + n + '"]'); };
+    var found = [];
     inp.value = [f("address") && f("address").value, f("postcode") && f("postcode").value, f("city") && f("city").value].filter(Boolean).join(" ");
+    land.addEventListener("change", function () { inp.placeholder = land.value === "nl" ? "Postcode + huisnummer, of straat en plaats" : "Straat, huisnummer, plaats en land (bijv. Rue de Lyon 5, Paris)"; list.hidden = true; say(""); });
     function say(t) { hint.hidden = !t; hint.textContent = t || ""; }
+    function show(items) {
+      found = items; say("");
+      list.innerHTML = items.map(function (d, i) { return '<li data-i="' + i + '">' + esc(d.label) + "</li>"; }).join("");
+      list.hidden = false;
+    }
+    function searchInt(q, auto) {
+      say(auto ? "Niet gevonden in Nederland, zoeken in het buitenland…" : "Zoeken…");
+      fetch("/klanten/api/adres?q=" + encodeURIComponent(q), { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (js) {
+        if (js.error) { say(js.error); return; }
+        var docs = (js.results || []).map(function (d) { d.kind = "int"; return d; });
+        if (!docs.length) { say("Geen adres gevonden. Typ straat, huisnummer en plaats, eventueel met het land erbij."); return; }
+        if (auto) land.value = "int";
+        show(docs);
+      }).catch(function () { say("Adres zoeken lukt nu niet."); });
+    }
     function search() {
-      var q = inp.value.trim(); if (!q) { say("Typ eerst een postcode en huisnummer, of een straat en plaats."); return; }
-      say("Zoeken…"); list.hidden = true;
+      var q = inp.value.trim(); if (!q) { say("Typ eerst een adres om te zoeken."); return; }
+      list.hidden = true;
+      if (land.value === "int") { searchInt(q); return; }
+      say("Zoeken…");
       fetch(BASE + "suggest?rows=8&fq=type:adres&q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (js) {
         var docs = (js.response && js.response.docs) || [];
-        if (!docs.length) { say("Geen adres gevonden. Probeer postcode + huisnummer."); return; }
-        say("");
-        list.innerHTML = docs.map(function (d) { return '<li data-id="' + esc(d.id) + '">' + esc(d.weergavenaam) + "</li>"; }).join("");
-        list.hidden = false;
-      }).catch(function () { say("Adres zoeken lukt nu niet (geen verbinding met de adressendienst)."); });
+        if (!docs.length) { searchInt(q, true); return; }
+        show(docs.map(function (d) { return { kind: "nl", id: d.id, label: d.weergavenaam }; }));
+      }).catch(function () { searchInt(q, true); });
+    }
+    function fill(a, label) {
+      if (f("address")) f("address").value = a.address || "";
+      if (f("postcode")) f("postcode").value = a.postcode || "";
+      if (f("city")) f("city").value = a.city || "";
+      inp.value = label; list.hidden = true; say("Adres ingevuld.");
     }
     btn.addEventListener("click", search);
     inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); search(); } });
     list.addEventListener("mousedown", function (e) {
-      var li = e.target.closest("li[data-id]"); if (!li) return; e.preventDefault();
-      fetch(BASE + "lookup?fl=straatnaam,huisnummer,huisletter,huisnummertoevoeging,postcode,woonplaatsnaam&id=" + encodeURIComponent(li.getAttribute("data-id")))
+      var li = e.target.closest("li[data-i]"); if (!li) return; e.preventDefault();
+      var d = found[+li.getAttribute("data-i")]; if (!d) return;
+      if (d.kind === "int") { fill(d, d.label); return; }
+      fetch(BASE + "lookup?fl=straatnaam,huisnummer,huisletter,huisnummertoevoeging,postcode,woonplaatsnaam&id=" + encodeURIComponent(d.id))
         .then(function (r) { return r.json(); }).then(function (js) {
-          var d = (js.response && js.response.docs && js.response.docs[0]) || {};
-          var nr = [d.huisnummer, d.huisletter].filter(Boolean).join("") + (d.huisnummertoevoeging ? "-" + d.huisnummertoevoeging : "");
-          if (f("address")) f("address").value = [d.straatnaam, nr].filter(Boolean).join(" ");
-          if (f("postcode")) f("postcode").value = d.postcode || "";
-          if (f("city")) f("city").value = d.woonplaatsnaam || "";
-          inp.value = li.textContent; list.hidden = true; say("Adres ingevuld.");
+          var x = (js.response && js.response.docs && js.response.docs[0]) || {};
+          var nr = [x.huisnummer, x.huisletter].filter(Boolean).join("") + (x.huisnummertoevoeging ? "-" + x.huisnummertoevoeging : "");
+          fill({ address: [x.straatnaam, nr].filter(Boolean).join(" "), postcode: x.postcode, city: x.woonplaatsnaam }, d.label);
         }).catch(function () { say("Adres ophalen mislukt."); });
     });
     document.addEventListener("mousedown", function (e) { if (!box.contains(e.target)) list.hidden = true; });
@@ -955,3 +980,11 @@
     });
   });
 })();
+
+/* Knop die een (verborgen) formulier opent/sluit: data-toggle-form="id" */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-toggle-form]"); if (!b) return;
+  var f = document.getElementById(b.getAttribute("data-toggle-form")); if (!f) return;
+  f.classList.toggle("hidden");
+  if (!f.classList.contains("hidden")) { var i = f.querySelector("input:not([type=hidden]),select,textarea"); if (i) i.focus(); f.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+});

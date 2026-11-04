@@ -214,6 +214,52 @@ def add_installation(cid):
     return redirect(url_for("klanten.customer", cid=cid) + f"#inst{iid or ''}")
 
 
+COUNTRY_NL = {"de": "Duitsland", "be": "België", "fr": "Frankrijk", "gb": "Verenigd Koninkrijk", "lu": "Luxemburg", "at": "Oostenrijk",
+              "ch": "Zwitserland", "dk": "Denemarken", "pl": "Polen", "es": "Spanje", "it": "Italië", "cz": "Tsjechië", "se": "Zweden",
+              "no": "Noorwegen", "ie": "Ierland", "pt": "Portugal", "hu": "Hongarije", "nl": "Nederland"}
+
+
+@bp.route("/api/adres")
+def address_search():
+    """Adres zoeken in het buitenland (OpenStreetMap via Photon). Nederlandse adressen zoekt de browser zelf bij PDOK.
+    Alleen de zoektekst gaat naar de dienst, verder niets."""
+    from .util import rate_limited
+    if not (can("klanten", BEWERKEN) or can("service", BEWERKEN) or can("crediteuren", BEWERKEN)):
+        return jsonify({"error": "Geen rechten."}), 403
+    q = (request.args.get("q") or "").strip()[:200]
+    if len(q) < 3:
+        return jsonify({"results": []})
+    if rate_limited("adres", 60, 300):
+        return jsonify({"error": "Even wachten, te veel zoekopdrachten."}), 429
+    try:
+        r = requests.get("https://photon.komoot.io/api/", params={"q": q, "limit": 8},
+                         headers={"User-Agent": "WorkPortal De Vreugd Productietechniek"}, timeout=10)
+        feats = r.json().get("features", []) if r.status_code < 400 else []
+    except Exception:  # noqa: BLE001
+        return jsonify({"error": "De adressendienst is nu niet bereikbaar."}), 502
+    out, seen = [], set()
+    for f in feats:
+        pr = f.get("properties") or {}
+        cc = (pr.get("countrycode") or "").lower()
+        street = pr.get("street") or (pr.get("name") if pr.get("type") in ("street", "house") else None)
+        nr = pr.get("housenumber") or ""
+        city = pr.get("city") or pr.get("town") or pr.get("village") or pr.get("district") or pr.get("county") or ""
+        if not (street or city):
+            continue
+        country = COUNTRY_NL.get(cc) or pr.get("country") or ""
+        res = {"address": " ".join(x for x in (street or "", nr) if x).strip(), "postcode": pr.get("postcode") or "",
+               "city": city + (f", {country}" if country and cc != "nl" else ""), "country": country}
+        label = ", ".join(x for x in (res["address"], " ".join(x for x in (res["postcode"], city) if x), country) if x)
+        if pr.get("name") and pr.get("type") not in ("street", "house") and pr.get("name") not in label:
+            label = pr["name"] + " – " + label
+        if label in seen:
+            continue
+        seen.add(label)
+        res["label"] = label
+        out.append(res)
+    return jsonify({"results": out})
+
+
 @bp.route("/api/snel/<kind>", methods=["POST"])
 def quick_add(kind):
     """Snel toevoegen vanuit een keuzelijst (bijv. bij een nieuw ticket): klant, locatie, machine of contactpersoon."""

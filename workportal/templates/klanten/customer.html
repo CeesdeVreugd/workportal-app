@@ -66,22 +66,23 @@
 
 <div class="grid g2 stack">
   <section class="card" id="locaties">
-    <div class="card-head"><h2>Locaties</h2></div>
+    <div class="card-head"><h2>Locaties</h2>{% if edit %}<button class="btn sm" type="button" data-toggle-form="locform">{{ icon('plus') }}Locatie</button>{% endif %}</div>
     <div class="rows">
       {% for l in locations %}<div class="rowitem"><div class="grow"><div class="t">{{ l.name }}</div><div class="s">{{ l.address or '' }} {{ l.postcode or '' }} {{ l.city or '' }}{% if l.address or l.city %} · <a href="https://www.google.com/maps/search/?api=1&query={{ ((l.address or '') ~ ' ' ~ (l.postcode or '') ~ ' ' ~ (l.city or ''))|urlencode }}" target="_blank" rel="noopener">Op de kaart</a>{% endif %}</div></div>
       {% if edit %}<form method="post" action="{{ url_for('klanten.delete_sub', cid=c.id, kind='locatie', oid=l.id) }}" data-confirm="Locatie verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="iconbtn" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}</div>
       {% else %}<div class="empty">Geen extra locaties.</div>{% endfor %}
     </div>
     {% if edit %}
-    <form method="post" action="{{ url_for('klanten.add_location', cid=c.id) }}" class="form" style="margin-top:14px">
+    <form method="post" action="{{ url_for('klanten.add_location', cid=c.id) }}" class="form subform hidden" id="locform">
+      <h3>Nieuwe locatie</h3>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required placeholder="bijv. Vestiging Noord"></label><div class="full" data-addr-search></div><label class="f">Adres<input type="text" name="address"></label><label class="f">Postcode<input type="text" name="postcode"></label><label class="f">Plaats<input type="text" name="city"></label></div>
-      <div><button class="btn sm">{{ icon('plus') }}Locatie toevoegen</button></div>
+      <div class="actions"><button class="btn primary sm">{{ icon('check') }}Locatie toevoegen</button><button class="btn ghost sm" type="button" data-toggle-form="locform">Annuleren</button></div>
     </form>
     {% endif %}
   </section>
   <section class="card" id="contacten">
-    <div class="card-head"><h2>Contactpersonen</h2></div>
+    <div class="card-head"><h2>Contactpersonen</h2>{% if edit %}<button class="btn sm" type="button" data-toggle-form="contactform">{{ icon('plus') }}Contactpersoon</button>{% endif %}</div>
     <div class="rows">
       {% for p in contacts %}<div class="rowitem"><div class="grow"><div class="t">{{ p.name }}{% if p.function %} <span class="muted small">· {{ p.function }}</span>{% endif %}</div>
         <div class="s">{% if p.phone %}<a href="tel:{{ p.phone }}">{{ p.phone }}</a>{% endif %} {% if p.email %}· <a href="mailto:{{ p.email }}">{{ p.email }}</a>{% endif %} {% if p.location %}· {{ p.location }}{% endif %}</div></div>
@@ -89,11 +90,12 @@
       {% else %}<div class="empty">Nog geen contactpersonen.</div>{% endfor %}
     </div>
     {% if edit %}
-    <form method="post" action="{{ url_for('klanten.add_contact', cid=c.id) }}" class="form" style="margin-top:14px">
+    <form method="post" action="{{ url_for('klanten.add_contact', cid=c.id) }}" class="form subform hidden" id="contactform">
+      <h3>Nieuwe contactpersoon</h3>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="fgrid"><label class="f">Naam *<input type="text" name="name" required></label><label class="f">Functie<input type="text" name="function"></label><label class="f">Telefoon<input type="tel" name="phone"></label><label class="f">E-mail<input type="email" name="email"></label>
       <label class="f full">Locatie<select name="location_id"><option value="">Algemeen</option>{% for l in locations %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></label></div>
-      <div><button class="btn sm">{{ icon('plus') }}Contactpersoon toevoegen</button></div>
+      <div class="actions"><button class="btn primary sm">{{ icon('check') }}Contactpersoon toevoegen</button><button class="btn ghost sm" type="button" data-toggle-form="contactform">Annuleren</button></div>
     </form>
     {% endif %}
   </section>
