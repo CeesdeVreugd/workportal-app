@@ -691,6 +691,16 @@ MIGRATIONS = [
     INSERT OR REPLACE INTO settings (key, value) VALUES ('svc_mail_on', '1');
     DELETE FROM settings WHERE key = 'svc_since';
     """,
+    # 36 - service: eigen verzonden mails (uit Verzonden items) die ten onrechte als "van de klant" zijn opgehaald
+    """
+    CREATE TEMP TABLE _own AS SELECT id FROM ticket_notes WHERE kind = 'mail_in' AND (mail_meta LIKE '%"from": "/o=%'
+        OR mail_meta LIKE '%"from": "%@' || (SELECT substr(v, instr(v, '@') + 1) FROM (SELECT COALESCE(
+            NULLIF((SELECT value FROM settings WHERE key = 'svc_mailbox'), ''),
+            NULLIF((SELECT value FROM settings WHERE key = 'cert_sender'), ''), 'devreugd-pt.nl') AS v)) || '"%');
+    DELETE FROM files WHERE entity = 'ticket_note' AND entity_id IN (SELECT id FROM _own);
+    DELETE FROM ticket_notes WHERE id IN (SELECT id FROM _own);
+    DROP TABLE _own;
+    """,
 ]
 
 

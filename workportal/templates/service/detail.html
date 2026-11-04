@@ -120,7 +120,9 @@
         {% endif %}
       </div>
       <div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ (mm.to or [])|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% else %}Van {{ mm['from'] }}{% endif %} · <i>{{ (mm.subject or '')|replace('[WP-T' ~ t.id ~ ']', '')|trim }}</i></div>
-      <div class="notebody" style="white-space:pre-line">{{ n.body }}</div>
+      {% set cb = n.body|mailclean if n.kind == 'mail_in' else n.body %}
+      <div class="notebody" style="white-space:pre-line">{{ cb }}</div>
+      {% if cb|length + 40 < (n.body or '')|length %}<details class="mailfull"><summary>Volledige mail tonen</summary><div class="notebody" style="white-space:pre-line">{{ n.body }}</div></details>{% endif %}
       {% set nf = nfiles.get(n.id, []) %}{% if nf %}<div style="margin-top:8px">{{ photos(nf) }}</div>{% endif %}
     </article>
   {% else %}<div class="empty">Nog geen mail met de klant.</div>{% endfor %}

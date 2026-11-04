@@ -344,6 +344,25 @@ TICKET_NO = _re.compile(r"\bT-\d{4}-\d{3,5}\b", _re.I)
 _RE_PREFIX = _re.compile(r"^\s*((re|aw|antw|fw|fwd|wg|tr)\s*:\s*)+", _re.I)
 
 
+_CLASS_LABEL = _re.compile(r"\A\s*(?://[A-Z][A-Z0-9 _-]*)+//\s*|\A\s*\[?(?:classification|sensitivity|classificatie)\s*:[^\n]*\]?\s*", _re.I)
+_DISCLAIMER = _re.compile(r"^\s*(?:This (?:e-?mail|message)(?: and any attachments?)?(?: is| and| may| contains| are)"
+                          r"|The information (?:contained )?in this (?:e-?mail|message)|Disclaimer\b|CONFIDENTIALITY NOTICE"
+                          r"|Dit (?:e-?mail)?bericht (?:en eventuele bijlagen )?(?:is|kan)|De informatie (?:verzonden )?(?:met|in) dit (?:e-?mail)?bericht"
+                          r"|Op al onze offertes|Diese (?:E-?Mail|Nachricht) (?:enthält|ist|kann)|Ce (?:message|courriel) (?:et|est|peut))", _re.I | _re.M)
+
+
+def clean_mail_text(t):
+    """Wat de klant echt schrijft: zonder classificatielabel (//GENERAL//…//), disclaimer en dubbele <mailto:>/<https:> links."""
+    t = t or ""
+    t = _CLASS_LABEL.sub("", t, count=1)
+    m = _DISCLAIMER.search(t)
+    if m and m.start() > 20:
+        t = t[:m.start()]
+    t = _re.sub(r"(?<=\S)<(?:mailto:|https?://)[^>\s]+>", "", t)
+    t = _re.sub(r"^\[(?:cid:[^\]]*|[^\]\n]{1,40})\]\s*$", "", t, flags=_re.M)   # [logo] / [LinkedIn] van plaatjes
+    return _re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
 def _svc_state():
     from .util import get_setting as _gs
     return {"on": _gs("svc_mail_on") == "1", "error": _gs("svc_last_error") or "", "last": _gs("svc_last_poll") or ""}
@@ -537,9 +556,19 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     if lookback_days:   # handmatig ophalen: ook wat eerder is gemist (dubbele worden overgeslagen)
         since = min(since, (now_utc() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     headers = {"Authorization": f"Bearer {_graph_token()}"}
-    # alle mappen (niet alleen Postvak IN): een regel of iemand kan de mail al hebben verplaatst
+    # alle mappen (niet alleen Postvak IN): een regel of iemand kan de mail al hebben verplaatst. Maar niet
+    # Verzonden items en Concepten: dat zijn onze eigen mails.
+    skip_folders = set()
+    for wk in ("sentitems", "drafts", "outbox"):
+        try:
+            rf = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/{wk}?$select=id", headers=headers, timeout=30)
+            if rf.status_code < 400 and rf.json().get("id"):
+                skip_folders.add(rf.json()["id"])
+        except Exception:  # noqa: BLE001
+            pass
+    own_domain = box.rpartition("@")[2]
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
-           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId&$orderby=receivedDateTime asc&$top=50")
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId&$orderby=receivedDateTime asc&$top=50")
     n, newest, pages = 0, since, 0
     while url and pages < 10:
         pages += 1
@@ -567,8 +596,10 @@ def poll_replies(conn, upload_dir, lookback_days=None):
             if not tid:
                 continue
             frm = (m.get("from") or {}).get("emailAddress") or {}
-            if (frm.get("address") or "").lower() == box:
-                continue   # eigen verzonden mail
+            fa = (frm.get("address") or "").lower()
+            if (m.get("parentFolderId") in skip_folders or fa == box or fa.startswith("/o=")
+                    or (own_domain and fa.endswith("@" + own_domain))):
+                continue   # eigen (verzonden) mail of van een collega, geen reactie van de klant
             rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
                               headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
             js2 = rb.json() if rb.status_code < 400 else {}

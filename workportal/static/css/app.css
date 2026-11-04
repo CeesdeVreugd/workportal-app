@@ -1121,3 +1121,7 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .svcstate { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); margin: -4px 0 8px; }
 .svcstate.bad { color: var(--bad, #C62828); }
 .svcstate form.inline { margin: 0; }
+/* V167: lange adressen/links in mails mogen de kaart niet breder maken (telefoon) */
+.note { min-width: 0; max-width: 100%; }
+.note .notebody, .note .mailmeta, .note .notehead b { overflow-wrap: anywhere; word-break: break-word; }
+.mailfull > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); margin-top: 6px; }

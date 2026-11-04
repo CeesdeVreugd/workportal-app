@@ -886,3 +886,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Valt [WP-T..] uit het onderwerp weg, dan wordt het ticketnummer (T-2026-0006) gebruikt.
   - Bij Notities klant staat of het ophalen werkt (laatste keer of de foutmelding) met een knop **Nu ophalen**.
 - Database-migratie 35: svc_mail_on aan, svc_since opnieuw.
+
+## V167 (2.9.2)
+- Service, Notities klant:
+  - Eigen mails (uit Verzonden items, of van een adres van De Vreugd) worden niet meer als "van de klant" opgehaald. De verkeerd opgehaalde worden bij het bijwerken opgeruimd (migratie 36).
+  - Mails van klanten opgeschoond: geen classificatielabel (//GENERAL//EMPLOYEES//), geen disclaimer, geen dubbele <mailto:>-links. "Volledige mail tonen" laat de originele tekst zien.
+  - Op de telefoon maken lange adressen en links de kaart niet meer breder dan het scherm.
