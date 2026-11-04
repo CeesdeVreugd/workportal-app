@@ -1163,3 +1163,11 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 }
 .attmain > .grow { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .attrow > .iconbtn, .attrow > form, .attrow > details, .attrow > .attdel { flex: 0 0 auto; }
+/* V172: interne/externe monteur */
+.seg label { display: inline-flex; cursor: pointer; }
+.seg label input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label span { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 9px; color: var(--ink-2); font-weight: 500; }
+.seg label input:checked + span { background: var(--basic, #0B0B8C); color: #fff; }
+.seg label input:focus-visible + span { outline: 2px solid #2F6FED; }
+.kind-intern[hidden], .kind-extern[hidden] { display: none !important; }
+.chip small { opacity: .7; font-weight: 400; }

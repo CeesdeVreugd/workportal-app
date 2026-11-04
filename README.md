@@ -919,3 +919,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V171 (2.10.3)
 - Bevestiging van een gepland bezoek gaat **onder het onderwerp van het ticket**: als antwoord in het bestaande mailgesprek met de klant (anders "Ticket T-… [WP-T…]"), niet meer met een eigen onderwerp.
 - Bij het plannen is de **taal** van de bevestiging te kiezen (standaard die van de relatie).
+
+## V172 (2.10.4)
+- Bezoek plannen: eerst kiezen **Interne monteur** of **Externe monteur**.
+  - Intern: collega's met de functie Werkplaats-Service.
+  - Extern: bedrijf (leverancier / klant-en-leverancier) en de monteur als contactpersoon van dat bedrijf (beide verplicht).
+- In de bevestiging aan de klant staan **naam en telefoonnummer** van de monteur(s), bij een externe monteur ook het bedrijf.
+- Gebruikers hebben een veld **Telefoon (mobiel)** (Beheer > Gebruikers); dat nummer gaat mee in de bevestiging. Bij het plannen staat "geen tel." als het ontbreekt.
+- Database-migratie 39: users.phone.

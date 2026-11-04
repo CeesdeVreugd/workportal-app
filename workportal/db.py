@@ -726,6 +726,10 @@ MIGRATIONS = [
     ALTER TABLE visit_plans ADD COLUMN ext_customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
     ALTER TABLE visit_plans ADD COLUMN ext_contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL;
     """,
+    # 39 - telefoonnummer van een gebruiker (monteur) voor de bevestiging aan de klant
+    """
+    ALTER TABLE users ADD COLUMN phone TEXT;
+    """,
 ]
 
 

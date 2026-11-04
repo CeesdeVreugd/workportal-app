@@ -65,13 +65,13 @@ def user(uid=None):
         role_ids = [r["id"] for r in roles if str(r["id"]) in request.form.getlist("role_ids")]
         role_id = role_ids[0] if role_ids else None
         if uid:
-            execute("UPDATE users SET email=?, name=?, role_id=?, is_admin=?, active=? WHERE id=?",
-                    (email, name, role_id, is_admin, active, uid))
+            execute("UPDATE users SET email=?, name=?, phone=?, role_id=?, is_admin=?, active=? WHERE id=?",
+                    (email, name, _f("phone"), role_id, is_admin, active, uid))
             if not active:
                 execute("DELETE FROM devices WHERE user_id = ?", (uid,))
         else:
-            uid = execute("INSERT INTO users (email, name, role_id, is_admin, active, created_at) VALUES (?,?,?,?,?,?)",
-                          (email, name, role_id, is_admin, active, now_iso()))
+            uid = execute("INSERT INTO users (email, name, phone, role_id, is_admin, active, created_at) VALUES (?,?,?,?,?,?,?)",
+                          (email, name, _f("phone"), role_id, is_admin, active, now_iso()))
             if request.form.get("welcome"):
                 app_url = os.environ.get("APP_URL", "")
                 send_mail(email, "Je account voor WorkPortal",

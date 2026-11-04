@@ -10,6 +10,7 @@
     <div class="fgrid">
       <label class="f">Naam *<input type="text" name="name" value="{{ u.name or '' }}" required></label>
       <label class="f">E-mailadres *<input type="email" name="email" value="{{ u.email or '' }}" required></label>
+      <label class="f">Telefoon (mobiel)<input type="tel" name="phone" value="{{ u.phone or '' }}" placeholder="+31 6 …"><span class="hint">Staat bij een monteur in de bevestiging van een gepland bezoek aan de klant.</span></label>
       <div class="f full"><span>Functierollen</span>
         <div class="rolepick">{% for r in roles %}<label class="rolechip role-{{ r.key }}"><input type="checkbox" name="role_ids" value="{{ r.id }}" {{ 'checked' if r.id in user_roles }}><span><i></i>{{ r.name }}</span></label>{% endfor %}</div>
         <span class="hint">Meerdere rollen mogelijk; per module geldt het hoogste recht van de gekozen rollen.</span></div>

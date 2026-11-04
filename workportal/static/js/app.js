@@ -988,3 +988,11 @@ document.addEventListener("click", function (e) {
   f.classList.toggle("hidden");
   if (!f.classList.contains("hidden")) { var i = f.querySelector("input:not([type=hidden]),select,textarea"); if (i) i.focus(); f.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 });
+
+/* Bezoek plannen: interne of externe monteur */
+document.addEventListener("change", function (e) {
+  if (!e.target.matches("[data-kind]")) return;
+  var form = e.target.form, ext = e.target.value === "extern";
+  form.querySelectorAll(".kind-intern").forEach(function (x) { x.hidden = ext; });
+  form.querySelectorAll(".kind-extern").forEach(function (x) { x.hidden = !ext; });
+});

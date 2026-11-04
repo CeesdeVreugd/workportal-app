@@ -8,13 +8,20 @@
 <form method="post" class="card form" style="max-width:760px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label class="f" style="max-width:240px">Datum *<input type="date" name="date" value="{{ p.date or '' }}" required min="{{ now_date() if not pid else '' }}"></label>
-  <div class="f"><span>Monteur(s)</span>
-    <div class="chips">{% for u in users %}<label class="chip"><input type="checkbox" name="users" value="{{ u.id }}" {{ 'checked' if u.id in sel }}><span>{{ u.name }}</span></label>{% endfor %}</div>
-    <span class="hint">{% if users %}Alleen collega's met de functie Werkplaats-Service. {% else %}Er zijn nog geen collega's met de functie Werkplaats-Service (Beheer &gt; Gebruikers). {% endif %}Zij krijgen een melding in WorkPortal en zien het bezoek bij Start en in de planning.</span></div>
-  <div class="fgrid">
-    <label class="f">Extern bedrijf (optioneel)<select name="ext_customer_id" data-combo><option value="">–</option>{% for r in ext_rel %}<option value="{{ r.id }}" {{ 'selected' if (p.ext_customer_id or '')|string == r.id|string }}>{{ r.name }}{% if r.city %} · {{ r.city }}{% endif %}</option>{% endfor %}</select>
+  {% set kind = request.form.get('kind') or ('extern' if p.ext_customer_id and not sel else 'intern') %}
+  <div class="f"><span>Monteur</span>
+    <div class="seg" role="radiogroup">
+      <label><input type="radio" name="kind" value="intern" {{ 'checked' if kind == 'intern' }} data-kind><span>Interne monteur</span></label>
+      <label><input type="radio" name="kind" value="extern" {{ 'checked' if kind == 'extern' }} data-kind><span>Externe monteur</span></label>
+    </div></div>
+  <div class="f kind-intern" {{ 'hidden' if kind != 'intern' }}><span>Interne monteur(s)</span>
+    <div class="chips">{% for u in users %}<label class="chip"><input type="checkbox" name="users" value="{{ u.id }}" {{ 'checked' if u.id in sel }}><span>{{ u.name }}{% if not u.phone %} <small title="Geen telefoonnummer (Beheer &gt; Gebruikers)">· geen tel.</small>{% endif %}</span></label>{% endfor %}</div>
+    <span class="hint">{% if users %}Alleen collega's met de functie Werkplaats-Service. {% else %}Er zijn nog geen collega's met de functie Werkplaats-Service (Beheer &gt; Gebruikers). {% endif %}Zij krijgen een melding in WorkPortal. Het telefoonnummer (Beheer &gt; Gebruikers) gaat mee in de bevestiging aan de klant.</span></div>
+  <div class="fgrid kind-extern" {{ 'hidden' if kind != 'extern' }}>
+    <label class="f">Extern bedrijf *<select name="ext_customer_id" data-combo><option value="">–</option>{% for r in ext_rel %}<option value="{{ r.id }}" {{ 'selected' if (p.ext_customer_id or '')|string == r.id|string }}>{{ r.name }}{% if r.city %} · {{ r.city }}{% endif %}</option>{% endfor %}</select>
       <span class="hint">Bijvoorbeeld voor de besturing. Alleen leveranciers en klant-en-leveranciers.</span></label>
-    <label class="f">Contactpersoon extern bedrijf<select name="ext_contact_id" data-combo data-filter-by="ext_customer_id" data-add="contact"><option value="">–</option>{% for ct in ext_contacts %}<option value="{{ ct.id }}" data-c="{{ ct.customer_id }}" {{ 'selected' if (p.ext_contact_id or '')|string == ct.id|string }}>{{ ct.name }}{% if ct.function %} · {{ ct.function }}{% endif %}</option>{% endfor %}</select></label>
+    <label class="f">Monteur (contactpersoon) *<select name="ext_contact_id" data-combo data-filter-by="ext_customer_id" data-add="contact"><option value="">–</option>{% for ct in ext_contacts %}<option value="{{ ct.id }}" data-c="{{ ct.customer_id }}" {{ 'selected' if (p.ext_contact_id or '')|string == ct.id|string }}>{{ ct.name }}{% if ct.function %} · {{ ct.function }}{% endif %}{% if not ct.phone %} · geen tel.{% endif %}</option>{% endfor %}</select>
+      <span class="hint">Naam en telefoonnummer gaan mee in de bevestiging aan de klant.</span></label>
   </div>
   <details class="planmail" {{ 'open' if request.form.get('mail') }}>
     <summary><label class="check" onclick="event.stopPropagation()"><input type="checkbox" name="mail" value="1" {{ 'checked' if request.form.get('mail') }} onchange="this.closest('details').open=this.checked"> Klant een bevestiging mailen</label></summary>
@@ -22,7 +29,7 @@
       <label class="f">Aan<input type="text" name="mail_to" value="{{ mail_to }}" inputmode="email" placeholder="naam@klant.nl"></label>
       <label class="f">Taal<select name="taal">{% for k, l in LANGS %}<option value="{{ k }}" {{ 'selected' if k == lang }}>{{ l }}</option>{% endfor %}</select></label>
     </div>
-    <span class="hint">Met datum en monteur(s), onder het onderwerp van het ticket (als antwoord in het mailgesprek met de klant). Antwoorden komen bij Notities klant. De taal staat standaard op die van de relatie.</span>
+    <span class="hint">Met datum, naam en telefoonnummer van de monteur(s), onder het onderwerp van het ticket (als antwoord in het mailgesprek met de klant). Antwoorden komen bij Notities klant. De taal staat standaard op die van de relatie.</span>
     <label class="f">Extra tekst (optioneel)<textarea name="extra" rows="3" placeholder="bijv. We komen rond 8:00 uur. Graag de installatie vrijgeven.">{{ request.form.get('extra', '') }}</textarea></label>
   </details>
   <div class="actions"><button class="btn primary">{{ icon('check') }}{{ 'Opslaan' if pid else 'Inplannen' }}</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) }}#bezoeken">Annuleren</a></div>

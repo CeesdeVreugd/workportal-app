@@ -717,12 +717,21 @@ def plans_query(where="", params=(), order="p.date, p.id"):
     return out
 
 
-def _plan_mail_text(t, date_iso, names, lang, extra=""):
+def _plan_mail_text(t, date_iso, people, lang, extra=""):
+    """people: [(naam, telefoon, bedrijf of None)] - de monteur(s), met telefoonnummer in de mail."""
     from .talen import tr, long_date
     L = tr(lang)
     who = t["contact"]
     body = (L["greet"].format(n=who) if who else L["greet_none"]) + "\n\n" + L["plan_body"].format(
-        d=long_date(date_iso, lang), who=L["plan_who"].format(n=names) if names else "")
+        d=long_date(date_iso, lang), who="")
+    if people:
+        lines = []
+        for name, phone, company in people:
+            line = name + (f" ({L['of_company']} {company})" if company else "")
+            if phone:
+                line += f" – {L['tel']} {phone}"
+            lines.append(line)
+        body += "\n\n" + (L["plan_tech"] if len(lines) == 1 else L["plan_techs"]) + ":\n" + "\n".join(lines)
     if extra:
         body += "\n\n" + extra.strip()
     return L["plan_subject"].format(nr=t["number"]), body + "\n\n" + L["plan_q"]
@@ -742,20 +751,21 @@ def plan(tid, pid=None):
             return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
     sel_now = {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))} if pid else set()
     users = [u for u in query(
-        "SELECT u.id, u.name, u.email, EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id"
+        "SELECT u.id, u.name, u.email, u.phone, EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id"
         " WHERE ur.user_id = u.id AND r.key = 'werkplaats') AS tech FROM users u WHERE u.active = 1 ORDER BY u.name")
         if u["tech"] or u["id"] in sel_now]
     valid = {u["id"] for u in users}
     ext_rel = query("SELECT id, name, city FROM customers WHERE active = 1 AND relation_type IN ('leverancier', 'beide') ORDER BY name")
     ext_ids = {r["id"] for r in ext_rel}
-    ext_contacts = query("SELECT ct.id, ct.customer_id, ct.name, ct.function FROM contacts ct JOIN customers c ON c.id = ct.customer_id"
+    ext_contacts = query("SELECT ct.id, ct.customer_id, ct.name, ct.function, ct.phone FROM contacts ct JOIN customers c ON c.id = ct.customer_id"
                          " WHERE c.relation_type IN ('leverancier', 'beide') ORDER BY ct.name")
     extra_ctx = dict(ext_rel=ext_rel, ext_contacts=ext_contacts)
     lang = _lang(t, request.form.get("taal"))
     if request.method == "POST":
         date_v = (_f("date") or "")[:10]
-        uids = [u for u in (to_int(x) for x in request.form.getlist("users")) if u in valid]
-        ext_c = to_int(request.form.get("ext_customer_id"))
+        kind = "extern" if request.form.get("kind") == "extern" else "intern"
+        uids = [u for u in (to_int(x) for x in request.form.getlist("users")) if u in valid] if kind == "intern" else []
+        ext_c = to_int(request.form.get("ext_customer_id")) if kind == "extern" else None
         ext_c = ext_c if ext_c in ext_ids else None
         ext_p = to_int(request.form.get("ext_contact_id"))
         if ext_p and not (ext_c and query("SELECT 1 FROM contacts WHERE id = ? AND customer_id = ?", (ext_p, ext_c), one=True)):
@@ -765,8 +775,8 @@ def plan(tid, pid=None):
             _dt.date.fromisoformat(date_v)
         except ValueError:
             date_v = ""
-        if not date_v or not (uids or ext_c):
-            flash("Kies een datum en minstens één monteur of een extern bedrijf.", "error")
+        if not date_v or (kind == "intern" and not uids) or (kind == "extern" and not (ext_c and ext_p)):
+            flash("Kies een datum en " + ("minstens één monteur." if kind == "intern" else "het externe bedrijf en de monteur (contactpersoon)."), "error")
             return render_template("service/plan.html", t=t, p=request.form, pid=pid, users=users, sel=set(uids), lang=lang,
                                    mail_to=_f("mail_to") or "", **extra_ctx)
         now = now_iso()
@@ -785,7 +795,11 @@ def plan(tid, pid=None):
             execute("UPDATE tickets SET status = 'ingepland' WHERE id = ?", (tid,))
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
         ext_name = next((r["name"] for r in ext_rel if r["id"] == ext_c), None)
-        names = ", ".join([u["name"] for u in users if u["id"] in uids] + ([ext_name] if ext_name else []))
+        ext_ct = next((x for x in ext_contacts if x["id"] == ext_p), None)
+        people = [(u["name"], u["phone"], None) for u in users if u["id"] in uids]
+        if ext_ct:
+            people.append((ext_ct["name"], ext_ct["phone"], ext_name))
+        names = ", ".join([u["name"] for u in users if u["id"] in uids] + ([f"{ext_ct['name']} ({ext_name})"] if ext_ct else []))
         audit("bezoek gepland" if not old else "planning gewijzigd", "ticket", tid, f"{fmt_date(date_v)} · {names}")
         # monteurs een melding (nieuw ingepland of datum gewijzigd)
         try:
@@ -798,7 +812,7 @@ def plan(tid, pid=None):
             print(f"[WorkPortal] Melding planning mislukt: {exc}", flush=True)
         msg = f"Bezoek gepland op {fmt_date(date_v)} ({names})."
         if request.form.get("mail"):
-            ok, err = _mail_plan(t, tid, pid, date_v, names, lang, _f("mail_to"), _f("extra") or "")
+            ok, err = _mail_plan(t, tid, pid, date_v, people, lang, _f("mail_to"), _f("extra") or "")
             msg += " Bevestiging gemaild aan de klant." if ok else f" Mailen is niet gelukt: {err}"
         flash(msg, "ok")
         return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
@@ -807,7 +821,7 @@ def plan(tid, pid=None):
                            mail_to=t["contact_email"] or t["customer_email"] or "", **extra_ctx)
 
 
-def _mail_plan(t, tid, pid, date_v, names, lang, to_raw, extra):
+def _mail_plan(t, tid, pid, date_v, people, lang, to_raw, extra):
     from .mail import send_mail_with_files
     to = [a.strip() for a in _re.split(r"[;,\s]+", to_raw or "") if a.strip()]
     if not to or any(not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
@@ -816,7 +830,7 @@ def _mail_plan(t, tid, pid, date_v, names, lang, to_raw, extra):
     if not box:
         return False, "geen service-mailbox ingesteld (Beheer > Instellingen)"
     from .mail import reply_in_thread
-    _subj, body = _plan_mail_text(t, date_v, names, lang, extra)
+    _subj, body = _plan_mail_text(t, date_v, people, lang, extra)
     cc = [g.user["email"]] if g.user["email"] and g.user["email"] not in to else []
     signer = "werkvoorbereiding:" + (g.user["name"] or "")
     # onder het onderwerp van het ticket: antwoord in het bestaande mailgesprek, anders "Ticket T-… [WP-T…]"
