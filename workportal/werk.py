@@ -190,7 +190,8 @@ def detail(pid):
     nfiles = {n["id"]: files_for("project_note", n["id"]) for n in notes}
     from .kennis import calcs_for
     from .aantekeningen import annotations_for, STATUS_LABEL
-    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, tests=tests, calcs=calcs,
+    open_tickets = sum(1 for t in tickets if t["status"] not in ("afgerond", "gefactureerd"))
+    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
@@ -510,6 +511,24 @@ def print_bon(pid):
         audit("afgedrukt", "project", pid, f"{p['number']} · Orderbon · via Printix")
         flash("Orderbon naar de printer gestuurd.", "ok")
     return redirect(target)
+
+
+@bp.route("/<int:pid>/status", methods=["POST"])
+def set_status(pid):
+    """Project/order afronden of weer actief maken (knop op de detailpagina)."""
+    p = _row(pid)
+    r = _wrong_bp(p)
+    if r:
+        return r
+    k = K()
+    _need(BEWERKEN)
+    status = request.form.get("status")
+    if status not in ("actief", "afgerond", "gearchiveerd"):
+        abort(400)
+    execute("UPDATE projects SET status = ? WHERE id = ?", (status, pid))
+    audit({"afgerond": "afgerond", "actief": "heropend", "gearchiveerd": "gearchiveerd"}[status], "project", pid, p["number"])
+    flash(f"{k['label']} {p['number']} " + {"afgerond": "afgerond.", "actief": "weer actief.", "gearchiveerd": "gearchiveerd."}[status], "ok")
+    return redirect(url_for(f"{request.blueprint}.detail", pid=pid))
 
 
 @bp.route("/<int:pid>/verwijderen", methods=["POST"])

@@ -939,3 +939,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - Ticket: de **status wijzig je bovenaan** door op het statuslabel te tikken (keuzelijst). Het losse blok "Status" is weg.
 - Bij Gegevens staat het eerstvolgende geplande bezoek.
 - (Sinds V173: bij het plannen van een bezoek gaat het ticket automatisch op Ingepland.)
+
+## V176 (2.10.8)
+- Orders en projecten: knop **Order afronden** / **Project afronden** bovenaan de detailpagina (met waarschuwing als er nog open tickets zijn). Afgerond staat als label bij het nummer; met **Weer actief maken** zet je hem terug.

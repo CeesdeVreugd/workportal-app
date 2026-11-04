@@ -6,11 +6,14 @@
 {% block content %}
 <div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / {{ p.number }}</div>
 <div class="pagehead">
-  <div><div class="eyebrow">{{ K.label }} {{ p.number }} · {{ p.status }}</div><h1>{{ p.name }}</h1><p>{% if p.customer_id %}<a href="{{ url_for('klanten.customer', cid=p.customer_id) }}">{{ p.customer }}</a>{% else %}Geen klant gekoppeld{% endif %}{% if p.sharepoint_path and not p.sp_item_id %} · SharePoint: {{ p.sharepoint_path }}{% endif %}</p></div>
+  <div><div class="eyebrow">{{ K.label }} {{ p.number }}{% if p.status != 'actief' %} · <span class="badge {{ 'b-ok' if p.status == 'afgerond' else '' }}">{{ {'afgerond': 'Afgerond', 'gearchiveerd': 'Gearchiveerd'}.get(p.status, p.status) }}</span>{% endif %}</div><h1>{{ p.name }}</h1><p>{% if p.customer_id %}<a href="{{ url_for('klanten.customer', cid=p.customer_id) }}">{{ p.customer }}</a>{% else %}Geen klant gekoppeld{% endif %}{% if p.sharepoint_path and not p.sp_item_id %} · SharePoint: {{ p.sharepoint_path }}{% endif %}</p></div>
   <div class="actions">
     {% if can('druktest', 2) %}<a class="btn" href="{{ url_for('druktest.new', project=p.id) }}">{{ icon('druktest') }}Druktest</a>{% endif %}
     {% if can('nacalculatie') %}<a class="btn" href="{{ url_for('nacalc.index', project=p.id) }}">{{ icon('nacalculatie') }}Na-calculatie</a>{% endif %}
     {% if can('projecten', 2) and can('orders', 2) %}<form method="post" action="{{ url_for(B ~ '.convert', pid=p.id) }}" data-confirm="{{ p.number }} omzetten naar {{ 'order' if p.kind == 'project' else 'project' }}?{{ ' De map in SharePoint wordt hernoemd.' if p.sp_item_id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn">{{ icon('refresh') }}Maak {{ 'order' if p.kind == 'project' else 'project' }}</button></form>{% endif %}
+    {% if can(K.module, 2) %}<form method="post" action="{{ url_for(B ~ '.set_status', pid=p.id) }}"{% if p.status == 'actief' %} data-confirm="{{ K.label }} {{ p.number }} afronden?{% if open_tickets %} Let op: er {{ 'staat' if open_tickets == 1 else 'staan' }} nog {{ open_tickets }} open ticket{{ '' if open_tickets == 1 else 's' }}.{% endif %}"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if p.status == 'actief' %}<button class="btn" name="status" value="afgerond">{{ icon('check') }}{{ K.label }} afronden</button>
+      {% else %}<button class="btn" name="status" value="actief">{{ icon('refresh') }}Weer actief maken</button>{% endif %}</form>{% endif %}
     {% if can(K.module, 2) %}<a class="btn primary" href="{{ url_for(B ~ '.edit', pid=p.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
   </div>
 </div>
