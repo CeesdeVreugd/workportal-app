@@ -705,6 +705,8 @@ def plans_query(where="", params=(), order="p.date, p.id"):
                  " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
                  " (SELECT GROUP_CONCAT(u.name, ', ') FROM visit_plan_users pu JOIN users u ON u.id = pu.user_id WHERE pu.plan_id = p.id) AS names,"
                  " (SELECT GROUP_CONCAT(pu.user_id) FROM visit_plan_users pu WHERE pu.plan_id = p.id) AS uids,"
+                 " (SELECT GROUP_CONCAT(u.name || '|' || IFNULL(u.phone, ''), ';;') FROM visit_plan_users pu JOIN users u ON u.id = pu.user_id"
+                 "  WHERE pu.plan_id = p.id) AS techs_raw,"
                  " xc.name AS ext_name, xp.name AS ext_contact, xp.phone AS ext_phone, xp.email AS ext_email"
                  " FROM visit_plans p JOIN tickets t ON t.id = p.ticket_id LEFT JOIN customers c ON c.id = t.customer_id"
                  " LEFT JOIN customers xc ON xc.id = p.ext_customer_id LEFT JOIN contacts xp ON xp.id = p.ext_contact_id"
@@ -713,6 +715,7 @@ def plans_query(where="", params=(), order="p.date, p.id"):
     for r in rows:
         d = dict(r)
         d["uid_list"] = [int(x) for x in (r["uids"] or "").split(",") if x]
+        d["techs"] = [tuple(x.split("|", 1)) for x in (r["techs_raw"] or "").split(";;") if x]
         out.append(d)
     return out
 
@@ -757,7 +760,7 @@ def plan(tid, pid=None):
     valid = {u["id"] for u in users}
     ext_rel = query("SELECT id, name, city FROM customers WHERE active = 1 AND relation_type IN ('leverancier', 'beide') ORDER BY name")
     ext_ids = {r["id"] for r in ext_rel}
-    ext_contacts = query("SELECT ct.id, ct.customer_id, ct.name, ct.function, ct.phone FROM contacts ct JOIN customers c ON c.id = ct.customer_id"
+    ext_contacts = query("SELECT ct.id, ct.customer_id, ct.name, ct.function, ct.phone, ct.email, c.language FROM contacts ct JOIN customers c ON c.id = ct.customer_id"
                          " WHERE c.relation_type IN ('leverancier', 'beide') ORDER BY ct.name")
     extra_ctx = dict(ext_rel=ext_rel, ext_contacts=ext_contacts)
     lang = _lang(t, request.form.get("taal"))
@@ -791,7 +794,7 @@ def plan(tid, pid=None):
                           " VALUES (?,?,?,?,?,?,?)", (tid, date_v, ext_c, ext_p, g.user["id"], now, now))
         for u in uids:
             execute("INSERT OR IGNORE INTO visit_plan_users (plan_id, user_id) VALUES (?, ?)", (pid, u))
-        if t["status"] == "nieuw":
+        if t["status"] in ("nieuw", "wacht", "in_uitvoering"):
             execute("UPDATE tickets SET status = 'ingepland' WHERE id = ?", (tid,))
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
         ext_name = next((r["name"] for r in ext_rel if r["id"] == ext_c), None)
@@ -811,14 +814,53 @@ def plan(tid, pid=None):
         except Exception as exc:  # pragma: no cover
             print(f"[WorkPortal] Melding planning mislukt: {exc}", flush=True)
         msg = f"Bezoek gepland op {fmt_date(date_v)} ({names})."
+        cust_mailed = False
         if request.form.get("mail"):
             ok, err = _mail_plan(t, tid, pid, date_v, people, lang, _f("mail_to"), _f("extra") or "")
+            cust_mailed = ok
             msg += " Bevestiging gemaild aan de klant." if ok else f" Mailen is niet gelukt: {err}"
+        if ext_ct and request.form.get("mail_ext"):
+            if not ext_ct["email"]:
+                msg += f" {ext_ct['name']} heeft geen e-mailadres; de externe monteur is niet gemaild."
+            else:
+                ok, err = _mail_ext(t, tid, date_v, ext_ct, ext_name, cust_mailed or bool(p and p["mailed_at"]))
+                msg += f" Planning gemaild aan {ext_ct['name']}." if ok else f" Mailen aan de externe monteur is niet gelukt: {err}"
         flash(msg, "ok")
         return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
     sel = sel_now if pid else ({g.user["id"]} & valid)
     return render_template("service/plan.html", t=t, p=p or {"date": ""}, pid=pid, users=users, sel=sel, lang=lang,
                            mail_to=t["contact_email"] or t["customer_email"] or "", **extra_ctx)
+
+
+def _mail_ext(t, tid, date_v, ct, company, informed):
+    """Externe monteur: bevestiging dat hij is ingepland, met de gegevens van de klant (in de taal van zijn bedrijf)."""
+    from .mail import send_mail_with_files
+    from .talen import tr, long_date, LANG_LABELS
+    box = svc_mailbox()
+    if not box:
+        return False, "geen service-mailbox ingesteld"
+    xl = ct["language"] if ct["language"] in LANG_LABELS else "nl"
+    L = tr(xl)
+    d = long_date(date_v, xl)
+    lines = [(L["x_ticket"], f"{t['number']} – {t['title']}"), (L["x_customer"], t["customer"]), (L["x_address"], t["visit_address"]),
+             (L["x_install"], " ".join(x for x in (t["installation"] or "", f"({t['serial']})" if t["serial"] else "") if x)),
+             (L["x_contact"], " · ".join(x for x in (t["contact"], t["contact_phone"], t["contact_email"]) if x))]
+    body = (L["greet"].format(n=ct["name"]) + "\n\n" + L["x_body"].format(d=d) + "\n\n"
+            + "\n".join(f"{k}: {v}" for k, v in lines if v))
+    if t["description"]:
+        body += f"\n\n{L['x_report']}:\n" + t["description"].strip()[:1500]
+    if informed:
+        body += "\n\n" + L["x_informed"]
+    body += "\n\n" + L["x_q"]
+    subject = L["x_subject"].format(d=fmt_date(date_v), nr=t["number"]) + f" [WP-T{tid}]"
+    cc = [g.user["email"]] if g.user["email"] and g.user["email"] != ct["email"] else []
+    ok, err = send_mail_with_files(box, [ct["email"]], subject, body, [], cc=cc or None, signer="werkvoorbereiding:" + (g.user["name"] or ""))
+    if ok:
+        execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at) VALUES (?,?,?,?,?)",
+                (tid, "intern", f"Planning ({fmt_date(date_v)}) gemaild aan externe monteur {ct['name']} ({company}, {ct['email']}).",
+                 g.user["id"], now_iso()))
+        audit("planning gemaild extern", "ticket", tid, f"{ct['name']} <{ct['email']}>")
+    return ok, err
 
 
 def _mail_plan(t, tid, pid, date_v, people, lang, to_raw, extra):

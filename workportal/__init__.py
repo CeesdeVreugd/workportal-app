@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.10.4"
+VERSION = "2.10.6"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -106,6 +106,8 @@ def create_app(test_config=None, start_scheduler=True):
     app.jinja_env.globals.update(LANGS=LANGS, LANG_LABELS=LANG_LABELS)
     from .service import clean_mail_text
     app.jinja_env.filters['mailclean'] = clean_mail_text
+    from .talen import long_date as _ld
+    app.jinja_env.filters['longdate'] = _ld
 
     @app.before_request
     def _before():

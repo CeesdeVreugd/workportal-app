@@ -160,11 +160,18 @@
 <section class="card" id="bezoeken">
   <div class="card-head"><h2>Bezoeken ({{ visits|length }}{% if plans %} + {{ plans|length }} gepland{% endif %})</h2>{% if edit %}<div class="actions" style="margin:0"><a class="btn sm" href="{{ url_for('service.plan', tid=t.id) }}">{{ icon('timer') }}Plannen</a><a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a></div>{% endif %}</div>
   <div class="rows">
-  {% for p in plans %}
-    <div class="rowitem plan {{ 'late' if p.date < now_date() }}" id="plan{{ p.id }}">
-      <div class="grow"><div class="t"><span class="badge b-blue">Gepland</span> {{ p.date|date }}{% if p.date < now_date() %} <span class="badge b-warn">over datum</span>{% endif %}</div>
-        <div class="s">{{ p.names or ('' if p.ext_name else '–') }}{% if p.ext_name %}{{ ' · ' if p.names }}<b>extern:</b> {{ p.ext_name }}{% if p.ext_contact %} ({{ p.ext_contact }}{% if p.ext_phone %}, <a href="tel:{{ p.ext_phone }}">{{ p.ext_phone }}</a>{% endif %}){% endif %}{% endif %}{% if p.mailed_at %} · klant gemaild {{ p.mailed_at|dt }}{% endif %}</div></div>
-      {% if edit %}<div class="actions" style="margin:0">
+  {% for p in plans %}{% set late = p.date < now_date() %}
+    <div class="planitem {{ 'late' if late }}" id="plan{{ p.id }}">
+      <div class="planhead">
+        <span class="badge {{ 'b-warn' if late else 'b-blue' }}">{{ 'Over datum' if late else ('Vandaag' if p.date == now_date() else 'Gepland') }}</span>
+        <b>{{ p.date|longdate }}</b>
+      </div>
+      <ul class="planwho">
+        {% for name, phone in p.techs %}<li>{{ icon('service') }}<span><b>{{ name }}</b>{% if phone %} · <a href="tel:{{ phone }}">{{ phone }}</a>{% endif %}</span></li>{% endfor %}
+        {% if p.ext_name %}<li>{{ icon('service') }}<span><b>{{ p.ext_contact or 'Externe monteur' }}</b>{% if p.ext_phone %} · <a href="tel:{{ p.ext_phone }}">{{ p.ext_phone }}</a>{% endif %}<br><span class="muted">extern · {{ p.ext_name }}</span></span></li>{% endif %}
+      </ul>
+      {% if p.mailed_at %}<div class="small muted plansent">{{ icon('mail') }} Bevestiging naar klant {{ p.mailed_at|dt }}</div>{% endif %}
+      {% if edit %}<div class="planbtns">
         <a class="btn sm primary" href="{{ url_for('service.visit', tid=t.id, plan=p.id) }}">{{ icon('plus') }}Uitvoeren</a>
         <a class="btn sm" href="{{ url_for('service.plan', tid=t.id, pid=p.id) }}">{{ icon('edit') }}Wijzigen</a>
         <form method="post" action="{{ url_for('service.plan_delete', tid=t.id, pid=p.id) }}" data-confirm="Planning van {{ p.date|date }} verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" title="Planning verwijderen" aria-label="Planning verwijderen">{{ icon('trash') }}</button></form>

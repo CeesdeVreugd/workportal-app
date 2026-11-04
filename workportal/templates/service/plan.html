@@ -22,6 +22,7 @@
       <span class="hint">Bijvoorbeeld voor de besturing. Alleen leveranciers en klant-en-leveranciers.</span></label>
     <label class="f">Monteur (contactpersoon) *<select name="ext_contact_id" data-combo data-filter-by="ext_customer_id" data-add="contact"><option value="">–</option>{% for ct in ext_contacts %}<option value="{{ ct.id }}" data-c="{{ ct.customer_id }}" {{ 'selected' if (p.ext_contact_id or '')|string == ct.id|string }}>{{ ct.name }}{% if ct.function %} · {{ ct.function }}{% endif %}{% if not ct.phone %} · geen tel.{% endif %}</option>{% endfor %}</select>
       <span class="hint">Naam en telefoonnummer gaan mee in de bevestiging aan de klant.</span></label>
+    <label class="check full"><input type="checkbox" name="mail_ext" value="1" {{ 'checked' if request.method == 'GET' or request.form.get('mail_ext') }}> Externe monteur mailen dat hij is ingepland (met klant, adres, contactpersoon en melding; en dat de klant is gemaild)</label>
   </div>
   <details class="planmail" {{ 'open' if request.form.get('mail') }}>
     <summary><label class="check" onclick="event.stopPropagation()"><input type="checkbox" name="mail" value="1" {{ 'checked' if request.form.get('mail') }} onchange="this.closest('details').open=this.checked"> Klant een bevestiging mailen</label></summary>

@@ -1171,3 +1171,18 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .seg label input:focus-visible + span { outline: 2px solid #2F6FED; }
 .kind-intern[hidden], .kind-extern[hidden] { display: none !important; }
 .chip small { opacity: .7; font-weight: 400; }
+/* V173: gepland bezoek netter */
+.planitem { border: 1px solid #C9D7FA; background: #F5F8FF; border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.planitem.late { border-color: #F3C98B; background: #FFF8EC; }
+.planhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.planhead b { font-size: 16px; }
+.planwho { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.planwho li { display: flex; gap: 8px; align-items: flex-start; }
+.planwho li > svg { width: 16px; height: 16px; margin-top: 3px; color: var(--accent); flex: 0 0 auto; }
+.planwho .muted { font-size: 13px; }
+.plansent svg { width: 14px; height: 14px; vertical-align: -2px; }
+.planbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.planbtns form { margin: 0; }
+.planbtns .btn.primary { flex: 1 1 auto; }
+@media (min-width: 641px) { .planbtns .btn.primary { flex: 0 0 auto; } }
+#bezoeken .rows > .planitem + .planitem, #bezoeken .rows > .planitem + .rowitem { margin-top: 10px; }

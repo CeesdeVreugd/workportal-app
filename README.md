@@ -927,3 +927,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 - In de bevestiging aan de klant staan **naam en telefoonnummer** van de monteur(s), bij een externe monteur ook het bedrijf.
 - Gebruikers hebben een veld **Telefoon (mobiel)** (Beheer > Gebruikers); dat nummer gaat mee in de bevestiging. Bij het plannen staat "geen tel." als het ontbreekt.
 - Database-migratie 39: users.phone.
+
+## V173 (2.10.5)
+- Gepland bezoek op het ticket netter: eigen kader met de dag voluit (bijv. "donderdag 5 november 2026"), per monteur naam en telefoonnummer (extern met het bedrijf eronder), wanneer de bevestiging naar de klant is gegaan en de knoppen op één rij.
+- Bij het plannen gaat het ticket automatisch op **Ingepland** (ook vanuit "Wacht op onderdelen" of "In uitvoering").
+
+## V174 (2.10.6)
+- Bezoek plannen met een externe monteur: vinkje **Externe monteur mailen** (standaard aan). Hij krijgt een mail dat hij is ingepland, met datum, ticket, klant, adres, installatie, contactpersoon bij de klant en de melding, en (als de klant is gemaild) dat de klant is geïnformeerd en zijn naam en telefoonnummer heeft. Taal: die van zijn bedrijf. Kopie aan jezelf; antwoorden komen bij het ticket. Op het ticket komt een interne notitie dat hij is gemaild.
