@@ -20,7 +20,7 @@
 <a class="rowitem" href="{{ url_for('service.detail', tid=p.ticket_id) }}#plan{{ p.id }}">
   <div class="grow"><div class="t">{{ p.number }} · {{ p.title }} {{ prio(p.priority) }}</div>
   <div class="s">{{ p.customer or 'Geen klant' }}{% if p.visit_address %} · {{ p.visit_address }}{% endif %}</div>
-  <div class="s"><b>{{ p.names or '–' }}</b></div></div>
+  <div class="s"><b>{{ p.names or ('' if p.ext_name else '–') }}</b>{% if p.ext_name %}{{ ' · ' if p.names }}extern: {{ p.ext_name }}{% if p.ext_contact %} ({{ p.ext_contact }}){% endif %}{% endif %}</div></div>
 </a>
 {%- endmacro %}
 {% if late %}

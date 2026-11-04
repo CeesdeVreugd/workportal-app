@@ -907,3 +907,15 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Aparte knoppen **+ Locatie** en **+ Contactpersoon**; het formulier verschijnt pas na een klik.
   - Kop en knoppen van de blokken netjes uitgelijnd op de telefoon.
   - **Adres zoeken in het buitenland**: keuze Nederland/Buitenland bij "Adres zoeken". Vindt Nederland niets, dan zoekt WorkPortal vanzelf in het buitenland. Buitenlandse adressen komen via WorkPortal van OpenStreetMap (Photon, alleen de zoektekst wordt verstuurd); bij Plaats komt het land erbij (bijv. "Lyon, Frankrijk").
+
+## V170 (2.10.2)
+- Bezoek plannen:
+  - Bij Monteur(s) staan alleen collega's met de functie Werkplaats-Service (administratie e.d. niet).
+  - Optioneel een **extern bedrijf** (alleen leveranciers en klant-en-leveranciers) met een **contactpersoon** van dat bedrijf (ook direct nieuw toe te voegen). Zichtbaar op het ticket (met telefoonnummer) en in de planning; in de bevestiging aan de klant staat het bedrijf bij "door …".
+  - Een planning kan ook alleen met een extern bedrijf (zonder eigen monteur).
+- Telefoon: "Ticket afsluiten" is even breed als de andere knoppen; bij een lange bijlagenaam lopen de knoppen niet meer door de tekst.
+- Database-migratie 38: visit_plans.ext_customer_id/ext_contact_id.
+
+## V171 (2.10.3)
+- Bevestiging van een gepland bezoek gaat **onder het onderwerp van het ticket**: als antwoord in het bestaande mailgesprek met de klant (anders "Ticket T-… [WP-T…]"), niet meer met een eigen onderwerp.
+- Bij het plannen is de **taal** van de bevestiging te kiezen (standaard die van de relatie).

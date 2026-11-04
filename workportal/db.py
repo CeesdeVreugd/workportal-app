@@ -721,6 +721,11 @@ MIGRATIONS = [
     CREATE INDEX idx_visit_plans_date ON visit_plans(date);
     CREATE INDEX idx_visit_plans_ticket ON visit_plans(ticket_id);
     """,
+    # 38 - planning: ook een extern bedrijf (leverancier) met contactpersoon
+    """
+    ALTER TABLE visit_plans ADD COLUMN ext_customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+    ALTER TABLE visit_plans ADD COLUMN ext_contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL;
+    """,
 ]
 
 

@@ -163,7 +163,7 @@
   {% for p in plans %}
     <div class="rowitem plan {{ 'late' if p.date < now_date() }}" id="plan{{ p.id }}">
       <div class="grow"><div class="t"><span class="badge b-blue">Gepland</span> {{ p.date|date }}{% if p.date < now_date() %} <span class="badge b-warn">over datum</span>{% endif %}</div>
-        <div class="s">{{ p.names or '–' }}{% if p.mailed_at %} · klant gemaild {{ p.mailed_at|dt }}{% endif %}</div></div>
+        <div class="s">{{ p.names or ('' if p.ext_name else '–') }}{% if p.ext_name %}{{ ' · ' if p.names }}<b>extern:</b> {{ p.ext_name }}{% if p.ext_contact %} ({{ p.ext_contact }}{% if p.ext_phone %}, <a href="tel:{{ p.ext_phone }}">{{ p.ext_phone }}</a>{% endif %}){% endif %}{% endif %}{% if p.mailed_at %} · klant gemaild {{ p.mailed_at|dt }}{% endif %}</div></div>
       {% if edit %}<div class="actions" style="margin:0">
         <a class="btn sm primary" href="{{ url_for('service.visit', tid=t.id, plan=p.id) }}">{{ icon('plus') }}Uitvoeren</a>
         <a class="btn sm" href="{{ url_for('service.plan', tid=t.id, pid=p.id) }}">{{ icon('edit') }}Wijzigen</a>

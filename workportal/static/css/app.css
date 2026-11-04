@@ -1156,3 +1156,10 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
   .card-head > .actions .btn { white-space: nowrap; }
   .pagehead > .actions { width: 100%; }
 }
+/* V170: telefoon - knop in een formulier (Ticket afsluiten) even breed als de andere; lange bijlagenaam niet onder de knoppen */
+@media (max-width: 900px) {
+  .pagehead .actions > form { flex: 1 1 0; display: flex; margin: 0; }
+  .pagehead .actions > form > .btn { flex: 1; }
+}
+.attmain > .grow { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.attrow > .iconbtn, .attrow > form, .attrow > details, .attrow > .attdel { flex: 0 0 auto; }

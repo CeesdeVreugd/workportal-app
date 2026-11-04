@@ -704,8 +704,10 @@ def plans_query(where="", params=(), order="p.date, p.id"):
     rows = query("SELECT p.*, t.number, t.title, t.status AS ticket_status, t.priority, c.name AS customer,"
                  " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
                  " (SELECT GROUP_CONCAT(u.name, ', ') FROM visit_plan_users pu JOIN users u ON u.id = pu.user_id WHERE pu.plan_id = p.id) AS names,"
-                 " (SELECT GROUP_CONCAT(pu.user_id) FROM visit_plan_users pu WHERE pu.plan_id = p.id) AS uids"
+                 " (SELECT GROUP_CONCAT(pu.user_id) FROM visit_plan_users pu WHERE pu.plan_id = p.id) AS uids,"
+                 " xc.name AS ext_name, xp.name AS ext_contact, xp.phone AS ext_phone, xp.email AS ext_email"
                  " FROM visit_plans p JOIN tickets t ON t.id = p.ticket_id LEFT JOIN customers c ON c.id = t.customer_id"
+                 " LEFT JOIN customers xc ON xc.id = p.ext_customer_id LEFT JOIN contacts xp ON xp.id = p.ext_contact_id"
                  " LEFT JOIN locations l ON l.id = t.location_id" + (" WHERE " + where if where else "") + " ORDER BY " + order, params)
     out = []
     for r in rows:
@@ -738,36 +740,52 @@ def plan(tid, pid=None):
         if p["visit_id"]:
             flash("Dit bezoek is al uitgevoerd.", "info")
             return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
-    users = query("SELECT id, name, email FROM users WHERE active = 1 ORDER BY name")
+    sel_now = {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))} if pid else set()
+    users = [u for u in query(
+        "SELECT u.id, u.name, u.email, EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id"
+        " WHERE ur.user_id = u.id AND r.key = 'werkplaats') AS tech FROM users u WHERE u.active = 1 ORDER BY u.name")
+        if u["tech"] or u["id"] in sel_now]
     valid = {u["id"] for u in users}
-    lang = _lang(t)
+    ext_rel = query("SELECT id, name, city FROM customers WHERE active = 1 AND relation_type IN ('leverancier', 'beide') ORDER BY name")
+    ext_ids = {r["id"] for r in ext_rel}
+    ext_contacts = query("SELECT ct.id, ct.customer_id, ct.name, ct.function FROM contacts ct JOIN customers c ON c.id = ct.customer_id"
+                         " WHERE c.relation_type IN ('leverancier', 'beide') ORDER BY ct.name")
+    extra_ctx = dict(ext_rel=ext_rel, ext_contacts=ext_contacts)
+    lang = _lang(t, request.form.get("taal"))
     if request.method == "POST":
         date_v = (_f("date") or "")[:10]
         uids = [u for u in (to_int(x) for x in request.form.getlist("users")) if u in valid]
+        ext_c = to_int(request.form.get("ext_customer_id"))
+        ext_c = ext_c if ext_c in ext_ids else None
+        ext_p = to_int(request.form.get("ext_contact_id"))
+        if ext_p and not (ext_c and query("SELECT 1 FROM contacts WHERE id = ? AND customer_id = ?", (ext_p, ext_c), one=True)):
+            ext_p = None
         import datetime as _dt
         try:
             _dt.date.fromisoformat(date_v)
         except ValueError:
             date_v = ""
-        if not date_v or not uids:
-            flash("Kies een datum en minstens één monteur.", "error")
+        if not date_v or not (uids or ext_c):
+            flash("Kies een datum en minstens één monteur of een extern bedrijf.", "error")
             return render_template("service/plan.html", t=t, p=request.form, pid=pid, users=users, sel=set(uids), lang=lang,
-                                   mail_to=_f("mail_to") or "")
+                                   mail_to=_f("mail_to") or "", **extra_ctx)
         now = now_iso()
         old = None
         if p:
             old = (p["date"], {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))})
-            execute("UPDATE visit_plans SET date = ?, updated_at = ? WHERE id = ?", (date_v, now, pid))
+            execute("UPDATE visit_plans SET date = ?, ext_customer_id = ?, ext_contact_id = ?, updated_at = ? WHERE id = ?",
+                    (date_v, ext_c, ext_p, now, pid))
             execute("DELETE FROM visit_plan_users WHERE plan_id = ?", (pid,))
         else:
-            pid = execute("INSERT INTO visit_plans (ticket_id, date, created_by, created_at, updated_at) VALUES (?,?,?,?,?)",
-                          (tid, date_v, g.user["id"], now, now))
+            pid = execute("INSERT INTO visit_plans (ticket_id, date, ext_customer_id, ext_contact_id, created_by, created_at, updated_at)"
+                          " VALUES (?,?,?,?,?,?,?)", (tid, date_v, ext_c, ext_p, g.user["id"], now, now))
         for u in uids:
             execute("INSERT OR IGNORE INTO visit_plan_users (plan_id, user_id) VALUES (?, ?)", (pid, u))
         if t["status"] == "nieuw":
             execute("UPDATE tickets SET status = 'ingepland' WHERE id = ?", (tid,))
         execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
-        names = ", ".join(u["name"] for u in users if u["id"] in uids)
+        ext_name = next((r["name"] for r in ext_rel if r["id"] == ext_c), None)
+        names = ", ".join([u["name"] for u in users if u["id"] in uids] + ([ext_name] if ext_name else []))
         audit("bezoek gepland" if not old else "planning gewijzigd", "ticket", tid, f"{fmt_date(date_v)} · {names}")
         # monteurs een melding (nieuw ingepland of datum gewijzigd)
         try:
@@ -784,9 +802,9 @@ def plan(tid, pid=None):
             msg += " Bevestiging gemaild aan de klant." if ok else f" Mailen is niet gelukt: {err}"
         flash(msg, "ok")
         return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
-    sel = {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))} if pid else {g.user["id"]}
+    sel = sel_now if pid else ({g.user["id"]} & valid)
     return render_template("service/plan.html", t=t, p=p or {"date": ""}, pid=pid, users=users, sel=sel, lang=lang,
-                           mail_to=t["contact_email"] or t["customer_email"] or "")
+                           mail_to=t["contact_email"] or t["customer_email"] or "", **extra_ctx)
 
 
 def _mail_plan(t, tid, pid, date_v, names, lang, to_raw, extra):
@@ -797,10 +815,21 @@ def _mail_plan(t, tid, pid, date_v, names, lang, to_raw, extra):
     box = svc_mailbox()
     if not box:
         return False, "geen service-mailbox ingesteld (Beheer > Instellingen)"
-    subject, body = _plan_mail_text(t, date_v, names, lang, extra)
-    subject = f"{subject} [WP-T{tid}]"
+    from .mail import reply_in_thread
+    _subj, body = _plan_mail_text(t, date_v, names, lang, extra)
     cc = [g.user["email"]] if g.user["email"] and g.user["email"] not in to else []
-    ok, err = send_mail_with_files(box, to, subject, body, [], cc=cc or None, signer="werkvoorbereiding:" + (g.user["name"] or ""))
+    signer = "werkvoorbereiding:" + (g.user["name"] or "")
+    # onder het onderwerp van het ticket: antwoord in het bestaande mailgesprek, anders "Ticket T-… [WP-T…]"
+    notes = query("SELECT * FROM ticket_notes WHERE ticket_id = ? AND kind IN ('mail_in', 'mail_uit') ORDER BY id", (tid,))
+    last_in = next((n for n in reversed(notes) if n["kind"] == "mail_in" and n["mail_meta"]
+                    and _json.loads(n["mail_meta"]).get("msg_id")), None)
+    if last_in:
+        lm = _json.loads(last_in["mail_meta"])
+        subject = "RE: " + _RE_PREFIX.sub("", lm.get("subject") or "").strip()
+        ok, err = reply_in_thread(box, lm["msg_id"], to, body, [], cc=cc or None, signer=signer)
+    else:
+        subject = ("RE: " if notes else "") + f"Ticket {t['number']} [WP-T{tid}]"
+        ok, err = send_mail_with_files(box, to, subject, body, [], cc=cc or None, signer=signer)
     if ok:
         now = now_iso()
         execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
