@@ -1125,3 +1125,17 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .note { min-width: 0; max-width: 100%; }
 .note .notebody, .note .mailmeta, .note .notehead b { overflow-wrap: anywhere; word-break: break-word; }
 .mailfull > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+/* V168: bezoeken plannen */
+.rowitem.plan { align-items: center; gap: 10px; flex-wrap: wrap; border-left: 3px solid #2F6FED; }
+.rowitem.plan.late { border-left-color: var(--warn, #B54708); }
+.rowitem.plan form { margin: 0; }
+.planweek { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.planday.today { outline: 2px solid #2F6FED; }
+.planday.weekend { opacity: .8; }
+.planday .empty { padding: 6px 0; }
+.planlate { display: grid; gap: 2px; }
+.planmail > summary { list-style: none; }
+.planmail > summary::-webkit-details-marker { display: none; }
+.rowitem.plan > .grow { flex: 1 1 220px; min-width: 0; }
+@media (max-width: 640px) { .rowitem.plan > .actions { width: 100%; } .rowitem.plan > .actions .btn.primary { flex: 1; } }
+.planmail .f { margin-top: 8px; }

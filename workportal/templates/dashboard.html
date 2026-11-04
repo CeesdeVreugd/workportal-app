@@ -50,6 +50,15 @@
   {% endif %}
 </div>
 
+{% if d.my_plans and navok('service') %}
+<section class="card"><div class="card-head"><h2>Mijn planning</h2><a href="{{ url_for('service.planning', mijn=1) }}" class="small">Hele planning</a></div>
+  <div class="rows">{% for p in d.my_plans %}
+    <a class="rowitem" href="{{ url_for('service.detail', tid=p.ticket_id) }}#plan{{ p.id }}">
+      <div class="grow"><div class="t">{{ p.date|date }}{% if p.date < now_date() %} <span class="badge b-warn">over datum</span>{% elif p.date == now_date() %} <span class="badge b-blue">vandaag</span>{% endif %} · {{ p.title }}</div>
+      <div class="s">{{ p.number }} · {{ p.customer or 'Geen klant' }}{% if p.visit_address %} · {{ p.visit_address }}{% endif %}{% if p.names and ',' in p.names %} · met {{ p.names }}{% endif %}</div></div>
+    </a>{% endfor %}</div>
+</section>
+{% endif %}
 <div class="grid g2 stack">
   {% if (can('service') and navok('service')) %}
   <section class="card">

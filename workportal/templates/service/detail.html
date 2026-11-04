@@ -16,6 +16,7 @@
     {% if (t.inst_alert or t.inst_bring or t.customer_alert) and t.status in ['nieuw','ingepland','in_uitvoering','wacht'] %}<button class="btn accent" type="button" data-open-alert>{{ icon('check') }}Ik vertrek</button>{% endif %}
     <a class="btn" href="#notities" onclick="var f=document.getElementById('noteform');f.classList.remove('hidden');setTimeout(function(){f.querySelector('textarea').focus()},50)">{{ icon('edit') }}Notitie</a>
     <a class="btn" href="#klant" onclick="var d=document.getElementById('mailform');if(d){d.open=true;setTimeout(function(){var b=d.querySelector('textarea');if(b)b.focus()},60)}">{{ icon('mail') }}Mail klant</a>
+    <a class="btn" href="{{ url_for('service.plan', tid=t.id) }}">{{ icon('timer') }}Bezoek plannen</a>
     <a class="btn primary" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek vastleggen</a>
     {% if t.status != 'afgerond' %}<form method="post" action="{{ url_for('service.set_status', tid=t.id) }}" data-confirm="Ticket {{ t.number }} afsluiten?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" name="status" value="afgerond">{{ icon('check') }}Ticket afsluiten</button></form>{% endif %}
     {% endif %}
@@ -157,8 +158,19 @@
 </section>
 
 <section class="card" id="bezoeken">
-  <div class="card-head"><h2>Bezoeken ({{ visits|length }})</h2>{% if edit %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a>{% endif %}</div>
+  <div class="card-head"><h2>Bezoeken ({{ visits|length }}{% if plans %} + {{ plans|length }} gepland{% endif %})</h2>{% if edit %}<div class="actions" style="margin:0"><a class="btn sm" href="{{ url_for('service.plan', tid=t.id) }}">{{ icon('timer') }}Plannen</a><a class="btn sm" href="{{ url_for('service.visit', tid=t.id) }}">{{ icon('plus') }}Bezoek</a></div>{% endif %}</div>
   <div class="rows">
+  {% for p in plans %}
+    <div class="rowitem plan {{ 'late' if p.date < now_date() }}" id="plan{{ p.id }}">
+      <div class="grow"><div class="t"><span class="badge b-blue">Gepland</span> {{ p.date|date }}{% if p.date < now_date() %} <span class="badge b-warn">over datum</span>{% endif %}</div>
+        <div class="s">{{ p.names or '–' }}{% if p.mailed_at %} · klant gemaild {{ p.mailed_at|dt }}{% endif %}</div></div>
+      {% if edit %}<div class="actions" style="margin:0">
+        <a class="btn sm primary" href="{{ url_for('service.visit', tid=t.id, plan=p.id) }}">{{ icon('plus') }}Uitvoeren</a>
+        <a class="btn sm" href="{{ url_for('service.plan', tid=t.id, pid=p.id) }}">{{ icon('edit') }}Wijzigen</a>
+        <form method="post" action="{{ url_for('service.plan_delete', tid=t.id, pid=p.id) }}" data-confirm="Planning van {{ p.date|date }} verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" title="Planning verwijderen" aria-label="Planning verwijderen">{{ icon('trash') }}</button></form>
+      </div>{% endif %}
+    </div>
+  {% endfor %}
   {% for v in visits %}
     <div class="rowitem visit" id="bezoek{{ v.id }}">
       <div class="vhead"><div class="t">Bezoek {{ v.date|date }} · {{ v.technicians or '' }}</div><div class="s">{{ v.hours|num(2) }} uur · reistijd {{ v.travel_hours|num(2) }} uur · {{ v.km|num(0) }} km</div></div>
@@ -195,7 +207,7 @@
       <details class="vfiles" style="width:100%"><summary>{{ icon('image') }} Foto's &amp; bijlagen van dit bezoek ({{ vf|length }}) – staan op de werkbon</summary>
         {% if vdel %}{{ photos(vf, del_route='service.file_delete', del_args={'tid': t.id}) }}{% else %}{{ photos(vf) }}{% endif %}</details>{% endif %}
     </div>
-  {% else %}<div class="empty">Nog geen bezoeken vastgelegd.</div>{% endfor %}
+  {% else %}{% if not plans %}<div class="empty">Nog geen bezoeken vastgelegd.</div>{% endif %}{% endfor %}
   </div>
 </section>
 

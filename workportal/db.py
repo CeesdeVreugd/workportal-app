@@ -701,6 +701,26 @@ MIGRATIONS = [
     DELETE FROM ticket_notes WHERE id IN (SELECT id FROM _own);
     DROP TABLE _own;
     """,
+    # 37 - service: bezoeken plannen (datum + monteurs); na uitvoeren gekoppeld aan het vastgelegde bezoek
+    """
+    CREATE TABLE visit_plans (
+        id INTEGER PRIMARY KEY,
+        ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        visit_id INTEGER REFERENCES visits(id) ON DELETE SET NULL,
+        mailed_at TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE TABLE visit_plan_users (
+        plan_id INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (plan_id, user_id)
+    );
+    CREATE INDEX idx_visit_plans_date ON visit_plans(date);
+    CREATE INDEX idx_visit_plans_ticket ON visit_plans(ticket_id);
+    """,
 ]
 
 

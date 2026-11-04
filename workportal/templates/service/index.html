@@ -11,6 +11,7 @@
   {% for key, label in [('open','Open'),('mijn','Mijn tickets'),('afgerond','Afgerond'),('alle','Alle')] %}
   <a href="?view={{ key }}&type={{ typ }}" class="{{ 'active' if view == key }}">{{ label }}</a>
   {% endfor %}
+  <a href="{{ url_for('service.planning') }}">{{ icon('timer') }} Planning</a>
 </div>
 <form method="get" class="actions">
   <input type="hidden" name="view" value="{{ view }}">

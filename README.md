@@ -892,3 +892,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Eigen mails (uit Verzonden items, of van een adres van De Vreugd) worden niet meer als "van de klant" opgehaald. De verkeerd opgehaalde worden bij het bijwerken opgeruimd (migratie 36).
   - Mails van klanten opgeschoond: geen classificatielabel (//GENERAL//EMPLOYEES//), geen disclaimer, geen dubbele <mailto:>-links. "Volledige mail tonen" laat de originele tekst zien.
   - Op de telefoon maken lange adressen en links de kaart niet meer breder dan het scherm.
+
+## V168 (2.10.0)
+- Service: **bezoek plannen** vanuit het ticket (knop "Bezoek plannen"): datum en monteur(s).
+  - Monteurs krijgen een melding in WorkPortal; het ticket gaat van Nieuw naar Ingepland.
+  - Optioneel "Klant een bevestiging mailen": mail met datum en monteur(s) in de taal van de relatie, met eventueel extra tekst, via het mailgesprek van het ticket (antwoorden komen bij Notities klant).
+  - Op het ticket staat het geplande bezoek boven de bezoeken met Uitvoeren (opent "Bezoek vastleggen" met datum en monteurs ingevuld), Wijzigen en Verwijderen. Na het vastleggen is de planning afgehandeld.
+  - Start: blok "Mijn planning" (komende 14 dagen en wat over datum is).
+  - Service > Planning: overzicht per week (ook "Mijn planning"), met wat over datum is en nog niet is uitgevoerd.
+- Database-migratie 37: visit_plans en visit_plan_users.

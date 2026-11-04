@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.9.2"
+VERSION = "2.10.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
 
@@ -100,6 +100,8 @@ def create_app(test_config=None, start_scheduler=True):
     app.jinja_env.globals.update(navok=lambda m: can(m) and on_phone_ok(m), is_phone=is_phone)
     from .auth import idle_minutes, device_label
     app.jinja_env.globals.update(idle_minutes=idle_minutes, device_label=device_label)
+    from .util import local as _local, now_utc as _now_utc
+    app.jinja_env.globals.update(now_date=lambda: _local(_now_utc()).strftime('%Y-%m-%d'))
     from .talen import LANGS, LANG_LABELS
     app.jinja_env.globals.update(LANGS=LANGS, LANG_LABELS=LANG_LABELS)
     from .service import clean_mail_text

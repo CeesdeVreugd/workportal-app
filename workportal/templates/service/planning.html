@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import prio %}
+{% block title %}Planning service{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Planning</h1><p>Week {{ week_no }} · {{ days[0].isoformat()|date }} t/m {{ days[-1].isoformat()|date }}</p></div>
+  <div class="actions">
+    <a class="btn sm" href="?week={{ prev }}{{ '&mijn=1' if only_me }}" aria-label="Vorige week">‹</a>
+    <a class="btn sm" href="?{{ 'mijn=1' if only_me }}">Deze week</a>
+    <a class="btn sm" href="?week={{ next }}{{ '&mijn=1' if only_me }}" aria-label="Volgende week">›</a>
+  </div>
+</div>
+<div class="tabs">
+  <a href="{{ url_for('service.index') }}">Tickets</a>
+  <a href="?week={{ start.isoformat() }}" class="{{ 'active' if not only_me }}">Planning</a>
+  <a href="?week={{ start.isoformat() }}&mijn=1" class="{{ 'active' if only_me }}">Mijn planning</a>
+</div>
+{% macro planrow(p) -%}
+<a class="rowitem" href="{{ url_for('service.detail', tid=p.ticket_id) }}#plan{{ p.id }}">
+  <div class="grow"><div class="t">{{ p.number }} · {{ p.title }} {{ prio(p.priority) }}</div>
+  <div class="s">{{ p.customer or 'Geen klant' }}{% if p.visit_address %} · {{ p.visit_address }}{% endif %}</div>
+  <div class="s"><b>{{ p.names or '–' }}</b></div></div>
+</a>
+{%- endmacro %}
+{% if late %}
+<section class="card"><div class="card-head"><h2 style="color:var(--warn)">Over datum, nog niet uitgevoerd ({{ late|length }})</h2></div>
+<div class="rows">{% for p in late %}<div class="planlate"><span class="small muted">{{ p.date|date }}</span>{{ planrow(p) }}</div>{% endfor %}</div></section>
+{% endif %}
+<div class="planweek">
+{% for d in days %}{% set iso = d.isoformat() %}{% set items = by_day[iso] %}
+  <section class="card planday {{ 'today' if d == today }} {{ 'weekend' if d.weekday() >= 5 }}">
+    <div class="card-head"><h2>{{ ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag'][d.weekday()] }} <span class="muted small">{{ d.day }}-{{ d.month }}</span></h2>{% if items %}<span class="badge">{{ items|length }}</span>{% endif %}</div>
+    <div class="rows">{% for p in items %}{{ planrow(p) }}{% else %}<div class="empty small">–</div>{% endfor %}</div>
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

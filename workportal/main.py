@@ -26,6 +26,9 @@ def dashboard():
         data["tickets"] = query(
             "SELECT t.*, c.name AS customer FROM tickets t LEFT JOIN customers c ON c.id = t.customer_id"
             " ORDER BY CASE WHEN t.status IN ('afgerond','gefactureerd') THEN 1 ELSE 0 END, t.updated_at DESC LIMIT 6")
+        from .service import plans_query
+        data["my_plans"] = plans_query("p.visit_id IS NULL AND p.date <= date('now', '+14 days') AND EXISTS (SELECT 1 FROM visit_plan_users pu"
+                                       " WHERE pu.plan_id = p.id AND pu.user_id = ?)", (g.user["id"],))[:10]
         data["my_tickets"] = query("SELECT COUNT(*) c FROM tickets WHERE assigned_to = ? AND status NOT IN ('afgerond','gefactureerd')",
                                    (g.user["id"],), one=True)["c"]
     if can("druktest"):

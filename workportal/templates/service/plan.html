@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Bezoek plannen · {{ t.number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('service.index') }}">Service</a> / <a href="{{ url_for('service.detail', tid=t.id) }}">{{ t.number }}</a> / {{ 'planning wijzigen' if pid else 'bezoek plannen' }}</div>
+<h1>{{ 'Planning wijzigen' if pid else 'Bezoek plannen' }}</h1>
+<p class="muted">{{ t.title }}{% if t.customer %} · {{ t.customer }}{% endif %}{% if t.visit_address %} · {{ t.visit_address }}{% endif %}</p>
+<form method="post" class="card form" style="max-width:760px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="f" style="max-width:240px">Datum *<input type="date" name="date" value="{{ p.date or '' }}" required min="{{ now_date() if not pid else '' }}"></label>
+  <div class="f"><span>Monteur(s) *</span>
+    <div class="chips">{% for u in users %}<label class="chip"><input type="checkbox" name="users" value="{{ u.id }}" {{ 'checked' if u.id in sel }}><span>{{ u.name }}</span></label>{% endfor %}</div>
+    <span class="hint">De monteurs krijgen een melding in WorkPortal en zien het bezoek bij Start en in de planning.</span></div>
+  <details class="planmail" {{ 'open' if request.form.get('mail') }}>
+    <summary><label class="check" onclick="event.stopPropagation()"><input type="checkbox" name="mail" value="1" {{ 'checked' if request.form.get('mail') }} onchange="this.closest('details').open=this.checked"> Klant een bevestiging mailen</label></summary>
+    <label class="f">Aan<input type="text" name="mail_to" value="{{ mail_to }}" inputmode="email" placeholder="naam@klant.nl"><span class="hint">De mail gaat in het {{ LANG_LABELS.get(lang, 'Nederlands') }} (taal van de relatie) met datum en monteur(s), via het mailgesprek van dit ticket. Antwoorden komen bij Notities klant.</span></label>
+    <label class="f">Extra tekst (optioneel)<textarea name="extra" rows="3" placeholder="bijv. We komen rond 8:00 uur. Graag de installatie vrijgeven.">{{ request.form.get('extra', '') }}</textarea></label>
+  </details>
+  <div class="actions"><button class="btn primary">{{ icon('check') }}{{ 'Opslaan' if pid else 'Inplannen' }}</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) }}#bezoeken">Annuleren</a></div>
+</form>
+{% endblock %}

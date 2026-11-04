@@ -158,7 +158,8 @@ def detail(tid):
     import json
     metas = {n["id"]: json.loads(n["mail_meta"]) for n in notes if n["mail_meta"]}
     mail = _mail_defaults(t, notes, metas)
-    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, notes=notes, nfiles=nfiles, files=files_for("ticket", tid),
+    plans = plans_query("p.ticket_id = ? AND p.visit_id IS NULL", (tid,))
+    return render_template("service/detail.html", t=t, visits=visits, vfiles=vfiles, plans=plans, notes=notes, nfiles=nfiles, files=files_for("ticket", tid),
                            toolcalcs=calcs_for(ticket_id=tid), metas=metas, mail=mail, svc_box=svc_mailbox(), svc_state=_svc_state(),
                            history=history, STATUSES=STATUSES, TYPES=dict(TYPES))
 
@@ -696,6 +697,159 @@ def scheduled_poll(conn, app, state):
 
 # ---------------------------------------------------------------- bezoeken
 
+# ---------------------------------------------------------------- bezoeken plannen
+
+def plans_query(where="", params=(), order="p.date, p.id"):
+    """Geplande bezoeken met ticket, klant en monteurs (namen + ids)."""
+    rows = query("SELECT p.*, t.number, t.title, t.status AS ticket_status, t.priority, c.name AS customer,"
+                 " TRIM(COALESCE(NULLIF(TRIM(IFNULL(l.address,'') || ' ' || IFNULL(l.city,'')), ''), TRIM(IFNULL(c.address,'') || ' ' || IFNULL(c.city,'')))) AS visit_address,"
+                 " (SELECT GROUP_CONCAT(u.name, ', ') FROM visit_plan_users pu JOIN users u ON u.id = pu.user_id WHERE pu.plan_id = p.id) AS names,"
+                 " (SELECT GROUP_CONCAT(pu.user_id) FROM visit_plan_users pu WHERE pu.plan_id = p.id) AS uids"
+                 " FROM visit_plans p JOIN tickets t ON t.id = p.ticket_id LEFT JOIN customers c ON c.id = t.customer_id"
+                 " LEFT JOIN locations l ON l.id = t.location_id" + (" WHERE " + where if where else "") + " ORDER BY " + order, params)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["uid_list"] = [int(x) for x in (r["uids"] or "").split(",") if x]
+        out.append(d)
+    return out
+
+
+def _plan_mail_text(t, date_iso, names, lang, extra=""):
+    from .talen import tr, long_date
+    L = tr(lang)
+    who = t["contact"]
+    body = (L["greet"].format(n=who) if who else L["greet_none"]) + "\n\n" + L["plan_body"].format(
+        d=long_date(date_iso, lang), who=L["plan_who"].format(n=names) if names else "")
+    if extra:
+        body += "\n\n" + extra.strip()
+    return L["plan_subject"].format(nr=t["number"]), body + "\n\n" + L["plan_q"]
+
+
+@bp.route("/<int:tid>/plannen", methods=["GET", "POST"])
+@bp.route("/<int:tid>/plannen/<int:pid>", methods=["GET", "POST"])
+@require("service", BEWERKEN)
+def plan(tid, pid=None):
+    """Bezoek plannen: datum en monteur(s). Optioneel de klant een bevestiging mailen (in zijn taal)."""
+    t = _ticket(tid)
+    p = None
+    if pid:
+        p = query("SELECT * FROM visit_plans WHERE id = ? AND ticket_id = ?", (pid, tid), one=True) or abort(404)
+        if p["visit_id"]:
+            flash("Dit bezoek is al uitgevoerd.", "info")
+            return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
+    users = query("SELECT id, name, email FROM users WHERE active = 1 ORDER BY name")
+    valid = {u["id"] for u in users}
+    lang = _lang(t)
+    if request.method == "POST":
+        date_v = (_f("date") or "")[:10]
+        uids = [u for u in (to_int(x) for x in request.form.getlist("users")) if u in valid]
+        import datetime as _dt
+        try:
+            _dt.date.fromisoformat(date_v)
+        except ValueError:
+            date_v = ""
+        if not date_v or not uids:
+            flash("Kies een datum en minstens één monteur.", "error")
+            return render_template("service/plan.html", t=t, p=request.form, pid=pid, users=users, sel=set(uids), lang=lang,
+                                   mail_to=_f("mail_to") or "")
+        now = now_iso()
+        old = None
+        if p:
+            old = (p["date"], {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))})
+            execute("UPDATE visit_plans SET date = ?, updated_at = ? WHERE id = ?", (date_v, now, pid))
+            execute("DELETE FROM visit_plan_users WHERE plan_id = ?", (pid,))
+        else:
+            pid = execute("INSERT INTO visit_plans (ticket_id, date, created_by, created_at, updated_at) VALUES (?,?,?,?,?)",
+                          (tid, date_v, g.user["id"], now, now))
+        for u in uids:
+            execute("INSERT OR IGNORE INTO visit_plan_users (plan_id, user_id) VALUES (?, ?)", (pid, u))
+        if t["status"] == "nieuw":
+            execute("UPDATE tickets SET status = 'ingepland' WHERE id = ?", (tid,))
+        execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, tid))
+        names = ", ".join(u["name"] for u in users if u["id"] in uids)
+        audit("bezoek gepland" if not old else "planning gewijzigd", "ticket", tid, f"{fmt_date(date_v)} · {names}")
+        # monteurs een melding (nieuw ingepland of datum gewijzigd)
+        try:
+            from .notify import notify_user
+            for u in uids:
+                if u != g.user["id"] and (not old or old[0] != date_v or u not in old[1]):
+                    notify_user(get_db(), u, f"Ingepland: ticket {t['number']}", f"{fmt_date(date_v)} · {t['customer'] or ''} – {t['title']}"[:180],
+                                url=f"/service/{tid}#bezoeken", email=False)
+        except Exception as exc:  # pragma: no cover
+            print(f"[WorkPortal] Melding planning mislukt: {exc}", flush=True)
+        msg = f"Bezoek gepland op {fmt_date(date_v)} ({names})."
+        if request.form.get("mail"):
+            ok, err = _mail_plan(t, tid, pid, date_v, names, lang, _f("mail_to"), _f("extra") or "")
+            msg += " Bevestiging gemaild aan de klant." if ok else f" Mailen is niet gelukt: {err}"
+        flash(msg, "ok")
+        return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
+    sel = {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))} if pid else {g.user["id"]}
+    return render_template("service/plan.html", t=t, p=p or {"date": ""}, pid=pid, users=users, sel=sel, lang=lang,
+                           mail_to=t["contact_email"] or t["customer_email"] or "")
+
+
+def _mail_plan(t, tid, pid, date_v, names, lang, to_raw, extra):
+    from .mail import send_mail_with_files
+    to = [a.strip() for a in _re.split(r"[;,\s]+", to_raw or "") if a.strip()]
+    if not to or any(not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
+        return False, "geen geldig e-mailadres"
+    box = svc_mailbox()
+    if not box:
+        return False, "geen service-mailbox ingesteld (Beheer > Instellingen)"
+    subject, body = _plan_mail_text(t, date_v, names, lang, extra)
+    subject = f"{subject} [WP-T{tid}]"
+    cc = [g.user["email"]] if g.user["email"] and g.user["email"] not in to else []
+    ok, err = send_mail_with_files(box, to, subject, body, [], cc=cc or None, signer="werkvoorbereiding:" + (g.user["name"] or ""))
+    if ok:
+        now = now_iso()
+        execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
+                (tid, "mail_uit", body[:8000], g.user["id"], now,
+                 _json.dumps({"to": to, "cc": cc, "subject": subject, "from": box, "files": []}, ensure_ascii=False)))
+        execute("UPDATE visit_plans SET mailed_at = ? WHERE id = ?", (now, pid))
+        audit("planning gemaild", "ticket", tid, ", ".join(to))
+    return ok, err
+
+
+@bp.route("/<int:tid>/plannen/<int:pid>/verwijderen", methods=["POST"])
+@require("service", BEWERKEN)
+def plan_delete(tid, pid):
+    t = _ticket(tid)
+    p = query("SELECT * FROM visit_plans WHERE id = ? AND ticket_id = ?", (pid, tid), one=True) or abort(404)
+    execute("DELETE FROM visit_plans WHERE id = ?", (pid,))
+    if t["status"] == "ingepland" and not query("SELECT 1 FROM visit_plans WHERE ticket_id = ? AND visit_id IS NULL", (tid,), one=True) \
+            and not query("SELECT 1 FROM visits WHERE ticket_id = ?", (tid,), one=True):
+        execute("UPDATE tickets SET status = 'nieuw' WHERE id = ?", (tid,))
+    audit("planning verwijderd", "ticket", tid, fmt_date(p["date"]))
+    flash(f"Planning van {fmt_date(p['date'])} verwijderd.", "ok")
+    return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
+
+
+@bp.route("/planning")
+@require("service", LEZEN)
+def planning():
+    """Overzicht per week: alle geplande (nog niet uitgevoerde) bezoeken, plus wat over datum is."""
+    import datetime as _dt
+    today = local(now_utc()).date()
+    try:
+        start = _dt.date.fromisoformat(request.args.get("week", ""))
+    except ValueError:
+        start = today
+    start = start - _dt.timedelta(days=start.weekday())
+    end = start + _dt.timedelta(days=6)
+    only_me = request.args.get("mijn") == "1"
+    rows = plans_query("p.visit_id IS NULL AND p.date BETWEEN ? AND ?", (start.isoformat(), end.isoformat()))
+    late = plans_query("p.visit_id IS NULL AND p.date < ?", (today.isoformat(),)) if start <= today <= end else []
+    if only_me:
+        rows = [r for r in rows if g.user["id"] in r["uid_list"]]
+        late = [r for r in late if g.user["id"] in r["uid_list"]]
+    days = [(start + _dt.timedelta(days=i)) for i in range(7)]
+    by_day = {d.isoformat(): [r for r in rows if r["date"] == d.isoformat()] for d in days}
+    return render_template("service/planning.html", days=days, by_day=by_day, late=late, start=start, today=today,
+                           prev=(start - _dt.timedelta(days=7)).isoformat(), next=(start + _dt.timedelta(days=7)).isoformat(),
+                           only_me=only_me, week_no=start.isocalendar()[1])
+
+
 @bp.route("/<int:tid>/bezoek", methods=["GET", "POST"])
 @bp.route("/<int:tid>/bezoek/<int:vid>", methods=["GET", "POST"])
 @require("service", BEWERKEN)
@@ -726,6 +880,9 @@ def visit(tid, vid=None):
             vid = execute("INSERT INTO visits (date, technicians, hours, travel_hours, km, findings, work_done, materials,"
                           " ticket_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                           vals + (tid, g.user["id"], now_iso()))
+            plan_id = to_int(request.form.get("plan_id"))
+            if plan_id:
+                execute("UPDATE visit_plans SET visit_id = ? WHERE id = ? AND ticket_id = ? AND visit_id IS NULL", (vid, plan_id, tid))
             if t["status"] in ("nieuw", "ingepland"):
                 execute("UPDATE tickets SET status = 'in_uitvoering' WHERE id = ?", (tid,))
         save_uploads("visit", vid)
@@ -744,8 +901,16 @@ def visit(tid, vid=None):
             return redirect(url_for("service.visit_send", tid=tid, vid=vid))
         flash("Bezoek opgeslagen.", "ok")
         return redirect(url_for("service.detail", tid=tid) + f"#bezoek{vid}")
+    plan_id = None
+    if not v and request.args.get("plan"):
+        pl = plans_query("p.id = ? AND p.ticket_id = ? AND p.visit_id IS NULL", (to_int(request.args.get("plan")), tid))
+        if pl:
+            plan_id = pl[0]["id"]
+            today = local(now_utc()).strftime("%Y-%m-%d")
+            v = {"date": today if pl[0]["date"] < today else pl[0]["date"], "technicians": pl[0]["names"] or g.user["name"]}
     v = v or {"date": local(now_utc()).strftime("%Y-%m-%d"), "technicians": g.user["name"]}
-    return render_template("service/visit.html", t=t, v=v, vid=vid, done=done, files=files_for("visit", vid) if vid else [])
+    return render_template("service/visit.html", t=t, v=v, vid=vid, done=done, plan_id=plan_id,
+                           files=files_for("visit", vid) if vid else [])
 
 
 def _close_visit(tid, vid, note, close_ticket):
