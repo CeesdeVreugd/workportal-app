@@ -1001,3 +1001,16 @@ document.addEventListener("change", function (e) {
 document.addEventListener("click", function (e) {
   document.querySelectorAll("details.stpick[open]").forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
 });
+
+/* Mail aan klant vertalen (DeepL via WorkPortal): Nederlands -> taal van de klant */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-tr-go]"); if (!b) return;
+  var box = b.closest("[data-translate]"), msg = box.querySelector("[data-tr-msg]");
+  var src = box.querySelector('[name="body_nl"]'), dst = box.querySelector('[name="body"]'), lang = box.querySelector('[name="tr_lang"]').value;
+  if (!src.value.trim()) { msg.textContent = "Typ eerst je tekst in het Nederlands."; return; }
+  if (dst.value.trim() && dst.dataset.auto !== dst.value && !confirm("De vertaalde tekst is aangepast. Opnieuw vertalen en vervangen?")) return;
+  b.disabled = true; msg.textContent = "Vertalen…";
+  WP.api(box.getAttribute("data-translate"), { text: src.value, lang: lang }).then(function (js) {
+    dst.value = js.text; dst.dataset.auto = js.text; msg.textContent = "Vertaald. Controleer de tekst en pas hem zo nodig aan.";
+  }).catch(function (err) { msg.textContent = err.message; }).then(function () { b.disabled = false; });
+});

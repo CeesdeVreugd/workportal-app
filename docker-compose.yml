@@ -32,6 +32,8 @@ services:
       # SnelStart B2B-API (alleen lezen): abonnementssleutel (Developer Portal) en koppelingssleutel (SnelStart Web > Koppelingen > Maatwerk)
       SNELSTART_SUBSCRIPTION_KEY: ${SNELSTART_SUBSCRIPTION_KEY:-}
       SNELSTART_CLIENT_KEY: ${SNELSTART_CLIENT_KEY:-}
+      # DeepL: vertalen van mails aan buitenlandse klanten (API-sleutel, Free eindigt op :fx)
+      DEEPL_KEY: ${DEEPL_KEY:-}
       # Links onder de iconen in de mailhandtekening (optioneel)
       SIGNATURE_LINKEDIN: ${SIGNATURE_LINKEDIN:-}
       SIGNATURE_YOUTUBE: ${SIGNATURE_YOUTUBE:-}

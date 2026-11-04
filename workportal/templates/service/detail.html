@@ -119,6 +119,7 @@
       </div>
       <div class="small muted mailmeta">{% if n.kind == 'mail_uit' %}Aan {{ (mm.to or [])|join(', ') }}{% if mm.cc %} · cc {{ mm.cc|join(', ') }}{% endif %}{% else %}Van {{ mm['from'] }}{% endif %} · <i>{{ (mm.subject or '')|replace('[WP-T' ~ t.id ~ ']', '')|trim }}</i></div>
       {% set cb = n.body|mailclean if n.kind == 'mail_in' else n.body %}
+      {% if mm.body_nl %}<details class="mailfull"><summary>Nederlandse tekst</summary><div class="notebody" style="white-space:pre-line">{{ mm.body_nl }}</div></details>{% endif %}
       <div class="notebody" style="white-space:pre-line">{{ cb }}</div>
       {% if cb|length + 40 < (n.body or '')|length %}<details class="mailfull"><summary>Volledige mail tonen</summary><div class="notebody" style="white-space:pre-line">{{ n.body }}</div></details>{% endif %}
       {% set nf = nfiles.get(n.id, []) %}{% if nf %}<div style="margin-top:8px">{{ photos(nf) }}</div>{% endif %}
@@ -139,9 +140,25 @@
       </div>
       <label class="f">Onderwerp<input type="text" name="subject" value="{{ mail.subject }}" {{ 'readonly' if mail.reply_all }}>
         <span class="hint">Het ticketnummer staat erin, zodat het antwoord van de klant hier vanzelf terugkomt.</span></label>
+      {% set tl = t.customer_language if t.customer_language and t.customer_language != 'nl' else none %}
+      {% if tl %}
+      <div class="trbox" data-translate="{{ url_for('service.translate', tid=t.id) }}">
+        <label class="f">Jouw tekst in het Nederlands<textarea name="body_nl" rows="6">Beste {{ t.contact or 'heer/mevrouw' }},
+
+</textarea></label>
+        <div class="trbar">
+          <select name="tr_lang" aria-label="Vertalen naar">{% for k, l in LANGS if k != 'nl' %}<option value="{{ k }}" {{ 'selected' if k == tl }}>{{ l }}</option>{% endfor %}</select>
+          <button type="button" class="btn sm primary" data-tr-go>Vertaal ↓</button>
+          <span class="hint" data-tr-msg>De klant spreekt {{ LANG_LABELS.get(tl, tl) }}.</span>
+        </div>
+        <label class="f">Bericht aan de klant (vertaald) *<textarea name="body" rows="7" required placeholder="Hier komt de vertaling. Je kunt hem nog aanpassen."></textarea>
+          <span class="hint">Alleen deze tekst gaat naar de klant. De Nederlandse tekst wordt bij het ticket bewaard.</span></label>
+      </div>
+      {% else %}
       <label class="f">Bericht *<textarea name="body" rows="7" required>Beste {{ t.contact or 'heer/mevrouw' }},
 
 </textarea></label>
+      {% endif %}
       <label class="f">Bijlagen<input type="file" name="mailfiles" multiple></label>
       <div class="cred-actions">
         <label class="check"><input type="checkbox" name="cc_me" value="1"> Kopie naar mij</label>

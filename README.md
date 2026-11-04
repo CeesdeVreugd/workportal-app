@@ -942,3 +942,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V176 (2.10.8)
 - Orders en projecten: knop **Order afronden** / **Project afronden** bovenaan de detailpagina (met waarschuwing als er nog open tickets zijn). Afgerond staat als label bij het nummer; met **Weer actief maken** zet je hem terug.
+
+## V177 (2.11.0)
+- Ticket, mail aan de klant: is de taal van de relatie niet Nederlands, dan typ je in een vak je tekst in het Nederlands, kiest de taal en klikt **Vertaal**. De vertaling komt in het vak eronder (aan te passen); alleen die gaat naar de klant. De Nederlandse tekst wordt bij de mail bewaard ("Nederlandse tekst" bij de notitie).
+- Vertalen gaat via **DeepL**. Instellen: maak een DeepL API-account (DeepL API Free: 500.000 tekens per maand gratis), kopieer de API-sleutel en zet die in Portainer als omgevingsvariabele **DEEPL_KEY** (niet in GitHub). Zonder sleutel geeft de knop een melding.

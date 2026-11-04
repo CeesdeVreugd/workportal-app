@@ -1200,3 +1200,7 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .stopt .badge { font-size: 14px; }
 .stpick > summary { border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px 2px 2px; background: #fff; }
 .stpick > summary .caret { font-size: 13px; color: var(--basic, #0B0B8C); }
+/* V177: vertalen */
+.trbox { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #FAFBFF; }
+.trbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.trbar select { width: auto; }

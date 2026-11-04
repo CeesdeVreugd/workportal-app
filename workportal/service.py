@@ -407,6 +407,55 @@ def _mail_defaults(t, notes, metas):
     return out
 
 
+DEEPL_TARGET = {"en": "EN-GB", "de": "DE", "fr": "FR", "nl": "NL"}
+
+
+def translate_text(text, lang, source="NL"):
+    """Vertalen via DeepL (sleutel DEEPL_KEY in Portainer). Geeft (tekst, None) of (None, foutmelding)."""
+    import requests
+    key = _os.environ.get("DEEPL_KEY", "").strip()
+    if not key:
+        return None, "Vertalen is nog niet ingesteld (DEEPL_KEY ontbreekt in Portainer)."
+    target = DEEPL_TARGET.get(lang)
+    if not target:
+        return None, "Onbekende taal."
+    url = "https://api-free.deepl.com/v2/translate" if key.endswith(":fx") else "https://api.deepl.com/v2/translate"
+    try:
+        r = requests.post(url, headers={"Authorization": f"DeepL-Auth-Key {key}"}, timeout=30,
+                          json={"text": [text], "source_lang": source, "target_lang": target, "preserve_formatting": True,
+                                "formality": "prefer_more" if target in ("DE", "FR", "NL") else "default"})
+    except Exception:  # noqa: BLE001
+        return None, "De vertaaldienst is nu niet bereikbaar."
+    if r.status_code == 456:
+        return None, "Het vertaaltegoed van deze maand is op."
+    if r.status_code in (401, 403):
+        return None, "De vertaalsleutel (DEEPL_KEY) wordt niet geaccepteerd."
+    if r.status_code >= 400:
+        return None, f"Vertalen mislukt ({r.status_code})."
+    tr_ = (r.json().get("translations") or [{}])[0].get("text")
+    return (tr_, None) if tr_ else (None, "Geen vertaling ontvangen.")
+
+
+@bp.route("/<int:tid>/vertalen", methods=["POST"])
+@require("service", BEWERKEN)
+def translate(tid):
+    from flask import jsonify
+    from .util import rate_limited
+    _ticket(tid)
+    js = request.get_json(silent=True) or {}
+    text = (js.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Typ eerst de tekst in het Nederlands."}), 400
+    if len(text) > 8000:
+        return jsonify({"error": "De tekst is te lang om te vertalen (max. 8000 tekens)."}), 400
+    if rate_limited("vertalen", 60, 600):
+        return jsonify({"error": "Even wachten, er is net veel vertaald."}), 429
+    out, err = translate_text(text, js.get("lang") or "en")
+    if err:
+        return jsonify({"error": err}), 502
+    return jsonify({"text": out})
+
+
 @bp.route("/<int:tid>/mailen", methods=["POST"])
 @require("service", BEWERKEN)
 def mail_customer(tid):
@@ -457,7 +506,8 @@ def mail_customer(tid):
     now = now_iso()
     nid = execute("INSERT INTO ticket_notes (ticket_id, kind, body, created_by, created_at, mail_meta) VALUES (?,?,?,?,?,?)",
                   (tid, "mail_uit", body[:8000], g.user["id"], now,
-                   _json.dumps({"to": to, "cc": cc, "subject": subject, "from": box, "files": [a[0] for a in atts]},
+                   _json.dumps({"to": to, "cc": cc, "subject": subject, "from": box, "files": [a[0] for a in atts],
+                                **({"body_nl": (f.get("body_nl") or "").strip()[:8000]} if (f.get("body_nl") or "").strip() else {})},
                                ensure_ascii=False)))
     from .util import save_bytes
     for name, data, mime in atts:
