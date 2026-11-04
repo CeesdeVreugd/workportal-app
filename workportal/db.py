@@ -730,6 +730,16 @@ MIGRATIONS = [
     """
     ALTER TABLE users ADD COLUMN phone TEXT;
     """,
+    # 40 - externe monteur rondt het bezoek af via een persoonlijke link; daarna controle door ons
+    """
+    ALTER TABLE visit_plans ADD COLUMN ext_token_hash TEXT;
+    ALTER TABLE visit_plans ADD COLUMN ext_token_until TEXT;
+    ALTER TABLE visit_plans ADD COLUMN ext_done_at TEXT;
+    CREATE UNIQUE INDEX idx_visit_plans_token ON visit_plans(ext_token_hash) WHERE ext_token_hash IS NOT NULL;
+    ALTER TABLE visits ADD COLUMN review_pending INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE visits ADD COLUMN reviewed_at TEXT;
+    ALTER TABLE visits ADD COLUMN reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    """,
 ]
 
 

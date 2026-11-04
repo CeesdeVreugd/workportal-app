@@ -838,6 +838,8 @@ def plan(tid, pid=None):
             old = (p["date"], {r["user_id"] for r in query("SELECT user_id FROM visit_plan_users WHERE plan_id = ?", (pid,))})
             execute("UPDATE visit_plans SET date = ?, ext_customer_id = ?, ext_contact_id = ?, updated_at = ? WHERE id = ?",
                     (date_v, ext_c, ext_p, now, pid))
+            if (p["ext_contact_id"], p["date"]) != (ext_p, date_v):   # andere monteur of datum: oude link vervalt
+                execute("UPDATE visit_plans SET ext_token_hash = NULL, ext_token_until = NULL WHERE id = ?", (pid,))
             execute("DELETE FROM visit_plan_users WHERE plan_id = ?", (pid,))
         else:
             pid = execute("INSERT INTO visit_plans (ticket_id, date, ext_customer_id, ext_contact_id, created_by, created_at, updated_at)"
@@ -873,7 +875,7 @@ def plan(tid, pid=None):
             if not ext_ct["email"]:
                 msg += f" {ext_ct['name']} heeft geen e-mailadres; de externe monteur is niet gemaild."
             else:
-                ok, err = _mail_ext(t, tid, date_v, ext_ct, ext_name, cust_mailed or bool(p and p["mailed_at"]))
+                ok, err = _mail_ext(t, tid, date_v, ext_ct, ext_name, cust_mailed or bool(p and p["mailed_at"]), pid=pid)
                 msg += f" Planning gemaild aan {ext_ct['name']}." if ok else f" Mailen aan de externe monteur is niet gelukt: {err}"
         flash(msg, "ok")
         return redirect(url_for("service.detail", tid=tid) + "#bezoeken")
@@ -882,10 +884,27 @@ def plan(tid, pid=None):
                            mail_to=t["contact_email"] or t["customer_email"] or "", **extra_ctx)
 
 
-def _mail_ext(t, tid, date_v, ct, company, informed):
-    """Externe monteur: bevestiging dat hij is ingepland, met de gegevens van de klant (in de taal van zijn bedrijf)."""
+EXT_VALID_DAYS = 2   # link voor de externe monteur: geldig t/m 2 dagen na de geplande datum
+
+
+def new_ext_link(pid, date_v):
+    """Nieuwe persoonlijke link voor de externe monteur (oude werkt dan niet meer). Alleen de hash wordt bewaard."""
+    import hashlib
+    import secrets
+    import datetime as _dt
+    token = secrets.token_urlsafe(32)
+    until = (_dt.date.fromisoformat(date_v) + _dt.timedelta(days=EXT_VALID_DAYS)).isoformat()
+    execute("UPDATE visit_plans SET ext_token_hash = ?, ext_token_until = ? WHERE id = ?",
+            (hashlib.sha256(token.encode()).hexdigest(), until, pid))
+    base = (_os.environ.get("APP_URL") or request.host_url or "").rstrip("/")
+    return f"{base}/extern/{token}", until
+
+
+def _mail_ext(t, tid, date_v, ct, company, informed, pid=None):
+    """Externe monteur: bevestiging dat hij is ingepland, met de gegevens van de klant (in de taal van zijn bedrijf)
+    en een persoonlijke link om het bezoek na afloop in te vullen en de klant te laten tekenen."""
     from .mail import send_mail_with_files
-    from .talen import tr, long_date, LANG_LABELS
+    from .talen import tr, long_date, LANG_LABELS, ext_tr
     box = svc_mailbox()
     if not box:
         return False, "geen service-mailbox ingesteld"
@@ -901,6 +920,9 @@ def _mail_ext(t, tid, date_v, ct, company, informed):
         body += f"\n\n{L['x_report']}:\n" + t["description"].strip()[:1500]
     if informed:
         body += "\n\n" + L["x_informed"]
+    if pid:
+        link, until = new_ext_link(pid, date_v)
+        body += "\n\n" + ext_tr(xl)["link"].format(d=long_date(until, xl)) + "\n" + link
     body += "\n\n" + L["x_q"]
     subject = L["x_subject"].format(d=fmt_date(date_v), nr=t["number"]) + f" [WP-T{tid}]"
     cc = [g.user["email"]] if g.user["email"] and g.user["email"] != ct["email"] else []
@@ -944,6 +966,43 @@ def _mail_plan(t, tid, pid, date_v, people, lang, to_raw, extra):
         execute("UPDATE visit_plans SET mailed_at = ? WHERE id = ?", (now, pid))
         audit("planning gemaild", "ticket", tid, ", ".join(to))
     return ok, err
+
+
+@bp.route("/<int:tid>/plannen/<int:pid>/link", methods=["POST"])
+@require("service", BEWERKEN)
+def plan_link(tid, pid):
+    """Link voor de externe monteur opnieuw mailen (nieuwe link) of intrekken."""
+    t = _ticket(tid)
+    pl = plans_query("p.id = ? AND p.ticket_id = ? AND p.visit_id IS NULL", (pid, tid))
+    if not pl:
+        abort(404)
+    pl = pl[0]
+    back = url_for("service.detail", tid=tid) + f"#plan{pid}"
+    if request.form.get("actie") == "intrekken":
+        execute("UPDATE visit_plans SET ext_token_hash = NULL, ext_token_until = NULL WHERE id = ?", (pid,))
+        audit("link externe monteur ingetrokken", "ticket", tid, pl["ext_contact"] or "")
+        flash("De link van de externe monteur werkt niet meer.", "ok")
+        return redirect(back)
+    ct = query("SELECT ct.*, c.language FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.id = ?",
+               (pl["ext_contact_id"] or 0,), one=True)
+    if not ct or not ct["email"]:
+        flash("De externe monteur heeft geen e-mailadres (vul het in bij de contactpersoon van zijn bedrijf).", "error")
+        return redirect(back)
+    ok, err = _mail_ext(t, tid, pl["date"], ct, pl["ext_name"], bool(pl["mailed_at"]), pid=pid)
+    flash(f"Nieuwe link gemaild aan {ct['name']}." if ok else f"Mailen is niet gelukt: {err}", "ok" if ok else "error")
+    return redirect(back)
+
+
+@bp.route("/<int:tid>/bezoek/<int:vid>/gecontroleerd", methods=["POST"])
+@require("service", BEWERKEN)
+def visit_reviewed(tid, vid):
+    """Bezoek dat de externe monteur heeft ingevuld: gecontroleerd, door naar versturen van de werkbon."""
+    _ticket(tid)
+    query("SELECT 1 FROM visits WHERE id = ? AND ticket_id = ?", (vid, tid), one=True) or abort(404)
+    execute("UPDATE visits SET review_pending = 0, reviewed_at = ?, reviewed_by = ? WHERE id = ?", (now_iso(), g.user["id"], vid))
+    audit("bezoek extern gecontroleerd", "ticket", tid, str(vid))
+    flash("Gecontroleerd. Verstuur nu de werkbon naar de klant.", "ok")
+    return redirect(url_for("service.visit_send", tid=tid, vid=vid))
 
 
 @bp.route("/<int:tid>/plannen/<int:pid>/verwijderen", methods=["POST"])

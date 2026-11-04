@@ -11,9 +11,10 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.11.0"
+VERSION = "2.12.0"
 
-PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie"}
+PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie",
+                    "extern.visit"}
 
 
 def _secret_key(data_dir):
@@ -90,6 +91,8 @@ def create_app(test_config=None, start_scheduler=True):
     from .models3d import bp as models3d_bp
     from .crediteuren import bp as cred_bp, open_counts as cred_counts
     from . import werk
+    from .extern import bp as extern_bp
+    app.register_blueprint(extern_bp)
     for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp, komdex_bp, models3d_bp, cred_bp):
         app.register_blueprint(bp)
     # Projecten en Orders: dezelfde code, twee modules
@@ -142,6 +145,10 @@ def create_app(test_config=None, start_scheduler=True):
     @app.after_request
     def _headers(resp):
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        if request.blueprint == "extern":   # persoonlijke link: niet bewaren, niet indexeren
+            resp.headers["Cache-Control"] = "no-store"
+            resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+            resp.headers["Referrer-Policy"] = "no-referrer"
         resp.headers.setdefault("Referrer-Policy", "same-origin")
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         resp.headers.setdefault("Permissions-Policy", "camera=(self), geolocation=(self), microphone=(), payment=(), usb=(), "

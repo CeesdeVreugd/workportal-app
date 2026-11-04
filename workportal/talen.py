@@ -122,3 +122,48 @@ def long_date(iso, lang="nl"):
         return str(iso or "")
     L = tr(lang)
     return f"{L['days'][d.weekday()]} {d.day} {L['months'][d.month - 1]} {d.year}"
+
+
+# Pagina voor de externe monteur (bezoek invullen via een persoonlijke link)
+EXT = {
+    "nl": {"title": "Bezoek invullen", "intro": "Vul na afloop van het bezoek de gegevens in en laat de klant tekenen.",
+           "valid": "Deze link is persoonlijk en geldig tot en met {d}.", "date": "Datum bezoek", "work_h": "Gewerkte uren",
+           "photos": "Foto's", "add": "Foto's toevoegen", "sign": "Handtekening klant", "sign_name": "Naam klant", "clear": "Wissen",
+           "no_sign": "De klant is niet aanwezig of tekent niet", "reason": "Reden", "submit": "Bezoek afronden",
+           "confirm": "Bezoek afronden? Daarna kunt u niets meer wijzigen.",
+           "need": "Vul de bevindingen of de uitgevoerde werkzaamheden in, en laat de klant tekenen (of vink aan dat de klant niet tekent).",
+           "done_t": "Bedankt!", "done": "Het bezoek is afgerond. De Vreugd Productietechniek controleert de gegevens en stuurt de werkbon naar de klant.",
+           "bad_t": "Link niet (meer) geldig", "bad": "Deze link is verlopen, al gebruikt of ingetrokken. Neem contact op met De Vreugd Productietechniek: +31 (0)488 41 28 28.",
+           "link": "Na afloop vult u het bezoek in via deze persoonlijke link (werkzaamheden, uren, foto's en de handtekening van de klant). De link is geldig tot en met {d}:"},
+    "en": {"title": "Complete visit", "intro": "After the visit, please fill in the details and have the customer sign.",
+           "valid": "This link is personal and valid until {d}.", "date": "Visit date", "work_h": "Hours worked",
+           "photos": "Photos", "add": "Add photos", "sign": "Customer signature", "sign_name": "Customer name", "clear": "Clear",
+           "no_sign": "The customer is not present or does not sign", "reason": "Reason", "submit": "Complete visit",
+           "confirm": "Complete the visit? You cannot change anything afterwards.",
+           "need": "Please fill in the findings or the work carried out, and have the customer sign (or tick that the customer does not sign).",
+           "done_t": "Thank you!", "done": "The visit has been completed. De Vreugd Productietechniek will check the details and send the work order to the customer.",
+           "bad_t": "Link no longer valid", "bad": "This link has expired, has already been used or has been revoked. Please contact De Vreugd Productietechniek: +31 (0)488 41 28 28.",
+           "link": "After the visit, please complete it via this personal link (work carried out, hours, photos and the customer's signature). The link is valid until {d}:"},
+    "de": {"title": "Besuch ausfüllen", "intro": "Bitte füllen Sie nach dem Besuch die Angaben aus und lassen Sie den Kunden unterschreiben.",
+           "valid": "Dieser Link ist persönlich und gültig bis einschließlich {d}.", "date": "Datum des Besuchs", "work_h": "Arbeitsstunden",
+           "photos": "Fotos", "add": "Fotos hinzufügen", "sign": "Unterschrift Kunde", "sign_name": "Name Kunde", "clear": "Löschen",
+           "no_sign": "Der Kunde ist nicht anwesend oder unterschreibt nicht", "reason": "Grund", "submit": "Besuch abschließen",
+           "confirm": "Besuch abschließen? Danach können Sie nichts mehr ändern.",
+           "need": "Bitte füllen Sie den Befund oder die durchgeführten Arbeiten aus und lassen Sie den Kunden unterschreiben (oder kreuzen Sie an, dass er nicht unterschreibt).",
+           "done_t": "Vielen Dank!", "done": "Der Besuch ist abgeschlossen. De Vreugd Productietechniek prüft die Angaben und sendet den Arbeitsbericht an den Kunden.",
+           "bad_t": "Link nicht (mehr) gültig", "bad": "Dieser Link ist abgelaufen, wurde bereits verwendet oder widerrufen. Bitte wenden Sie sich an De Vreugd Productietechniek: +31 (0)488 41 28 28.",
+           "link": "Nach dem Besuch füllen Sie diesen über diesen persönlichen Link aus (Arbeiten, Stunden, Fotos und Unterschrift des Kunden). Der Link ist gültig bis einschließlich {d}:"},
+    "fr": {"title": "Compléter la visite", "intro": "Après la visite, veuillez remplir les informations et faire signer le client.",
+           "valid": "Ce lien est personnel et valable jusqu'au {d} inclus.", "date": "Date de visite", "work_h": "Heures travaillées",
+           "photos": "Photos", "add": "Ajouter des photos", "sign": "Signature du client", "sign_name": "Nom du client", "clear": "Effacer",
+           "no_sign": "Le client est absent ou ne signe pas", "reason": "Motif", "submit": "Terminer la visite",
+           "confirm": "Terminer la visite ? Vous ne pourrez plus rien modifier ensuite.",
+           "need": "Veuillez remplir les constatations ou les travaux effectués, et faire signer le client (ou cocher qu'il ne signe pas).",
+           "done_t": "Merci !", "done": "La visite est terminée. De Vreugd Productietechniek vérifie les informations et envoie le bon d'intervention au client.",
+           "bad_t": "Lien non valide", "bad": "Ce lien a expiré, a déjà été utilisé ou a été révoqué. Veuillez contacter De Vreugd Productietechniek : +31 (0)488 41 28 28.",
+           "link": "Après la visite, complétez-la via ce lien personnel (travaux, heures, photos et signature du client). Le lien est valable jusqu'au {d} inclus :"},
+}
+
+
+def ext_tr(lang):
+    return EXT.get(lang or "nl", EXT["nl"])

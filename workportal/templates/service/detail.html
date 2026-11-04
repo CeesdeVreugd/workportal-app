@@ -185,6 +185,12 @@
         {% if p.ext_name %}<li>{{ icon('service') }}<span><b>{{ p.ext_contact or 'Externe monteur' }}</b>{% if p.ext_phone %} · <a href="tel:{{ p.ext_phone }}">{{ p.ext_phone }}</a>{% endif %}<br><span class="muted">extern · {{ p.ext_name }}</span></span></li>{% endif %}
       </ul>
       {% if p.mailed_at %}<div class="small muted plansent">{{ icon('mail') }} Bevestiging naar klant {{ p.mailed_at|dt }}</div>{% endif %}
+      {% if p.ext_name and edit %}<div class="extlink small">
+        {% if p.ext_token_hash and p.ext_token_until >= now_date() %}<span class="badge b-blue">Link externe monteur geldig t/m {{ p.ext_token_until|date }}</span>
+        {% elif p.ext_token_hash %}<span class="badge b-warn">Link verlopen</span>{% else %}<span class="muted">Externe monteur heeft (nog) geen link</span>{% endif %}
+        <form method="post" action="{{ url_for('service.plan_link', tid=t.id, pid=p.id) }}" data-confirm="Een nieuwe link mailen aan {{ p.ext_contact or 'de externe monteur' }}? Een eerdere link werkt dan niet meer."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('mail') }}{{ 'Nieuwe link mailen' if p.ext_token_hash else 'Link mailen' }}</button></form>
+        {% if p.ext_token_hash %}<form method="post" action="{{ url_for('service.plan_link', tid=t.id, pid=p.id) }}" data-confirm="Link intrekken? De externe monteur kan het bezoek dan niet meer invullen."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="actie" value="intrekken">Intrekken</button></form>{% endif %}
+      </div>{% endif %}
       {% if edit %}<div class="planbtns">
         <a class="btn sm primary" href="{{ url_for('service.visit', tid=t.id, plan=p.id) }}">{{ icon('plus') }}Uitvoeren</a>
         <a class="btn sm" href="{{ url_for('service.plan', tid=t.id, pid=p.id) }}">{{ icon('edit') }}Wijzigen</a>
@@ -194,6 +200,8 @@
   {% endfor %}
   {% for v in visits %}
     <div class="rowitem visit" id="bezoek{{ v.id }}">
+      {% if v.review_pending %}<div class="vreview"><span><b>Ingevuld door de externe monteur.</b> Controleer het bezoek en verstuur daarna de werkbon.</span>
+        {% if edit %}<form method="post" action="{{ url_for('service.visit_reviewed', tid=t.id, vid=v.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm primary">{{ icon('check') }}Gecontroleerd, werkbon versturen</button></form>{% endif %}</div>{% endif %}
       <div class="vhead"><div class="t">Bezoek {{ v.date|date }} · {{ v.technicians or '' }}</div><div class="s">{{ v.hours|num(2) }} uur · reistijd {{ v.travel_hours|num(2) }} uur · {{ v.km|num(0) }} km</div></div>
       {% if v.signed_at or v.closed_at or v.sent_at %}<div class="vbadges">
         {% if v.signed_at %}<span class="badge b-ok">Getekend door {{ v.signed_name }}</span>{% elif v.closed_at %}<span class="badge b-ok" title="{{ v.closed_note or '' }}">Afgerond zonder handtekening</span>{% endif %}
@@ -208,7 +216,7 @@
         {% endif %}
         <a class="btn sm" href="{{ url_for('service.werkbon', tid=t.id, vid=v.id) }}" data-pdf="Werkbon {{ t.number }}" target="_blank">{{ icon('pdf') }}Werkbon</a>
         {% if edit and (v.signed_at or v.closed_at) %}<a class="btn sm" href="{{ url_for('service.visit', tid=t.id, vid=v.id) }}" title="Foto's toevoegen of gegevens aanvullen">{{ icon('edit') }}Aanvullen</a>
-        <a class="btn sm" href="{{ url_for('service.visit_send', tid=t.id, vid=v.id) }}">{{ icon('mail') }}Versturen</a>{% endif %}
+        {% if not v.review_pending %}<a class="btn sm" href="{{ url_for('service.visit_send', tid=t.id, vid=v.id) }}">{{ icon('mail') }}Versturen</a>{% endif %}{% endif %}
         {% if edit and (not v.signed_at or can('service', 3)) %}<form class="vdel" method="post" action="{{ url_for('service.visit_delete', tid=t.id, vid=v.id) }}" data-confirm="{{ 'Dit bezoek is ondertekend door ' ~ v.signed_name ~ '. Toch verwijderen, met werkbon en foto\'s?' if v.signed_at else 'Bezoek van ' ~ (v.date|date) ~ ' met foto\'s verwijderen?' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Bezoek verwijderen" title="Bezoek verwijderen">{{ icon('trash') }}</button></form>{% endif %}
         {% if not v.signed_at and not v.closed_at and edit %}
         <details class="cred-pop vclose"><summary class="btn sm ghost">Afronden zonder handtekening</summary>

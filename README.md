@@ -946,3 +946,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V177 (2.11.0)
 - Ticket, mail aan de klant: is de taal van de relatie niet Nederlands, dan typ je in een vak je tekst in het Nederlands, kiest de taal en klikt **Vertaal**. De vertaling komt in het vak eronder (aan te passen); alleen die gaat naar de klant. De Nederlandse tekst wordt bij de mail bewaard ("Nederlandse tekst" bij de notitie).
 - Vertalen gaat via **DeepL**. Instellen: maak een DeepL API-account (DeepL API Free: 500.000 tekens per maand gratis), kopieer de API-sleutel en zet die in Portainer als omgevingsvariabele **DEEPL_KEY** (niet in GitHub). Zonder sleutel geeft de knop een melding.
+
+## V178 (2.12.0)
+- **Externe monteur rondt het bezoek zelf af** via een persoonlijke link (geen account nodig).
+  - De link staat in de mail "Ingepland" aan de externe monteur (vinkje Externe monteur mailen bij het plannen), in de taal van zijn bedrijf.
+  - Hij ziet alleen dit bezoek (ticket, klant, adres, installatie, contactpersoon, melding) en vult uren, reistijd, km, bevindingen, werkzaamheden, materialen en foto's in; de klant tekent op het scherm (of: klant niet aanwezig + reden).
+  - Daarna werkt de link niet meer. Geldig t/m 2 dagen na de geplande datum; op het ticket: "Nieuwe link mailen" of "Intrekken". Andere datum of andere monteur = oude link vervalt.
+  - Na afronden: melding (en mail) aan wie het heeft ingepland en de toegewezen collega; op het ticket staat het bezoek met "Ingevuld door de externe monteur" en de knop **Gecontroleerd, werkbon versturen**. Pas daarna gaat de werkbon (in de taal van de klant) naar de klant.
+  - Veiligheid: sleutel van 256 bits, alleen de hash staat in de database; geen toegang tot de rest van WorkPortal; mislukte pogingen worden afgeremd; pagina wordt niet bewaard of geïndexeerd.
+- Database-migratie 40.
