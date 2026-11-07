@@ -740,6 +740,15 @@ MIGRATIONS = [
     ALTER TABLE visits ADD COLUMN reviewed_at TEXT;
     ALTER TABLE visits ADD COLUMN reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
     """,
+    # 41 - externe monteur: tussentijds opslaan (op de server, ook verder op een ander apparaat)
+    """
+    ALTER TABLE visit_plans ADD COLUMN ext_draft TEXT;
+    ALTER TABLE visit_plans ADD COLUMN ext_draft_at TEXT;
+    """,
+    # 42 - vertaling van de ingevulde teksten van een bezoek (werkbon in de taal van de klant)
+    """
+    ALTER TABLE visits ADD COLUMN tr_json TEXT;
+    """,
 ]
 
 

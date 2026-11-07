@@ -11,10 +11,10 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.12.1"
+VERSION = "2.12.4"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie",
-                    "extern.visit"}
+                    "extern.visit", "extern.done", "extern.photo"}
 
 
 def _secret_key(data_dir):

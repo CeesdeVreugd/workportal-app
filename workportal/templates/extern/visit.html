@@ -16,10 +16,12 @@
 {% if bad %}
   <section class="card"><h1>{{ X.bad_t }}</h1><p>{{ X.bad }}</p></section>
 {% elif done %}
+  <div class="flash ok" style="display:none">ok</div>
   <section class="card"><h1>{{ X.done_t }}</h1><p>{{ X.done }}</p></section>
+  <script>try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("wp_extsig:") === 0) localStorage.removeItem(k); }); } catch (e) {}</script>
 {% else %}
   <h1>{{ X.title }}</h1>
-  <p class="muted">{{ X.intro }} {{ X.valid.format(d=until) }}</p>
+  <p class="muted">{{ X.intro }} {{ X.valid.format(d=until) }} {{ X.saved_here }}</p>
   <section class="card">
     <dl class="dl">
       <dt>{{ L.x_ticket }}</dt><dd>{{ p.number }} – {{ p.title }}</dd>
@@ -33,9 +35,12 @@
     {% if p.description %}<h3 style="margin-top:12px">{{ L.report }}</h3><div class="prose" style="white-space:pre-line">{{ p.description }}</div>{% endif %}
   </section>
   {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
-  <form method="post" enctype="multipart/form-data" class="card form" id="extform" data-confirm-text="{{ X.confirm }}">
+  {% if saved %}<div class="flash ok">{{ saved }}</div>{% elif p.ext_draft_at %}<div class="flash info">{{ X.saved.format(t=(p.ext_draft_at|dt)) }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="card form" id="extform" data-confirm-text="{{ X.confirm }}"
+        data-draft="extern-{{ p.id }}" data-sig-key="wp_extsig:{{ p.id }}"
+        data-t-src="" {% for k in ['restored', 'with', 'photo', 'photos', 'check', 'discard', 'discard_q', 'failed', 'offline', 'from', 'locale'] %}data-t-{{ k }}="{{ X[k] }}" {% endfor %}>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="signature" id="sigdata">
+    <input type="hidden" name="signature" id="sigdata" value="{{ form.get('signature', '') }}">
     <div class="fgrid">
       <label class="f">{{ L.hours }}<input type="text" name="hours" inputmode="decimal" value="{{ form.get('hours', '') }}"></label>
       <label class="f">{{ L.travel }}<input type="text" name="travel_hours" inputmode="decimal" value="{{ form.get('travel_hours', '') }}"></label>
@@ -45,8 +50,9 @@
     <label class="f">{{ L.work }}<textarea name="work_done" rows="4">{{ form.get('work_done', '') }}</textarea></label>
     <label class="f">{{ L.materials }}<textarea name="materials" rows="3">{{ form.get('materials', '') }}</textarea></label>
     <div class="f"><span>{{ X.photos }}</span>
-      <label class="addphoto ext-add">📷 {{ X.add }}<input type="file" name="photos" accept="image/*" multiple id="extphotos"></label>
-      <div class="photos" id="extprev"></div></div>
+      <label class="addphoto ext-add">📷 {{ X.add }}<input type="file" name="photos" accept="image/*" multiple data-collect data-preview="extprev"></label>
+      <div class="photos" id="extprev">{% for fr in dphotos %}<div class="photo"><img src="{{ url_for('extern.photo', token=request.view_args.token, fid=fr.id) }}" alt="">
+        <button class="photo-x" name="del_photo" value="{{ fr.id }}" title="{{ X.remove }}" aria-label="{{ X.remove }}" formnovalidate>×</button></div>{% endfor %}</div></div>
     <h2 style="margin:6px 0 0">{{ X.sign }}</h2>
     <div id="signbox">
       <label class="f">{{ X.sign_name }}<input type="text" name="signed_name" value="{{ form.get('signed_name', p.contact or '') }}"></label>
@@ -55,35 +61,39 @@
     </div>
     <label class="check"><input type="checkbox" name="no_sign" value="1" id="nosign" {{ 'checked' if form.get('no_sign') }}> {{ X.no_sign }}</label>
     <label class="f" id="reasonbox" {{ '' if form.get('no_sign') else 'hidden' }}>{{ X.reason }}<input type="text" name="reason" value="{{ form.get('reason', '') }}"></label>
-    <div class="actions"><button class="btn primary">{{ X.submit }}</button></div>
+    <div class="actions"><button class="btn primary" name="actie" value="afronden">{{ X.submit }}</button><button class="btn" name="actie" value="tussentijds">💾 {{ X.save }}</button></div>
   </form>
 <script>
 (function () {
-  var cv = document.getElementById("sig"), target = document.getElementById("sigdata"), ctx = cv.getContext("2d"), drawing = false, dirty = false;
+  var form = document.getElementById("extform"), SK = form.getAttribute("data-sig-key");
+  var cv = document.getElementById("sig"), target = document.getElementById("sigdata"), ctx = cv.getContext("2d"), drawing = false, dirty = false, changed = false;
   function size() { var r = cv.getBoundingClientRect(), k = window.devicePixelRatio || 1; cv.width = r.width * k; cv.height = r.height * k;
-    ctx.scale(k, k); ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0A0A96"; }
+    ctx.setTransform(k, 0, 0, k, 0, 0); ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0A0A96"; }
   size();
   function pos(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   cv.addEventListener("pointerdown", function (e) { drawing = true; cv.setPointerCapture(e.pointerId); var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
   cv.addEventListener("pointermove", function (e) { if (!drawing) return; var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); dirty = true; });
-  function end() { if (!drawing) return; drawing = false; if (dirty) target.value = cv.toDataURL("image/png"); }
+  function end() { if (!drawing) return; drawing = false; if (dirty) { target.value = cv.toDataURL("image/png"); changed = true; try { localStorage.setItem(SK, target.value); } catch (x) {} } }
   ["pointerup", "pointercancel", "pointerleave"].forEach(function (n) { cv.addEventListener(n, end); });
-  document.getElementById("sigclear").addEventListener("click", function () { ctx.clearRect(0, 0, cv.width, cv.height); dirty = false; target.value = ""; });
+  document.getElementById("sigclear").addEventListener("click", function () { ctx.clearRect(0, 0, cv.width, cv.height); dirty = false; target.value = ""; try { localStorage.removeItem(SK); } catch (x) {} });
+  // handtekening terugzetten (bijv. na per ongeluk terug of verversen; of tussentijds opgeslagen op de server)
+  try { var saved = localStorage.getItem(SK) || target.value; if (saved) { var im = new Image(); im.onload = function () { var r = cv.getBoundingClientRect(); ctx.drawImage(im, 0, 0, r.width, r.height); }; im.src = saved; target.value = saved; dirty = true; } } catch (x) {}
   var ns = document.getElementById("nosign");
   function sync() { document.getElementById("reasonbox").hidden = !ns.checked; document.getElementById("signbox").hidden = ns.checked; }
-  ns.addEventListener("change", sync); sync();
-  document.getElementById("extphotos").addEventListener("change", function () {
-    var box = document.getElementById("extprev"); box.innerHTML = "";
-    Array.prototype.forEach.call(this.files, function (f) { var d = document.createElement("div"); d.className = "photo";
-      var i = document.createElement("img"); i.src = URL.createObjectURL(f); d.appendChild(i); box.appendChild(d); });
-  });
-  var form = document.getElementById("extform");
+  ns.addEventListener("change", sync); ns.addEventListener("input", sync); sync(); setTimeout(sync, 300);
+  form.addEventListener("input", function () { changed = true; });
   form.addEventListener("submit", function (e) {
+    var sub = e.submitter;
+    if (sub && (sub.value === "tussentijds" || sub.name === "del_photo")) return;   // tussentijds opslaan: geen vraag
     if (!confirm(form.getAttribute("data-confirm-text"))) { e.preventDefault(); return; }
-    form.querySelector("button.primary").disabled = true;
+  });
+  // waarschuwen bij weggaan (terugknop, tabblad sluiten) zolang er iets is ingevuld en niet verstuurd
+  window.addEventListener("beforeunload", function (e) {
+    if (changed && !form.hasAttribute("data-submitting")) { e.preventDefault(); e.returnValue = ""; }
   });
 })();
 </script>
+<script src="{{ url_for('static', filename='js/draft.js') }}?v={{ VERSION }}"></script>
 {% endif %}
 </main>
 </body>

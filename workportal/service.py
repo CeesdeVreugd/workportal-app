@@ -414,6 +414,12 @@ DEEPL_TARGET = {"en": "EN-GB", "de": "DE", "fr": "FR", "nl": "NL"}
 
 def translate_text(text, lang, source="NL"):
     """Vertalen via DeepL (sleutel DEEPL_KEY in Portainer). Geeft (tekst, None) of (None, foutmelding)."""
+    out, err = translate_many([text], lang, source)
+    return (out[0], None) if out else (None, err)
+
+
+def translate_many(texts, lang, source=None):
+    """Meerdere teksten in één keer (source=None: taal zelf herkennen). Geeft ([teksten], None) of (None, foutmelding)."""
     import requests
     key = _os.environ.get("DEEPL_KEY", "").strip()
     if not key:
@@ -424,8 +430,9 @@ def translate_text(text, lang, source="NL"):
     url = "https://api-free.deepl.com/v2/translate" if key.endswith(":fx") else "https://api.deepl.com/v2/translate"
     try:
         r = requests.post(url, headers={"Authorization": f"DeepL-Auth-Key {key}"}, timeout=30,
-                          json={"text": [text], "source_lang": source, "target_lang": target, "preserve_formatting": True,
-                                "formality": "prefer_more" if target in ("DE", "FR", "NL") else "default"})
+                          json=dict({"text": list(texts), "target_lang": target, "preserve_formatting": True,
+                                     "formality": "prefer_more" if target in ("DE", "FR", "NL") else "default"},
+                                    **({"source_lang": source} if source else {})))
     except Exception:  # noqa: BLE001
         return None, "De vertaaldienst is nu niet bereikbaar."
     if r.status_code == 456:
@@ -434,8 +441,47 @@ def translate_text(text, lang, source="NL"):
         return None, "De vertaalsleutel (DEEPL_KEY) wordt niet geaccepteerd."
     if r.status_code >= 400:
         return None, f"Vertalen mislukt ({r.status_code})."
-    tr_ = (r.json().get("translations") or [{}])[0].get("text")
-    return (tr_, None) if tr_ else (None, "Geen vertaling ontvangen.")
+    got = [x.get("text") for x in (r.json().get("translations") or [])]
+    return (got, None) if len(got) == len(texts) and all(x is not None for x in got) else (None, "Geen vertaling ontvangen.")
+
+
+TR_FIELDS = ("findings", "work_done", "materials", "closed_note")
+
+
+def _tr_hash(v):
+    import hashlib
+    return hashlib.sha1("\x1f".join((v[k] or "") for k in TR_FIELDS).encode()).hexdigest()[:16]
+
+
+def visit_translation(v, lang, auto=True, force=False):
+    """Vertaling van de ingevulde teksten van een bezoek voor de werkbon (bewaard per taal in visits.tr_json).
+    Verandert de Nederlandse tekst, dan wordt opnieuw vertaald. Geeft ({veld: tekst}, foutmelding of None)."""
+    if not lang or lang == "nl":
+        return None, None
+    data = _json.loads(v["tr_json"]) if v["tr_json"] else {}
+    cur = data.get(lang)
+    h = _tr_hash(v)
+    if cur and cur.get("_h") == h and not force:
+        return cur, None
+    if not auto:
+        return None, None
+    keys = [k for k in TR_FIELDS if (v[k] or "").strip()]
+    if not keys:
+        return {}, None
+    out, err = translate_many([v[k] for k in keys], lang)
+    if err:
+        return None, err
+    cur = dict(zip(keys, out), _h=h)
+    data[lang] = cur
+    execute("UPDATE visits SET tr_json = ? WHERE id = ?", (_json.dumps(data, ensure_ascii=False), v["id"]))
+    return cur, None
+
+
+def save_visit_translation(v, lang, values):
+    """Handmatig aangepaste vertaling bewaren (hoort bij de huidige Nederlandse tekst)."""
+    data = _json.loads(v["tr_json"]) if v["tr_json"] else {}
+    data[lang] = dict({k: (values.get(k) or "").strip() for k in TR_FIELDS if (v[k] or "").strip()}, _h=_tr_hash(v), _manual=1)
+    execute("UPDATE visits SET tr_json = ? WHERE id = ?", (_json.dumps(data, ensure_ascii=False), v["id"]))
 
 
 @bp.route("/<int:tid>/vertalen", methods=["POST"])
@@ -1097,6 +1143,8 @@ def visit_reviewed(tid, vid):
 def plan_delete(tid, pid):
     t = _ticket(tid)
     p = query("SELECT * FROM visit_plans WHERE id = ? AND ticket_id = ?", (pid, tid), one=True) or abort(404)
+    for fr in files_for("plan_draft", pid):
+        delete_file(fr["id"])
     execute("DELETE FROM visit_plans WHERE id = ?", (pid,))
     if t["status"] == "ingepland" and not query("SELECT 1 FROM visit_plans WHERE ticket_id = ? AND visit_id IS NULL", (tid,), one=True) \
             and not query("SELECT 1 FROM visits WHERE ticket_id = ?", (tid,), one=True):
@@ -1298,7 +1346,10 @@ def visit_send(tid, vid):
         want_sp = bool(request.form.get("sharepoint")) and _sp_available(t)
         if (not to and not want_sp) or bad:
             flash("Vul een geldig e-mailadres in" + (f" (ongeldig: {', '.join(bad)})" if bad else "") + ", of kies SharePoint.", "error")
-            return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang)
+            return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang,
+                                   **_send_tr(v, lang))
+        if lang != "nl" and any(k.startswith("tr_") for k in request.form):
+            save_visit_translation(v, lang, {k: request.form.get("tr_" + k) for k in TR_FIELDS})
         pdf, fname = _werkbon(tid, vid, lang)
         msgs = []
         if to:
@@ -1314,7 +1365,8 @@ def visit_send(tid, vid):
                 msgs.append("Werkbon gemaild naar " + ", ".join(to) + ".")
             else:
                 flash(f"Mailen is mislukt: {err}", "error")
-                return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang)
+                return render_template("service/send.html", t=t, v=v, form=request.form, sharepoint=_sp_available(t), lang=lang,
+                                   **_send_tr(v, lang))
         if want_sp:
             res = sp.upload_document(get_db(), t["project_id"], sp.setting(get_db(), "sp_sub_werkbon"), fname, pdf)
             if res is None:
@@ -1331,7 +1383,18 @@ def visit_send(tid, vid):
                     + ("" if v["signed_at"] else "\n" + L["unsigned"])
                     + "\n\n" + L["questions"]}
     return render_template("service/send.html", t=t, v=v, form=form, sharepoint=_sp_available(t), lang=lang,
+                           **_send_tr(v, lang, force=bool(request.args.get("opnieuw"))),
                            cust_lang=_lang(t))
+
+
+def _send_tr(v, lang, force=False):
+    """Voor het verstuurscherm: vertaling van bevindingen/werkzaamheden/materialen (aan te passen voor het versturen)."""
+    if lang == "nl":
+        return {"trv": None, "tr_err": None, "tr_fields": []}
+    trv, err = visit_translation(v, lang, force=force)
+    labels = {"findings": "Bevindingen", "work_done": "Uitgevoerde werkzaamheden", "materials": "Gebruikte materialen", "closed_note": "Opmerking afronden"}
+    fields = [(k, labels[k], v[k]) for k in TR_FIELDS if (v[k] or "").strip()]
+    return {"trv": trv or {}, "tr_err": err, "tr_fields": fields}
 
 
 def _sp_available(t):
@@ -1359,6 +1422,10 @@ def _werkbon(tid, vid, lang=None):
     t = dict(_ticket(tid))
     lang = _lang(t, lang)
     v = dict(query("SELECT v.*, u.name AS amended_name FROM visits v LEFT JOIN users u ON u.id = v.amended_by WHERE v.id = ?", (vid,), one=True))
+    trv, _err = visit_translation(v, lang)   # ingevulde teksten in de taal van de klant (DeepL; zonder sleutel: Nederlands)
+    for k, val in (trv or {}).items():
+        if k in TR_FIELDS and val:
+            v[k] = val
     photos = [(file_path(f), f["caption"]) for f in files_for("visit", vid, "photo")]
     sigs = files_for("visit", vid, "signature")
     pdf = visit_pdf(t, v, photos, file_path(sigs[-1]) if sigs else None, lang)

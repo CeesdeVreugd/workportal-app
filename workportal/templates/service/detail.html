@@ -187,6 +187,7 @@
       {% if p.mailed_at %}<div class="small muted plansent">{{ icon('mail') }} Bevestiging naar klant {{ p.mailed_at|dt }}</div>{% endif %}
       {% if p.ext_name and edit %}<div class="extlink small">
         {% if p.ext_token_hash and p.ext_token_until >= now_date() %}<span class="badge b-blue">Link externe monteur geldig t/m {{ p.ext_token_until|date }}</span>
+        {% if p.ext_draft_at %}<span class="badge b-warn">Externe monteur heeft tussentijds opgeslagen ({{ p.ext_draft_at|dt }})</span>{% endif %}
         {% elif p.ext_token_hash %}<span class="badge b-warn">Link verlopen</span>{% else %}<span class="muted">Externe monteur heeft (nog) geen link</span>{% endif %}
         <form method="post" action="{{ url_for('service.plan_link', tid=t.id, pid=p.id) }}" data-confirm="Een nieuwe link mailen aan {{ p.ext_contact or 'de externe monteur' }}? Een eerdere link werkt dan niet meer."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('mail') }}{{ 'Nieuwe link mailen' if p.ext_token_hash else 'Link mailen' }}</button></form>
         {% if p.ext_token_hash %}<form method="post" action="{{ url_for('service.plan_link', tid=t.id, pid=p.id) }}" data-confirm="Link intrekken? De externe monteur kan het bezoek dan niet meer invullen."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="actie" value="intrekken">Intrekken</button></form>{% endif %}

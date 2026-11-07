@@ -264,12 +264,12 @@
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
       overlay.remove(); overlay = null; unlock();
       if (/\/(login|pin|vergrendel)/.test(url)) { alert("Je was vergrendeld. Wat je had ingevuld (met foto's en bestanden) is bewaard: voer je pincode in en sla opnieuw op."); location.href = url; }
-      else alert("Opslaan is niet gelukt (" + (xhr.status || "geen verbinding") + "). Wat je had ingevuld is bewaard; probeer het opnieuw.");
+      else alert(form.getAttribute("data-t-failed") || ("Opslaan is niet gelukt (" + (xhr.status || "geen verbinding") + "). Wat je had ingevuld is bewaard; probeer het opnieuw."));
     };
     xhr.onerror = function () {
       try { sessionStorage.removeItem(CLEAR); } catch (x) {}
       if (overlay) { overlay.remove(); overlay = null; } unlock();
-      alert("Geen verbinding. Wat je had ingevuld is bewaard op dit apparaat; probeer het opnieuw als je weer bereik hebt.");
+      alert(form.getAttribute("data-t-offline") || "Geen verbinding. Wat je had ingevuld is bewaard op dit apparaat; probeer het opnieuw als je weer bereik hebt.");
     };
     xhr.send(fd);
   }
@@ -285,11 +285,13 @@
     var src = "", hd = form.querySelector("h2, h3") || (form.closest(".card") && form.closest(".card").querySelector("h2, h3"));
     var sm = form.closest("details") && form.closest("details").querySelector("summary");
     src = ((sm && sm.textContent) || (hd && hd.textContent) || "").replace(/[\s\u2026.]+$/, "").trim();
-    b.innerHTML = "<span><b>Concept teruggezet</b>" + (src ? " – " + src.replace(/[<>&]/g, "") : "") + " – van " + t.toLocaleDateString("nl-NL") + " " + hh +
-      (nPhotos || nFiles ? " (met " + [nPhotos ? nPhotos + " foto" + (nPhotos === 1 ? "" : "'s") : "", nFiles ? nFiles + " bijlage" + (nFiles === 1 ? "" : "n") : ""].filter(Boolean).join(" en ") + ")" : "") + ". Controleer en sla op, of gooi het weg.</span>";
-    var x = document.createElement("button"); x.type = "button"; x.className = "btn sm ghost"; x.textContent = "Concept weggooien";
+    if (form.hasAttribute("data-t-src")) src = form.getAttribute("data-t-src");
+    var T = function (k, d) { return form.getAttribute("data-t-" + k) || d; };
+    b.innerHTML = "<span><b>" + T("restored", "Concept teruggezet") + "</b>" + (src ? " – " + src.replace(/[<>&]/g, "") : "") + " – " + (form.getAttribute("data-t-from") || "van") + " " + t.toLocaleDateString(form.getAttribute("data-t-locale") || "nl-NL") + " " + hh +
+      (nPhotos || nFiles ? " (" + T("with", "met") + " " + [nPhotos ? nPhotos + " " + (nPhotos === 1 ? T("photo", "foto") : T("photos", "foto's")) : "", nFiles ? nFiles + " bijlage" + (nFiles === 1 ? "" : "n") : ""].filter(Boolean).join(" en ") + ")" : "") + ". " + T("check", "Controleer en sla op, of gooi het weg.") + "</span>";
+    var x = document.createElement("button"); x.type = "button"; x.className = "btn sm ghost"; x.textContent = T("discard", "Concept weggooien");
     x.addEventListener("click", function () {
-      if (!confirm("Het teruggezette concept weggooien?")) return;
+      if (!confirm(T("discard_q", "Het teruggezette concept weggooien?"))) return;
       try { localStorage.removeItem(LS); } catch (e) {} idbDel(KEY); idbDel(KEY + ":img"); idbDel(KEY + ":att"); setTimeout(function () { location.reload(); }, 150);
     });
     b.appendChild(x); form.parentNode.insertBefore(b, form);

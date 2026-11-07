@@ -20,6 +20,18 @@
   <label class="check"><input type="checkbox" name="cc_me" value="1" {{ 'checked' if form.cc_me }}> Kopie aan mij ({{ g.user.email }})</label>
   <label class="f">Onderwerp<input type="text" name="subject" value="{{ form.subject or '' }}"></label>
   <label class="f">Tekst<textarea name="body" rows="6">{{ form.body or '' }}</textarea></label>
+  {% if tr_fields %}
+  <div class="trbox">
+    <div class="card-head" style="margin:0"><h3 style="margin:0">Werkbon in het {{ LANG_LABELS.get(lang, lang) }}: ingevulde teksten</h3>
+      <a class="btn sm ghost" href="?taal={{ lang }}&opnieuw=1" data-confirm="Opnieuw laten vertalen? Je eigen aanpassingen hieronder gaan dan verloren.">{{ icon('refresh') }}Opnieuw vertalen</a></div>
+    {% if tr_err %}<p class="hint err" style="margin:0">Niet vertaald: {{ tr_err }} De werkbon gebruikt dan de Nederlandse tekst, tenzij je hieronder zelf een vertaling invult.</p>
+    {% else %}<p class="hint" style="margin:0">Automatisch vertaald (DeepL). Controleer en pas zo nodig aan; dit komt op de werkbon.</p>{% endif %}
+    {% for k, label, nl in tr_fields %}
+    <label class="f">{{ label }}<textarea name="tr_{{ k }}" rows="{{ 3 if k != 'closed_note' else 2 }}">{{ (form.get('tr_' ~ k) if form.get('tr_' ~ k) is not none else trv.get(k, '')) }}</textarea>
+      <span class="hint">Nederlands: {{ nl|truncate(220) }}</span></label>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% if sharepoint %}<label class="check"><input type="checkbox" name="sharepoint" value="1" {{ 'checked' if request.method == 'GET' or form.sharepoint }}> Werkbon ook in SharePoint (projectmap) plaatsen</label>{% endif %}
   <div class="actions"><button class="btn primary">{{ icon('mail') }}Versturen</button><a class="btn ghost" href="{{ url_for('service.detail', tid=t.id) }}#bezoek{{ v.id }}">{{ 'Overslaan' if request.method == 'GET' and not v.sent_at else 'Annuleren' }}</a></div>
 </form>

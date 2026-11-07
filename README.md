@@ -962,3 +962,22 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Reacties die al bij tickets staan, worden bij de eerste ophaalronde na het bijwerken ook verplaatst.
   - Beheer > Instellingen: aan/uit en de naam van de map. Bestaat de map niet, dan komt hij onder Postvak IN.
   - Bewaarde bericht-id's worden bijgewerkt, zodat "Antwoord allen" in hetzelfde mailgesprek blijft werken; geen dubbele reacties na verplaatsen.
+
+## V180 (2.12.2)
+- Pagina van de externe monteur: wat hij invult (tekst, foto's én de handtekening) wordt tussentijds op zijn telefoon bewaard. Per ongeluk terug, verversen, de camera die de pagina herlaadt of geen bereik: bij terugkomen staat alles er weer ("Eerder ingevulde gegevens teruggezet", in zijn taal).
+  - Waarschuwing bij weggaan van de pagina als er nog iets niet verstuurd is.
+  - Foto's worden verkleind en met voortgang verstuurd; mislukt het versturen, dan blijft alles bewaard.
+  - Na afronden een vaste bedankpagina (terug/verversen geeft geen foutmelding) en de bewaarde gegevens worden opgeruimd.
+
+## V181 (2.12.3)
+- Pagina van de externe monteur: knop **Tussentijds opslaan**. Tekst, foto's en handtekening worden op de server bewaard; de link blijft geldig en hij kan later verder, ook op een ander apparaat. Tussentijds opgeslagen foto's zijn weg te halen (×). Bij afronden gaat alles mee naar het bezoek.
+- Op het ticket staat bij de planning wanneer de externe monteur tussentijds heeft opgeslagen.
+- Database-migratie 41.
+
+## V182 (2.12.4)
+- Werkbon voor een klant met een andere taal: ook de **ingevulde teksten** (bevindingen, uitgevoerde werkzaamheden, gebruikte materialen, opmerking bij afronden) worden vertaald (DeepL, taal automatisch herkend).
+  - Bij "Werkbon versturen" staan de vertalingen in aanpasbare vakken (met de Nederlandse tekst eronder); jouw aanpassingen komen op de werkbon. Knop "Opnieuw vertalen".
+  - De vertaling wordt bewaard; verandert de Nederlandse tekst (bijv. aanvullen), dan wordt opnieuw vertaald.
+  - Ook bij mailen direct na het tekenen. Zonder DEEPL_KEY blijft de Nederlandse tekst staan.
+  - De melding van de klant zelf ("Reported issue") wordt niet vertaald.
+- Database-migratie 42.
