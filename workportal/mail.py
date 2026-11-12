@@ -397,12 +397,45 @@ class GraphError(RuntimeError):
         self.status = status
 
 
+GRAPH_TRANSIENT = (429, 500, 502, 503, 504)
+
+
+def graph_retry(method, url, tries=3, **kw):
+    """Microsoft geeft af en toe een tijdelijke fout (502/503/504 'UnknownError', of 429 'te druk'): dan even wachten
+    en opnieuw proberen (met de wachttijd die Microsoft zelf opgeeft)."""
+    import time as _t
+    r = None
+    for n in range(tries):
+        try:
+            r = requests.get(url, **kw) if method == "GET" else requests.request(method, url, **kw)
+        except (requests.ConnectionError, requests.Timeout):
+            if n == tries - 1:
+                raise
+            _t.sleep(2 + 3 * n)
+            continue
+        if r.status_code not in GRAPH_TRANSIENT or n == tries - 1:
+            return r
+        try:
+            wait = min(int(r.headers.get("Retry-After") or 0), 20)
+        except ValueError:
+            wait = 0
+        _t.sleep(wait or (2 + 3 * n))
+    return r
+
+
+def graph_error_text(status, detail=""):
+    """Leesbare melding voor een Graph-fout (zonder de ruwe JSON)."""
+    if status in GRAPH_TRANSIENT:
+        return f"tijdelijke storing bij Microsoft ({status}); WorkPortal probeert het over een paar minuten vanzelf opnieuw"
+    return f"{status}: {detail}"[:300]
+
+
 def _gcall(method, path, **kw):
-    r = requests.request(method, "https://graph.microsoft.com/v1.0" + path,
-                         headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=40, **kw)
+    r = graph_retry(method, "https://graph.microsoft.com/v1.0" + path,
+                    headers={"Authorization": f"Bearer {_graph_token()}"}, timeout=40, **kw)
     if r.status_code == 403:   # net een recht toegevoegd in Entra? het bewaarde token kent dat nog niet: één keer vernieuwen
-        r = requests.request(method, "https://graph.microsoft.com/v1.0" + path,
-                             headers={"Authorization": f"Bearer {_graph_token(force=True)}"}, timeout=40, **kw)
+        r = graph_retry(method, "https://graph.microsoft.com/v1.0" + path,
+                        headers={"Authorization": f"Bearer {_graph_token(force=True)}"}, timeout=40, **kw)
     if r.status_code >= 400:
         raise GraphError(r.status_code, r.text)
     return r.json() if r.content else {}

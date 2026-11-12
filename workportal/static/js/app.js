@@ -1014,3 +1014,9 @@ document.addEventListener("click", function (e) {
     dst.value = js.text; dst.dataset.auto = js.text; msg.textContent = "Vertaald. Controleer de tekst en pas hem zo nodig aan.";
   }).catch(function (err) { msg.textContent = err.message; }).then(function () { b.disabled = false; });
 });
+
+/* Na downloaden een uitleg tonen (bijv. "Voor SnelStart": vanuit de downloadlijst slepen) */
+document.addEventListener("click", function (e) {
+  var a = e.target.closest && e.target.closest("[data-dl-hint]"); if (!a) return;
+  var h = document.getElementById(a.getAttribute("data-dl-hint")); if (h) h.hidden = false;
+});

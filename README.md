@@ -981,3 +981,7 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Ook bij mailen direct na het tekenen. Zonder DEEPL_KEY blijft de Nederlandse tekst staan.
   - De melding van de klant zelf ("Reported issue") wordt niet vertaald.
 - Database-migratie 42.
+
+## V183 (2.12.5)
+- Mailbox ophalen (inkoopfacturen, service): bij een tijdelijke fout van Microsoft (502/503/504 "UnknownError", 429 te druk) probeert WorkPortal het direct nog twee keer; lukt het dan nog niet, dan een leesbare melding in plaats van de ruwe foutcode (de planner probeert het na 5 minuten vanzelf opnieuw).
+- Inkoopfacturen: knop **Voor SnelStart** naast het sleepvak. Downloadt de PDF als "Leverancier Factuurnummer.pdf"; sleep hem daarna vanuit de downloadlijst van de browser naar SnelStart. Slepen direct vanuit WorkPortal blijft werken naar Komdex, Outlook, de Verkenner en het bureaublad.

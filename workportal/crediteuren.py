@@ -761,7 +761,7 @@ def _fix_forward(conn, iid, r):
     from .mail import _graph_token
     box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
     try:
-        rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{r['mail_id'].split(':')[0]}?$select=body",
+        rb = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{r['mail_id'].split(':')[0]}?$select=body",
                           headers={"Authorization": f"Bearer {_graph_token()}", "Prefer": 'outlook.body-content-type="text"'}, timeout=30)
         fs = forwarded_sender((rb.json().get("body") or {}).get("content") or "") if rb.status_code < 400 else None
     except Exception:  # noqa: BLE001
@@ -868,7 +868,7 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
     import requests
     mid = m["id"]
     body = ""
-    rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
+    rb = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
                       headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
     if rb.status_code < 400:
         js = rb.json()
@@ -880,7 +880,7 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
             rcpt[k] = [a for a in rcpt[k] if a]
     names = []
     if m.get("hasAttachments"):
-        ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
+        ar = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
         if ar.status_code < 400:
             for a in ar.json().get("value", []):
                 if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
@@ -915,6 +915,11 @@ def _store_reply(conn, upload_dir, box, headers, m, frm, iid):
             print(f"[WorkPortal] Melding reactie leverancier mislukt: {exc}", flush=True)
 
 
+def _graph_get(url, **kw):
+    from .mail import graph_retry
+    return graph_retry("GET", url, **kw)
+
+
 def _poll(conn, upload_dir):
     import requests
     try:
@@ -936,7 +941,8 @@ def _poll(conn, upload_dir):
     pages = 0
     while url and pages < 10:
         pages += 1
-        r = requests.get(url, headers=headers, timeout=30)
+        from .mail import graph_retry, graph_error_text, GRAPH_TRANSIENT
+        r = graph_retry("GET", url, headers=headers, timeout=30)
         if r.status_code in (401, 403) and not refreshed:
             # net een recht toegevoegd in Entra? Het bewaarde token kent dat nog niet: één keer een nieuw token halen
             refreshed = True
@@ -948,6 +954,8 @@ def _poll(conn, upload_dir):
                 msg = r.json().get("error", {}).get("message") or r.text[:200]
             except ValueError:
                 msg = r.text[:200]
+            if r.status_code in GRAPH_TRANSIENT:
+                raise RuntimeError(f"Mailbox {box} lezen: " + graph_error_text(r.status_code))
             raise RuntimeError(f"Mailbox {box} lezen mislukt ({r.status_code}): {msg}" + _mail_hint(r.status_code, box))
         js = r.json()
         for m in js.get("value", []):
@@ -974,10 +982,11 @@ def _poll(conn, upload_dir):
                              (mid, m.get("receivedDateTime")))
                 conn.commit()
                 continue
-            ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments",
+            ar = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments",
                               headers=headers, timeout=60)
             if ar.status_code >= 400:
-                raise RuntimeError(f"Bijlagen lezen mislukt ({ar.status_code})")
+                from .mail import graph_error_text
+                raise RuntimeError("Bijlagen lezen: " + graph_error_text(ar.status_code, "mislukt"))
             # één kaart per mail: de PDF die het meest op een factuur lijkt is de factuur, de rest zijn bijlagen
             files = []
             for a in ar.json().get("value", []):
@@ -1003,7 +1012,7 @@ def _poll(conn, upload_dir):
                 if _own_addr(maildata["from_addr"]) or _FWD_SUBJ.match(m.get("subject") or ""):
                     # door een collega doorgestuurd: de leverancier staat in de doorgestuurde mail
                     try:
-                        rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=body",
+                        rb = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=body",
                                           headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
                         fs = forwarded_sender((rb.json().get("body") or {}).get("content") or "") if rb.status_code < 400 else None
                     except Exception:  # noqa: BLE001
@@ -1051,11 +1060,11 @@ def sync_categories(conn, box, headers):
     import requests
     last = _setting(conn, "cred_cat_at", "")
     if not last or _setting(conn, "cred_cat_err", "") or (now_utc() - datetime.fromisoformat(last)).total_seconds() > 3600:
-        r = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
+        r = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
         if r.status_code == 403:   # recht net toegevoegd: met een vers token nog eens
             from .mail import _graph_token
             headers = {"Authorization": f"Bearer {_graph_token(force=True)}"}
-            r = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
+            r = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/outlook/masterCategories", headers=headers, timeout=30)
         if r.status_code < 400:
             _set(conn, "cred_cat_colors", json.dumps({c.get("displayName"): c.get("color") for c in r.json().get("value", [])
                                                       if c.get("displayName")}, ensure_ascii=False))

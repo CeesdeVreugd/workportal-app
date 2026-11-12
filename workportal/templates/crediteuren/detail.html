@@ -52,12 +52,16 @@
 <div class="grid g2 stack cred-grid">
   <section class="card cred-pdf">
     <div class="card-head"><h2>Factuur (PDF)</h2>
-      {% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=(r.supplier or 'Factuur') ~ ' ' ~ (r.invoice_no or '')) }}">Openen</a> · <a href="{{ pdf_url }}?download=1">Downloaden</a></div>{% endif %}
+      {% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=(r.supplier or 'Factuur') ~ ' ' ~ (r.invoice_no or '')) }}">Openen</a> · <a href="{{ pdf_url }}?download=1&naam={{ drag_name|urlencode }}">Downloaden</a></div>{% endif %}
     </div>
     {% if pdf_url %}
-    <div class="dragfile hide-m" draggable="true" data-dragfile="{{ pdf_url }}?download=1" data-dragname="{{ drag_name }}" data-dragmime="application/pdf"
-         title="Sleep dit naar Komdex, de Verkenner of een mail">
-      <span class="attico att-pdf">PDF</span><span class="grow"><b>{{ drag_name }}</b><small>Sleep naar Komdex (of naar je bureaublad / een map)</small></span><span class="draghandle" aria-hidden="true">⠿</span></div>
+    <div class="dragrow hide-m">
+    <div class="dragfile" draggable="true" data-dragfile="{{ pdf_url }}?download=1&naam={{ drag_name|urlencode }}" data-dragname="{{ drag_name }}" data-dragmime="application/pdf"
+         title="Sleep dit naar Komdex, de Verkenner, het bureaublad of een mail">
+      <span class="attico att-pdf">PDF</span><span class="grow"><b>{{ drag_name }}</b><small>Sleep naar Komdex, een mail, de Verkenner of het bureaublad</small></span><span class="draghandle" aria-hidden="true">⠿</span></div>
+    <a class="btn sm" href="{{ pdf_url }}?download=1&naam={{ drag_name|urlencode }}" data-dl-hint="sshint" title="Downloaden en vanuit de downloadlijst naar SnelStart slepen">{{ icon('download') }}Voor SnelStart</a>
+    </div>
+    <div class="flash info sshint hide-m" id="sshint" hidden><b>Naar SnelStart:</b> het bestand staat nu in je downloads. Sleep het vanuit de downloadlijst van de browser (pijltje rechtsboven) naar SnelStart. Een programma als SnelStart neemt geen bestand aan dat rechtstreeks uit een webpagina wordt gesleept.</div>
     <iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
     <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel=r.supplier or 'Factuur') }}">{{ icon('pdf') }}Factuur bekijken</a>
     {% else %}<div class="empty">Geen PDF.</div>{% endif %}

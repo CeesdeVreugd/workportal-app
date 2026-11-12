@@ -730,7 +730,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     skip_folders = set()
     for wk in ("sentitems", "drafts", "outbox"):
         try:
-            rf = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/{wk}?$select=id", headers=headers, timeout=30)
+            rf = __import__("workportal.mail", fromlist=["x"]).graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/{wk}?$select=id", headers=headers, timeout=30)
             if rf.status_code < 400 and rf.json().get("id"):
                 skip_folders.add(rf.json()["id"])
         except Exception:  # noqa: BLE001
@@ -742,9 +742,10 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     n, newest, pages = 0, since, 0
     while url and pages < 10:
         pages += 1
-        r = requests.get(url, headers=headers, timeout=30)
+        from .mail import graph_retry, graph_error_text
+        r = graph_retry("GET", url, headers=headers, timeout=30)
         if r.status_code >= 400:
-            raise RuntimeError(f"Service-mailbox {box} lezen mislukt ({r.status_code})")
+            raise RuntimeError(f"Service-mailbox {box} lezen: " + graph_error_text(r.status_code, "mislukt"))
         js = r.json()
         for m in js.get("value", []):
             newest = max(newest, m.get("receivedDateTime") or newest)
@@ -772,7 +773,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
             if (m.get("parentFolderId") in skip_folders or fa == box or fa.startswith("/o=")
                     or (own_domain and fa.endswith("@" + own_domain))):
                 continue   # eigen (verzonden) mail of van een collega, geen reactie van de klant
-            rb = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
+            rb = __import__("workportal.mail", fromlist=["x"]).graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
                               headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
             js2 = rb.json() if rb.status_code < 400 else {}
             body = _reply_text((js2.get("uniqueBody") or {}).get("content") or (js2.get("body") or {}).get("content") or "")
@@ -785,7 +786,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
                                              "cc": [a for a in rc("ccRecipients") if a]}, ensure_ascii=False)))
             nid = cur.lastrowid
             if m.get("hasAttachments"):
-                ar = requests.get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
+                ar = __import__("workportal.mail", fromlist=["x"]).graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
                 for a in (ar.json().get("value", []) if ar.status_code < 400 else []):
                     if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
                         continue

@@ -127,7 +127,15 @@ def file(fid, name=None):
         head = fh.read(16)
     mt = inline_type(row["mime"], head)   # alleen PDF/foto/tekst inline; de rest altijd als download
     download = request.args.get("download") == "1" or mt is None
-    resp = send_file(path, mimetype=mt or "application/octet-stream", download_name=row["filename"],
+    dl_name = row["filename"]
+    if request.args.get("naam"):   # nette naam bij downloaden (bijv. "Leverancier Factuurnummer.pdf"), extensie blijft die van het bestand
+        import os as _o
+        from .util import safe_filename
+        ext = _o.path.splitext(row["filename"] or "")[1].lower()
+        base = _o.path.splitext(safe_filename(request.args["naam"])[:150])[0].strip(" .")
+        if base:
+            dl_name = base + ext
+    resp = send_file(path, mimetype=mt or "application/octet-stream", download_name=dl_name,
                      as_attachment=download, max_age=3600)
     resp.cache_control.public = False
     resp.cache_control.private = True

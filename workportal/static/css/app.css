@@ -1220,3 +1220,8 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .extbody { overflow-x: hidden; min-height: 100vh; background: var(--bg, #F3F5FB); }
 .ext > * { min-width: 0; }
 .ext .dl dd { overflow-wrap: anywhere; }
+/* V183: slepen / Voor SnelStart */
+.dragrow { display: flex; gap: 8px; align-items: stretch; margin-bottom: 10px; }
+.dragrow .dragfile { flex: 1; margin-bottom: 0; min-width: 0; }
+.dragrow .btn { align-self: center; white-space: nowrap; }
+.sshint { margin: 0 0 10px; font-size: 13.5px; }
