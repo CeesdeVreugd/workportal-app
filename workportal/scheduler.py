@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 
-from . import sharepoint, komdex, crediteuren, service
+from . import sharepoint, komdex, crediteuren, service, taken
 from .db import raw_connection, backup
 from .notify import notify_user, vapid_keys
 from .util import now_utc, now_iso, parse_iso, TZ
@@ -108,6 +108,7 @@ def _loop(app):
         try:
             _check_pressure_tests(conn)
             _ticket_reminders(conn)
+            taken.scheduled_reminders(conn)
             sharepoint.scheduled_sync(conn, state)
             komdex.notify_pending(conn)
             crediteuren.scheduled_poll(conn, app, state)

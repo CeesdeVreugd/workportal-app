@@ -784,6 +784,43 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_deliveries_project ON deliveries(project_id);
     """,
+    # 44 - taken per persoon: voor jezelf of voor een collega, met herinnering (push en/of mail) en doorgeven
+    """
+    CREATE TABLE tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        due_date TEXT,
+        due_time TEXT,
+        remind TEXT,
+        remind_at TEXT,
+        remind_mail INTEGER NOT NULL DEFAULT 0,
+        reminded_at TEXT,
+        seen_at TEXT,
+        link_url TEXT,
+        link_label TEXT,
+        done_at TEXT,
+        done_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_tasks_user ON tasks(assigned_to, done_at);
+    CREATE INDEX idx_tasks_creator ON tasks(created_by, done_at);
+    CREATE INDEX idx_tasks_remind ON tasks(remind_at) WHERE remind_at IS NOT NULL AND reminded_at IS NULL AND done_at IS NULL;
+    CREATE TABLE task_log (
+        id INTEGER PRIMARY KEY,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        to_user INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        action TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_task_log ON task_log(task_id, id);
+    CREATE INDEX idx_task_log_user ON task_log(user_id);
+    """,
 ]
 
 

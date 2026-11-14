@@ -1287,3 +1287,32 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .pagehead .actions > form > .btn, .pagehead .actions > .btn { justify-content: center; }
 .dl dd .badge { border-radius: 8px; }
 .logmore > summary { cursor: pointer; color: var(--accent); padding: 8px 0; } .loglist .rowitem div:last-child { overflow-wrap: anywhere; }
+
+/* Taken */
+.tklist { display: flex; flex-direction: column; }
+.tkrow { display: flex; gap: 12px; align-items: flex-start; padding: 10px 2px; border-top: 1px solid var(--line); }
+.tkrow:first-child { border-top: 0; }
+.tkcheck { margin: 0; flex: 0 0 auto; }
+.tkcheck button { width: 28px; height: 28px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: #fff; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.tkcheck button:hover:not([disabled]) { border-color: var(--basic); }
+.tkcheck button[disabled] { cursor: default; opacity: .4; }
+.tkrow.done .tkcheck button { background: #1A6B43; border-color: #1A6B43; }
+.tkrow.done .tktxt b { color: var(--muted); font-weight: 500; }
+.tktxt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; text-decoration: none; color: var(--ink); padding-top: 2px; }
+.tktxt b { font-weight: 500; overflow-wrap: anywhere; }
+.tk-late { border-color: var(--bad-bg); }
+.tk-late .card-head h2 { color: var(--bad); }
+.tkgrid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.tksum { cursor: pointer; font-weight: 500; color: var(--basic); display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.tksum svg { width: 18px; height: 18px; }
+.tklog { display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
+.tkquick { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.tkquick input[type=text] { flex: 1 1 220px; }
+@media (max-width: 640px) { .tkcheck button { width: 32px; height: 32px; } }
+.bottomnav a { position: relative; }
+.bndot { position: absolute; top: 6px; left: calc(50% + 8px); width: 9px; height: 9px; border-radius: 50%; background: var(--bad); border: 2px solid #fff; }
+.tkdash { gap: 8px; margin-bottom: 4px; }
+.tkmore > summary { cursor: pointer; color: var(--basic); font-size: 14px; min-height: 32px; display: flex; align-items: center; }
+.tkmore[open] > summary { margin-bottom: 8px; }
+.f[hidden] { display: none !important; }
+.tktxt b .badge { vertical-align: 1px; margin-left: 4px; }

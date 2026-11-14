@@ -5,6 +5,7 @@
 <h1>Menu</h1>
 <div class="card flush"><div class="nav" style="padding:8px">
   <a href="{{ url_for('main.dashboard') }}">{{ icon('dashboard') }}Dashboard</a>
+  {% set tc = task_count(g.user.id) %}<a href="{{ url_for('taken.index') }}">{{ icon('task') }}Taken{% if tc %}<span class="navbadge">{{ tc }}</span>{% endif %}</a>
   {% if navok('klanten') or navok('projecten') or navok('orders') %}<div class="navhead">Relaties &amp; werk</div>{% endif %}
   {% if navok('klanten') %}<a href="{{ url_for('klanten.index') }}">{{ icon('klanten') }}Relaties</a>{% endif %}
   {% if navok('projecten') %}<a href="{{ url_for('projecten.index') }}">{{ icon('project') }}Projecten</a>{% endif %}

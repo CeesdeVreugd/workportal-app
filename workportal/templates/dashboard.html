@@ -19,6 +19,26 @@
 <a class="actionbar" href="{{ url_for('crediteuren.index', filter='mij') }}">{{ icon('invoice') }}<span><b>{{ cc.mij }} vraag{{ 'en' if cc.mij != 1 }} over inkoopfacturen</b> wacht{{ 'en' if cc.mij != 1 }} op jouw antwoord.</span><span class="go">Bekijken →</span></a>
 {% endif %}{% endif %}
 
+{% from "taken/_form.html" import taskrow %}
+<section class="card" id="taken">
+  <div class="card-head"><h2>Mijn taken{% if d.task_open %} <span class="muted small">({{ d.task_open }})</span>{% endif %}</h2><a class="btn sm ghost" href="{{ url_for('taken.index') }}">Alle taken</a></div>
+  <form method="post" action="{{ url_for('taken.new') }}" class="form tkdash" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('main.dashboard') }}#taken">
+    <div class="tkquick"><input type="text" name="title" required maxlength="200" placeholder="Nieuwe taak, bijv. lasapparaat meenemen" aria-label="Nieuwe taak">
+      <button class="btn primary">{{ icon('plus') }}Toevoegen</button></div>
+    <details class="tkmore"><summary>Datum, herinnering of voor een collega</summary>
+      <div class="fgrid tkgrid">
+        <label class="f">Voor wie<select name="assigned_to">{% for u in d.staff %}<option value="{{ u.id }}" {{ 'selected' if u.id == g.user.id }}>{{ u.name }}{{ ' (ik)' if u.id == g.user.id }}</option>{% endfor %}</select></label>
+        <label class="f">Datum<input type="date" name="due_date"></label>
+        <label class="f">Tijd<input type="time" name="due_time"></label>
+        <label class="f">Herinnering<select name="remind">{% for v, l in REMIND_OPTS if v != 'eigen' %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+      </div>
+      <label class="check"><input type="checkbox" name="remind_mail" value="1"> Herinnering ook per mail</label>
+    </details>
+  </form>
+  {% if d.tasks %}<div class="tklist">{% for t in d.tasks %}{{ taskrow(t, next=url_for('main.dashboard') ~ '#taken') }}{% endfor %}</div>{% endif %}
+</section>
+
 {% if d.annots %}
 {% set na = d.annots|length %}<section class="card"><div class="card-head"><h2>Aantekeningen met een actie voor mij{% if na > 3 %} ({{ na }}){% endif %}</h2></div>
   <div class="rows">{% for a in d.annots %}<a class="rowitem{{ ' dash-extra' if loop.index > 3 }}" {{ 'hidden' if loop.index > 3 }} href="{{ werk_url('annot_view', a.pkind, pid=a.project_id, aid=a.id) }}">{% if a.image_file_id %}<img class="annthumb" src="{{ url_for('main.file', fid=a.image_file_id) }}" alt="" loading="lazy">{% endif %}<div class="grow"><div class="t">{{ a.pnumber }} · {{ a.number }}. {{ a.title }}</div><div class="s">{{ a.pname }}</div></div><span class="badge {{ 'b-warn' if a.status == 'in_behandeling' else 'b-blue' }}">{{ 'In behandeling' if a.status == 'in_behandeling' else 'Nieuw' }}</span></a>{% endfor %}</div>

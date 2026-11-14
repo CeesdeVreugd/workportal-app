@@ -14,6 +14,7 @@
         {% for k, l in STATUSES %}<button class="stopt {{ 'cur' if t.status == k }}" name="status" value="{{ k }}" {{ 'disabled' if t.status == k }}>{{ ticket_status(k) }}</button>{% endfor %}
       </form></details>{% else %}{{ ticket_status(t.status) }}{% endif %} {{ prio(t.priority) }} · aangemaakt {{ t.created_at|dt }}</p></div>
   <div class="actions">
+    <a class="btn" href="{{ url_for('taken.index', nieuw=1, link=url_for('service.detail', tid=t.id), label='Ticket ' ~ t.number ~ ' ' ~ t.title) }}" title="Taak maken bij dit ticket">{{ icon('task') }}Taak</a>
     {% if t.project_sp and not t.project_sp_missing %}<a class="btn" href="{{ url_for('projecten.project_folder', pid=t.project_id) }}">{{ icon('folder') }}{{ 'Ordermap' if t.project_kind == 'order' else 'Projectmap' }}</a>{% endif %}
     {% if edit %}
     <a class="btn" href="{{ url_for('service.edit', tid=t.id) }}">{{ icon('edit') }}Bewerken</a>

@@ -1,0 +1,34 @@
+{% from "partials/macros.html" import opt %}
+{# Velden van een taak. t = bestaande taak (wijzigen) of None; who = toon 'Voor wie' #}
+{% macro taskfields(staff, REMIND_OPTS, t=None, prefill={}, who=True, remind_custom='') %}
+  {% set rid = 'tk' ~ (t.id if t else 'new') %}
+  <label class="f">Wat moet er gebeuren? *<input type="text" name="title" required maxlength="200" value="{{ t.title if t else (prefill.title or '') }}" placeholder="bijv. Lasapparaat meenemen naar NewCold"></label>
+  <div class="fgrid tkgrid">
+    {% if who %}<label class="f">Voor wie<select name="assigned_to">{% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if u.id == g.user.id }}>{{ u.name }}{{ ' (ik)' if u.id == g.user.id }}</option>{% endfor %}</select></label>{% endif %}
+    <label class="f">Datum<input type="date" name="due_date" value="{{ t.due_date if t and t.due_date else '' }}"></label>
+    <label class="f">Tijd<input type="time" name="due_time" value="{{ t.due_time if t and t.due_time else '' }}"></label>
+    <label class="f">Herinnering<select name="remind" onchange="document.getElementById('{{ rid }}c').hidden=this.value!=='eigen'">{% for v, l in REMIND_OPTS %}{{ opt(v, l, (t.remind or '') if t else '') }}{% endfor %}</select></label>
+    <label class="f" id="{{ rid }}c" {{ 'hidden' if not (t and t.remind == 'eigen') }}>Herinner mij op<input type="datetime-local" name="remind_custom" value="{{ remind_custom }}"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="remind_mail" value="1" {{ 'checked' if t and t.remind_mail }}> Herinnering ook per mail</label>
+  <label class="f">Notitie<textarea name="description" rows="2" placeholder="Optioneel">{{ t.description if t and t.description else '' }}</textarea></label>
+  <p class="hint" style="margin:0">Zonder tijd komt de herinnering om 08:00. Een taak voor een collega geeft die direct een melding en een mail.</p>
+{% endmacro %}
+
+{% macro taskrow(t, next='') %}
+<div class="tkrow {{ 'done' if t.done_at }} {{ 'late' if t.late }}" id="t{{ t.id }}">
+  {% if (t.assigned_to == g.user.id or t.created_by == g.user.id) %}
+  <form method="post" action="{{ url_for('taken.reopen' if t.done_at else 'taken.done', tid=t.id) }}" class="tkcheck"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button title="{{ 'Weer open zetten' if t.done_at else 'Afvinken' }}" aria-label="{{ 'Weer open zetten' if t.done_at else 'Afvinken' }}: {{ t.title }}">{% if t.done_at %}✓{% endif %}</button></form>
+  {% else %}<span class="tkcheck"><button disabled aria-hidden="true"></button></span>{% endif %}
+  <a class="tktxt" href="{{ url_for('taken.detail', tid=t.id) }}">
+    <b>{{ t.title }}{% if not t.seen_at and t.assigned_to == g.user.id and t.created_by != g.user.id %} <span class="badge b-blue">Nieuw</span>{% endif %}</b>
+    {%- set parts = [] -%}
+    {%- if t.when %}{% set _ = parts.append((t.when, 'apred' if t.late else '')) %}{% endif -%}
+    {%- if t.remind_at and not t.reminded_at and not t.done_at %}{% set _ = parts.append(('🔔', 'bell')) %}{% endif -%}
+    {%- if t.assigned_to != g.user.id %}{% set _ = parts.append(('voor ' ~ (t.assignee or 'niemand'), '')) %}{% elif t.created_by and t.created_by != g.user.id %}{% set _ = parts.append(('van ' ~ t.creator, '')) %}{% endif -%}
+    {%- if t.link_label %}{% set _ = parts.append((t.link_label, '')) %}{% endif -%}
+    {%- if t.done_at %}{% set _ = parts.append(('klaar ' ~ (t.done_at|dt) ~ ((' door ' ~ t.done_name) if t.done_name and t.done_by != g.user.id else ''), '')) %}{% endif -%}
+    {% if parts %}<span class="small muted">{% for txt, cls in parts %}{{ ' · ' if not loop.first }}<span class="{{ cls }}"{% if cls == 'bell' %} title="Herinnering"{% endif %}>{{ txt }}</span>{% endfor %}</span>{% endif %}</a>
+</div>
+{% endmacro %}

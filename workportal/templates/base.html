@@ -49,6 +49,7 @@
     </a>
     <div class="nav">
       {{ navlink('main.dashboard', 'Dashboard', 'dashboard', 'main.') }}
+      {% set tc = task_count(g.user.id) %}<a href="{{ url_for('taken.index') }}" class="{{ 'active' if ep.startswith('taken.') }}">{{ icon('task') }}<span>Taken</span>{% if tc %}<span class="navbadge" title="Nieuw of voor vandaag">{{ tc }}</span>{% endif %}</a>
       {% if can('klanten') or can('projecten') or can('orders') %}<div class="navhead">Relaties &amp; werk</div>{% endif %}
       {% if can('klanten') %}{{ navlink('klanten.index', 'Relaties', 'klanten', 'klanten.') }}{% endif %}
       {% if can('projecten') %}{{ navlink('projecten.index', 'Projecten', 'project', 'projecten.') }}{% endif %}
@@ -102,11 +103,12 @@
 </div>
 <nav class="bottomnav" aria-label="Snelmenu">
   <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if ep.startswith('main.') and ep != 'main.menu' }}">{{ icon('home') }}Start</a>
+  <a href="{{ url_for('taken.index') }}" class="{{ 'active' if ep.startswith('taken.') }}">{{ icon('task') }}Taken{% if task_count(g.user.id) %}<i class="bndot" aria-label="nieuw"></i>{% endif %}</a>
   {% if navok('service') %}<a href="{{ url_for('service.index') }}" class="{{ 'active' if ep.startswith('service.') }}">{{ icon('service') }}Service</a>{% endif %}
   {% if navok('druktest') %}<a href="{{ url_for('druktest.index') }}" class="{{ 'active' if ep.startswith('druktest.') }}">{{ icon('druktest') }}Druktest</a>{% endif %}
   {% if navok('calculatie') %}<a href="{{ url_for('calculatie.index') }}" class="{{ 'active' if ep.startswith('calculatie.') or ep.startswith('nacalc.') }}">{{ icon('calculatie') }}Calculatie</a>
   {% elif navok('nacalculatie') %}<a href="{{ url_for('nacalc.index') }}" class="{{ 'active' if ep.startswith('nacalc.') }}">{{ icon('nacalculatie') }}Na-calc.</a>{% endif %}
-  {% if navok('kennis') %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
+  {% if navok('kennis') and not (navok('service') and navok('druktest') and (navok('calculatie') or navok('nacalculatie'))) %}<a href="{{ url_for('kennis.index') }}" class="{{ 'active' if ep.startswith('kennis.') }}">{{ icon('kennis') }}Kennis</a>{% endif %}
   <a href="{{ url_for('main.menu') }}" class="{{ 'active' if ep in ['main.menu'] or ep.startswith('klanten.') or ep.startswith('projecten.') or ep.startswith('orders.') or ep.startswith('beheer.') }}">{{ icon('menu') }}Meer</a>
 </nav>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ VERSION }}"></script>

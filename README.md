@@ -1020,6 +1020,16 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V192 (2.14.0)
+- Nieuwe module **Taken** (menu, onderbalk op de telefoon en blok 'Mijn taken' op het dashboard). Voor iedere gebruiker, geen modulerecht nodig.
+  - Taak voor jezelf of voor een collega, met datum, tijd en notitie.
+  - Herinnering: op het tijdstip, 15 min, 1 uur of 1 dag van tevoren, of een eigen moment. Je krijgt een melding op telefoon/pc en, als je dat aanvinkt, ook een mail. Zonder tijd komt de herinnering om 08:00. Op de taak kun je de herinnering uitstellen (over 1 uur of morgen 08:00).
+  - Doorgeven aan een collega, met notitie. Die krijgt een melding en een mail. Wie doorgeeft, houdt de taak in 'Uitgezet'. De maker krijgt een melding als de taak wordt doorgegeven of afgerond.
+  - Weergaven: Mijn taken (te laat / vandaag / morgen / deze week / later / zonder datum), Uitgezet en Afgerond. De geschiedenis per taak laat zien wie wat deed.
+  - Knop 'Taak' op een ticket en op een project/order: de taak wordt daaraan gekoppeld.
+  - Alleen de maker, de uitvoerder en wie de taak eerder had, kunnen een taak zien.
+- Databasemigratie 44 (tasks, task_log).
+
 ## V191 (2.13.7)
 - Gespreksnotitie verwijderen werkte niet: de knop Verwijderen in 'Bewerken' sloeg de notitie opnieuw op. Oorzaak: het automatische concept-opslaan verstuurde altijd naar het opslaan-adres en negeerde de knop. Nu gaat elke knop met een eigen actie (ook bij tickets) naar de juiste plek.
 

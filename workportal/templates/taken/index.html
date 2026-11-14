@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "taken/_form.html" import taskfields, taskrow %}
+{% block title %}Taken{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Taken</h1><p>Voor jezelf, met herinnering, of voor een collega.</p></div>
+  <div class="actions"><button class="btn primary" type="button" data-toggle-form="tknew">{{ icon('plus') }}Nieuwe taak</button></div>
+</div>
+<form method="post" action="{{ url_for('taken.new') }}" class="card form {{ '' if show_new else 'hidden' }}" id="tknew" data-no-draft>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if prefill.link_url %}<input type="hidden" name="link_url" value="{{ prefill.link_url }}"><input type="hidden" name="link_label" value="{{ prefill.link_label or '' }}">
+  <div class="small muted">Gekoppeld aan <a href="{{ prefill.link_url }}">{{ prefill.link_label or prefill.link_url }}</a></div>{% endif %}
+  {{ taskfields(staff, REMIND_OPTS, prefill=prefill) }}
+  <div class="actions"><button class="btn primary">{{ icon('check') }}Toevoegen</button><button class="btn ghost" type="button" data-toggle-form="tknew">Annuleren</button></div>
+</form>
+<nav class="seg" aria-label="Weergave">
+  <a href="{{ url_for('taken.index') }}" class="{{ 'active' if view == 'open' }}">Mijn taken{% if counts.open %} ({{ counts.open }}){% endif %}</a>
+  <a href="{{ url_for('taken.index', v='uitgezet') }}" class="{{ 'active' if view == 'uitgezet' }}">Uitgezet{% if counts.uitgezet %} ({{ counts.uitgezet }}){% endif %}</a>
+  <a href="{{ url_for('taken.index', v='klaar') }}" class="{{ 'active' if view == 'klaar' }}">Afgerond</a>
+</nav>
+{% for key, label, rows in groups %}
+<section class="card tkgroup tk-{{ key }}">
+  {% if label %}<div class="card-head"><h2>{{ label }} <span class="muted small">({{ rows|length }})</span></h2></div>{% endif %}
+  <div class="tklist">{% for t in rows %}{{ taskrow(t) }}{% endfor %}</div>
+</section>
+{% else %}
+<div class="card"><div class="empty">{% if view == 'open' %}Geen open taken. Maak er een met <b>Nieuwe taak</b>.{% elif view == 'uitgezet' %}Je hebt geen taken bij collega's open staan.{% else %}Nog niets afgerond.{% endif %}</div></div>
+{% endfor %}
+{% endblock %}

@@ -55,7 +55,11 @@ def dashboard():
         from .actiepunten import open_for_user as ap_open
         data["my_actions"] = ap_open(g.user["id"])
         data["today"] = now_iso()[:10]
-    return render_template("dashboard.html", d=data)
+    from .taken import my_open, REMIND_OPTS
+    data["tasks"] = my_open(g.user["id"])
+    data["task_open"] = query("SELECT COUNT(*) c FROM tasks WHERE assigned_to = ? AND done_at IS NULL", (g.user["id"],), one=True)["c"]
+    data["staff"] = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
+    return render_template("dashboard.html", d=data, REMIND_OPTS=REMIND_OPTS)
 
 
 @bp.route("/menu")

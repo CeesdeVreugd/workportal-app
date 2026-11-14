@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "taken/_form.html" import taskfields %}
+{% block title %}{{ t.title }} – Taken{% endblock %}
+{% block content %}
+{% set mine = g.user.id in [t.assigned_to, t.created_by] %}
+<div class="pagehead">
+  <div><div class="eyebrow"><a href="{{ url_for('taken.index') }}">Taken</a>{% if t.done_at %} · <span class="badge b-ok">Afgerond</span>{% elif t.late %} · <span class="badge b-bad">Te laat</span>{% endif %}</div>
+    <h1>{{ t.title }}</h1>
+    <p>{% if t.when %}{{ t.when }} · {% endif %}voor {{ t.assignee or 'niemand' }}{% if t.creator and t.created_by != t.assigned_to %} · van {{ t.creator }}{% endif %}</p></div>
+  {% if mine %}<div class="actions">
+    {% if t.done_at %}
+      <form method="post" action="{{ url_for('taken.reopen', tid=t.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn">{{ icon('refresh') }}Weer open zetten</button></form>
+    {% else %}
+      <form method="post" action="{{ url_for('taken.done', tid=t.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn primary">{{ icon('check') }}Afgerond</button></form>
+    {% endif %}
+  </div>{% endif %}
+</div>
+
+<section class="card">
+  {% if t.description %}<div class="prose" style="white-space:pre-line">{{ t.description }}</div>{% endif %}
+  <dl class="dl" style="margin-top:10px">
+    {% if t.link_url %}<dt>Hoort bij</dt><dd><a href="{{ t.link_url }}">{{ t.link_label or t.link_url }}</a></dd>{% endif %}
+    <dt>Herinnering</dt><dd>{% if t.remind_at %}{{ t.remind_at|dt }}{% if t.remind_mail %} (melding + mail){% else %} (melding){% endif %}{% if t.reminded_at %} · verstuurd{% endif %}{% else %}geen{% endif %}</dd>
+  </dl>
+  {% if mine and not t.done_at %}
+  <div class="actions" style="margin-top:12px">
+    <form method="post" action="{{ url_for('taken.snooze', tid=t.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="when" value="uur">{{ icon('timer') }}Over 1 uur herinneren</button></form>
+    <form method="post" action="{{ url_for('taken.snooze', tid=t.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="when" value="morgen">{{ icon('timer') }}Morgen 08:00</button></form>
+  </div>{% endif %}
+</section>
+
+{% if mine %}
+<section class="card">
+  <div class="card-head"><h2>Doorgeven aan een collega</h2></div>
+  <form method="post" action="{{ url_for('taken.handover', tid=t.id) }}" class="form" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fgrid">
+      <label class="f">Aan<select name="to" required><option value="">Kies…</option>{% for u in staff if u.id != t.assigned_to %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></label>
+      <label class="f">Notitie<input type="text" name="note" maxlength="2000" placeholder="Optioneel, bijv. wat er al gedaan is"></label>
+    </div>
+    <div class="actions"><button class="btn primary sm">{{ icon('share') }}Doorgeven</button><span class="hint">Krijgt een melding en een mail; jij houdt de taak in 'Uitgezet'.</span></div>
+  </form>
+</section>
+
+<section class="card">
+  <details><summary class="tksum">{{ icon("edit") }}Wijzigen of verwijderen</summary>
+  <form method="post" action="{{ url_for('taken.edit', tid=t.id) }}" class="form" style="margin-top:10px" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ taskfields(staff, REMIND_OPTS, t=t, who=False, remind_custom=remind_custom) }}
+    <div class="actions"><button class="btn primary sm">Opslaan</button></div>
+  </form>
+  {% if can_delete %}
+  <form method="post" action="{{ url_for('taken.delete', tid=t.id) }}" data-confirm="Taak '{{ t.title }}' verwijderen?" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger">{{ icon('trash') }}Taak verwijderen</button></form>
+  {% endif %}
+  </details>
+</section>
+{% endif %}
+
+{% if log %}
+<section class="card">
+  <div class="card-head"><h2>Geschiedenis</h2></div>
+  <div class="tklog">{% for l in log %}<div><span class="muted small">{{ l.created_at|dt }} · {{ l.who or 'onbekend' }}</span> — {{ l.action }}{% if l.to_name %} {{ 'aan' if l.action == 'doorgegeven' else 'voor' }} {{ l.to_name }}{% endif %}{% if l.note %}: <i>{{ l.note }}</i>{% endif %}</div>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}
