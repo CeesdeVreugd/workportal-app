@@ -135,5 +135,14 @@
   {% if can('calculatie') and (p.kind == 'project' or calcs) %}<section class="card"><h2>Calculaties</h2><div class="rows">{% for c in calcs %}<a class="rowitem" href="{{ url_for('calculatie.edit', cid=c.id) }}"><div class="grow"><div class="t">{{ c.number }} · {{ c.title }}</div></div>{{ calc_status(c.status) }}</a>{% else %}<div class="empty">Geen calculaties.</div>{% endfor %}</div></section>{% endif %}
   {% if can('nacalculatie') %}<section class="card"><h2>Na-calculaties</h2><div class="rows">{% for n in nacalcs %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=n.id) }}"><div class="grow"><div class="t">Import {{ n.imported_at|dt }}</div><div class="s">Order {{ n.order_no }} · {{ n.order_total|eur }}</div></div></a>{% else %}<div class="empty">Nog geen na-calculatie.</div>{% endfor %}</div></section>{% endif %}
 </div>
+<section class="card" id="logboek">
+  <div class="card-head"><div><h2>Logboek</h2><div class="small muted">wie wanneer wat heeft gedaan bij deze {{ K.lower }}</div></div></div>
+  <div class="rows loglist">
+  {% for h in history %}{% if loop.index == 16 %}<details class="logmore"><summary class="small">Alles tonen ({{ history|length }})</summary>{% endif %}
+    <div class="rowitem"><div class="grow"><div class="s">{{ h.created_at|dt }} · {{ h.who or 'Systeem' }}</div><div>{{ h.action|capitalize }}{% if h.details %}: {{ h.details }}{% endif %}</div></div></div>
+  {% if loop.last and loop.length >= 16 %}</details>{% endif %}
+  {% else %}<div class="empty">Nog niets vastgelegd.</div>{% endfor %}
+  </div>
+</section>
 {% if can(K.module, 3) %}<form method="post" action="{{ url_for(B ~ '.delete', pid=p.id) }}" data-confirm="{{ K.label }} {{ p.number }} verwijderen? Gekoppelde tickets en druktesten blijven bestaan, de map in SharePoint ook."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">{{ K.label }} verwijderen</button></form>{% endif %}
 {% endblock %}

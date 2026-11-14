@@ -1016,3 +1016,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 
 ## V188 (2.13.4)
 - Werkbon: "Projectnummer" bij een ticket aan een project, "Ordernummer" bij een ticket aan een order (ook in EN/DE/FR).
+
+## V189 (2.13.5)
+- Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".

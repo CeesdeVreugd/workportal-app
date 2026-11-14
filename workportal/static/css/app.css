@@ -1286,3 +1286,4 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .pagehead .actions { align-items: stretch; }
 .pagehead .actions > form > .btn, .pagehead .actions > .btn { justify-content: center; }
 .dl dd .badge { border-radius: 8px; }
+.logmore > summary { cursor: pointer; color: var(--accent); padding: 8px 0; } .loglist .rowitem div:last-child { overflow-wrap: anywhere; }

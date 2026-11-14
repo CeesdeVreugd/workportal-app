@@ -194,7 +194,9 @@ def detail(pid):
     from .actiepunten import items_for
     from .oplevering import deliveries_for
     actions, deliveries = items_for(pid), deliveries_for(pid)
-    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, tests=tests, calcs=calcs,
+    history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
+                    " WHERE a.entity = 'project' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 300", (pid,))
+    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, history=history, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
@@ -223,7 +225,11 @@ def edit(pid):
             execute("UPDATE projects SET number=?, name=?, customer_id=?, status=?, sharepoint_path=?, notes=? WHERE id=?",
                     (_f("number"), _f("name"), to_int(request.form.get("customer_id")), _f("status") or "actief",
                      _f("sharepoint_path") if not p["sp_item_id"] else p["sharepoint_path"], _f("notes"), pid))
-            audit("gewijzigd", "project", pid)
+            labels = {"number": "nummer", "name": "omschrijving", "customer_id": "klant", "status": "status", "notes": "notities"}
+            newv = {"number": _f("number"), "name": _f("name"), "customer_id": to_int(request.form.get("customer_id")),
+                    "status": _f("status") or "actief", "notes": _f("notes")}
+            changed = [lab for k_, lab in labels.items() if (p[k_] or None) != (newv[k_] or None)]
+            audit("gewijzigd", "project", pid, ", ".join(changed) if changed else None)
             flash(f"{k['label']} opgeslagen.", "ok")
             target = url_for(f"{request.blueprint}.detail", pid=pid)
             if on and p["sp_item_id"] and not p["sp_missing"] and (_f("number"), _f("name")) != (p["number"], p["name"]):
@@ -398,6 +404,7 @@ def note_delete(pid, nid):
     for f in files_for("project_note", nid):
         delete_file(f["id"])
     execute("DELETE FROM project_notes WHERE id = ?", (nid,))
+    audit("gespreksnotitie verwijderd", "project", pid, (n["body"] or "")[:120])
     flash("Gespreksnotitie verwijderd.", "ok")
     return redirect(werk_url("detail", p, pid=pid) + "#notities")
 
