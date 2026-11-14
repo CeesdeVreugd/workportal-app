@@ -241,7 +241,8 @@
     var nAll = files.length + (atts || []).length;
     progress(2, nAll ? nAll + (files.length && !(atts || []).length ? " foto" + (nAll === 1 ? "" : "'s") : " bestand" + (nAll === 1 ? "" : "en")) + " versturen" : "");
     var xhr = new XMLHttpRequest();
-    xhr.open("POST", form.getAttribute("action") || location.href);
+    var target = (submitter && submitter.hasAttribute("formaction") && submitter.getAttribute("formaction")) || form.getAttribute("action") || location.href;
+    xhr.open("POST", target);
     xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) progress(Math.round(ev.loaded / ev.total * 95), Math.round(ev.loaded / 1048576 * 10) / 10 + " van " + Math.round(ev.total / 1048576 * 10) / 10 + " MB"); };
     xhr.onload = function () {
       var url = xhr.responseURL || "";

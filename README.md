@@ -1020,5 +1020,8 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V191 (2.13.7)
+- Gespreksnotitie verwijderen werkte niet: de knop Verwijderen in 'Bewerken' sloeg de notitie opnieuw op. Oorzaak: het automatische concept-opslaan verstuurde altijd naar het opslaan-adres en negeerde de knop. Nu gaat elke knop met een eigen actie (ook bij tickets) naar de juiste plek.
+
 ## V190 (2.13.6)
 - Mails aan de klant vanuit een ticket met een project/order: het onderwerp krijgt het nummer erbij, bijv. "Ticket T-2026-0004 – Order 20260138" of "Werkbon T-2026-0004 – … – Project 20260101" (in de taal van de klant: Order/Project, Auftrag/Projekt, Commande/Projet). Geldt voor mail klant, werkbon versturen, werkbon na tekenen, bevestiging planning en de mail aan de externe monteur.
