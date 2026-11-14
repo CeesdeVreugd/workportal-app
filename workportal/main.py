@@ -14,6 +14,7 @@ ENTITY_MODULE = {
     "pressure_test": "druktest", "pressure_reading": "druktest",
     "customer": "klanten", "installation": "klanten", "project": "klanten",
     "article": "kennis", "nacalc": "nacalculatie", "calc": "calculatie", "invoice": "crediteuren",
+    "plan_draft": "service",
 }
 
 
@@ -112,9 +113,15 @@ def _file_row(fid):
     if row["entity"] in ("project", "order_inbox", "project_note"):
         if not (can("projecten") or can("orders") or can("service") or can("druktest")):
             abort(403)
+    elif row["entity"] in ("action_item", "action_done", "delivery"):   # actiepunten en opleverdocumenten
+        if not (can("projecten") or can("orders")):
+            abort(403)
     else:
         module = ENTITY_MODULE.get(row["entity"])
-        if module and not can(module):
+        if module is None:   # onbekende soort: standaard dicht (alleen beheerders)
+            if not (g.user and g.user["is_admin"]):
+                abort(403)
+        elif not can(module):
             abort(403)
     return row
 

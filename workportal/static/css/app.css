@@ -1263,3 +1263,26 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .eurin > .pm { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--basic, #0B0B8C); font-weight: 700; cursor: pointer; }
 .eurin > .pm + input { padding-right: 44px; }
 td.credit { color: #6B2FA0; }
+/* V187: tablet (iPad) – velden passen zich aan de breedte van de kaart aan, niet alleen aan het scherm */
+section.card, form.card, .card.form { container-type: inline-size; }
+@container (max-width: 520px) {
+  .fgrid, .fgrid.three { grid-template-columns: minmax(0, 1fr); }
+  .fgrid > * { grid-column: auto; }
+  .cred-status { grid-template-columns: minmax(0, 1fr); }
+  .cred-status .cred-st { grid-column: 1 / -1; }
+}
+@container (max-width: 380px) {
+  .card-head { flex-wrap: wrap; }
+}
+@media (min-width: 901px) and (max-width: 1300px) {
+  .cred-grid.g2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.dl dd .badge, .dl dd { overflow-wrap: anywhere; }
+.dl dd .badge { white-space: normal; text-align: left; }
+.tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs > a { flex: 0 0 auto; white-space: nowrap; }
+/* knoppen in een kop: netjes uitgelijnd en even hoog, ook als ze over twee regels gaan */
+.pagehead .actions { align-items: stretch; }
+.pagehead .actions > form > .btn, .pagehead .actions > .btn { justify-content: center; }
+.dl dd .badge { border-radius: 8px; }

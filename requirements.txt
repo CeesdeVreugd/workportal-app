@@ -7,7 +7,7 @@ blinker==1.9.0
 click==8.3.3
 openpyxl==3.1.5
 et_xmlfile==2.0.0
-pillow==12.2.0
+pillow>=12.3.0,<13
 reportlab==4.4.10
 cryptography==46.0.7
 requests==2.33.1
@@ -20,4 +20,4 @@ tzdata
 pdfplumber==0.11.9
 pdfminer.six>=20251230
 defusedxml==0.7.1
-pypdf>=6.12.2,<7
+pypdf>=6.21.1,<7
