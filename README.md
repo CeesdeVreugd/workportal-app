@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V193 (2.14.1)
+- iPad (app op beginscherm): de bovenbalk en het menu schoven onder de statusbalk (tijd, batterij). Er is nu ruimte boven de bovenbalk en het menu. Op pc en in de browser verandert er niets.
+
 ## V192 (2.14.0)
 - Nieuwe module **Taken** (menu, onderbalk op de telefoon en blok 'Mijn taken' op het dashboard). Voor iedere gebruiker, geen modulerecht nodig.
   - Taak voor jezelf of voor een collega, met datum, tijd en notitie.

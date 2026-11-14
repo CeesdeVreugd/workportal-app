@@ -456,11 +456,11 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 .nk-teams { background: #EAF0FF; color: #0A0A96; } .nk-anders { background: #F0F2F8; color: var(--ink-2); }
 .table th.chk, .table td.chk { width: 44px; text-align: center; padding-left: 14px; padding-right: 4px; cursor: default; }
 .table td.chk input, .table th.chk input { width: 18px; height: 18px; accent-color: var(--basic); cursor: pointer; }
-.bulkbar { position: sticky; top: 76px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin: 0 0 12px; background: var(--basic); color: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(10,10,150,.18); }
+.bulkbar { position: sticky; top: calc(76px + env(safe-area-inset-top)); z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin: 0 0 12px; background: var(--basic); color: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(10,10,150,.18); }
 .bulkbar .btn.primary { background: #fff; color: var(--basic); border-color: #fff; }
 .bulkbar .btn.ghost { color: #fff; background: transparent; border-color: rgba(255,255,255,.55); }
 .bulkbar .btn.ghost:hover { background: rgba(255,255,255,.12); }
-@media (max-width: 760px) { .bulkbar { top: 64px; } }
+@media (max-width: 760px) { .bulkbar { top: calc(64px + env(safe-area-inset-top)); } }
 .iconlink { display: inline-flex; align-items: center; gap: 5px; } .iconlink svg { width: 16px; height: 16px; }
 .ficon.cube { background: #EFEDFE; color: #4B3FB8; }
 .m3dform { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
@@ -1316,3 +1316,7 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .tkmore[open] > summary { margin-bottom: 8px; }
 .f[hidden] { display: none !important; }
 .tktxt b .badge { vertical-align: 1px; margin-left: 4px; }
+
+/* iPad/tablet als app (beginscherm): ruimte voor de statusbalk (tijd, batterij) boven de bovenbalk en het menu */
+.topbar { height: calc(68px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+.sidebar { padding-top: calc(24px + env(safe-area-inset-top)); }

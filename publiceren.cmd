@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V192: module Taken (per persoon, herinneringen, doorgeven)"
+set "OMSCHRIJVING=WorkPortal V193: ruimte voor statusbalk op de iPad"
 
 echo.
 echo ============================================
