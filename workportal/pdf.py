@@ -264,7 +264,8 @@ def visit_pdf(ticket, visit, photos, signature_path, lang="nl"):
         (L["installation"], ticket.get("installation") or "–"), (L["serial"], ticket.get("serial") or "–"),
         (L["date"], fmt_date(visit["date"])), (L["techs"], visit.get("technicians") or "–"),
         (L["hours"], fmt_num(visit.get("hours"), 2)), (L["travel"], fmt_num(visit.get("travel_hours"), 2)),
-        (L["km"], fmt_num(visit.get("km"), 0)), (L["project"], ticket.get("project_no") or "–"),
+        (L["km"], fmt_num(visit.get("km"), 0)),
+        (L["order"] if ticket.get("project_kind") == "order" else L["project"], ticket.get("project_no") or "–"),
     ]
     story += [Spacer(1, 4), _kv_table(pairs, W)]
     if ticket.get("description"):

@@ -1013,3 +1013,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Pillow ≥ 12.3.0 (CVE-2026-59200) en pypdf ≥ 6.21.1 (CVE-2026-113786).
   - Alle routes nagelopen op rechten, publieke pagina's (externe monteur) op sleutel, CSRF en afremmen; geen nieuwe problemen gevonden.
 - iPad: velden en knoppen passen zich aan de breedte van het blok aan (niet alleen aan het scherm), zodat smalle kolommen op een liggende iPad niet meer krap worden (factuurkaart, Instellingen, Na-calculatie e.d.). Factuurkaart op een liggende iPad: PDF en gegevens half-half. Lange meldingen in Beheer lopen niet meer buiten het scherm; tabbladen scrollen netjes.
+
+## V188 (2.13.4)
+- Werkbon: "Projectnummer" bij een ticket aan een project, "Ordernummer" bij een ticket aan een order (ook in EN/DE/FR).
