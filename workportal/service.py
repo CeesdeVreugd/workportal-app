@@ -384,11 +384,24 @@ def svc_mailbox(conn=None):
     return ((_gs("svc_mailbox") or _gs("cert_sender") or _os.environ.get("MAIL_FROM", "")) or "").strip().lower()
 
 
+def ref_suffix(t, lang=None):
+    """" – Order 20260138" / " – Project 20260138" voor in het onderwerp van mails aan de klant (leeg zonder project/order)."""
+    from .talen import tr
+    if not t["project_no"]:
+        return ""
+    L = tr(lang or _lang(t))
+    return " – " + L["ref_order" if t["project_kind"] == "order" else "ref_project"].format(n=t["project_no"])
+
+
+def ticket_subject(t, lang=None):
+    return f"Ticket {t['number']}" + ref_suffix(t, lang)
+
+
 def _mail_defaults(t, notes, metas):
     """Aan/Cc/onderwerp voor het mailformulier. Was er al mail: 'Antwoord allen' op de laatste mail."""
     box = svc_mailbox()
     mails = [n for n in reversed(notes) if n["kind"] in ("mail_in", "mail_uit") and n["id"] in metas]   # oud -> nieuw
-    out = {"to": t["contact_email"] or t["customer_email"] or "", "cc": "", "subject": f"Ticket {t['number']}",
+    out = {"to": t["contact_email"] or t["customer_email"] or "", "cc": "", "subject": ticket_subject(t),
            "reply_all": False, "last": None}
     if mails:
         last = mails[-1]
@@ -543,7 +556,7 @@ def mail_customer(tid):
         subject = "RE: " + _RE_PREFIX.sub("", lm.get("subject") or "").strip()
         ok, err = reply_in_thread(box, lm["msg_id"], to, body, atts, cc=cc or None, signer=signer)
     else:
-        subject = _RE_PREFIX.sub("", MAIL_TAG.sub("", (f.get("subject") or "").strip())).strip() or f"Ticket {t['number']}"
+        subject = _RE_PREFIX.sub("", MAIL_TAG.sub("", (f.get("subject") or "").strip())).strip() or ticket_subject(t)
         if f.get("reply_all") and notes:
             subject = "RE: " + subject
         subject = f"{subject} [WP-T{tid}]"
@@ -1058,7 +1071,7 @@ def _mail_ext(t, tid, date_v, ct, company, informed, pid=None):
         link, until = new_ext_link(pid, date_v)
         body += "\n\n" + ext_tr(xl)["link"].format(d=long_date(until, xl)) + "\n" + link
     body += "\n\n" + L["x_q"]
-    subject = L["x_subject"].format(d=fmt_date(date_v), nr=t["number"]) + f" [WP-T{tid}]"
+    subject = L["x_subject"].format(d=fmt_date(date_v), nr=t["number"]) + ref_suffix(t, xl) + f" [WP-T{tid}]"
     cc = [g.user["email"]] if g.user["email"] and g.user["email"] != ct["email"] else []
     ok, err = send_mail_with_files(box, [ct["email"]], subject, body, [], cc=cc or None, signer="werkvoorbereiding:" + (g.user["name"] or ""))
     if ok:
@@ -1090,7 +1103,7 @@ def _mail_plan(t, tid, pid, date_v, people, lang, to_raw, extra):
         subject = "RE: " + _RE_PREFIX.sub("", lm.get("subject") or "").strip()
         ok, err = reply_in_thread(box, lm["msg_id"], to, body, [], cc=cc or None, signer=signer)
     else:
-        subject = ("RE: " if notes else "") + f"Ticket {t['number']} [WP-T{tid}]"
+        subject = ("RE: " if notes else "") + ticket_subject(t, lang) + f" [WP-T{tid}]"
         ok, err = send_mail_with_files(box, to, subject, body, [], cc=cc or None, signer=signer)
     if ok:
         now = now_iso()
@@ -1306,7 +1319,7 @@ def sign(tid, vid):
         msgs = ["Werkbon ondertekend."]
         to = _f("mail_to")
         if request.form.get("mail") and to:
-            ok = send_mail(to, L["subject_short"].format(nr=t["number"]),
+            ok = send_mail(to, L["subject_short"].format(nr=t["number"]) + ref_suffix(t),
                            L["greet"].format(n=name) + "\n\n" + L["body_short"] + "\n\n" + L["questions"],
                            attachments=[(fname, pdf, "application/pdf")], signer="werkvoorbereiding")
             msgs.append("Werkbon gemaild naar " + to + "." if ok else "Mailen is mislukt.")
@@ -1357,7 +1370,7 @@ def visit_send(tid, vid):
             from .mail import send_mail_with_files
             import os as _os
             sender = get_setting("cert_sender") or _os.environ.get("CERT_MAIL_FROM") or _os.environ.get("MAIL_FROM") or ""
-            ok, err = send_mail_with_files(sender, to, (request.form.get("subject") or "").strip() or L["subject"].format(nr=t["number"], title=t["title"]),
+            ok, err = send_mail_with_files(sender, to, (request.form.get("subject") or "").strip() or (L["subject"].format(nr=t["number"], title=t["title"]) + ref_suffix(t, lang)),
                                            (request.form.get("body") or "").strip(), [(fname, pdf, "application/pdf")],
                                            cc=cc or None, signer="werkvoorbereiding")
             if ok:
@@ -1379,7 +1392,7 @@ def visit_send(tid, vid):
         flash(" ".join(msgs), "ok")
         return redirect(back)
     form = {"to": request.args.get("to", default_to), "cc": request.args.get("cc", ""), "cc_me": request.args.get("cc_me", "1"),
-            "subject": L["subject"].format(nr=t["number"], title=t["title"]),
+            "subject": L["subject"].format(nr=t["number"], title=t["title"]) + ref_suffix(t, lang),
             "body": greet_line + "\n\n" + L["body"].format(d=fmt_date(v["date"]))
                     + ("" if v["signed_at"] else "\n" + L["unsigned"])
                     + "\n\n" + L["questions"]}

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V189: logboek bij projecten en orders"
+set "OMSCHRIJVING=WorkPortal V190: order- of projectnummer in onderwerp mails aan de klant"
 
 echo.
 echo ============================================
