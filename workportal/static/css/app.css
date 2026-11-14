@@ -1232,7 +1232,7 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .apitem > summary::-webkit-details-marker { display: none; }
 .apcheck { flex: 0 0 22px; height: 22px; border: 2px solid var(--line); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; margin-top: 1px; }
 .apitem.done .apcheck { background: #1A6B43; border-color: #1A6B43; }
-.apitem.done .aptxt b { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+.apitem.done .aptxt b { color: var(--ink-2, #3A3F66); }
 .apitem.late { border-color: #F3C98B; }
 .aptxt { display: grid; gap: 2px; min-width: 0; }
 .aptxt b { overflow-wrap: anywhere; }

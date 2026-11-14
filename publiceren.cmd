@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V185: creditfacturen met negatief bedrag"
+set "OMSCHRIJVING=WorkPortal V186: afgevinkt actiepunt zonder doorhaling"
 
 echo.
 echo ============================================

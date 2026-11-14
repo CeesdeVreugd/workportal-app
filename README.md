@@ -1003,3 +1003,6 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
   - Uitlezen herkent een creditnota/creditfactuur/credit note/Gutschrift/avoir aan het kopje, en negatieve bedragen in elke schrijfwijze: -123,45 · 123,45- · € -123,45 · -€ 123,45 · (123,45). Bedrag incl. en excl. worden dan allebei negatief. Ook "Creditnotanummer" / "Gutschrift Nr." wordt als factuurnummer gelezen.
   - Een gewone factuur met "creditnota" in de voorwaarden wordt niet als credit gezien.
   - In de lijst en op de kaart een label "Credit(factuur)"; bij de bedragen een ±-knop om het teken te wisselen (handig op de telefoon, daar heeft het cijfertoetsenbord geen minteken).
+
+## V186 (2.13.2)
+- Actiepunten: een afgevinkt punt wordt niet meer doorgestreept (groen vinkje blijft).
