@@ -48,9 +48,21 @@ _MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "apr": 4, "mei": 5, "jun": 6,
 def parse_amount(s):
     if s is None:
         return None
-    s = str(s).strip().replace("€", "").replace(" ", "").replace(" ", "")
+    s = str(s).strip().replace("€", "").replace(" ", "").replace(" ", "").replace("−", "-").replace("–", "-")
     if not s:
         return None
+    neg = False
+    if s.startswith("(") and s.endswith(")"):
+        neg, s = True, s[1:-1]
+    if s.endswith("-"):
+        neg, s = True, s[:-1]
+    if s.startswith("-"):
+        neg, s = True, s[1:]
+    if s.startswith("+"):
+        s = s[1:]
+    if neg:
+        v = parse_amount(s)
+        return -v if v is not None else None
     if re.search(r",\d{2}$", s):
         s = s.replace(".", "").replace(",", ".")
     elif re.search(r"\.\d{2}$", s):
@@ -246,10 +258,33 @@ def _clean(v):
     return re.sub(r"\(cid:\d+\)", "", v)
 
 
+def _signs(t):
+    """Negatieve bedragen op één manier schrijven ("-123,45"): ook "123,45-", "- € 123,45", "€ - 123,45" en "(123,45)"."""
+    t = re.sub(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2})-(?![\d-])", r"-\1", t)   # 123,45-  (minteken erachter)
+    t = re.sub(r"-\s*€\s*(?=\d)", "€ -", t)                    # -€ 123,45 / - € 123,45
+    t = re.sub(r"€\s*-\s+(?=\d)", "€ -", t)                    # € - 123,45
+    t = re.sub(r"\((\s*€?\s*)(\d[\d.]*,\d{2})\s*\)", r"\1-\2", t)   # (123,45)
+    return t
+
+
+CREDIT_RE = re.compile(r"\b(?:credit\s*(?:factuur|nota|note|invoice|memo)|creditfactuur|creditnota|gutschrift|avoir|nota\s+de\s+cr[ée]dit)\b", re.I)
+
+
+def is_credit_text(text):
+    """Creditfactuur? Alleen kijken naar de kop (eerste regels): in de voorwaarden van een gewone factuur staat soms ook 'creditnota'."""
+    for line in (text or "").splitlines()[:40]:
+        ln = line.strip()
+        m = CREDIT_RE.search(ln)
+        # als kopje: de regel begint ermee ("CREDITNOTA", "Creditnotanummer: …") of het is (bijna) de hele regel
+        if m and (m.start() <= 2 or len(ln) <= len(m.group(0)) + 25):
+            return True
+    return False
+
+
 def extract(data):
     """Leest factuurnummer, datums, bedragen en ons inkoopnummer uit een (tekst-)PDF. Geeft altijd een dict; ontbrekend = None."""
     out = {"invoice_no": None, "invoice_date": None, "due_date": None, "amount_incl": None, "amount_excl": None,
-           "erp_ref": None, "supplier_guess": None, "text": ""}
+           "erp_ref": None, "supplier_guess": None, "text": "", "credit": False}
     words = []
     try:
         import pdfplumber
@@ -275,14 +310,16 @@ def extract(data):
     if not text.strip():
         return out
     # andere streepjes (‐ ‑ – — −) en harde spaties gelijk maken, anders worden 15‑10‑2026 en 4288‑20260000 niet herkend
-    text = _clean(text)
+    text = _signs(_clean(text))
     for ws in words:
         for w in ws:
-            w["text"] = _clean(w["text"])
+            w["text"] = _signs(_clean(w["text"]))
     sep = r"[\s.:#\-]*"
     num = r"((?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])"   # met minstens één cijfer (niet "Klantnummer")
     out["invoice_no"] = _find([
         r"(?:factuur|invoice|facture)\s*n[°º]\.?\s*((?:[A-Z]{1,5}\s)?(?=[A-Z0-9\-/.]*\d)[A-Z0-9][A-Z0-9\-/.]{2,24})(?![A-Za-z])",
+        r"credit\s*(?:nota|factuur|note|invoice)\s*(?:nummer|nr\.?|no\.?|number|#)?" + sep + num,
+        r"gutschrifts?\s*(?:nummer|nr\.?)" + sep + num,
         r"factuur\s*(?:nummer|nr\.?|no\.?)" + sep + num,
         r"invoice\s*(?:number|no\.?|nr\.?|#)" + sep + num,
         r"rechnungs?\s*(?:nummer|nr\.?)" + sep + num,
@@ -339,9 +376,14 @@ def extract(data):
             incl = incl or _below_amount(ws, r"(?<![\w.])(?:totaal|total)(?![\w ]*(?:btw|vat|excl|netto))")
     out["amount_incl"] = parse_amount(incl)
     out["amount_excl"] = parse_amount(excl)
+    # creditfactuur: bedragen eerst zonder minteken narekenen, aan het eind negatief maken
+    credit = is_credit_text(text) or any(v is not None and v < 0 for v in (out["amount_incl"], out["amount_excl"]))
+    for k in ("amount_incl", "amount_excl"):
+        if out[k] is not None:
+            out[k] = abs(out[k])
     if out["amount_incl"] is None:
         nums = [parse_amount(x) for x in re.findall(r"€\s*" + _AMOUNT, text)]
-        nums = [n for n in nums if n]
+        nums = [abs(n) for n in nums if n]
         if nums:
             out["amount_incl"] = max(nums)
     if out["amount_incl"] is not None and out["amount_excl"] is not None and out["amount_excl"] > out["amount_incl"] > 0:
@@ -355,12 +397,12 @@ def extract(data):
             continue
         nums = _AMT_TOKEN.findall(line)
         v = parse_amount(nums[-1]) if nums else None
-        if v and v > 0:
-            vat = v
+        if v:
+            vat = abs(v)
             break
     if vat is None:
         for ws in words:
-            vat = vat or parse_amount(_below_amount(ws, _VATAMT_LABEL))
+            vat = vat or (abs(parse_amount(_below_amount(ws, _VATAMT_LABEL)) or 0) or None)
     ex, inc = out["amount_excl"], out["amount_incl"]
     if vat and ex and inc is None and _close_vat(ex, vat):
         out["amount_incl"] = round(ex + vat, 2)
@@ -372,6 +414,11 @@ def extract(data):
             out["amount_excl"] = round(inc - vat, 2)
         elif _close_vat(ex, vat):
             out["amount_incl"] = round(ex + vat, 2)   # incl. verkeerd gelezen (bijv. een regelbedrag): excl. + btw klopt wel
+    if credit:
+        for k in ("amount_incl", "amount_excl"):
+            if out[k]:
+                out[k] = -abs(out[k])
+    out["credit"] = credit
     # vervaldatum uit de betalingstermijn ("betaling binnen 30 dagen", "30 dagen netto")
     if not out["due_date"] and out["invoice_date"]:
         dm = re.search(r"(?:binnen|within|innerhalb)\s*(\d{1,3})\s*(?:dagen|days|tagen)|(\d{1,3})\s*(?:dagen|days|tage)\s*(?:netto|net|na\s*factuurdatum)", text, re.I)

@@ -985,3 +985,21 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V183 (2.12.5)
 - Mailbox ophalen (inkoopfacturen, service): bij een tijdelijke fout van Microsoft (502/503/504 "UnknownError", 429 te druk) probeert WorkPortal het direct nog twee keer; lukt het dan nog niet, dan een leesbare melding in plaats van de ruwe foutcode (de planner probeert het na 5 minuten vanzelf opnieuw).
 - Inkoopfacturen: knop **Voor SnelStart** naast het sleepvak. Downloadt de PDF als "Leverancier Factuurnummer.pdf"; sleep hem daarna vanuit de downloadlijst van de browser naar SnelStart. Slepen direct vanuit WorkPortal blijft werken naar Komdex, Outlook, de Verkenner en het bureaublad.
+
+## V184 (2.13.0)
+- Projecten en orders: blok **Actiepunten** – afvinklijst.
+  - Per punt: omschrijving, toelichting, verantwoordelijke (krijgt melding + mail), streefdatum (over datum = rood), foto's.
+  - Afvinken met opmerking en foto's als bewijs; de maker krijgt een melding. Weer open zetten kan.
+  - Wie verantwoordelijk is mag zijn eigen punt afvinken, ook met alleen leesrechten op de module.
+  - Start: blok "Mijn actiepunten".
+- Projecten en orders: blok **Oplevering** – opleverdocument (afnamedocument / Document Receipt / Abnahmeprotokoll / PV de réception).
+  - Ingevuld uit project, klant en de **regels van de Komdex-orderbon** (pos, aantal, eenheid, omschrijving); alles aan te passen, regels toevoegen/weghalen; taal standaard die van de relatie.
+  - Beide partijen tekenen op het scherm (tablet/telefoon). Daarna: PDF bewaard, in de projectmap in SharePoint onder **3 Documenten**, optioneel gemaild aan de klant (in zijn taal).
+  - Getekend = vast; "Kopie" maakt een nieuwe versie (-02, -03 …).
+- Database-migratie 43.
+
+## V185 (2.13.1)
+- Inkoopfacturen: **creditfacturen** met een negatief bedrag.
+  - Uitlezen herkent een creditnota/creditfactuur/credit note/Gutschrift/avoir aan het kopje, en negatieve bedragen in elke schrijfwijze: -123,45 · 123,45- · € -123,45 · -€ 123,45 · (123,45). Bedrag incl. en excl. worden dan allebei negatief. Ook "Creditnotanummer" / "Gutschrift Nr." wordt als factuurnummer gelezen.
+  - Een gewone factuur met "creditnota" in de voorwaarden wordt niet als credit gezien.
+  - In de lijst en op de kaart een label "Credit(factuur)"; bij de bedragen een ±-knop om het teken te wisselen (handig op de telefoon, daar heeft het cijfertoetsenbord geen minteken).

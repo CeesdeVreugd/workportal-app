@@ -749,6 +749,41 @@ MIGRATIONS = [
     """
     ALTER TABLE visits ADD COLUMN tr_json TEXT;
     """,
+    # 43 - projecten/orders: actiepunten (afvinklijst met foto's) en opleverdocumenten (afnamedocument, getekend op het scherm)
+    """
+    CREATE TABLE action_items (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        due_date TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        done_at TEXT,
+        done_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        done_note TEXT
+    );
+    CREATE INDEX idx_action_items_project ON action_items(project_id);
+    CREATE INDEX idx_action_items_user ON action_items(assigned_to, done_at);
+    CREATE TABLE deliveries (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL DEFAULT 1,
+        language TEXT NOT NULL DEFAULT 'nl',
+        customer_name TEXT, address TEXT, postcode_city TEXT, country TEXT,
+        attn TEXT, phone TEXT, reference TEXT,
+        description TEXT, project_manager TEXT, delivery_date TEXT,
+        collection_date TEXT, location TEXT, serial TEXT,
+        lines_json TEXT, remarks TEXT,
+        dv_name TEXT, dv_signed_at TEXT, cust_company TEXT, cust_name TEXT, cust_signed_at TEXT,
+        pdf_file_id INTEGER, sp_status TEXT, mailed_at TEXT, mailed_to TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL, updated_at TEXT
+    );
+    CREATE INDEX idx_deliveries_project ON deliveries(project_id);
+    """,
 ]
 
 

@@ -131,7 +131,7 @@ def parse(data):
         left = _column(lines, 0, split, LEFT)
         right = _column(lines, split, page.width + 1, RIGHT)
         # werkomschrijving: kolom 'Omschrijving' onder de kop 'Pos Aantal ...', over alle pagina's
-        work = []
+        work, order_lines = [], []
         for pg in pdf.pages:
             pw = pg.extract_words()
             pl = _lines(pw)
@@ -139,6 +139,7 @@ def parse(data):
             if head is None:
                 continue
             xdesc = next((w["x0"] for w in pl[head][1] if w["text"] == "Omschrijving"), None)
+            hx = {w["text"].lower(): w["x0"] for w in pl[head][1]}
             for _, ws in pl[head + 1:]:
                 t = " ".join(w["text"] for w in ws)
                 if t.upper().startswith("DE VREUGD PRODUCTIETECHNIEK") or t.lower().startswith(("gebruikte materialen", "gebruite materialen")):
@@ -146,6 +147,20 @@ def parse(data):
                 d = " ".join(w["text"] for w in ws if xdesc is None or w["x0"] >= xdesc - 2)
                 if d:
                     work.append(d)
+                # orderregels (pos, aantal, eenheid, artikelnummer, omschrijving) voor bijv. het opleverdocument
+                if xdesc is not None and "aantal" in hx:
+                    col = lambda w: ("pos" if w["x0"] < hx["aantal"] - 2 else "qty" if w["x0"] < hx.get("eenheid", xdesc) - 2   # noqa: E731
+                                     else "unit" if w["x0"] < hx.get("artikelnummer", xdesc) - 2
+                                     else "art" if w["x0"] < xdesc - 2 else "desc")
+                    parts = {}
+                    for w in ws:
+                        parts.setdefault(col(w), []).append(w["text"])
+                    pos = " ".join(parts.get("pos", []))
+                    if re.fullmatch(r"\d{1,4}", pos):
+                        order_lines.append({"pos": pos, "qty": " ".join(parts.get("qty", [])), "unit": " ".join(parts.get("unit", [])),
+                                            "article": " ".join(parts.get("art", [])), "description": " ".join(parts.get("desc", []))})
+                    elif order_lines and parts.get("desc"):
+                        order_lines[-1]["description"] = (order_lines[-1]["description"] + "\n" + " ".join(parts["desc"])).strip()
     num = left.get("number", "")
     m = re.match(r"^\s*(\d{8})\s*(.*)$", num)
     if not m:
@@ -165,5 +180,6 @@ def parse(data):
         "reference": right.get("reference") or None,
         "contact": right.get("contact") or None,
         "work": "\n".join(work).strip() or None,
+        "lines": order_lines,
         "props": props,
     }

@@ -167,3 +167,36 @@ EXT = {
 
 def ext_tr(lang):
     return EXT.get(lang or "nl", EXT["nl"])
+
+
+# Opleverdocument (afnamedocument)
+DELIV = {
+    "nl": {"title": "Afnamedocument", "file": "Afnamedocument", "project": "Projectnummer", "order": "Ordernummer", "desc": "Omschrijving",
+           "pm": "Projectleider", "delivery": "Leverdatum", "attn": "T.a.v.", "tel": "Tel.", "ref": "Ref.", "collection": "Datum afname",
+           "location": "Projectlocatie", "serial": "Serienummer", "pos": "Pos", "unit": "Eenheid", "qty": "Aantal", "delivered": "Geleverd",
+           "backorder": "In backorder", "company": "Firma", "name": "Naam", "date": "Datum", "sign": "Handtekening",
+           "remarks": "Opmerkingen", "subject": "Afnamedocument {nr} – De Vreugd Productietechniek",
+           "body": "In de bijlage vindt u het ondertekende afnamedocument van {desc}."},
+    "en": {"title": "Document Receipt", "file": "Document Receipt", "project": "Project Number", "order": "Order Number", "desc": "Description",
+           "pm": "Project Manager", "delivery": "Delivery Date", "attn": "Attn", "tel": "Tel.", "ref": "Ref.", "collection": "Date of collection",
+           "location": "Project location", "serial": "Serial Number", "pos": "Pos", "unit": "Unity", "qty": "Quantity", "delivered": "Delivered",
+           "backorder": "In backorder", "company": "Company", "name": "Name", "date": "Date", "sign": "Signature",
+           "remarks": "Remarks", "subject": "Document Receipt {nr} – De Vreugd Productietechniek",
+           "body": "Please find attached the signed document receipt for {desc}."},
+    "de": {"title": "Abnahmeprotokoll", "file": "Abnahmeprotokoll", "project": "Projektnummer", "order": "Auftragsnummer", "desc": "Beschreibung",
+           "pm": "Projektleiter", "delivery": "Liefertermin", "attn": "z. Hd.", "tel": "Tel.", "ref": "Ref.", "collection": "Abnahmedatum",
+           "location": "Projektstandort", "serial": "Seriennummer", "pos": "Pos", "unit": "Einheit", "qty": "Menge", "delivered": "Geliefert",
+           "backorder": "Rückstand", "company": "Firma", "name": "Name", "date": "Datum", "sign": "Unterschrift",
+           "remarks": "Bemerkungen", "subject": "Abnahmeprotokoll {nr} – De Vreugd Productietechniek",
+           "body": "Anbei erhalten Sie das unterschriebene Abnahmeprotokoll für {desc}."},
+    "fr": {"title": "Procès-verbal de réception", "file": "PV de reception", "project": "N° de projet", "order": "N° de commande", "desc": "Description",
+           "pm": "Chef de projet", "delivery": "Date de livraison", "attn": "À l'att. de", "tel": "Tél.", "ref": "Réf.", "collection": "Date de réception",
+           "location": "Lieu du projet", "serial": "N° de série", "pos": "Pos", "unit": "Unité", "qty": "Quantité", "delivered": "Livré",
+           "backorder": "En attente", "company": "Société", "name": "Nom", "date": "Date", "sign": "Signature",
+           "remarks": "Remarques", "subject": "Procès-verbal de réception {nr} – De Vreugd Productietechniek",
+           "body": "Veuillez trouver ci-joint le procès-verbal de réception signé pour {desc}."},
+}
+
+
+def deliv_tr(lang):
+    return DELIV.get(lang or "nl", DELIV["nl"])

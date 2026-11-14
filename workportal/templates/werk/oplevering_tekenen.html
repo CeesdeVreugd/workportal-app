@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Tekenen {{ number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.detail', pid=p.id) }}#oplevering">{{ p.number }}</a> / oplevering {{ number }} / tekenen</div>
+<h1>Opleverdocument laten tekenen</h1>
+<div class="card" style="max-width:820px">
+  <dl class="dl"><dt>Document</dt><dd>{{ number }} · {{ d.description or p.name }}</dd><dt>Klant</dt><dd>{{ d.customer_name or '–' }}</dd>
+  <dt>Datum afname</dt><dd>{{ d.collection_date|date if d.collection_date else '–' }}</dd><dt>Serienummer</dt><dd>{{ d.serial or '–' }}</dd></dl>
+  <p><a href="{{ url_for(B ~ '.delivery_pdf_view', pid=p.id, did=d.id, voorbeeld=1) }}" data-pdf="{{ number }}" target="_blank">{{ icon('pdf') }} Document bekijken</a> ·
+    <a href="{{ url_for(B ~ '.delivery_edit', pid=p.id, did=d.id) }}">Gegevens aanpassen</a></p>
+</div>
+<form method="post" class="card form" style="max-width:820px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="sig_dv" id="sigdv"><input type="hidden" name="sig_cust" id="sigcust">
+  <h3>De Vreugd Productietechniek</h3>
+  <label class="f">Naam *<input type="text" name="dv_name" required value="{{ form.get('dv_name', d.dv_name or g.user.name) }}"></label>
+  <div><canvas class="sigpad" id="sdv" data-target="sigdv"></canvas><button type="button" class="btn ghost sm" data-clear="sdv">Wissen</button></div>
+  <h3>Klant</h3>
+  <div class="fgrid">
+    <label class="f">Firma<input type="text" name="cust_company" value="{{ form.get('cust_company', d.cust_company or d.customer_name or '') }}"></label>
+    <label class="f">Naam *<input type="text" name="cust_name" required value="{{ form.get('cust_name', d.attn or '') }}"></label>
+  </div>
+  <div><canvas class="sigpad" id="scust" data-target="sigcust"></canvas><button type="button" class="btn ghost sm" data-clear="scust">Wissen</button></div>
+  <label class="check"><input type="checkbox" name="mail" value="1" {{ 'checked' if mail_to }}> Getekend document mailen naar</label>
+  <input type="text" name="mail_to" value="{{ mail_to }}" inputmode="email" placeholder="e-mailadres klant">
+  <span class="hint">Het document is in het {{ LANG_LABELS.get(d.language, d.language) }}. Na het tekenen gaat de PDF naar de {{ K.lower }}map (3 Documenten) als die gekoppeld is.</span>
+  <div class="actions"><button class="btn primary">{{ icon('check') }}Ondertekenen</button><a class="btn ghost" href="{{ url_for(B ~ '.detail', pid=p.id) }}#oplevering">Annuleren</a></div>
+</form>
+{% endblock %}

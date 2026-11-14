@@ -55,7 +55,7 @@
         <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div>
         <div class="show-m stchips row-m">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</div></td>
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>
-      <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
+      <td class="num nowrap{{ ' credit' if r.amount_incl is not none and r.amount_incl < 0 }}">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}{% if r.amount_incl is not none and r.amount_incl < 0 %}<div><span class="badge b-purple">Credit</span></div>{% endif %}</td>
       <td class="hide-m nowrap" {% if r.due_date and r.status in ('nieuw','erp','buiten') and r.due_date <= soon %}style="color:var(--bad);font-weight:500"{% endif %}>{{ r.due_date|date if r.due_date else '–' }}</td>
       <td class="hide-m"><span class="stchips">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</span>{% if has_cats(r, cat_hide)|int > 0 %}<div class="ocats">{{ cats(r, cat_colors, cat_hide) }}</div>{% endif %}</td>
       <td class="hide-m small muted">{{ r.last_action or '' }}</td>

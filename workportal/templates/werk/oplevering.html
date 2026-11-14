@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% block title %}Oplevering {{ number }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}#oplevering">{{ p.number }}</a> / oplevering {{ number }}</div>
+<div class="pagehead"><div><h1>Opleverdocument {{ number }}</h1><p>{{ p.name }}{% if d.cust_signed_at %} · <span class="badge b-ok">Getekend {{ d.cust_signed_at|dt }}</span>{% endif %}</p></div>
+  <div class="actions"><a class="btn" href="{{ url_for(B ~ '.delivery_pdf_view', pid=p.id, did=d.id, voorbeeld=1) }}" data-pdf="{{ number }}" target="_blank">{{ icon('pdf') }}Voorbeeld</a></div></div>
+<form method="post" class="card form dlform" data-draft="dl-{{ d.id }}-{{ g.user.id }}" {{ 'inert' if d.cust_signed_at }}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fgrid">
+    <label class="f">Taal van het document<select name="language">{% for k, l in LANGS %}{{ opt(k, l, d.language) }}{% endfor %}</select><span class="hint">Standaard de taal van de relatie.</span></label>
+    <label class="f">Serienummer<input type="text" name="serial" value="{{ d.serial or '' }}"></label>
+  </div>
+  <h3>Klant</h3>
+  <div class="fgrid">
+    <label class="f full">Naam<input type="text" name="customer_name" value="{{ d.customer_name or '' }}"></label>
+    <label class="f">Adres<input type="text" name="address" value="{{ d.address or '' }}"></label>
+    <label class="f">Postcode en plaats<input type="text" name="postcode_city" value="{{ d.postcode_city or '' }}"></label>
+    <label class="f">Land<input type="text" name="country" value="{{ d.country or '' }}" placeholder="bijv. Deutschland"></label>
+    <label class="f">T.a.v.<input type="text" name="attn" value="{{ d.attn or '' }}"></label>
+    <label class="f">Telefoon<input type="text" name="phone" value="{{ d.phone or '' }}"></label>
+    <label class="f">Referentie<input type="text" name="reference" value="{{ d.reference or '' }}" placeholder="bijv. Mail 31/08/2026"></label>
+  </div>
+  <h3>{{ K.label }}</h3>
+  <div class="fgrid">
+    <label class="f full">Omschrijving<input type="text" name="description" value="{{ d.description or '' }}"></label>
+    <label class="f">Projectleider<input type="text" name="project_manager" value="{{ d.project_manager or '' }}"></label>
+    <label class="f">Leverdatum<input type="date" name="delivery_date" value="{{ d.delivery_date or '' }}"></label>
+    <label class="f">Datum afname<input type="date" name="collection_date" value="{{ d.collection_date or '' }}"></label>
+    <label class="f">Projectlocatie<input type="text" name="location" value="{{ d.location or '' }}"></label>
+  </div>
+  <h3>Regels {% if not lines %}<span class="small muted">(geen regels in de orderbon gevonden: vul ze zelf in)</span>{% endif %}</h3>
+  <div class="dllines" id="dllines">
+    <div class="dlhead"><span>Pos</span><span>Eenheid</span><span>Omschrijving</span><span>Aantal</span><span>Geleverd</span><span>Backorder</span><span></span></div>
+    {% for l in lines + [{}] %}
+    <div class="dlline{{ ' dltpl' if loop.last }}" {{ 'hidden' if loop.last }}>
+      <input type="text" name="l_pos" placeholder="Pos" value="{{ l.pos or '' }}" aria-label="Pos" {{ 'disabled' if loop.last }}>
+      <input type="text" name="l_unit" placeholder="Eenheid" value="{{ l.unit or '' }}" aria-label="Eenheid" {{ 'disabled' if loop.last }}>
+      <textarea name="l_description" placeholder="Omschrijving" rows="{{ [2, (l.description or '').count('\n') + 1]|max if l.description else 2 }}" aria-label="Omschrijving" {{ 'disabled' if loop.last }}>{{ l.description or '' }}</textarea>
+      <input type="text" name="l_qty" placeholder="Aantal" value="{{ l.qty or '' }}" inputmode="decimal" aria-label="Aantal" {{ 'disabled' if loop.last }}>
+      <input type="text" name="l_delivered" placeholder="Geleverd" value="{{ l.delivered or '' }}" inputmode="decimal" aria-label="Geleverd" {{ 'disabled' if loop.last }}>
+      <input type="text" name="l_backorder" placeholder="Backorder" value="{{ l.backorder or '' }}" inputmode="decimal" aria-label="In backorder" {{ 'disabled' if loop.last }}>
+      <button type="button" class="iconbtn" data-dl-del title="Regel weghalen" aria-label="Regel weghalen">{{ icon('trash') }}</button>
+    </div>
+    {% endfor %}
+  </div>
+  <div><button type="button" class="btn sm" data-dl-add>{{ icon('plus') }}Regel</button></div>
+  <label class="f">Opmerkingen (komen op het document)<textarea name="remarks" rows="2">{{ d.remarks or '' }}</textarea></label>
+  {% if not d.cust_signed_at %}<div class="actions"><button class="btn">Opslaan</button><button class="btn primary" name="next" value="tekenen">Opslaan en laten tekenen</button>
+    <a class="btn ghost" href="{{ url_for(B ~ '.detail', pid=p.id) }}#oplevering">Terug</a></div>{% endif %}
+  {% if not sp_ok %}<p class="hint">Na het tekenen wordt de PDF bewaard in WorkPortal. Deze {{ K.lower }} is (nog) niet gekoppeld aan een map in SharePoint.</p>
+  {% else %}<p class="hint">Na het tekenen gaat de PDF ook naar de {{ K.lower }}map in SharePoint, onder 3 Documenten.</p>{% endif %}
+</form>
+<script>
+(function () {
+  var box = document.getElementById("dllines"), tpl = box.querySelector(".dltpl");
+  document.querySelector("[data-dl-add]").addEventListener("click", function () {
+    var n = tpl.cloneNode(true); n.hidden = false; n.classList.remove("dltpl");
+    n.querySelectorAll("input,textarea").forEach(function (x) { x.disabled = false; x.value = ""; });
+    var rows = box.querySelectorAll(".dlline:not(.dltpl)"), last = rows.length ? rows[rows.length - 1].querySelector('[name="l_pos"]').value : "0";
+    n.querySelector('[name="l_pos"]').value = /^\d+$/.test(last) ? String(+last + 1) : "";
+    box.insertBefore(n, tpl); n.querySelector("textarea").focus();
+  });
+  box.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-dl-del]"); if (!b) return;
+    var row = b.closest(".dlline"); if (row.querySelector("textarea").value.trim() && !confirm("Deze regel weghalen?")) return;
+    row.remove(); box.closest("form").dispatchEvent(new Event("input", { bubbles: true }));
+  });
+})();
+</script>
+{% endblock %}

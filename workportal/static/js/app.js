@@ -1020,3 +1020,16 @@ document.addEventListener("click", function (e) {
   var a = e.target.closest && e.target.closest("[data-dl-hint]"); if (!a) return;
   var h = document.getElementById(a.getAttribute("data-dl-hint")); if (h) h.hidden = false;
 });
+
+/* Creditfactuur: ± wisselt het teken van de bedragen (incl. en excl. samen) */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest && e.target.closest("[data-negate]"); if (!b) return;
+  e.preventDefault();
+  var form = b.closest("form");
+  ["amount_incl", "amount_excl"].forEach(function (n) {
+    var i = form && form.querySelector('[name="' + n + '"]'); if (!i || !i.value.trim()) return;
+    var v = i.value.trim();
+    i.value = v.charAt(0) === "-" ? v.slice(1) : "-" + v;
+    i.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});

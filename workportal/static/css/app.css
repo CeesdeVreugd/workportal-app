@@ -1225,3 +1225,41 @@ button.cdd-next { border: 0; cursor: pointer; font-family: inherit; }
 .dragrow .dragfile { flex: 1; margin-bottom: 0; min-width: 0; }
 .dragrow .btn { align-self: center; white-space: nowrap; }
 .sshint { margin: 0 0 10px; font-size: 13.5px; }
+/* V184: actiepunten */
+.aplist { display: grid; gap: 6px; }
+.apitem { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.apitem > summary { list-style: none; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer; }
+.apitem > summary::-webkit-details-marker { display: none; }
+.apcheck { flex: 0 0 22px; height: 22px; border: 2px solid var(--line); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; margin-top: 1px; }
+.apitem.done .apcheck { background: #1A6B43; border-color: #1A6B43; }
+.apitem.done .aptxt b { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+.apitem.late { border-color: #F3C98B; }
+.aptxt { display: grid; gap: 2px; min-width: 0; }
+.aptxt b { overflow-wrap: anywhere; }
+.aptxt svg { width: 13px; height: 13px; vertical-align: -2px; }
+.apred { color: var(--bad, #C62828); font-weight: 600; }
+.apbody { padding: 0 12px 12px 44px; display: grid; gap: 8px; }
+.apbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.apbtns form.inline { margin: 0; }
+.apdone { width: 100%; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; }
+@media (max-width: 640px) { .apbody { padding-left: 12px; } }
+/* V184: opleverdocument */
+.dllines { display: grid; gap: 6px; }
+.dlhead, .dlline { display: grid; grid-template-columns: 54px 80px 1fr 74px 74px 80px 36px; gap: 6px; align-items: start; }
+.dlhead { font-size: 12px; color: var(--muted); font-weight: 600; }
+.dlline[hidden] { display: none; }
+.dlline textarea { min-height: 42px; }
+@media (max-width: 760px) {
+  .dlhead { display: none; }
+  .dlline { grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .dlline textarea { grid-column: 1 / -1; order: -1; }
+  .dlline [data-dl-del] { justify-self: end; }
+}
+.dlform[inert] { opacity: .75; }
+.dlrow { flex-wrap: wrap; gap: 10px; }
+.dlrow .grow { flex: 1 1 260px; }
+.dlrow details form { position: absolute; right: 0; z-index: 30; }
+/* V185: creditfacturen */
+.eurin > .pm { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--basic, #0B0B8C); font-weight: 700; cursor: pointer; }
+.eurin > .pm + input { padding-right: 44px; }
+td.credit { color: #6B2FA0; }

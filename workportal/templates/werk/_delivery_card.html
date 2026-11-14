@@ -1,0 +1,28 @@
+{% from "partials/icons.html" import icon %}
+{% set dl_edit = can(K.module, 2) %}
+<section class="card" id="oplevering">
+  <div class="card-head"><div><h2>Oplevering</h2>{% if deliveries %}<div class="small muted">{{ deliveries|length }} document{{ 'en' if deliveries|length != 1 }}</div>{% endif %}</div>
+    {% if dl_edit %}<div class="actions" style="margin:0">
+      {% if deliveries %}<form method="post" action="{{ url_for(B ~ '.delivery_new', pid=p.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="kopie" value="1"><button class="btn sm" title="Nieuwe versie op basis van het vorige document">{{ icon('refresh') }}Kopie</button></form>{% endif %}
+      <form method="post" action="{{ url_for(B ~ '.delivery_new', pid=p.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm primary">{{ icon('plus') }}Opleverdocument</button></form>
+    </div>{% endif %}</div>
+  <div class="rows">
+  {% for d in deliveries %}{% set nr = p.number ~ '-' ~ ('%02d' % d.seq) %}
+    <div class="rowitem dlrow">
+      <div class="grow"><div class="t">{{ nr }} {% if d.cust_signed_at %}<span class="badge b-ok">Getekend {{ d.cust_signed_at|dt }}</span>{% else %}<span class="badge b-warn">Concept</span>{% endif %}
+        <span class="badge">{{ LANG_LABELS.get(d.language, d.language) }}</span></div>
+        <div class="s">{% if d.cust_signed_at %}{{ d.cust_name }} ({{ d.cust_company or d.customer_name }}) · {{ d.dv_name }}{% else %}aangemaakt {{ d.created_at|dt }}{% if d.creator %} door {{ d.creator }}{% endif %}{% endif %}
+          {% if d.mailed_at %} · gemaild naar {{ d.mailed_to }}{% endif %}{% if d.sp_status %} · {{ d.sp_status }}{% endif %}</div></div>
+      <div class="actions" style="margin:0">
+        <a class="btn sm" href="{{ url_for(B ~ '.delivery_pdf_view', pid=p.id, did=d.id) }}" data-pdf="{{ nr }}" target="_blank">{{ icon('pdf') }}PDF</a>
+        {% if dl_edit and not d.cust_signed_at %}<a class="btn sm" href="{{ url_for(B ~ '.delivery_edit', pid=p.id, did=d.id) }}">{{ icon('edit') }}Bewerken</a>
+        <a class="btn sm primary" href="{{ url_for(B ~ '.delivery_sign', pid=p.id, did=d.id) }}">Laten tekenen</a>{% endif %}
+        {% if dl_edit and d.cust_signed_at %}<details class="cred-pop"><summary class="btn sm">{{ icon('mail') }}Mailen</summary>
+          <form method="post" action="{{ url_for(B ~ '.delivery_mail', pid=p.id, did=d.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="f">Aan<input type="text" name="mail_to" value="{{ d.mailed_to or '' }}" inputmode="email" required></label><button class="btn primary sm">Versturen</button></form></details>{% endif %}
+        {% if dl_edit and (not d.cust_signed_at or can(K.module, 3)) %}<form method="post" action="{{ url_for(B ~ '.delivery_delete', pid=p.id, did=d.id) }}" class="inline" data-confirm="{{ nr }} verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}
+      </div>
+    </div>
+  {% else %}<div class="empty">Nog geen opleverdocument.{% if dl_edit %} Maak er een: de regels komen uit de orderbon, beide partijen tekenen op het scherm.{% endif %}</div>{% endfor %}
+  </div>
+</section>

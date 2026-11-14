@@ -507,3 +507,74 @@ def annotations_pdf(p, items, labels):
         story.append(KeepTogether(block))
     doc.build(story)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- opleverdocument (afnamedocument)
+
+COMPANY_LINES = ["De Vreugd Productietechniek", "Edisonring 11", "6669 NA Dodewaard", "E: info@devreugd-pt.nl", "T: +31 (0)488 41 28 28",
+                 "W: www.devreugd-pt.nl", "KvK 11053630"]
+
+
+def delivery_pdf(d, lines, sig_dv=None, sig_cust=None, lang="nl", number_label=None):
+    """Afnamedocument / Document Receipt. d = dict met de kopgegevens, lines = [{pos, unit, description, qty, delivered, backorder}]."""
+    from .talen import deliv_tr
+    L = deliv_tr(lang)
+    buf = io.BytesIO()
+    doc = _doc(buf, L["title"], d.get("number") or "", {"nl": "Pagina", "en": "Page", "de": "Seite", "fr": "Page"}.get(lang, "Pagina"))
+    W = doc.width
+    lab = ParagraphStyle("dl", parent=S["cell"], textColor=MUTED)
+    company = Paragraph("<br/>".join(esc(x) if i else f"<b>{esc(x)}</b>" for i, x in enumerate(COMPANY_LINES)), S["small"])
+    story = [Table([[Paragraph(esc(L["title"]), S["h1"]), company]], colWidths=[W * 0.62, W * 0.38],
+                   style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                     ("RIGHTPADDING", (0, 0), (-1, -1), 0)])), Spacer(1, 8)]
+
+    def kv(rows, w):
+        t = Table([[Paragraph(esc(a), lab), Paragraph(esc(b) or "–", S["cellb"])] for a, b in rows], colWidths=[w * 0.36, w * 0.64])
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                               ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+        return t
+    cust = [Paragraph(f"<b>{esc(d.get('customer_name') or '')}</b>", S["body"])]
+    for x in (d.get("address"), d.get("postcode_city"), d.get("country")):
+        if x:
+            cust.append(Paragraph(esc(x), S["body"]))
+    cust.append(Spacer(1, 4))
+    cust.append(kv([(L["attn"], d.get("attn")), (L["tel"], d.get("phone")), (L["ref"], d.get("reference"))], W * 0.48))
+    right = kv([(number_label or L["project"], d.get("project_no")), (L["desc"], d.get("description")),
+                (L["pm"], d.get("project_manager")), (L["delivery"], fmt_date(d.get("delivery_date")) if d.get("delivery_date") else "")], W * 0.5)
+    head = Table([[cust, right]], colWidths=[W * 0.5, W * 0.5])
+    head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                              ("LINEABOVE", (0, 0), (-1, 0), 0.8, LINE), ("LINEBELOW", (0, 0), (-1, 0), 0.8, LINE),
+                              ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+    story.append(head)
+    extra = Table([[kv([(L["collection"], fmt_date(d.get("collection_date")) if d.get("collection_date") else ""),
+                        (L["location"], d.get("location"))], W * 0.48),
+                    kv([(L["serial"], d.get("serial"))], W * 0.5)]], colWidths=[W * 0.5, W * 0.5])
+    extra.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                               ("LINEBELOW", (0, 0), (-1, 0), 0.8, LINE), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+    story += [Spacer(1, 2), extra, Spacer(1, 8)]
+    data = [[L["pos"], L["unit"], L["desc"], L["qty"], L["delivered"], L["backorder"]]]
+    for ln in lines:
+        data.append([esc(ln.get("pos")), Paragraph(esc(ln.get("unit")), S["cell"]), Paragraph(esc(ln.get("description")), S["cell"]),
+                     esc(ln.get("qty")), esc(ln.get("delivered")), esc(ln.get("backorder"))])
+    story.append(_grid(data, [W * 0.06, W * 0.1, W * 0.5, W * 0.11, W * 0.11, W * 0.12], align_right=(3, 4, 5)))
+    if d.get("remarks"):
+        story += [Paragraph(esc(L["remarks"]), S["h2"]), Paragraph(esc(d["remarks"]), S["body"])]
+
+    def sig_cell(path, name):
+        if path:
+            im = _img(path, 55 * mm, 20 * mm)
+            if im:
+                return im
+        return ""
+    sdata = [[L["company"], L["name"], L["date"], L["sign"]],
+             [Paragraph("De Vreugd Productietechniek", S["cell"]), Paragraph(esc(d.get("dv_name")), S["cell"]),
+              fmt_date(d.get("dv_signed_at")) if d.get("dv_signed_at") else "", sig_cell(sig_dv, d.get("dv_name"))],
+             [Paragraph(esc(d.get("cust_company") or d.get("customer_name")), S["cell"]), Paragraph(esc(d.get("cust_name")), S["cell"]),
+              fmt_date(d.get("cust_signed_at")) if d.get("cust_signed_at") else "", sig_cell(sig_cust, d.get("cust_name"))]]
+    st = Table(sdata, colWidths=[W * 0.28, W * 0.24, W * 0.14, W * 0.34], rowHeights=[None, 24 * mm, 24 * mm])
+    st.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.6, INK), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                            ("FONTSIZE", (0, 0), (-1, -1), 9), ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                            ("VALIGN", (0, 1), (-1, -1), "MIDDLE"), ("BACKGROUND", (0, 0), (-1, 0), LIGHT)]))
+    story += [Spacer(1, 14), KeepTogether([st])]
+    doc.build(story)
+    return buf.getvalue()

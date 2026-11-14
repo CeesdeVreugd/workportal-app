@@ -191,7 +191,10 @@ def detail(pid):
     from .kennis import calcs_for
     from .aantekeningen import annotations_for, STATUS_LABEL
     open_tickets = sum(1 for t in tickets if t["status"] not in ("afgerond", "gefactureerd"))
-    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, tests=tests, calcs=calcs,
+    from .actiepunten import items_for
+    from .oplevering import deliveries_for
+    actions, deliveries = items_for(pid), deliveries_for(pid)
+    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
@@ -1005,3 +1008,5 @@ def inbox_handle(iid):
 
 # Aantekeningen (productie-opmerkingen) hangen aan dezelfde blueprint
 from . import aantekeningen  # noqa: E402,F401
+from . import actiepunten  # noqa: E402,F401
+from . import oplevering  # noqa: E402,F401

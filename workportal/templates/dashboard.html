@@ -50,6 +50,15 @@
   {% endif %}
 </div>
 
+{% if d.my_actions %}
+<section class="card"><div class="card-head"><h2>Mijn actiepunten ({{ d.my_actions|length }})</h2></div>
+  <div class="rows">{% for a in d.my_actions[:10] %}
+    <a class="rowitem" href="{{ werk_url('detail', a.kind, pid=a.project_id) }}?ap={{ a.id }}#ap{{ a.id }}">
+      <div class="grow"><div class="t">{{ a.title }}</div><div class="s">{{ a.number }} · {{ a.pname or '' }}</div></div>
+      {% if a.due_date %}<span class="badge {{ 'b-bad' if a.due_date < now_date() else '' }}">vóór {{ a.due_date|date }}</span>{% endif %}
+    </a>{% endfor %}</div>
+</section>
+{% endif %}
 {% if d.my_plans and navok('service') %}
 <section class="card"><div class="card-head"><h2>Mijn planning</h2><a href="{{ url_for('service.planning', mijn=1) }}" class="small">Hele planning</a></div>
   <div class="rows">{% for p in d.my_plans %}

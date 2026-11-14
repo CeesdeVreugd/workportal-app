@@ -51,6 +51,8 @@
 {% endif %}
 {% with entity='project', eid=p.id, to_sp=(sp_on and p.sp_item_id and not p.sp_missing), kind=p.kind %}{% include "modellen/_section.html" %}{% endwith %}
 
+{% include "werk/_actions_card.html" %}
+{% include "werk/_delivery_card.html" %}
 {% include "werk/_annot_card.html" %}
 {% include "partials/toolcalcs.html" %}
 {% macro notefields(n=None) %}

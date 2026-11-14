@@ -1,0 +1,72 @@
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import photos, opt %}
+{% set ap_edit = can(K.module, 2) %}
+{% set ap_open = actions|selectattr('done_at', 'none')|list %}
+<section class="card" id="actiepunten">
+  <div class="card-head"><div><h2>Actiepunten</h2>{% if actions %}<div class="small muted">{{ ap_open|length }} open{% if actions|length != ap_open|length %} · {{ actions|length - ap_open|length }} klaar{% endif %}</div>{% endif %}</div>
+    {% if ap_edit %}<button class="btn sm primary" type="button" data-toggle-form="apnew">{{ icon('plus') }}Actiepunt</button>{% endif %}</div>
+  {% if ap_edit %}
+  <form method="post" action="{{ url_for(B ~ '.action_save', pid=p.id) }}" enctype="multipart/form-data" class="form subform hidden" id="apnew" data-draft="ap-{{ p.id }}-{{ g.user.id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h3>Nieuw actiepunt</h3>
+    <label class="f">Wat moet er gebeuren? *<input type="text" name="title" required maxlength="200"></label>
+    <label class="f">Toelichting<textarea name="description" rows="2"></textarea></label>
+    <div class="fgrid">
+      <label class="f">Verantwoordelijke<select name="assigned_to"><option value="">–</option>{% for u in staff %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select><span class="hint">Krijgt een melding en een mail.</span></label>
+      <label class="f">Klaar vóór<input type="date" name="due_date"></label>
+    </div>
+    <div class="f"><span>Foto's</span><div class="photos" id="apnewprev"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" multiple data-collect data-preview="apnewprev"></label></div></div>
+    <div class="actions"><button class="btn primary sm">{{ icon('check') }}Toevoegen</button><button class="btn ghost sm" type="button" data-toggle-form="apnew">Annuleren</button></div>
+  </form>
+  {% endif %}
+  <div class="aplist">
+  {% for a in actions %}{% set mine = a.assigned_to == g.user.id %}{% set can_tick = ap_edit or mine %}{% set late = not a.done_at and a.due_date and a.due_date < now_date() %}
+    <details class="apitem {{ 'done' if a.done_at }} {{ 'late' if late }}" id="ap{{ a.id }}" {{ 'open' if request.args.get('ap')|string == a.id|string }}>
+      <summary>
+        <span class="apcheck" aria-hidden="true">{% if a.done_at %}✓{% endif %}</span>
+        <span class="aptxt"><b>{{ a.title }}</b>
+          <span class="small muted">{% if a.assignee %}{{ a.assignee }}{% else %}niemand toegewezen{% endif %}{% if a.due_date and not a.done_at %} · <span class="{{ 'apred' if late }}">vóór {{ a.due_date|date }}</span>{% endif %}{% if a.done_at %} · klaar {{ a.done_at|dt }}{% if a.done_name %} door {{ a.done_name }}{% endif %}{% endif %}{% if a.photos or a.done_photos %} · {{ icon('camera') }} {{ (a.photos|length) + (a.done_photos|length) }}{% endif %}</span></span>
+      </summary>
+      <div class="apbody">
+        {% if a.description %}<div class="prose" style="white-space:pre-line">{{ a.description }}</div>{% endif %}
+        {% set pd = {'pid': p.id, 'aid': a.id} %}
+        {% if a.photos %}<div class="small muted">Foto's bij het actiepunt</div>{{ photos(a.photos, del_route=(B ~ '.action_photo_delete') if can_tick else None, del_args=pd) }}{% endif %}
+        {% if a.done_at %}
+          {% if a.done_note %}<div><b class="small muted">Opmerking bij afvinken</b><div class="prose" style="white-space:pre-line">{{ a.done_note }}</div></div>{% endif %}
+          {% if a.done_photos %}<div class="small muted">Foto's bij afvinken</div>{{ photos(a.done_photos, del_route=(B ~ '.action_photo_delete') if can_tick else None, del_args=pd) }}{% endif %}
+        {% endif %}
+        <div class="apbtns">
+        {% if can_tick and not a.done_at %}
+          <form method="post" action="{{ url_for(B ~ '.action_done', pid=p.id, aid=a.id) }}" enctype="multipart/form-data" class="form apdone" data-draft="apd-{{ a.id }}-{{ g.user.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="f">Opmerking (optioneel)<input type="text" name="note" maxlength="2000" placeholder="bijv. vervangen en getest"></label>
+            <div class="photos" id="apd{{ a.id }}"><label class="addphoto">{{ icon('camera') }}Foto als bewijs<input type="file" name="photos" accept="image/*" multiple data-collect data-preview="apd{{ a.id }}"></label></div>
+            <div class="actions"><button class="btn primary sm">{{ icon('check') }}Afvinken</button></div>
+          </form>
+        {% elif can_tick %}
+          <form method="post" action="{{ url_for(B ~ '.action_reopen', pid=p.id, aid=a.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">{{ icon('refresh') }}Weer open zetten</button></form>
+          <form method="post" action="{{ url_for(B ~ '.action_photos', pid=p.id, aid=a.id) }}" enctype="multipart/form-data" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="btn sm">{{ icon('camera') }}Foto toevoegen<input type="file" name="photos" accept="image/*" multiple hidden data-autosubmit></label></form>
+        {% endif %}
+        {% if ap_edit %}
+          <button class="btn sm ghost" type="button" data-toggle-form="apedit{{ a.id }}">{{ icon('edit') }}Wijzigen</button>
+          <form method="post" action="{{ url_for(B ~ '.action_delete', pid=p.id, aid=a.id) }}" class="inline" data-confirm="Actiepunt '{{ a.title }}' met foto's verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Verwijderen" title="Verwijderen">{{ icon('trash') }}</button></form>
+        {% endif %}
+        </div>
+        {% if ap_edit %}
+        <form method="post" action="{{ url_for(B ~ '.action_save', pid=p.id) }}" enctype="multipart/form-data" class="form subform hidden" id="apedit{{ a.id }}" data-draft="ape-{{ a.id }}-{{ g.user.id }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="id" value="{{ a.id }}">
+          <label class="f">Wat moet er gebeuren? *<input type="text" name="title" required maxlength="200" value="{{ a.title }}"></label>
+          <label class="f">Toelichting<textarea name="description" rows="2">{{ a.description or '' }}</textarea></label>
+          <div class="fgrid">
+            <label class="f">Verantwoordelijke<select name="assigned_to"><option value="">–</option>{% for u in staff %}{{ opt(u.id, u.name, a.assigned_to) }}{% endfor %}</select></label>
+            <label class="f">Klaar vóór<input type="date" name="due_date" value="{{ a.due_date or '' }}"></label>
+          </div>
+          <div class="photos" id="ape{{ a.id }}"><label class="addphoto">{{ icon('camera') }}Foto<input type="file" name="photos" accept="image/*" multiple data-collect data-preview="ape{{ a.id }}"></label></div>
+          <div class="actions"><button class="btn primary sm">Opslaan</button><button class="btn ghost sm" type="button" data-toggle-form="apedit{{ a.id }}">Annuleren</button></div>
+        </form>
+        {% endif %}
+      </div>
+    </details>
+  {% else %}<div class="empty">Nog geen actiepunten.{% if ap_edit %} Maak een lijst met wat er nog moet gebeuren; vink af met een foto als bewijs.{% endif %}</div>{% endfor %}
+  </div>
+</section>

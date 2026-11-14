@@ -51,6 +51,8 @@ def dashboard():
     if can("projecten") or can("orders"):
         from .aantekeningen import open_for_user
         data["annots"] = open_for_user(g.user["id"], limit=200)
+        from .actiepunten import open_for_user as ap_open
+        data["my_actions"] = ap_open(g.user["id"])
         data["today"] = now_iso()[:10]
     return render_template("dashboard.html", d=data)
 
