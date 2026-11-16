@@ -1020,6 +1020,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V201 (2.16.1)
+- DigiDossier: het script vindt nu ook facturen die anders zijn opgeslagen: een PDF dieper in de factuurmap, of een PDF direct in de jaarmap (oudere jaren). In het logboek op DC01 staat per jaar hoeveel factuurmappen het script ziet. **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
+- Beheer > DC01 > Facturen: tabel per jaar met het aantal mappen op DC01, het aantal in WorkPortal en het aantal met PDF, plus een jaarfilter.
+- Verkoopfacturen: jaarfilter in het overzicht.
+- Herinneren en aanmanen: bij een voorstel zonder factuur-e-mail staat een vinkje 'Dit adres opslaan als factuur-e-mail bij de relatie'. Het adres wordt dan ook ingevuld bij de andere voorstellen voor die klant.
+
 ## V200 (2.16.0)
 - Verkoopfacturen: **herinneren en aanmanen** (Verkoopfacturen > Herinneren en aanmanen).
   - **Voorstellen:** elk uur maakt WorkPortal voorstellen voor open facturen die aan de beurt zijn: herinnering na 7 dagen, aanmaning na 21 en laatste aanmaning na 35 dagen over de vervaldatum (aanpasbaar). Tussen twee brieven zit minstens een week.

@@ -347,6 +347,12 @@ def _dossiers(folders):
         if sig and (not cur or cur["pdf_sig"] != sig) and len(want) < PDF_PER_RUN:
             want.append(path)
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_last', ?)", (f"{now}|{len(folders)}|{new}",))
+    years = {}
+    for f in folders:
+        y = str(f.get("year") or "")[:4]
+        if y.isdigit():
+            years[y] = years.get(y, 0) + 1
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_years', ?)", (json.dumps(dict(sorted(years.items()))),))
     conn.commit()
     return {"ok": True, "mappen": len(folders), "factuurnummers": len(best), "nieuw": new, "want": want}
 
@@ -444,6 +450,12 @@ def index():
         where.append("s.status = 'onbekend'")
     else:
         view = "alle"
+    year = request.args.get("jaar") or ""
+    if year.isdigit() and len(year) == 4:
+        where.append("COALESCE(substr(s.invoice_date, 1, 4), substr(s.number, 1, 4)) = ?")
+        params.append(year)
+    else:
+        year = ""
     if q:
         where.append("(s.number LIKE ? OR s.customer_name LIKE ? OR c.name LIKE ? OR s.debtor_no = ?)")
         params += [f"%{q}%", f"%{q}%", f"%{q}%", q]
@@ -472,7 +484,9 @@ def index():
     from . import snelstart
     ss = (_setting("deb_snelstart_status") or "").split("|")
     dc = (_setting("deb_dc01_last") or "").split("|")
-    return render_template("debiteuren/index.html", rows=out, view=view, q=q, kpi=kpi, counts=counts, STATUS_LABEL=STATUS_LABEL,
+    years = [r["y"] for r in query("SELECT DISTINCT COALESCE(substr(invoice_date, 1, 4), substr(number, 1, 4)) AS y FROM sales_invoices"
+                                   " WHERE y GLOB '[12][0-9][0-9][0-9]' ORDER BY y DESC")]
+    return render_template("debiteuren/index.html", rows=out, view=view, q=q, year=year, years=years, kpi=kpi, counts=counts, STATUS_LABEL=STATUS_LABEL,
                            last=last if last[0] else None, ss_on=snelstart.configured(), ss=ss if ss[0] else None, dc=dc if dc[0] else None)
 
 
@@ -868,6 +882,14 @@ def _save_letter(lid):
     f = request.form
     execute("UPDATE dunning_letters SET to_addr = ?, subject = ?, body = ?, updated_at = ? WHERE id = ? AND status = 'voorstel'",
             ((f.get("to_addr") or "").strip()[:500], (f.get("subject") or "").strip()[:300], (f.get("body") or "").strip()[:10000], now_iso(), lid))
+    to = (f.get("to_addr") or "").strip()
+    if f.get("save_to_customer") and re.match(r"^[^@\s;,]+@[^@\s;,]+\.[^@\s;,]+$", to):
+        r = query("SELECT s.customer_id FROM dunning_letters l JOIN sales_invoices s ON s.id = l.invoice_id WHERE l.id = ?", (lid,), one=True)
+        if r and r["customer_id"]:
+            execute("UPDATE customers SET invoice_email = ?, updated_at = ? WHERE id = ? AND IFNULL(invoice_email, '') = ''", (to, now_iso(), r["customer_id"]))
+            execute("UPDATE dunning_letters SET to_addr = ? WHERE status = 'voorstel' AND IFNULL(to_addr, '') = '' AND invoice_id IN"
+                    " (SELECT id FROM sales_invoices WHERE customer_id = ?)", (to, r["customer_id"]))
+            audit("factuur-e-mail ingevuld", "customer", r["customer_id"], to)
 
 
 @bp.route("/aanmaningen/<int:lid>", methods=["POST"])

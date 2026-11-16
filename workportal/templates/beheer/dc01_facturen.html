@@ -19,11 +19,17 @@
       <dt>Niet leesbaar</dt><dd>{% if counts.fout %}<span class="badge b-warn">{{ counts.fout }}</span>{% else %}0{% endif %}</dd>
       <dt>Klant niet herkend</dt><dd>{{ counts.geenklant or 0 }}</dd>
     </dl>
+    {% if years_dc or years_wp %}<h3 style="margin:16px 0 6px">Per jaar</h3>
+    <table class="table compact"><thead><tr><th>Jaar</th><th class="num">Mappen op DC01</th><th class="num">In WorkPortal</th><th class="num">Met PDF</th></tr></thead><tbody>
+    {% for y in ((years_dc.keys()|list) + (years_wp.keys()|list))|unique|sort(reverse=true) %}{% set w = years_wp.get(y, (0, 0)) %}
+      <tr><td><a href="{{ url_for('beheer.dc01', tab='facturen', jaar=y) }}">{{ y }}</a></td><td class="num">{{ years_dc.get(y, '–') }}</td><td class="num">{{ w[0] }}</td><td class="num">{{ w[1] or 0 }}</td></tr>{% endfor %}
+    </tbody></table>
+    <p class="hint">Mappen op DC01 = wat het script bij de laatste run zag. Staat een jaar hier niet, dan heeft het script die jaarmap niet gezien (oude scriptversie op DC01, of $FactuurVanaf).</p>{% endif %}
   </section>
   <section class="card">
     <h2>Zo werkt de sync</h2>
     <ul class="steps-list" style="margin-top:0">
-      <li>Hetzelfde script <code>komdex-orders.ps1</code> kijkt ook in het DigiDossier met facturen (jaarmappen vanaf 2020, per factuur een map).</li>
+      <li>Hetzelfde script <code>komdex-orders.ps1</code> kijkt ook in het DigiDossier met facturen (jaarmappen vanaf 2020; per factuur een map, of de PDF direct in de jaarmap).</li>
       <li>Per factuurmap wordt de nieuwste PDF doorgegeven. Het factuurnummer komt uit de mapnaam.</li>
       <li>WorkPortal leest uit de PDF: datums, bedrag, klant (factuuradres), T.a.v. en <i>Onze ref.</i> (koppeling met de order).</li>
       <li>Wordt een PDF opnieuw opgeslagen, dan haalt WorkPortal hem opnieuw op.</li>
@@ -33,10 +39,10 @@
 </div>
 
 <form class="search" style="max-width:none" method="get">
-  <input type="hidden" name="tab" value="facturen"><input type="hidden" name="filter" value="{{ flt }}">
+  <input type="hidden" name="tab" value="facturen"><input type="hidden" name="filter" value="{{ flt }}">{% if year %}<input type="hidden" name="jaar" value="{{ year }}">{% endif %}
   {{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op factuurnummer, map of klant">
 </form>
-{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('beheer.dc01', tab='facturen', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('beheer.dc01', tab='facturen', filter=key, q=q or None, jaar=year or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
 <div class="fchips">
   {{ fbtn('alle', 'Alle', counts.alle) }}{{ fbtn('pdf', 'Met PDF', counts.pdf) }}{{ fbtn('wacht', 'Wacht op PDF', counts.wacht) }}{% if counts.fout %}{{ fbtn('fout', 'Niet leesbaar', counts.fout) }}{% endif %}{{ fbtn('geenklant', 'Klant niet herkend', counts.geenklant) }}
 </div>

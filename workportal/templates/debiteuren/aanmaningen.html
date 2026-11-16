@@ -19,7 +19,8 @@
   <form method="post" action="{{ url_for('debiteuren.letter_action', lid=l.id) }}" class="form" data-no-draft>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="f">Aan<input type="text" name="to_addr" value="{{ l.to_addr or '' }}" inputmode="email" placeholder="factuur-e-mail van de klant">
-      {% if not l.invoice_email %}<span class="hint">{% if l.customer_id %}Geen factuur-e-mail bij <a href="{{ url_for('klanten.edit', cid=l.customer_id) }}">de relatie</a>. Vul die daar in, dan staat hij er de volgende keer vanzelf.{% else %}Klant niet gekoppeld; vul het adres hier in.{% endif %}</span>{% endif %}</label>
+      {% if not l.invoice_email and not l.customer_id %}<span class="hint">Klant niet gekoppeld; vul het adres hier in.</span>{% endif %}</label>
+    {% if l.customer_id and not l.invoice_email %}<label class="check"><input type="checkbox" name="save_to_customer" value="1" checked> Dit adres opslaan als factuur-e-mail bij {{ l.cname or 'de relatie' }} (ook voor de andere voorstellen van deze klant)</label>{% endif %}
     <label class="f">Onderwerp<input type="text" name="subject" value="{{ l.subject }}"></label>
     <label class="f">Tekst<textarea name="body" rows="9">{{ l.body }}</textarea><span class="hint">Taal: {{ l.language|upper }} · vanaf {{ sender }} met de handtekening van Administratie{% if l.pdf_file_id %}, factuur als bijlage{% endif %}.</span></label>
     {% if l.error %}<div class="flash error">Vorige poging mislukt: {{ l.error }}</div>{% endif %}

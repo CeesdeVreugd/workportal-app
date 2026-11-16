@@ -315,6 +315,9 @@ def _dc01_invoices():
         where.append("pdf_file_id IS NOT NULL AND customer_id IS NULL")
     else:
         flt = "alle"
+    if (request.args.get("jaar") or "").isdigit():
+        where.append("substr(number, 1, 4) = ?")
+        params.append(request.args.get("jaar")[:4])
     if q:
         where.append("(number LIKE ? OR dossier_path LIKE ? OR IFNULL(customer_name,'') LIKE ?)")
         params += [f"%{q}%"] * 3
@@ -331,10 +334,18 @@ def _dc01_invoices():
     counts = query("SELECT COUNT(*) AS alle, SUM(pdf_file_id IS NOT NULL) AS pdf, SUM(pdf_file_id IS NULL) AS wacht,"
                    " SUM(pdf_json LIKE '%\"fout\"%') AS fout, SUM(pdf_file_id IS NOT NULL AND customer_id IS NULL) AS geenklant"
                    " FROM sales_invoices WHERE dossier_path IS NOT NULL", one=True)
+    try:
+        years_dc = _json.loads(sp.setting(conn, "deb_dc01_years") or "{}")
+    except ValueError:
+        years_dc = {}
+    years_wp = {r["y"]: (r["n"], r["p"]) for r in query("SELECT substr(number, 1, 4) AS y, COUNT(*) AS n, SUM(pdf_file_id IS NOT NULL) AS p"
+                                                        " FROM sales_invoices WHERE dossier_path IS NOT NULL GROUP BY y")}
+    year = request.args.get("jaar") or ""
     last = (sp.setting(conn, "deb_dc01_last") or "").split("|")
     lastpdf = (sp.setting(conn, "deb_dc01_lastpdf") or "").split("|")
     return render_template("beheer/dc01_facturen.html", items=items, counts=counts, flt=flt, q=q,
-                           last=last if last[0] else None, lastpdf=lastpdf if lastpdf[0] else None)
+                           last=last if last[0] else None, lastpdf=lastpdf if lastpdf[0] else None,
+                           years_dc=years_dc, years_wp=years_wp, year=year)
 
 
 @bp.route("/dc01", methods=["GET", "POST"])

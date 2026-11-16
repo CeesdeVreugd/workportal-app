@@ -20,12 +20,13 @@
   <div class="card kpi"><div class="label">1-30 dagen vervallen</div><div class="value">{{ kpi.b30|eur }}</div><div class="sub">nog binnen de eerste maand</div></div>
 </div>
 
-{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if view == key }}" href="{{ url_for('debiteuren.index', v=key, q=q or None) }}">{{ label }}{% if n is not none %} <span>{{ n }}</span>{% endif %}</a>{% endmacro %}
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if view == key }}" href="{{ url_for('debiteuren.index', v=key, q=q or None, jaar=year or None) }}">{{ label }}{% if n is not none %} <span>{{ n }}</span>{% endif %}</a>{% endmacro %}
 <div class="fchips" style="margin-bottom:12px">
   {{ fbtn('open', 'Open', counts.open) }}{{ fbtn('vervallen', 'Vervallen', kpi.n_over) }}{{ fbtn('onbekend', 'Nog niet in overzicht', counts.onbekend) }}{{ fbtn('betaald', 'Betaald', counts.betaald) }}{{ fbtn('alle', 'Alle', none) }}
 </div>
-<form method="get" class="inline-form" style="margin-bottom:12px;max-width:480px">
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:640px">
   <input type="hidden" name="v" value="{{ view }}">
+  <select name="jaar" aria-label="Jaar" style="width:auto" onchange="this.form.submit()"><option value="">Alle jaren</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
   <input type="search" name="q" value="{{ q }}" placeholder="Zoek klant, debiteurnummer of factuurnummer" style="flex:1">
   <button class="btn">{{ icon('search') }}Zoeken</button>
 </form>

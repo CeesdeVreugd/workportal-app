@@ -129,25 +129,38 @@ try {
             $froot = (Get-Item -LiteralPath $FactuurMap).FullName.TrimEnd('\')
             $fVanaf = $FactuurVanaf
             $fmappen = New-Object System.Collections.Generic.List[object]
-            foreach ($j in Get-ChildItem -LiteralPath $froot -Directory -ErrorAction SilentlyContinue) {
+            $perJaar = [ordered]@{}
+            foreach ($j in Get-ChildItem -LiteralPath $froot -Directory -ErrorAction SilentlyContinue | Sort-Object Name) {
                 if ($j.Name -notmatch '^\d{4}$' -or [int]$j.Name -lt $fVanaf) { continue }
+                $n = 0
+                # factuurmap per factuur (de PDF mag ook een niveau dieper staan)
                 foreach ($fm in Get-ChildItem -LiteralPath $j.FullName -Directory -ErrorAction SilentlyContinue) {
-                    $pdf = Get-ChildItem -LiteralPath $fm.FullName -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
+                    $pdf = Get-ChildItem -LiteralPath $fm.FullName -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue |
                         Sort-Object LastWriteTime -Descending | Select-Object -First 1
                     $info = [ordered]@{ path = $fm.FullName; name = $fm.Name; year = $j.Name }
                     if ($pdf) { $info.pdf = @{ name = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length } }
-                    $fmappen.Add([pscustomobject]$info)
+                    $fmappen.Add([pscustomobject]$info); $n++
                 }
+                # oudere jaren: PDF's direct in de jaarmap (zonder factuurmap)
+                foreach ($pdf in Get-ChildItem -LiteralPath $j.FullName -File -Filter "*.pdf" -ErrorAction SilentlyContinue) {
+                    $info = [ordered]@{ path = $pdf.FullName; name = $pdf.BaseName; year = $j.Name
+                                        pdf = @{ name = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length } }
+                    $fmappen.Add([pscustomobject]$info); $n++
+                }
+                $perJaar[$j.Name] = $n
             }
             $fjson = @{ folders = @($fmappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
             $fres = Invoke-RestMethod -Uri "$WorkPortal/debiteuren/api/dossiers" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($fjson)) `
                 -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
             if ($fres.fout) { Log ("Facturen: FOUT in WorkPortal: " + $fres.fout) }
-            else { Log ("Facturen: {0} mappen, {1} nieuw, {2} PDF's gevraagd" -f $fres.mappen, $fres.nieuw, @($fres.want).Count) }
+            else { Log ("Facturen: {0} mappen ({3}), {1} nieuw, {2} PDF's gevraagd" -f $fres.mappen, $fres.nieuw, @($fres.want).Count, (($perJaar.GetEnumerator() | ForEach-Object { "$($_.Key): $($_.Value)" }) -join ", ")) }
             foreach ($pad in @($fres.want)) {
                 if (-not $pad -or -not (Test-Path -LiteralPath $pad)) { continue }
-                $pdf = Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
-                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if (Test-Path -LiteralPath $pad -PathType Leaf) { $pdf = Get-Item -LiteralPath $pad }
+                else {
+                    $pdf = Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue |
+                        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                }
                 if (-not $pdf) { continue }
                 try {
                     $body = @{ path = $pad; filename = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length
