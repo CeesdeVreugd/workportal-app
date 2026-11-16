@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Openstaande posten importeren{% endblock %}
+{% block content %}
+<div class="pagehead"><div><div class="eyebrow"><a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a></div><h1>Openstaande posten importeren</h1>
+  <p>Excel 'Openstaande verkoopfacturen' uit SnelStart.{% if ss_on %} SnelStart is gekoppeld en wordt elk uur automatisch opgehaald; importeren is dan alleen nodig als reserve.{% endif %}</p></div></div>
+{% if not pv %}
+<section class="card">
+  <form method="post" enctype="multipart/form-data" class="form" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f">Excel-bestand (.xlsx)<input type="file" name="file" accept=".xlsx" required></label>
+    <p class="hint" style="margin:0">In SnelStart: Rapportages › Openstaande posten › Verkoopfacturen › exporteren naar Excel. Je ziet eerst wat er verandert; pas na 'Toepassen' wordt er iets bijgewerkt.<br>
+      Wat in de lijst staat, staat op open. Een factuur die eerder open stond en nu niet meer in de lijst staat, gaat op betaald.</p>
+    <div class="actions"><button class="btn primary">{{ icon('upload') }}Inlezen</button></div>
+  </form>
+</section>
+{% if hist %}<section class="card"><div class="card-head"><h2>Eerdere imports</h2></div>
+  <div class="rows">{% for h in hist %}<div class="rowitem"><div class="grow"><div class="t">{{ h.filename }}</div><div class="s">{{ h.applied_at|dt }} · {{ h.who or '' }} · {{ h.s.rows }} open ({{ h.s.new }} nieuw), {{ h.s.closed }} op betaald</div></div><span class="num">{{ h.s.total|eur }}</span></div>{% endfor %}</div></section>{% endif %}
+{% else %}
+<section class="card">
+  <div class="card-head"><h2>Voorbeeld: {{ filename }}</h2></div>
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="card kpi"><div class="label">Openstaande facturen</div><div class="value">{{ pv.rows }}</div><div class="sub">samen {{ pv.total|eur }}</div></div>
+    <div class="card kpi"><div class="label">Nieuw in WorkPortal</div><div class="value">{{ pv.new|length }}</div></div>
+    <div class="card kpi"><div class="label">Gewijzigd</div><div class="value">{{ pv.changed|length }}</div><div class="sub">ander openstaand bedrag of weer open</div></div>
+    <div class="card kpi"><div class="label">Gaat op betaald</div><div class="value" style="color:var(--ok)">{{ pv.closing|length }}</div><div class="sub">niet meer in de lijst</div></div>
+  </div>
+  {% if closing %}<details><summary class="tksum">Welke facturen gaan op betaald ({{ closing|length }})</summary>
+    <div class="rows">{% for c in closing %}<div class="rowitem"><div class="grow"><div class="t">{{ c.number }}</div><div class="s">{{ c.customer_name or '' }}</div></div><span class="num">{{ c.open_amount|eur(2) if c.open_amount is not none else '' }}</span></div>{% endfor %}</div></details>{% endif %}
+  <form method="post" class="actions" style="margin-top:14px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="import_id" value="{{ iid }}">
+    <button class="btn primary">{{ icon('check') }}Toepassen</button><a class="btn ghost" href="{{ url_for('debiteuren.import_excel') }}">Annuleren</a></form>
+</section>
+<section class="card flush tablewrap"><table class="table"><thead><tr><th>Factuur</th><th>Klant</th><th class="hide-m">Datum</th><th class="hide-m">Vervalt</th><th class="num">Openstaand</th></tr></thead><tbody>
+  {% for r in rows[:300] %}<tr><td><b>{{ r.number }}</b>{% if r.number in pv.new %} <span class="badge b-blue">nieuw</span>{% endif %}</td><td>{{ r.customer_name }} <span class="small muted">{{ r.debtor_no or '' }}</span></td><td class="hide-m">{{ r.invoice_date|date if r.invoice_date else '–' }}</td><td class="hide-m">{{ r.due_date|date if r.due_date else '–' }}</td><td class="num">{{ r.open_amount|eur(2) if r.open_amount is not none else '–' }}</td></tr>{% endfor %}
+</tbody></table></section>
+{% endif %}
+{% endblock %}

@@ -196,7 +196,7 @@ def settings():
                            phone_modules=[(k, dict(MODULES)[k]) for k in PHONE_MODULES])
 
 
-PHONE_MODULES = ["klanten", "projecten", "orders", "service", "druktest", "modellen3d", "calculatie", "nacalculatie", "crediteuren", "kennis", "beheer"]
+PHONE_MODULES = ["klanten", "projecten", "orders", "service", "druktest", "modellen3d", "calculatie", "nacalculatie", "crediteuren", "debiteuren", "kennis", "beheer"]
 
 
 @bp.route("/sharepoint", methods=["GET", "POST"])

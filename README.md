@@ -1020,6 +1020,15 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V195 (2.15.0)
+- Nieuwe module **Verkoopfacturen (debiteuren)**, met recht 'debiteuren'. Standaard: administratie bewerken, directie beheer, de andere rollen geen toegang (aanpasbaar in Beheer).
+  - Overzicht van de openstaande facturen: totaal, vervallen, ouderdom (1-30 / 31-60 / 61-90 / 90+ dagen), filters Open, Vervallen, Nog niet in overzicht, Betaald en zoeken. Per factuur: gegevens, PDF, notitie en andere open facturen van dezelfde klant. In het menu een teller met het aantal vervallen facturen.
+  - **Excel importeren** ('Openstaande verkoopfacturen' uit SnelStart). Je ziet eerst een voorbeeld (nieuw, gewijzigd, gaat op betaald) en pas daarna wordt het toegepast. Wat in de lijst staat, staat op open. Wat eerder open stond en niet meer in de lijst staat, gaat op betaald. De klant wordt gekoppeld via het debiteurnummer, anders via de naam.
+  - **SnelStart** (alleen lezen): zodra SNELSTART_SUBSCRIPTION_KEY en SNELSTART_CLIENT_KEY in Portainer staan, worden de openstaande posten elk uur automatisch opgehaald (en met de knop 'Nu uit SnelStart'). De Excel-import blijft als reserve.
+  - **DigiDossier DC01**: het script komdex-orders.ps1 kijkt nu ook in `D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\facturen` (dit jaar en vorig jaar, per factuurmap de nieuwste PDF) en stuurt de PDF's naar WorkPortal, hooguit 25 per keer. WorkPortal leest uit de PDF wat het kan (datums, bedrag, factuur-e-mail) als dat nog niet uit SnelStart of Excel bekend is.
+- Databasemigratie 45 (sales_invoices, sales_imports).
+- **Op DC01:** zet de nieuwe versie van scripts\komdex-orders.ps1 in C:\Scripts (vul $Sleutel weer in). Controleer of het pad in $FactuurMap klopt.
+
 ## V194 (2.14.2)
 - Opleverdocument: bij tekenen en bij 'Mailen' staat standaard het e-mailadres van de contactpersoon van de order of het project ingevuld (T.a.v. van het document, anders de contactpersoon uit de order). De naam wordt opgezocht bij de contactpersonen van de relatie, ook als die als 'K. Achternaam' op de order staat. Pas als er geen contactpersoon gevonden wordt, komt het algemene adres van de relatie erin.
 

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Factuur {{ s.number }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a> ·
+    {% if s.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% elif s.status == 'open' %}<span class="badge {{ 'b-bad' if days and days > 30 else 'b-warn' if days and days > 0 else 'b-blue' }}">{% if days and days > 0 %}{{ days }} dagen vervallen{% else %}Open{% endif %}</span>{% else %}<span class="badge">{{ STATUS_LABEL[s.status] }}</span>{% endif %}</div>
+    <h1>Factuur {{ s.number }}</h1>
+    <p>{% if s.customer_id %}<a href="{{ url_for('klanten.customer', cid=s.customer_id) }}">{{ s.cname }}</a>{% else %}{{ s.customer_name or 'Klant onbekend' }}{% endif %}{% if s.debtor_no %} · debiteur {{ s.debtor_no }}{% endif %}</p></div>
+  <div class="actions">{% if s.pdf_file_id %}<a class="btn primary" href="{{ url_for('main.file', fid=s.pdf_file_id) }}" target="_blank" data-pdf="Factuur {{ s.number }}">{{ icon('pdf') }}Factuur (PDF)</a>{% endif %}</div>
+</div>
+<div class="grid g2">
+<section class="card">
+  <dl class="dl">
+    <dt>Factuurdatum</dt><dd>{{ s.invoice_date|date if s.invoice_date else '–' }}</dd>
+    <dt>Vervaldatum</dt><dd>{{ s.due_date|date if s.due_date else '–' }}</dd>
+    <dt>Bedrag</dt><dd>{{ s.amount|eur(2) if s.amount is not none else '–' }}</dd>
+    <dt>Betaald</dt><dd>{{ s.paid|eur(2) if s.paid is not none else '–' }}</dd>
+    <dt>Openstaand</dt><dd><b>{{ s.open_amount|eur(2) if s.open_amount is not none else '–' }}</b></dd>
+    {% if s.mail_to %}<dt>Factuur-e-mail</dt><dd>{{ s.mail_to }}</dd>{% endif %}
+    <dt>Status bijgewerkt</dt><dd>{% if s.status_at %}{{ s.status_at|dt }} uit {{ 'SnelStart' if s.status_source == 'snelstart' else 'Excel' }}{% else %}nog niet{% endif %}{% if s.paid_at %} · betaald gemeld {{ s.paid_at|dt }}{% endif %}</dd>
+    <dt>DigiDossier</dt><dd class="small">{{ s.dossier_path or 'nog niet gevonden op DC01' }}</dd>
+  </dl>
+  {% if s.status == 'onbekend' %}<p class="hint">Deze factuur staat in het DigiDossier, maar is nog niet gezien in een overzicht met openstaande posten. Na de volgende import of SnelStart-ronde staat hij op open of betaald.</p>{% endif %}
+</section>
+<section class="card">
+  <div class="card-head"><h2>Notitie</h2></div>
+  {% if can('debiteuren', 2) %}
+  <form method="post" action="{{ url_for('debiteuren.note', sid=s.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="note" rows="4" placeholder="bijv. klant belt terug, betaalt eind van de maand">{{ s.note or '' }}</textarea>
+    <div class="actions"><button class="btn sm primary">Opslaan</button></div></form>
+  {% else %}<div class="prose" style="white-space:pre-line">{{ s.note or '–' }}</div>{% endif %}
+</section>
+</div>
+{% if others %}
+<section class="card flush tablewrap">
+  <div class="card-head" style="padding:16px 16px 0"><h2>Meer open bij deze klant</h2></div>
+  <table class="table"><thead><tr><th>Factuur</th><th class="hide-m">Datum</th><th>Vervalt</th><th class="num">Openstaand</th></tr></thead><tbody>
+  {% for o in others %}<tr class="link" data-href="{{ url_for('debiteuren.detail', sid=o.id) }}"><td><b>{{ o.number }}</b></td><td class="hide-m">{{ o.invoice_date|date if o.invoice_date else '–' }}</td><td>{{ o.due_date|date if o.due_date else '–' }}</td><td class="num">{{ o.open_amount|eur(2) if o.open_amount is not none else '–' }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+{% endblock %}

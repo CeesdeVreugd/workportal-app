@@ -821,6 +821,46 @@ MIGRATIONS = [
     CREATE INDEX idx_task_log ON task_log(task_id, id);
     CREATE INDEX idx_task_log_user ON task_log(user_id);
     """,
+    # 45 - debiteuren: verkoopfacturen (openstaande posten uit Excel of SnelStart, PDF uit het DigiDossier op DC01)
+    """
+    CREATE TABLE sales_invoices (
+        id INTEGER PRIMARY KEY,
+        number TEXT NOT NULL UNIQUE,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        debtor_no TEXT,
+        customer_name TEXT,
+        invoice_date TEXT,
+        due_date TEXT,
+        amount REAL,
+        paid REAL,
+        open_amount REAL,
+        status TEXT NOT NULL DEFAULT 'onbekend',
+        status_source TEXT,
+        status_at TEXT,
+        paid_at TEXT,
+        dossier_path TEXT,
+        pdf_file_id INTEGER,
+        pdf_sig TEXT,
+        pdf_json TEXT,
+        mail_to TEXT,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    CREATE INDEX idx_sales_inv_status ON sales_invoices(status, due_date);
+    CREATE INDEX idx_sales_inv_customer ON sales_invoices(customer_id);
+    CREATE TABLE sales_imports (
+        id INTEGER PRIMARY KEY,
+        source TEXT NOT NULL,
+        filename TEXT,
+        status TEXT NOT NULL DEFAULT 'voorbeeld',
+        rows_json TEXT,
+        summary_json TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        applied_at TEXT
+    );
+    """,
 ]
 
 

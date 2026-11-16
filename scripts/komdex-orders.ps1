@@ -7,6 +7,8 @@
   WorkPortal de na-calculatie van die order; alleen als hij nieuw of gewijzigd is). Met het ordertype op de bon maakt WorkPortal het project of de order
   zelf aan; anders komt de map in het actievenster "Nieuwe orders". Er wordt niets gewijzigd in de
   Komdex-map (alleen lezen).
+  Daarnaast: de verkoopfacturen uit het DigiDossier ($FactuurMap, jaarmappen > factuurmap > PDF) voor de module
+  Verkoopfacturen. Ook alleen lezen; per keer hooguit 25 PDF's.
 
   Instellen:
     1. Vul hieronder $OrderMap en $Sleutel in ($Sleutel = KOMDEX_KEY uit Portainer).
@@ -23,6 +25,8 @@ $OrderMap   = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\orders"   # 
 $WorkPortal = "https://workportal.devreugd-pt.nl"               # adres van WorkPortal
 $Sleutel    = "VUL-HIER-KOMDEX_KEY-IN"                         # zelfde waarde als KOMDEX_KEY in Portainer
 $Jaren      = 2                                                 # aantal recente jaarmappen dat wordt bekeken (2 = dit jaar en vorig jaar)
+$FactuurMap = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\facturen"   # DigiDossier verkoopfacturen (jaarmappen > factuurmap > PDF); leeg = overslaan
+$FactuurJaren = 2                                               # aantal recente jaarmappen met facturen
 $Logbestand = "$PSScriptRoot\komdex-orders.log"
 # -------------------------------------------------------------------------
 
@@ -117,6 +121,44 @@ try {
             Log ("Na-calculatie {0}: {1}" -f $nc.Name, $r3.resultaat)
         }
         catch { Log ("Na-calculatie {0}: FOUT {1}" -f $nc.Name, $_.Exception.Message) }
+    }
+
+    # Verkoopfacturen uit het DigiDossier: lijst met factuurmappen sturen, daarna de PDF's waar WorkPortal om vraagt
+    if ($FactuurMap -and (Test-Path -LiteralPath $FactuurMap)) {
+        try {
+            $froot = (Get-Item -LiteralPath $FactuurMap).FullName.TrimEnd('\')
+            $fVanaf = (Get-Date).Year - $FactuurJaren + 1
+            $fmappen = New-Object System.Collections.Generic.List[object]
+            foreach ($j in Get-ChildItem -LiteralPath $froot -Directory -ErrorAction SilentlyContinue) {
+                if ($j.Name -notmatch '^\d{4}$' -or [int]$j.Name -lt $fVanaf) { continue }
+                foreach ($fm in Get-ChildItem -LiteralPath $j.FullName -Directory -ErrorAction SilentlyContinue) {
+                    $pdf = Get-ChildItem -LiteralPath $fm.FullName -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
+                        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                    $info = [ordered]@{ path = $fm.FullName; name = $fm.Name; year = $j.Name }
+                    if ($pdf) { $info.pdf = @{ name = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length } }
+                    $fmappen.Add([pscustomobject]$info)
+                }
+            }
+            $fjson = @{ folders = @($fmappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+            $fres = Invoke-RestMethod -Uri "$WorkPortal/debiteuren/api/dossiers" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($fjson)) `
+                -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
+            Log ("Facturen: {0} mappen, {1} nieuw, {2} PDF's gevraagd" -f $fres.mappen, $fres.nieuw, @($fres.want).Count)
+            foreach ($pad in @($fres.want)) {
+                if (-not $pad -or -not (Test-Path -LiteralPath $pad)) { continue }
+                $pdf = Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if (-not $pdf) { continue }
+                try {
+                    $body = @{ path = $pad; filename = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length
+                               data = [Convert]::ToBase64String((LeesBestand $pdf.FullName)) } | ConvertTo-Json -Compress
+                    $r4 = Invoke-RestMethod -Uri "$WorkPortal/debiteuren/api/factuur" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($body)) `
+                        -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
+                    Log ("Factuur {0}: {1}" -f $pdf.Name, $r4.resultaat)
+                }
+                catch { Log ("Factuur {0}: FOUT {1}" -f $pdf.Name, $_.Exception.Message) }
+            }
+        }
+        catch { Log ("Facturen: FOUT " + $_.Exception.Message) }
     }
 }
 catch {

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Verkoopfacturen{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Verkoopfacturen</h1>
+    <p>{% if last %}Openstaande posten bijgewerkt {{ last[0]|dt }} uit {{ 'SnelStart' if last[1] == 'snelstart' else 'Excel' }}{% else %}Nog geen openstaande posten ingelezen{% endif %}{% if dc %} · DigiDossier DC01 {{ dc[0]|dt }}{% endif %}</p></div>
+  {% if can('debiteuren', 2) %}<div class="actions">
+    {% if ss_on %}<form method="post" action="{{ url_for('debiteuren.snelstart_now') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn">{{ icon('refresh') }}Nu uit SnelStart</button></form>{% endif %}
+    <a class="btn {{ '' if ss_on else 'primary' }}" href="{{ url_for('debiteuren.import_excel') }}">{{ icon('upload') }}Excel importeren</a>
+  </div>{% endif %}
+</div>
+{% if ss and ss[1] == 'fout' %}<div class="flash error">SnelStart ophalen mislukt ({{ ss[0]|dt }}): {{ ss[2] }}. De Excel-import werkt nog wel.</div>{% endif %}
+
+<div class="grid g4" style="margin-bottom:16px">
+  <a class="card kpi" href="{{ url_for('debiteuren.index') }}" style="text-decoration:none;color:inherit"><div class="label">Openstaand</div><div class="value">{{ kpi.open|eur }}</div><div class="sub">{{ kpi.n_open }} facturen</div></a>
+  <a class="card kpi" href="{{ url_for('debiteuren.index', v='vervallen') }}" style="text-decoration:none;color:inherit"><div class="label">Vervallen</div><div class="value" style="color:{{ 'var(--bad)' if kpi.over else 'inherit' }}">{{ kpi.over|eur }}</div><div class="sub">{{ kpi.n_over }} facturen over de vervaldatum</div></a>
+  <div class="card kpi"><div class="label">Meer dan 30 dagen vervallen</div><div class="value" style="color:{{ 'var(--bad)' if (kpi.b60 + kpi.b90 + kpi.b90p) else 'inherit' }}">{{ (kpi.b60 + kpi.b90 + kpi.b90p)|eur }}</div><div class="sub">31-60: {{ kpi.b60|eur }} · 61-90: {{ kpi.b90|eur }} · 90+: {{ kpi.b90p|eur }}</div></div>
+  <div class="card kpi"><div class="label">1-30 dagen vervallen</div><div class="value">{{ kpi.b30|eur }}</div><div class="sub">nog binnen de eerste maand</div></div>
+</div>
+
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if view == key }}" href="{{ url_for('debiteuren.index', v=key, q=q or None) }}">{{ label }}{% if n is not none %} <span>{{ n }}</span>{% endif %}</a>{% endmacro %}
+<div class="fchips" style="margin-bottom:12px">
+  {{ fbtn('open', 'Open', counts.open) }}{{ fbtn('vervallen', 'Vervallen', kpi.n_over) }}{{ fbtn('onbekend', 'Nog niet in overzicht', counts.onbekend) }}{{ fbtn('betaald', 'Betaald', counts.betaald) }}{{ fbtn('alle', 'Alle', none) }}
+</div>
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:480px">
+  <input type="hidden" name="v" value="{{ view }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek klant, debiteurnummer of factuurnummer" style="flex:1">
+  <button class="btn">{{ icon('search') }}Zoeken</button>
+</form>
+
+<section class="card flush tablewrap">
+  <table class="table">
+    <thead><tr><th>Factuur</th><th class="hide-m">Klant</th><th class="hide-m">Datum</th><th class="hide-m">Vervalt</th><th class="num hide-m">Bedrag</th><th class="num">Openstaand</th><th class="hide-m"></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr class="link" data-href="{{ url_for('debiteuren.detail', sid=r.id) }}">
+      <td class="nowrap"><b>{{ r.number }}</b>{% if r.pdf_file_id %} <span title="PDF uit het DigiDossier">{{ icon('pdf') }}</span>{% endif %}
+        <div class="show-m">{{ r.cname or r.customer_name or '–' }}</div>
+        <div class="small muted show-m">{% if r.due_date %}vervalt {{ r.due_date|date }}{% endif %}</div></td>
+      <td class="hide-m">{{ r.cname or r.customer_name or '–' }}{% if r.debtor_no %} <span class="small muted">{{ r.debtor_no }}</span>{% endif %}</td>
+      <td class="hide-m nowrap">{{ r.invoice_date|date if r.invoice_date else '–' }}</td>
+      <td class="hide-m nowrap">{{ r.due_date|date if r.due_date else '–' }}</td>
+      <td class="num hide-m nowrap">{{ r.amount|eur(2) if r.amount is not none else '–' }}</td>
+      <td class="num nowrap">{% if r.status == 'open' %}{{ r.open_amount|eur(2) if r.open_amount is not none else '–' }}{% elif r.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% else %}<span class="badge">{{ STATUS_LABEL[r.status] }}</span>{% endif %}
+        {% if r.days_over and r.days_over > 0 %}<div><span class="badge {{ 'b-bad' if r.days_over > 30 else 'b-warn' }}">{{ r.days_over }} dg vervallen</span></div>{% endif %}</td>
+      <td class="hide-m small muted">{% if r.paid and r.status == 'open' %}deels betaald{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">{% if not last %}Nog geen facturen. Importeer de Excel 'Openstaande verkoopfacturen' uit SnelStart.{% else %}Geen facturen in deze lijst.{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

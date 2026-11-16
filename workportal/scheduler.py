@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 
-from . import sharepoint, komdex, crediteuren, service, taken
+from . import sharepoint, komdex, crediteuren, service, taken, debiteuren
 from .db import raw_connection, backup
 from .notify import notify_user, vapid_keys
 from .util import now_utc, now_iso, parse_iso, TZ
@@ -113,6 +113,7 @@ def _loop(app):
             komdex.notify_pending(conn)
             crediteuren.scheduled_poll(conn, app, state)
             service.scheduled_poll(conn, app, state)
+            debiteuren.scheduled_snelstart(conn, state)
             _nightly_backup(app, state)
             conn.execute("DELETE FROM login_codes WHERE created_at < datetime('now', '-2 days')")
             conn.commit()
