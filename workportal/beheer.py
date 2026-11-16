@@ -292,11 +292,58 @@ def sharepoint_snelstart():
     return render_template("beheer/sharepoint_snelstart.html", plan=plan, counts=counts, extra=extra)
 
 
+def _dc01_invoices():
+    """DC01 > Facturen: verkoopfacturen uit het DigiDossier (via hetzelfde script)."""
+    import json as _json
+    conn = get_db()
+    if request.method == "POST":
+        ids = [to_int(x) for x in request.form.getlist("ids") if to_int(x)]
+        if request.form.get("action") == "opnieuw" and ids:
+            execute(f"UPDATE sales_invoices SET pdf_sig = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
+            flash(f"De PDF wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} factuur/facturen).", "ok")
+        return redirect(url_for("beheer.dc01", tab="facturen", filter=request.form.get("filter"), q=request.form.get("q") or None))
+    flt = request.args.get("filter") or "alle"
+    q = (request.args.get("q") or "").strip()
+    where, params = ["dossier_path IS NOT NULL"], []
+    if flt == "pdf":
+        where.append("pdf_file_id IS NOT NULL")
+    elif flt == "wacht":
+        where.append("pdf_file_id IS NULL")
+    elif flt == "fout":
+        where.append("pdf_json LIKE '%\"fout\"%'")
+    elif flt == "geenklant":
+        where.append("pdf_file_id IS NOT NULL AND customer_id IS NULL")
+    else:
+        flt = "alle"
+    if q:
+        where.append("(number LIKE ? OR dossier_path LIKE ? OR IFNULL(customer_name,'') LIKE ?)")
+        params += [f"%{q}%"] * 3
+    rows = query("SELECT s.*, c.name AS cname FROM sales_invoices s LEFT JOIN customers c ON c.id = s.customer_id WHERE "
+                 + " AND ".join(where) + " ORDER BY number DESC LIMIT 600", params)
+    items = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["info"] = _json.loads(r["pdf_json"]) if r["pdf_json"] else {}
+        except ValueError:
+            d["info"] = {}
+        items.append(d)
+    counts = query("SELECT COUNT(*) AS alle, SUM(pdf_file_id IS NOT NULL) AS pdf, SUM(pdf_file_id IS NULL) AS wacht,"
+                   " SUM(pdf_json LIKE '%\"fout\"%') AS fout, SUM(pdf_file_id IS NOT NULL AND customer_id IS NULL) AS geenklant"
+                   " FROM sales_invoices WHERE dossier_path IS NOT NULL", one=True)
+    last = (sp.setting(conn, "deb_dc01_last") or "").split("|")
+    lastpdf = (sp.setting(conn, "deb_dc01_lastpdf") or "").split("|")
+    return render_template("beheer/dc01_facturen.html", items=items, counts=counts, flt=flt, q=q,
+                           last=last if last[0] else None, lastpdf=lastpdf if lastpdf[0] else None)
+
+
 @bp.route("/dc01", methods=["GET", "POST"])
 @require("beheer", BEHEER)
 def dc01():
     """Sync met de Komdex-ordermappen op de server DC01 (via het script komdex-orders.ps1)."""
     from . import komdex
+    if request.args.get("tab") == "facturen" or request.form.get("tab") == "facturen":
+        return _dc01_invoices()
     if request.method == "POST" and request.form.get("action") == "meldingen":
         import json as _json
         conn = get_db()

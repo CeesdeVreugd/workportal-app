@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}DC01 – facturen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
+{% include "beheer/_nav.html" %}
+<nav class="tabs" style="margin-bottom:16px"><a href="{{ url_for('beheer.dc01') }}">Orders</a><a href="{{ url_for('beheer.dc01', tab='facturen') }}" class="active">Facturen</a></nav>
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Status</h2>
+    <dl class="dl">
+      <dt>Laatste run script</dt><dd>{% if last %}{{ last[0]|dt }}{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
+      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">…\DigiDossier\facturen <span class="muted">(instelling $FactuurMap in het script)</span></dd>
+      <dt>Factuurmappen gezien</dt><dd>{{ last[1] if last else 0 }} <span class="muted">(bij laatste run{% if last and last[2] != '0' %}, {{ last[2] }} nieuw{% endif %})</span></dd>
+      <dt>Met PDF in WorkPortal</dt><dd>{{ counts.pdf or 0 }}</dd>
+      <dt>Wacht nog op PDF</dt><dd>{{ counts.wacht or 0 }} <span class="muted">(hooguit 25 per run, nieuwste eerst)</span></dd>
+      <dt>Laatste PDF binnen</dt><dd>{% if lastpdf %}{{ lastpdf[0]|dt }} <span class="muted">· factuur {{ lastpdf[1] }}</span>{% else %}<span class="muted">–</span>{% endif %}</dd>
+      <dt>Niet leesbaar</dt><dd>{% if counts.fout %}<span class="badge b-warn">{{ counts.fout }}</span>{% else %}0{% endif %}</dd>
+      <dt>Klant niet herkend</dt><dd>{{ counts.geenklant or 0 }}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Zo werkt de sync</h2>
+    <ul class="steps-list" style="margin-top:0">
+      <li>Hetzelfde script <code>komdex-orders.ps1</code> kijkt ook in het DigiDossier met facturen (jaarmappen van dit jaar en vorig jaar, per factuur een map).</li>
+      <li>Per factuurmap wordt de nieuwste PDF doorgegeven. Het factuurnummer komt uit de mapnaam.</li>
+      <li>WorkPortal leest uit de PDF: datums, bedrag, klant (factuuradres), T.a.v. en <i>Onze ref.</i> (koppeling met de order).</li>
+      <li>Wordt een PDF opnieuw opgeslagen, dan haalt WorkPortal hem opnieuw op.</li>
+      <li>Open/betaald komt uit SnelStart of de Excel-import bij <a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a>.</li>
+    </ul>
+  </section>
+</div>
+
+<form class="search" style="max-width:none" method="get">
+  <input type="hidden" name="tab" value="facturen"><input type="hidden" name="filter" value="{{ flt }}">
+  {{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Zoek op factuurnummer, map of klant">
+</form>
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('beheer.dc01', tab='facturen', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
+<div class="fchips">
+  {{ fbtn('alle', 'Alle', counts.alle) }}{{ fbtn('pdf', 'Met PDF', counts.pdf) }}{{ fbtn('wacht', 'Wacht op PDF', counts.wacht) }}{% if counts.fout %}{{ fbtn('fout', 'Niet leesbaar', counts.fout) }}{% endif %}{{ fbtn('geenklant', 'Klant niet herkend', counts.geenklant) }}
+</div>
+
+<form method="post" id="bulkform">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tab" value="facturen"><input type="hidden" name="filter" value="{{ flt }}"><input type="hidden" name="q" value="{{ q }}">
+<div class="bulkbar hidden" id="bulkbar"><span><b id="bulkn">0</b> geselecteerd</span>
+  <button class="btn sm primary" name="action" value="opnieuw">{{ icon('refresh') }}PDF opnieuw ophalen</button>
+  <button class="btn sm ghost" type="button" data-bulk-clear>Selectie wissen</button></div>
+<div class="card flush tablewrap"><table class="table dctable">
+  <thead><tr><th class="chk"><input type="checkbox" data-bulk-all aria-label="Alles selecteren"></th><th>Factuurmap</th><th>PDF</th><th class="hide-m">Klant</th><th class="hide-m">Order</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for it in items %}
+  <tr>
+    <td class="chk td-chk"><input type="checkbox" name="ids" value="{{ it.id }}" aria-label="Selecteer {{ it.number }}"></td>
+    <td class="td-main"><a href="{{ url_for('debiteuren.detail', sid=it.id) }}"><b>{{ it.number }}</b></a><div class="small muted td-path" title="{{ it.dossier_path }}">{{ it.dossier_path }}</div></td>
+    <td class="nowrap">{% if it.pdf_file_id %}<a class="iconlink" href="{{ url_for('main.file', fid=it.pdf_file_id) }}" data-pdf="Factuur {{ it.number }}" target="_blank" rel="noopener">{{ icon('pdf') }} {{ it.amount|eur(2) if it.amount is not none else 'PDF' }}</a>{% else %}<span class="muted">wacht</span>{% endif %}{% if it.info.fout %}<div><span class="badge b-warn" title="{{ it.info.fout }}">Niet leesbaar</span></div>{% endif %}</td>
+    <td class="hide-m">{{ it.cname or it.customer_name or '' }}{% if it.pdf_file_id and not it.customer_id %} <span class="badge b-warn">niet herkend</span>{% endif %}</td>
+    <td class="hide-m">{{ it.order_no or '' }}</td>
+    <td>{% if it.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% elif it.status == 'open' %}<span class="badge b-blue">Open</span>{% else %}<span class="badge">Nog niet in overzicht</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="empty">Nog geen factuurmappen ontvangen van DC01.</td></tr>{% endfor %}
+  </tbody></table></div>
+</form>
+{% if items|length >= 600 %}<p class="small muted">Eerste 600 getoond; gebruik zoeken of filters.</p>{% endif %}
+{% endblock %}

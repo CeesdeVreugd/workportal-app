@@ -287,12 +287,13 @@ def parse_pdf(data):
 
 
 def _sig(js):
-    pdf = js.get("pdf") or {}
+    pdf = js.get("pdf") if isinstance(js.get("pdf"), dict) else {}
     return f"{pdf.get('name')}|{pdf.get('modified') or ''}|{pdf.get('size') or ''}"[:400] if pdf.get("name") else None
 
 
 def _number_of(folder):
-    for s in (folder.get("name"), (folder.get("pdf") or {}).get("name")):
+    pdf = folder.get("pdf") if isinstance(folder.get("pdf"), dict) else {}
+    for s in (folder.get("name"), pdf.get("name")):
         m = NUM_RE.search(str(s or ""))
         if m:
             return m.group(1)
@@ -309,26 +310,45 @@ def api_dossiers():
     if not _key_ok():
         return jsonify({"error": "Ongeldige sleutel"}), 401
     js = request.get_json(silent=True) or {}
+    folders = [f for f in (js.get("folders") or []) if isinstance(f, dict)][:20000]
+    try:
+        return jsonify(_dossiers(folders))
+    except Exception as exc:  # noqa: BLE001 - reden terug naar het script (komt in het logboek op DC01)
+        get_db().rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "fout": f"{type(exc).__name__}: {str(exc)[:200]}", "mappen": len(folders), "nieuw": 0, "want": []})
+
+
+def _dossiers(folders):
     conn = get_db()
     now = now_iso()
-    known = {r["number"]: r for r in conn.execute("SELECT number, pdf_sig, dossier_path FROM sales_invoices")}
-    want, new = [], 0
-    for f in (js.get("folders") or [])[:20000]:
+    # per factuurnummer één map: voorkeur voor de map die precies zo heet, anders de nieuwste PDF
+    best = {}
+    for f in folders:
         num, path = _number_of(f), str(f.get("path") or "")[:500]
         if not num or not path:
             continue
+        exact = str(f.get("name") or "").strip() == num
+        pdf = f.get("pdf") if isinstance(f.get("pdf"), dict) else {}
+        key = (exact, str(pdf.get("modified") or ""))
+        if num not in best or key > best[num][0]:
+            best[num] = (key, f, path)
+    known = {r["number"]: r for r in conn.execute("SELECT number, pdf_sig, dossier_path FROM sales_invoices")}
+    want, new = [], 0
+    for num, (_, f, path) in sorted(best.items(), reverse=True):   # nieuwste facturen eerst
         cur = known.get(num)
         if not cur:
-            conn.execute("INSERT INTO sales_invoices (number, dossier_path, status, created_at) VALUES (?,?, 'onbekend', ?)", (num, path, now))
+            conn.execute("INSERT OR IGNORE INTO sales_invoices (number, dossier_path, status, created_at) VALUES (?,?, 'onbekend', ?)", (num, path, now))
             new += 1
         elif cur["dossier_path"] != path:
             conn.execute("UPDATE sales_invoices SET dossier_path = ? WHERE number = ?", (path, num))
         sig = _sig(f)
         if sig and (not cur or cur["pdf_sig"] != sig) and len(want) < PDF_PER_RUN:
             want.append(path)
-    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_last', ?)", (f"{now}|{len(js.get('folders') or [])}|{new}",))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_last', ?)", (f"{now}|{len(folders)}|{new}",))
     conn.commit()
-    return jsonify({"ok": True, "mappen": len(js.get("folders") or []), "nieuw": new, "want": want})
+    return {"ok": True, "mappen": len(folders), "factuurnummers": len(best), "nieuw": new, "want": want}
 
 
 @bp.route("/api/factuur", methods=["POST"])
@@ -337,6 +357,16 @@ def api_pdf():
     if not _key_ok():
         return jsonify({"error": "Ongeldige sleutel"}), 401
     js = request.get_json(silent=True) or {}
+    try:
+        return _pdf(js)
+    except Exception as exc:  # noqa: BLE001 - reden terug naar het script
+        get_db().rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "resultaat": f"FOUT in WorkPortal: {type(exc).__name__}: {str(exc)[:200]}"})
+
+
+def _pdf(js):
     conn = get_db()
     inv = conn.execute("SELECT * FROM sales_invoices WHERE dossier_path = ?", (str(js.get("path") or ""),)).fetchone()
     if not inv:
@@ -375,6 +405,8 @@ def api_pdf():
             delete_file(old)
         except Exception:  # noqa: BLE001
             pass
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_lastpdf', ?)", (f"{now_iso()}|{inv['number']}",))
+    conn.commit()
     return jsonify({"ok": True, "resultaat": f"Factuur {inv['number']} opgeslagen"})
 
 

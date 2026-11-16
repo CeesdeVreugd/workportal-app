@@ -1020,6 +1020,16 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V198 (2.15.3)
+- Beheer > DC01 heeft nu twee tabbladen: **Orders** (zoals het was) en **Facturen**.
+  - Status: laatste run, aantal factuurmappen, met PDF, wacht nog op PDF, laatste PDF, niet leesbaar, klant niet herkend.
+  - Lijst met factuurmappen: pad, PDF met bedrag, klant, order en open/betaald. Filters en zoeken.
+  - Selectie 'PDF opnieuw ophalen'.
+
+## V197 (2.15.2)
+- Facturen uit het DigiDossier: WorkPortal gaf een 500-fout als hetzelfde factuurnummer in meer dan één map voorkwam. Nu kiest WorkPortal per factuurnummer één map: de map die precies het nummer als naam heeft, anders de map met de nieuwste PDF. De nieuwste facturen komen het eerst.
+- Gaat er bij het verwerken toch iets mis, dan stuurt WorkPortal de reden terug. Het script op DC01 zet die in het logboek, in plaats van alleen '500'. Zet daarvoor ook de nieuwe scripts\komdex-orders.ps1 op DC01 (en vul $Sleutel weer in).
+
 ## V196 (2.15.1)
 - Verkoopfacturen: het uitlezen van de factuur-PDF is afgestemd op onze eigen factuur. WorkPortal haalt eruit: factuurnummer, factuurdatum ('20 maart 2026'), vervaldatum ('betaling voor 19-04-2026'), totaal incl. btw, de klant (linkerkolom onder Factuuradres), T.a.v. en 'Onze ref.'. Ook Engelse, Duitse en Franse teksten worden zo goed mogelijk herkend.
 - 'Onze ref.' koppelt de factuur aan de order of het project. Op de order/het project staat een blok Verkoopfacturen met de status (alleen zichtbaar met recht debiteuren). Op de factuur staat een link naar de order.

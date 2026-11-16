@@ -142,7 +142,8 @@ try {
             $fjson = @{ folders = @($fmappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
             $fres = Invoke-RestMethod -Uri "$WorkPortal/debiteuren/api/dossiers" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($fjson)) `
                 -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
-            Log ("Facturen: {0} mappen, {1} nieuw, {2} PDF's gevraagd" -f $fres.mappen, $fres.nieuw, @($fres.want).Count)
+            if ($fres.fout) { Log ("Facturen: FOUT in WorkPortal: " + $fres.fout) }
+            else { Log ("Facturen: {0} mappen, {1} nieuw, {2} PDF's gevraagd" -f $fres.mappen, $fres.nieuw, @($fres.want).Count) }
             foreach ($pad in @($fres.want)) {
                 if (-not $pad -or -not (Test-Path -LiteralPath $pad)) { continue }
                 $pdf = Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -ErrorAction SilentlyContinue |

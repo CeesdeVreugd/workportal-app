@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V196: verkoopfactuur uitlezen (klant, order, datums)"
+set "OMSCHRIJVING=WorkPortal V198: Beheer DC01 met tabbladen Orders en Facturen"
 
 echo.
 echo ============================================
