@@ -861,6 +861,13 @@ MIGRATIONS = [
         applied_at TEXT
     );
     """,
+    # 46 - verkoopfacturen: order/project uit 'Onze ref.' op de factuur, en T.a.v. van het factuuradres
+    """
+    ALTER TABLE sales_invoices ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+    ALTER TABLE sales_invoices ADD COLUMN order_no TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN attn TEXT;
+    CREATE INDEX idx_sales_inv_project ON sales_invoices(project_id);
+    """,
 ]
 
 

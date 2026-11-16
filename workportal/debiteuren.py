@@ -208,25 +208,81 @@ def scheduled_snelstart(conn, state):
 
 # ---------------------------------------------------------------- factuur-PDF uit het DigiDossier
 
+MONTHS = {"januari": 1, "februari": 2, "maart": 3, "april": 4, "mei": 5, "juni": 6, "juli": 7, "augustus": 8, "september": 9,
+          "oktober": 10, "november": 11, "december": 12, "january": 1, "february": 2, "march": 3, "may": 5, "june": 6, "july": 7,
+          "august": 8, "october": 10, "januar": 1, "februar": 2, "märz": 3, "mai": 5, "dezember": 12,
+          "janvier": 1, "février": 2, "mars": 3, "avril": 4, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10,
+          "novembre": 11, "décembre": 12}
+DATE_TXT = r"(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}\.?\s+[a-zäéû]+\s+\d{4})"
+
+
+def _date_txt(v):
+    """'20 maart 2026' / '20-03-2026' -> '2026-03-20'."""
+    v = (v or "").strip()
+    m = re.match(r"(\d{1,2})\.?\s+([a-zäéû]+)\s+(\d{4})", v, re.I)
+    if m:
+        mon = MONTHS.get(m.group(2).lower())
+        if mon:
+            try:
+                return date(int(m.group(3)), mon, int(m.group(1))).isoformat()
+            except ValueError:
+                return None
+        return None
+    return _d(v.replace("/", "-").replace(".", "-"))
+
+
+def _address_block(page):
+    """Linkerkolom onder 'Factuuradres:' (rechts staat het werk-/afleveradres)."""
+    words = page.extract_words()
+    head = next((w for w in words if re.match(r"(factuuradres|invoice\s*address|rechnungsadresse|adresse)", w["text"], re.I)), None)
+    if not head:
+        return []
+    right = min([w["x0"] for w in words if abs(w["top"] - head["top"]) < 3 and w["x0"] > head["x1"] + 20] or [page.width / 2])
+    lines = {}
+    for w in words:
+        if head["top"] + 5 < w["top"] < head["top"] + 120 and w["x0"] < right - 5:
+            lines.setdefault(round(w["top"] / 3), []).append(w)
+    out = []
+    for k in sorted(lines):
+        txt = " ".join(w["text"] for w in sorted(lines[k], key=lambda w: w["x0"]))
+        if re.match(r"(factuurnummer|invoice|rechnung|facture)", txt, re.I):
+            break
+        out.append(txt)
+    return out
+
+
 def parse_pdf(data):
-    """Gegevens van de factuur zelf (zo goed mogelijk): nummer, datums, bedrag, factuur-e-mailadres."""
+    """Gegevens van de factuur zelf: nummer, datums, bedrag, klant (factuuradres), T.a.v., onze referentie (order),
+    factuur-e-mailadres als dat op de factuur staat."""
     import pdfplumber
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         text = "\n".join((p.extract_text() or "") for p in pdf.pages[:3])
+        block = _address_block(pdf.pages[0]) if pdf.pages else []
     out = {}
-    m = re.search(r"factuur\s*(?:nummer|nr\.?|no\.?)\s*[:.]?\s*(\d{6,10})", text, re.I) or re.search(r"invoice\s*(?:number|no\.?)\s*[:.]?\s*(\d{6,10})", text, re.I)
+    m = re.search(r"(?:factuur\s*(?:nummer|nr\.?)|invoice\s*(?:number|no\.?)|rechnungs?\s*(?:nummer|nr\.?)|num[ée]ro\s*de\s*facture)\s*[:.]?\s*(\d{6,10})", text, re.I)
     if m:
         out["number"] = m.group(1)
-    for key, pat in (("invoice_date", r"factuurdatum|invoice\s*date|datum"), ("due_date", r"vervaldatum|due\s*date|uiterste\s*betaaldatum")):
-        m = re.search(r"(?:" + pat + r")\s*[:.]?\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})", text, re.I)
-        if m:
-            out[key] = _d(m.group(1).replace("/", "-").replace(".", "-"))
-    m = re.search(r"(?:totaal|total|te betalen)[^\n\d€]*(?:incl[^\n\d€]*)?€?\s*([\d.]+,\d{2})", text, re.I)
+    m = re.search(r"(?:factuurdatum|invoice\s*date|rechnungsdatum|date\s*de\s*facture)\s*[:.]?\s*" + DATE_TXT, text, re.I)
     if m:
-        out["amount"] = _amount(m.group(1))
+        out["invoice_date"] = _date_txt(m.group(1))
+    m = (re.search(r"(?:vervaldatum|due\s*date|f[äa]llig(?:keitsdatum)?|[ée]ch[ée]ance)\s*[:.]?\s*" + DATE_TXT, text, re.I)
+         or re.search(r"(?:betaling\s+v[oó][oó]r|payment\s+(?:before|by)|zahlung\s+bis(?:\s+zum)?|paiement\s+avant\s+le)\s+" + DATE_TXT, text, re.I))
+    if m:
+        out["due_date"] = _date_txt(m.group(1))
+    m = re.search(r"^\s*(?:totaal|total|gesamt(?:betrag)?|te betalen)\b[^\n\d€-]*€?\s*(-?\s*[\d.]+,\d{2})", text, re.I | re.M)
+    if m:
+        out["amount"] = _amount(m.group(1).replace(" ", ""))
+    m = re.search(r"(?:onze\s*ref|our\s*ref|unsere\s*ref|notre\s*r[ée]f)[^:\n]*:\s*(\d{8})\b", text, re.I)
+    if m:
+        out["order_no"] = m.group(1)
     m = re.search(r"factuur[\s-]*e-?mail(?:adres)?\s*[:.]?\s*([^\s@]+@[^\s@]+\.[a-z]{2,})", text, re.I)
     if m:
         out["mail_to"] = m.group(1).strip(".,;")
+    if block:
+        out["customer"] = block[0].strip()
+        attn = next((l for l in block[1:] if re.match(r"(t\.?a\.?v\.?|attn\.?|z\.?\s*hd\.?|[àa]\s*l'attention)", l, re.I)), None)
+        if attn:
+            out["attn"] = re.sub(r"^(t\.?a\.?v\.?|attn\.?|z\.?\s*hd\.?)\s*:?\s*", "", attn, flags=re.I).strip()
     return out
 
 
@@ -299,6 +355,14 @@ def api_pdf():
     except Exception as exc:  # noqa: BLE001 - PDF bewaren, uitlezen is bijzaak
         info = {"fout": f"{type(exc).__name__}: {str(exc)[:150]}"}
     sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
+    cid = inv["customer_id"] or (_match_customer(conn, None, info.get("customer")) if info.get("customer") else None)
+    pid = inv["project_id"]
+    if not pid and info.get("order_no"):
+        pr = conn.execute("SELECT id FROM projects WHERE number = ?", (info["order_no"],)).fetchone()
+        pid = pr["id"] if pr else None
+    conn.execute("UPDATE sales_invoices SET customer_id = ?, customer_name = COALESCE(customer_name, ?), project_id = ?,"
+                 " order_no = COALESCE(order_no, ?), attn = COALESCE(attn, ?) WHERE id = ?",
+                 (cid, info.get("customer"), pid, info.get("order_no"), info.get("attn"), inv["id"]))
     # gegevens uit de PDF alleen invullen waar SnelStart/Excel nog niets gaf
     conn.execute("UPDATE sales_invoices SET pdf_file_id = ?, pdf_sig = ?, pdf_json = ?, invoice_date = COALESCE(invoice_date, ?),"
                  " due_date = COALESCE(due_date, ?), amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
@@ -388,7 +452,10 @@ def detail(sid):
                    " OR (debtor_no IS NOT NULL AND debtor_no = ?)) ORDER BY due_date", (sid, s["customer_id"] or -1, s["debtor_no"] or "-"))
     dd = _d(s["due_date"])
     days = (_today() - date.fromisoformat(dd)).days if dd and s["status"] == "open" else None
-    return render_template("debiteuren/detail.html", s=s, others=others, days=days, STATUS_LABEL=STATUS_LABEL,
+    proj = query("SELECT id, kind, number, name FROM projects WHERE id = ?", (s["project_id"],), one=True) if s["project_id"] else None
+    if proj and not (can("projecten") if proj["kind"] == "project" else can("orders")):
+        proj = None
+    return render_template("debiteuren/detail.html", s=s, proj=proj, others=others, days=days, STATUS_LABEL=STATUS_LABEL,
                            info=json.loads(s["pdf_json"]) if s["pdf_json"] else {})
 
 

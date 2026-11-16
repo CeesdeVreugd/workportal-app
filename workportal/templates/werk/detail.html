@@ -136,6 +136,13 @@
   {% if can('calculatie') and (p.kind == 'project' or calcs) %}<section class="card"><h2>Calculaties</h2><div class="rows">{% for c in calcs %}<a class="rowitem" href="{{ url_for('calculatie.edit', cid=c.id) }}"><div class="grow"><div class="t">{{ c.number }} · {{ c.title }}</div></div>{{ calc_status(c.status) }}</a>{% else %}<div class="empty">Geen calculaties.</div>{% endfor %}</div></section>{% endif %}
   {% if can('nacalculatie') %}<section class="card"><h2>Na-calculaties</h2><div class="rows">{% for n in nacalcs %}<a class="rowitem" href="{{ url_for('nacalc.detail', nid=n.id) }}"><div class="grow"><div class="t">Import {{ n.imported_at|dt }}</div><div class="s">Order {{ n.order_no }} · {{ n.order_total|eur }}</div></div></a>{% else %}<div class="empty">Nog geen na-calculatie.</div>{% endfor %}</div></section>{% endif %}
 </div>
+{% if sales %}
+<section class="card" id="facturen">
+  <div class="card-head"><h2>Verkoopfacturen</h2></div>
+  <div class="rows">{% for f in sales %}<a class="rowitem" href="{{ url_for('debiteuren.detail', sid=f.id) }}"><div class="grow"><div class="t">Factuur {{ f.number }}</div><div class="s">{{ f.invoice_date|date if f.invoice_date else '' }}{% if f.due_date %} · vervalt {{ f.due_date|date }}{% endif %}</div></div>
+    <span class="num">{{ f.amount|eur(2) if f.amount is not none else '' }}</span>{% if f.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% elif f.status == 'open' %}<span class="badge {{ 'b-bad' if f.due_date and f.due_date < now_date() else 'b-warn' }}">Open {{ f.open_amount|eur(2) if f.open_amount is not none else '' }}</span>{% endif %}</a>{% endfor %}</div>
+</section>
+{% endif %}
 <section class="card" id="logboek">
   <div class="card-head"><div><h2>Logboek</h2><div class="small muted">wie wanneer wat heeft gedaan bij deze {{ K.lower }}</div></div></div>
   <div class="rows loglist">

@@ -196,7 +196,8 @@ def detail(pid):
     actions, deliveries = items_for(pid), deliveries_for(pid)
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'project' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 300", (pid,))
-    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, history=history, tests=tests, calcs=calcs,
+    sales = query("SELECT * FROM sales_invoices WHERE project_id = ? ORDER BY number", (pid,)) if can("debiteuren") else []
+    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, sales=sales, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, history=history, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,

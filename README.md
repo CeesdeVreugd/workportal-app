@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V196 (2.15.1)
+- Verkoopfacturen: het uitlezen van de factuur-PDF is afgestemd op onze eigen factuur. WorkPortal haalt eruit: factuurnummer, factuurdatum ('20 maart 2026'), vervaldatum ('betaling voor 19-04-2026'), totaal incl. btw, de klant (linkerkolom onder Factuuradres), T.a.v. en 'Onze ref.'. Ook Engelse, Duitse en Franse teksten worden zo goed mogelijk herkend.
+- 'Onze ref.' koppelt de factuur aan de order of het project. Op de order/het project staat een blok Verkoopfacturen met de status (alleen zichtbaar met recht debiteuren). Op de factuur staat een link naar de order.
+- Databasemigratie 46 (sales_invoices: project_id, order_no, attn).
+
 ## V195 (2.15.0)
 - Nieuwe module **Verkoopfacturen (debiteuren)**, met recht 'debiteuren'. Standaard: administratie bewerken, directie beheer, de andere rollen geen toegang (aanpasbaar in Beheer).
   - Overzicht van de openstaande facturen: totaal, vervallen, ouderdom (1-30 / 31-60 / 61-90 / 90+ dagen), filters Open, Vervallen, Nog niet in overzicht, Betaald en zoeken. Per factuur: gegevens, PDF, notitie en andere open facturen van dezelfde klant. In het menu een teller met het aantal vervallen facturen.
