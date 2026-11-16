@@ -19,7 +19,7 @@
         <a class="btn sm primary" href="{{ url_for(B ~ '.delivery_sign', pid=p.id, did=d.id) }}">Laten tekenen</a>{% endif %}
         {% if dl_edit and d.cust_signed_at %}<details class="cred-pop"><summary class="btn sm">{{ icon('mail') }}Mailen</summary>
           <form method="post" action="{{ url_for(B ~ '.delivery_mail', pid=p.id, did=d.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="f">Aan<input type="text" name="mail_to" value="{{ d.mailed_to or '' }}" inputmode="email" required></label><button class="btn primary sm">Versturen</button></form></details>{% endif %}
+            <label class="f">Aan<input type="text" name="mail_to" value="{{ d.mail_default or '' }}" inputmode="email" required></label><button class="btn primary sm">Versturen</button></form></details>{% endif %}
         {% if dl_edit and (not d.cust_signed_at or can(K.module, 3)) %}<form method="post" action="{{ url_for(B ~ '.delivery_delete', pid=p.id, did=d.id) }}" class="inline" data-confirm="{{ nr }} verwijderen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm danger" aria-label="Verwijderen">{{ icon('trash') }}</button></form>{% endif %}
       </div>
     </div>

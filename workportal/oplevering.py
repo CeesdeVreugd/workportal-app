@@ -32,8 +32,18 @@ def _need(p, level=BEWERKEN):
 
 
 def deliveries_for(pid):
-    return query("SELECT d.*, u.name AS creator FROM deliveries d LEFT JOIN users u ON u.id = d.created_by"
+    rows = query("SELECT d.*, u.name AS creator FROM deliveries d LEFT JOIN users u ON u.id = d.created_by"
                  " WHERE d.project_id = ? ORDER BY d.seq DESC", (pid,))
+    if not rows:
+        return rows
+    from .werk import _contact_email
+    p = query("SELECT * FROM projects WHERE id = ?", (pid,), one=True)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["mail_default"] = d["mailed_to"] or _contact_email(p, d["attn"])   # contactpersoon van de order (T.a.v.)
+        out.append(d)
+    return out
 
 
 def _get(p, did):
@@ -191,9 +201,8 @@ def delivery_sign(pid, did):
     if d["cust_signed_at"]:
         flash("Dit document is al getekend.", "info")
         return redirect(werk_url("detail", p, pid=pid) + "#oplevering")
-    c = query("SELECT * FROM customers WHERE id = ?", (p["customer_id"] or 0,), one=True)
-    ct = query("SELECT * FROM contacts WHERE customer_id = ? AND name = ?", (p["customer_id"] or 0, d["attn"] or ""), one=True)
-    mail_to = (ct["email"] if ct else None) or (c["email"] if c else None) or ""
+    from .werk import _contact_email
+    mail_to = _contact_email(p, d["attn"])
     if request.method == "POST":
         f = request.form
         dv_name, cust_name = (f.get("dv_name") or "").strip()[:120], (f.get("cust_name") or "").strip()[:120]

@@ -788,22 +788,33 @@ def _cert_root(rel):
     return None
 
 
-def _contact_email(p):
-    """E-mailadres van de contactpersoon van het project/de order (T.a.v.), anders van de klant."""
+def _contact_email(p, name=None):
+    """E-mailadres van de contactpersoon van het project/de order (T.a.v.), anders van de klant.
+    name: andere naam eerst proberen (bijv. T.a.v. op het opleverdocument)."""
     if p["customer_id"]:
-        if p["contact_name"]:
-            r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND lower(name) = lower(?)",
-                      (p["customer_id"], p["contact_name"].strip()), one=True)
-            if not r:
-                r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND"
-                          " (lower(name) LIKE lower(?) OR lower(?) LIKE '%' || lower(name) || '%') LIMIT 1",
-                          (p["customer_id"], f"%{p['contact_name'].strip()}%", p["contact_name"].strip()), one=True)
-            if r:
-                return r["email"]
+        for nm in [x for x in (name, p["contact_name"]) if x and x.strip()]:
+            em = _contact_by_name(p["customer_id"], nm)
+            if em:
+                return em
         c = query("SELECT email FROM customers WHERE id = ?", (p["customer_id"],), one=True)
         if c and c["email"]:
             return c["email"]
     return ""
+
+
+def _contact_by_name(cid, name):
+    name = name.strip()
+    r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND lower(name) = lower(?)", (cid, name), one=True)
+    if not r:
+        r = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND"
+                  " (lower(name) LIKE lower(?) OR lower(?) LIKE '%' || lower(name) || '%') LIMIT 1", (cid, f"%{name}%", name), one=True)
+    if not r:   # bijv. 'K. Winterschladen' -> 'Konstantin Winterschladen': op achternaam, alleen als die uniek is
+        last = name.replace(".", " ").split()[-1] if name.replace(".", " ").split() else ""
+        if len(last) >= 3:
+            rs = query("SELECT email FROM contacts WHERE customer_id = ? AND IFNULL(email,'') <> '' AND"
+                       " (' ' || lower(name) || ' ') LIKE ?", (cid, f"% {last.lower()} %"))
+            r = rs[0] if len(rs) == 1 else None
+    return r["email"] if r else None
 
 
 @bp.route("/<int:pid>/map/certificaten", methods=["GET", "POST"])

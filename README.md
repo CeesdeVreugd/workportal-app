@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V194 (2.14.2)
+- Opleverdocument: bij tekenen en bij 'Mailen' staat standaard het e-mailadres van de contactpersoon van de order of het project ingevuld (T.a.v. van het document, anders de contactpersoon uit de order). De naam wordt opgezocht bij de contactpersonen van de relatie, ook als die als 'K. Achternaam' op de order staat. Pas als er geen contactpersoon gevonden wordt, komt het algemene adres van de relatie erin.
+
 ## V193 (2.14.1)
 - iPad (app op beginscherm): de bovenbalk en het menu schoven onder de statusbalk (tijd, batterij). Er is nu ruimte boven de bovenbalk en het menu. Op pc en in de browser verandert er niets.
 
