@@ -8,7 +8,7 @@
   zelf aan; anders komt de map in het actievenster "Nieuwe orders". Er wordt niets gewijzigd in de
   Komdex-map (alleen lezen).
   Daarnaast: de verkoopfacturen uit het DigiDossier ($FactuurMap, jaarmappen > factuurmap > PDF) voor de module
-  Verkoopfacturen. Ook alleen lezen; per keer hooguit 25 PDF's.
+  Verkoopfacturen. Ook alleen lezen; per keer hooguit 50 PDF's.
 
   Instellen:
     1. Vul hieronder $OrderMap en $Sleutel in ($Sleutel = KOMDEX_KEY uit Portainer).
@@ -26,7 +26,7 @@ $WorkPortal = "https://workportal.devreugd-pt.nl"               # adres van Work
 $Sleutel    = "VUL-HIER-KOMDEX_KEY-IN"                         # zelfde waarde als KOMDEX_KEY in Portainer
 $Jaren      = 2                                                 # aantal recente jaarmappen dat wordt bekeken (2 = dit jaar en vorig jaar)
 $FactuurMap = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\facturen"   # DigiDossier verkoopfacturen (jaarmappen > factuurmap > PDF); leeg = overslaan
-$FactuurJaren = 2                                               # aantal recente jaarmappen met facturen
+$FactuurVanaf = 2020                                            # facturen vanaf dit jaar (jaarmappen 2020, 2021, ...)
 $Logbestand = "$PSScriptRoot\komdex-orders.log"
 # -------------------------------------------------------------------------
 
@@ -127,7 +127,7 @@ try {
     if ($FactuurMap -and (Test-Path -LiteralPath $FactuurMap)) {
         try {
             $froot = (Get-Item -LiteralPath $FactuurMap).FullName.TrimEnd('\')
-            $fVanaf = (Get-Date).Year - $FactuurJaren + 1
+            $fVanaf = $FactuurVanaf
             $fmappen = New-Object System.Collections.Generic.List[object]
             foreach ($j in Get-ChildItem -LiteralPath $froot -Directory -ErrorAction SilentlyContinue) {
                 if ($j.Name -notmatch '^\d{4}$' -or [int]$j.Name -lt $fVanaf) { continue }

@@ -19,6 +19,10 @@
 <a class="actionbar" href="{{ url_for('crediteuren.index', filter='mij') }}">{{ icon('invoice') }}<span><b>{{ cc.mij }} vraag{{ 'en' if cc.mij != 1 }} over inkoopfacturen</b> wacht{{ 'en' if cc.mij != 1 }} op jouw antwoord.</span><span class="go">Bekijken →</span></a>
 {% endif %}{% endif %}
 
+{% if can('debiteuren', 3) and navok('debiteuren') %}{% set nd = dun_count() %}{% if nd %}
+<a class="actionbar" href="{{ url_for('debiteuren.dunning') }}">{{ icon('mail') }}<span><b>{{ nd }} herinnering{{ 'en' if nd != 1 }}/aanmaning{{ 'en' if nd != 1 }}</b> klaar om te controleren en te versturen.</span><span class="go">Bekijken →</span></a>
+{% endif %}{% endif %}
+
 {% from "taken/_form.html" import taskrow %}
 <section class="card" id="taken">
   <div class="card-head"><h2>Mijn taken{% if d.task_open %} <span class="muted small">({{ d.task_open }})</span>{% endif %}</h2><a class="btn sm ghost" href="{{ url_for('taken.index') }}">Alle taken</a></div>

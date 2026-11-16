@@ -14,7 +14,7 @@
       <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">…\DigiDossier\facturen <span class="muted">(instelling $FactuurMap in het script)</span></dd>
       <dt>Factuurmappen gezien</dt><dd>{{ last[1] if last else 0 }} <span class="muted">(bij laatste run{% if last and last[2] != '0' %}, {{ last[2] }} nieuw{% endif %})</span></dd>
       <dt>Met PDF in WorkPortal</dt><dd>{{ counts.pdf or 0 }}</dd>
-      <dt>Wacht nog op PDF</dt><dd>{{ counts.wacht or 0 }} <span class="muted">(hooguit 25 per run, nieuwste eerst)</span></dd>
+      <dt>Wacht nog op PDF</dt><dd>{{ counts.wacht or 0 }} <span class="muted">(hooguit 50 per run, nieuwste eerst)</span></dd>
       <dt>Laatste PDF binnen</dt><dd>{% if lastpdf %}{{ lastpdf[0]|dt }} <span class="muted">· factuur {{ lastpdf[1] }}</span>{% else %}<span class="muted">–</span>{% endif %}</dd>
       <dt>Niet leesbaar</dt><dd>{% if counts.fout %}<span class="badge b-warn">{{ counts.fout }}</span>{% else %}0{% endif %}</dd>
       <dt>Klant niet herkend</dt><dd>{{ counts.geenklant or 0 }}</dd>
@@ -23,7 +23,7 @@
   <section class="card">
     <h2>Zo werkt de sync</h2>
     <ul class="steps-list" style="margin-top:0">
-      <li>Hetzelfde script <code>komdex-orders.ps1</code> kijkt ook in het DigiDossier met facturen (jaarmappen van dit jaar en vorig jaar, per factuur een map).</li>
+      <li>Hetzelfde script <code>komdex-orders.ps1</code> kijkt ook in het DigiDossier met facturen (jaarmappen vanaf 2020, per factuur een map).</li>
       <li>Per factuurmap wordt de nieuwste PDF doorgegeven. Het factuurnummer komt uit de mapnaam.</li>
       <li>WorkPortal leest uit de PDF: datums, bedrag, klant (factuuradres), T.a.v. en <i>Onze ref.</i> (koppeling met de order).</li>
       <li>Wordt een PDF opnieuw opgeslagen, dan haalt WorkPortal hem opnieuw op.</li>

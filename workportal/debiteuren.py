@@ -300,7 +300,7 @@ def _number_of(folder):
     return None
 
 
-PDF_PER_RUN = 25
+PDF_PER_RUN = 50
 
 
 @bp.route("/api/dossiers", methods=["POST"])
@@ -412,8 +412,9 @@ def _pdf(js):
 
 # ---------------------------------------------------------------- pagina's
 
-def _setting(key):
-    r = query("SELECT value FROM settings WHERE key = ?", (key,), one=True)
+def _setting(key, conn=None):
+    r = (conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone() if conn is not None
+         else query("SELECT value FROM settings WHERE key = ?", (key,), one=True))
     return r["value"] if r else None
 
 
@@ -487,7 +488,10 @@ def detail(sid):
     proj = query("SELECT id, kind, number, name FROM projects WHERE id = ?", (s["project_id"],), one=True) if s["project_id"] else None
     if proj and not (can("projecten") if proj["kind"] == "project" else can("orders")):
         proj = None
-    return render_template("debiteuren/detail.html", s=s, proj=proj, others=others, days=days, STATUS_LABEL=STATUS_LABEL,
+    letters = query("SELECT l.*, u.name AS who FROM dunning_letters l LEFT JOIN users u ON u.id = COALESCE(l.sent_by, l.created_by)"
+                    " WHERE l.invoice_id = ? AND l.status IN ('voorstel', 'verstuurd') ORDER BY l.id DESC", (sid,))
+    cust = query("SELECT invoice_email FROM customers WHERE id = ?", (s["customer_id"],), one=True) if s["customer_id"] else None
+    return render_template("debiteuren/detail.html", s=s, letters=letters, LEVELS=LEVELS, cust=cust, today=_today().isoformat(), proj=proj, others=others, days=days, STATUS_LABEL=STATUS_LABEL,
                            info=json.loads(s["pdf_json"]) if s["pdf_json"] else {})
 
 
@@ -556,3 +560,415 @@ def snelstart_now():
     except Exception as exc:  # noqa: BLE001
         flash(f"Ophalen uit SnelStart mislukt: {str(exc)[:300]}", "error")
     return redirect(url_for("debiteuren.index"))
+
+
+# ---------------------------------------------------------------- herinneren en aanmanen
+
+LEVELS = {1: "Herinnering", 2: "Aanmaning", 3: "Laatste aanmaning"}
+DEFAULT_DAYS = (7, 21, 35)
+DEFAULT_SENDER = "administratie@devreugd-pt.nl"
+IBAN = "NL70 RABO 0133 9900 36"
+
+DUN = {
+    "nl": {
+        "subject": {1: "Herinnering factuur {nr}", 2: "Aanmaning factuur {nr}", 3: "Laatste aanmaning factuur {nr}"},
+        "body": {
+            1: "Geachte heer/mevrouw,\n\nVolgens onze administratie is factuur {nr} van {date} ter waarde van {amount} nog niet (volledig) betaald. "
+               "De vervaldatum was {due}; het openstaande bedrag is {open}.\n\nWilt u dit bedrag binnen 7 dagen overmaken op {iban} "
+               "onder vermelding van het factuurnummer? Heeft u inmiddels betaald, dan kunt u deze herinnering als niet verzonden beschouwen.\n\n"
+               "De factuur is als bijlage meegestuurd.",
+            2: "Geachte heer/mevrouw,\n\nOndanks onze eerdere herinnering hebben wij de betaling van factuur {nr} van {date} nog niet ontvangen. "
+               "De vervaldatum was {due}, inmiddels {days} dagen geleden. Het openstaande bedrag is {open}.\n\n"
+               "Wij verzoeken u dit bedrag binnen 7 dagen over te maken op {iban} onder vermelding van het factuurnummer. "
+               "Is er een reden waarom de factuur nog niet betaald is, neem dan contact met ons op.\n\nDe factuur is als bijlage meegestuurd.",
+            3: "Geachte heer/mevrouw,\n\nTot onze spijt hebben wij, ondanks herinnering en aanmaning, de betaling van factuur {nr} van {date} "
+               "nog steeds niet ontvangen. Het openstaande bedrag is {open} (vervaldatum {due}).\n\n"
+               "Wij verzoeken u dringend dit bedrag binnen 5 werkdagen over te maken op {iban} onder vermelding van het factuurnummer. "
+               "Blijft betaling uit, dan zijn wij genoodzaakt verdere stappen te nemen; de kosten daarvan komen voor uw rekening.\n\n"
+               "De factuur is als bijlage meegestuurd.",
+        },
+    },
+    "en": {
+        "subject": {1: "Payment reminder invoice {nr}", 2: "Second reminder invoice {nr}", 3: "Final notice invoice {nr}"},
+        "body": {
+            1: "Dear Sir/Madam,\n\nAccording to our records, invoice {nr} dated {date} for {amount} has not yet been (fully) paid. "
+               "The due date was {due}; the outstanding amount is {open}.\n\nPlease transfer this amount within 7 days to {iban} (BIC RABONL2U), "
+               "stating the invoice number. If you have already paid, please disregard this reminder.\n\nThe invoice is attached.",
+            2: "Dear Sir/Madam,\n\nDespite our earlier reminder, we have not yet received payment of invoice {nr} dated {date}. "
+               "The due date was {due}, {days} days ago. The outstanding amount is {open}.\n\n"
+               "We kindly ask you to transfer this amount within 7 days to {iban} (BIC RABONL2U), stating the invoice number. "
+               "If there is a reason why the invoice has not been paid, please contact us.\n\nThe invoice is attached.",
+            3: "Dear Sir/Madam,\n\nWe regret to note that, despite our reminders, invoice {nr} dated {date} is still unpaid. "
+               "The outstanding amount is {open} (due date {due}).\n\n"
+               "We urgently request you to transfer this amount within 5 working days to {iban} (BIC RABONL2U), stating the invoice number. "
+               "If payment is not received, we will have to take further action, at your expense.\n\nThe invoice is attached.",
+        },
+    },
+    "de": {
+        "subject": {1: "Zahlungserinnerung Rechnung {nr}", 2: "Mahnung Rechnung {nr}", 3: "Letzte Mahnung Rechnung {nr}"},
+        "body": {
+            1: "Sehr geehrte Damen und Herren,\n\nlaut unserer Buchhaltung ist die Rechnung {nr} vom {date} über {amount} noch nicht (vollständig) bezahlt. "
+               "Fällig war sie am {due}; der offene Betrag beträgt {open}.\n\nBitte überweisen Sie diesen Betrag innerhalb von 7 Tagen auf {iban} "
+               "(BIC RABONL2U) unter Angabe der Rechnungsnummer. Sollten Sie bereits bezahlt haben, betrachten Sie diese Erinnerung bitte als gegenstandslos.\n\n"
+               "Die Rechnung finden Sie im Anhang.",
+            2: "Sehr geehrte Damen und Herren,\n\ntrotz unserer Erinnerung haben wir die Zahlung der Rechnung {nr} vom {date} noch nicht erhalten. "
+               "Sie war am {due} fällig, vor {days} Tagen. Der offene Betrag beträgt {open}.\n\n"
+               "Bitte überweisen Sie diesen Betrag innerhalb von 7 Tagen auf {iban} (BIC RABONL2U) unter Angabe der Rechnungsnummer. "
+               "Gibt es einen Grund für die ausstehende Zahlung, nehmen Sie bitte Kontakt mit uns auf.\n\nDie Rechnung finden Sie im Anhang.",
+            3: "Sehr geehrte Damen und Herren,\n\nleider ist die Rechnung {nr} vom {date} trotz Erinnerung und Mahnung noch immer nicht bezahlt. "
+               "Der offene Betrag beträgt {open} (fällig am {due}).\n\n"
+               "Wir fordern Sie dringend auf, diesen Betrag innerhalb von 5 Werktagen auf {iban} (BIC RABONL2U) zu überweisen. "
+               "Andernfalls sehen wir uns gezwungen, weitere Schritte einzuleiten; die Kosten gehen zu Ihren Lasten.\n\nDie Rechnung finden Sie im Anhang.",
+        },
+    },
+    "fr": {
+        "subject": {1: "Rappel facture {nr}", 2: "Relance facture {nr}", 3: "Dernière relance facture {nr}"},
+        "body": {
+            1: "Madame, Monsieur,\n\nSelon notre comptabilité, la facture {nr} du {date} d'un montant de {amount} n'a pas encore été (entièrement) réglée. "
+               "L'échéance était le {due} ; le montant restant dû est de {open}.\n\nNous vous prions de virer ce montant sous 7 jours sur {iban} "
+               "(BIC RABONL2U) en indiquant le numéro de facture. Si vous avez déjà payé, veuillez ne pas tenir compte de ce rappel.\n\nLa facture est jointe.",
+            2: "Madame, Monsieur,\n\nMalgré notre rappel, nous n'avons pas encore reçu le paiement de la facture {nr} du {date}. "
+               "L'échéance était le {due}, il y a {days} jours. Le montant restant dû est de {open}.\n\n"
+               "Nous vous prions de virer ce montant sous 7 jours sur {iban} (BIC RABONL2U) en indiquant le numéro de facture. "
+               "Si ce retard a une raison, merci de nous contacter.\n\nLa facture est jointe.",
+            3: "Madame, Monsieur,\n\nMalgré nos rappels, la facture {nr} du {date} reste impayée. Le montant restant dû est de {open} (échéance le {due}).\n\n"
+               "Nous vous demandons instamment de virer ce montant sous 5 jours ouvrables sur {iban} (BIC RABONL2U). "
+               "À défaut, nous serons contraints d'engager d'autres démarches, à vos frais.\n\nLa facture est jointe.",
+        },
+    },
+}
+
+
+def _ddmm(v):
+    d = _d(v)
+    return date.fromisoformat(d).strftime("%d-%m-%Y") if d else "–"
+
+
+def _eur(v):
+    from .util import fmt_eur
+    return fmt_eur(v or 0, 2)
+
+
+def dun_days(conn=None):
+    raw = _setting("deb_days", conn) or ""
+    try:
+        vals = tuple(int(x) for x in raw.split(","))
+        if len(vals) == 3 and all(0 <= v <= 365 for v in vals):
+            return vals
+    except ValueError:
+        pass
+    return DEFAULT_DAYS
+
+
+def sender():
+    return (_setting("deb_sender") or DEFAULT_SENDER).strip()
+
+
+def _cust(conn, inv):
+    return conn.execute("SELECT * FROM customers WHERE id = ?", (inv["customer_id"],)).fetchone() if inv["customer_id"] else None
+
+
+def letter_text(inv, level, lang):
+    L = DUN.get(lang) or DUN["nl"]
+    dd = _d(inv["due_date"])
+    days = (_today() - date.fromisoformat(dd)).days if dd else 0
+    v = {"nr": inv["number"], "date": _ddmm(inv["invoice_date"]), "due": _ddmm(inv["due_date"]), "amount": _eur(inv["amount"]),
+         "open": _eur(inv["open_amount"] if inv["open_amount"] is not None else inv["amount"]), "days": days, "iban": IBAN}
+    return L["subject"][level].format(**v), L["body"][level].format(**v)
+
+
+def new_letter(conn, inv, level, auto, uid=None):
+    c = _cust(conn, inv)
+    from .talen import norm_lang
+    lang = norm_lang(c["language"] if c and c["language"] else "nl")
+    lang = lang if lang in DUN else "en"
+    subject, body = letter_text(inv, level, lang)
+    to = (c["invoice_email"] if c and c["invoice_email"] else None) or inv["mail_to"] or ""
+    cur = conn.execute("INSERT INTO dunning_letters (invoice_id, level, status, auto, language, to_addr, subject, body, created_by, created_at)"
+                       " VALUES (?,?, 'voorstel', ?,?,?,?,?,?,?)", (inv["id"], level, 1 if auto else 0, lang, to, subject, body, uid, now_iso()))
+    return cur.lastrowid
+
+
+def _due_for_dunning(inv, days):
+    """Welk niveau is aan de beurt (of None)."""
+    if inv["status"] != "open" or inv["no_dunning"] or (inv["open_amount"] is not None and inv["open_amount"] <= 0.004):
+        return None
+    if inv["postpone_until"] and inv["postpone_until"] > _today().isoformat():
+        return None
+    dd = _d(inv["due_date"])
+    if not dd or inv["dun_level"] >= 3:
+        return None
+    over = (_today() - date.fromisoformat(dd)).days
+    level = inv["dun_level"] + 1
+    if over < days[level - 1]:
+        return None
+    if inv["dunned_at"] and (now_utc().astimezone(TZ).date() - date.fromisoformat(inv["dunned_at"][:10])).days < 7:
+        return None   # minstens een week tussen twee brieven
+    return level
+
+
+def cleanup(conn):
+    """Voorstellen van facturen die betaald, uitgesteld of op 'niet aanmanen' staan, vervallen."""
+    conn.execute("UPDATE dunning_letters SET status = 'vervallen', updated_at = ? WHERE status = 'voorstel' AND invoice_id IN"
+                 " (SELECT id FROM sales_invoices WHERE status <> 'open' OR no_dunning = 1 OR IFNULL(open_amount, 1) <= 0.004"
+                 " OR (postpone_until IS NOT NULL AND postpone_until > ?))", (now_iso(), _today().isoformat()))
+
+
+def propose(conn):
+    """Nieuwe voorstellen maken voor facturen die aan de beurt zijn. Geeft het aantal nieuwe voorstellen."""
+    cleanup(conn)
+    days = dun_days(conn)
+    pending = {r[0] for r in conn.execute("SELECT invoice_id FROM dunning_letters WHERE status = 'voorstel'")}
+    n = 0
+    for inv in conn.execute("SELECT * FROM sales_invoices WHERE status = 'open' AND no_dunning = 0").fetchall():
+        if inv["id"] in pending:
+            continue
+        level = _due_for_dunning(inv, days)
+        if level:
+            new_letter(conn, inv, level, auto=True)
+            n += 1
+    conn.commit()
+    return n
+
+
+def scheduled_dunning(conn, state):
+    """Elk uur: voorstellen maken (alleen als er openstaande posten zijn ingelezen); directie krijgt een melding."""
+    import time
+    if time.time() - state.get("deb_dun", 0) < 3600:
+        return
+    state["deb_dun"] = time.time()
+    if not conn.execute("SELECT 1 FROM settings WHERE key = 'deb_last_update'").fetchone():
+        return
+    n = propose(conn)
+    if n:
+        from .notify import notify_user
+        users = [r["id"] for r in conn.execute(
+            "SELECT DISTINCT u.id FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN role_permissions rp"
+            " ON rp.role_id = ur.role_id AND rp.module = 'debiteuren' LEFT JOIN user_permissions up ON up.user_id = u.id AND up.module = 'debiteuren'"
+            " WHERE u.active = 1 AND (u.is_admin = 1 OR rp.level >= 3 OR up.level >= 3)")]
+        for uid in users:
+            try:
+                notify_user(conn, uid, f"{n} nieuwe aanmaningsvoorstel{'len' if n != 1 else ''}",
+                            "Er staan herinneringen/aanmaningen klaar om te controleren en te versturen.", url="/debiteuren/aanmaningen", email=False)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def snelstart_open(number):
+    """Actueel openstaand saldo uit SnelStart (None = niet bekend / niet gekoppeld)."""
+    from . import snelstart
+    if not snelstart.configured():
+        return None
+    rows = snelstart.get("verkoopfacturen", {"$filter": f"factuurnummer eq '{number}'"}) or []
+    if not rows:
+        return None
+    return _amount(rows[0].get("openstaandSaldo"))
+
+
+def send_letter(conn, lid):
+    """Versturen (na goedkeuring). Geeft (ok, melding)."""
+    from .mail import send_mail_with_files
+    from .util import file_path
+    L = conn.execute("SELECT * FROM dunning_letters WHERE id = ?", (lid,)).fetchone()
+    if not L or L["status"] != "voorstel":
+        return False, "Deze brief is al verstuurd of vervallen."
+    inv = conn.execute("SELECT * FROM sales_invoices WHERE id = ?", (L["invoice_id"],)).fetchone()
+    to = [a.strip() for a in re.split(r"[;,\s]+", L["to_addr"] or "") if a.strip()]
+    if not to or any(not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
+        return False, "Vul een geldig e-mailadres in (bij voorkeur de factuur-e-mail bij de relatie)."
+    try:
+        open_now = snelstart_open(inv["number"])
+    except Exception:  # noqa: BLE001 - SnelStart niet bereikbaar: niet tegenhouden, wel melden
+        open_now = None
+    if open_now is not None and open_now <= 0.004:
+        now = now_iso()
+        conn.execute("UPDATE sales_invoices SET status = 'betaald', open_amount = 0, paid_at = ?, status_source = 'snelstart', status_at = ? WHERE id = ?",
+                     (now, now, inv["id"]))
+        conn.execute("UPDATE dunning_letters SET status = 'vervallen', note = 'Betaald volgens SnelStart vlak voor versturen', updated_at = ? WHERE id = ?", (now, lid))
+        conn.commit()
+        return False, f"Niet verstuurd: factuur {inv['number']} is volgens SnelStart inmiddels betaald."
+    atts = []
+    if inv["pdf_file_id"]:
+        f = conn.execute("SELECT * FROM files WHERE id = ?", (inv["pdf_file_id"],)).fetchone()
+        if f:
+            with open(file_path(f), "rb") as fh:
+                atts.append((f"Factuur_{inv['number']}.pdf", fh.read(), "application/pdf"))
+    ok, err = send_mail_with_files(sender(), to, L["subject"], L["body"], atts, signer="administratie")
+    now = now_iso()
+    if not ok:
+        conn.execute("UPDATE dunning_letters SET error = ?, updated_at = ? WHERE id = ?", (str(err)[:400], now, lid))
+        conn.commit()
+        return False, f"Versturen mislukt: {err}"
+    conn.execute("UPDATE dunning_letters SET status = 'verstuurd', sent_by = ?, sent_at = ?, error = NULL, updated_at = ? WHERE id = ?",
+                 (g.user["id"], now, now, lid))
+    conn.execute("UPDATE sales_invoices SET dun_level = MAX(dun_level, ?), dunned_at = ? WHERE id = ?", (L["level"], now, inv["id"]))
+    conn.commit()
+    audit(f"{LEVELS[L['level']].lower()} verstuurd", "sales_invoice", inv["id"], f"{inv['number']} aan {', '.join(to)}")
+    return True, f"{LEVELS[L['level']]} voor factuur {inv['number']} verstuurd aan {', '.join(to)}."
+
+
+def pending_count():
+    if "_dun_count" not in g:
+        g._dun_count = query("SELECT COUNT(*) c FROM dunning_letters WHERE status = 'voorstel'", one=True)["c"] if can("debiteuren") else 0
+    return g._dun_count
+
+
+@bp.route("/aanmaningen", methods=["GET", "POST"])
+@require("debiteuren")
+def dunning():
+    conn = get_db()
+    if request.method == "POST" and request.form.get("action") == "instellingen":
+        if not can("debiteuren", BEHEER):
+            abort(403)
+        try:
+            days = [int(request.form.get(f"d{i}") or 0) for i in (1, 2, 3)]
+        except ValueError:
+            days = list(DEFAULT_DAYS)
+        if not (0 <= days[0] < days[1] < days[2] <= 365):
+            flash("De dagen moeten oplopen (bijv. 7, 21, 35).", "error")
+        else:
+            snd = (request.form.get("sender") or "").strip()
+            if snd and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", snd):
+                flash("Ongeldig afzenderadres.", "error")
+                return redirect(url_for("debiteuren.dunning"))
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_days', ?)", (",".join(map(str, days)),))
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_sender', ?)", (snd or DEFAULT_SENDER,))
+            conn.commit()
+            audit("instellingen", "debiteuren", None, f"aanmaningen na {days} dagen, afzender {snd or DEFAULT_SENDER}")
+            flash("Instellingen opgeslagen.", "ok")
+        return redirect(url_for("debiteuren.dunning"))
+    if request.method == "POST" and request.form.get("action") == "voorstellen":
+        n = propose(conn)
+        flash(f"{n} nieuw{'e' if n != 1 else ''} voorstel{'len' if n != 1 else ''} gemaakt." if n else "Er is nu niets aan de beurt.", "ok")
+        return redirect(url_for("debiteuren.dunning"))
+    cleanup(conn)
+    conn.commit()
+    items = query("SELECT l.*, s.number, s.customer_id, s.customer_name, s.invoice_date, s.due_date, s.amount, s.open_amount, s.pdf_file_id,"
+                  " s.dun_level, c.name AS cname, c.invoice_email, u.name AS creator FROM dunning_letters l JOIN sales_invoices s ON s.id = l.invoice_id"
+                  " LEFT JOIN customers c ON c.id = s.customer_id LEFT JOIN users u ON u.id = l.created_by"
+                  " WHERE l.status = 'voorstel' ORDER BY l.level DESC, s.due_date")
+    sent = query("SELECT l.*, s.number, s.customer_name, c.name AS cname, u.name AS who FROM dunning_letters l JOIN sales_invoices s ON s.id = l.invoice_id"
+                 " LEFT JOIN customers c ON c.id = s.customer_id LEFT JOIN users u ON u.id = l.sent_by"
+                 " WHERE l.status = 'verstuurd' ORDER BY l.sent_at DESC LIMIT 50")
+    out = []
+    for r in items:
+        d = dict(r)
+        dd = _d(r["due_date"])
+        d["days_over"] = (_today() - date.fromisoformat(dd)).days if dd else None
+        out.append(d)
+    return render_template("debiteuren/aanmaningen.html", items=out, sent=sent, LEVELS=LEVELS, days=dun_days(), sender=sender(),
+                           has_data=bool(_setting("deb_last_update")))
+
+
+def _letter(lid):
+    return query("SELECT * FROM dunning_letters WHERE id = ?", (lid,), one=True) or abort(404)
+
+
+def _save_letter(lid):
+    f = request.form
+    execute("UPDATE dunning_letters SET to_addr = ?, subject = ?, body = ?, updated_at = ? WHERE id = ? AND status = 'voorstel'",
+            ((f.get("to_addr") or "").strip()[:500], (f.get("subject") or "").strip()[:300], (f.get("body") or "").strip()[:10000], now_iso(), lid))
+
+
+@bp.route("/aanmaningen/<int:lid>", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def letter_action(lid):
+    L = _letter(lid)
+    act = request.form.get("action")
+    if L["status"] != "voorstel":
+        flash("Deze brief is al verstuurd of vervallen.", "error")
+        return redirect(url_for("debiteuren.dunning"))
+    if act == "versturen":
+        if not can("debiteuren", BEHEER):
+            abort(403)
+        _save_letter(lid)
+        ok, msg = send_letter(get_db(), lid)
+        flash(msg, "ok" if ok else "error")
+    elif act == "opslaan":
+        _save_letter(lid)
+        flash("Opgeslagen.", "ok")
+    elif act == "verwijderen":
+        execute("UPDATE dunning_letters SET status = 'vervallen', note = ?, updated_at = ? WHERE id = ?",
+                (f"Weggegooid door {g.user['name']}", now_iso(), lid))
+        flash("Voorstel weggegooid. Bij de volgende ronde komt het terug als de factuur dan nog openstaat; gebruik 'Uitstellen' of 'Niet aanmanen' om dat te voorkomen.", "ok")
+    nxt = _safe_next(request.form.get("next"))
+    return redirect(nxt or (url_for("debiteuren.dunning") + f"#l{lid}"))
+
+
+def _safe_next(url):
+    url = (url or "").strip()
+    return url if url.startswith("/debiteuren/") and "//" not in url and "\\" not in url else None
+
+
+@bp.route("/<int:sid>/aanmanen", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def make_letter(sid):
+    conn = get_db()
+    inv = conn.execute("SELECT * FROM sales_invoices WHERE id = ?", (sid,)).fetchone() or abort(404)
+    if inv["status"] != "open":
+        flash("Deze factuur staat niet open.", "error")
+        return redirect(url_for("debiteuren.detail", sid=sid))
+    level = request.form.get("level", type=int) or min(inv["dun_level"] + 1, 3)
+    level = level if level in LEVELS else 1
+    conn.execute("UPDATE dunning_letters SET status = 'vervallen', note = 'Vervangen door een nieuw voorstel', updated_at = ? WHERE invoice_id = ? AND status = 'voorstel'",
+                 (now_iso(), sid))
+    lid = new_letter(conn, inv, level, auto=False, uid=g.user["id"])
+    conn.commit()
+    return redirect(url_for("debiteuren.dunning") + f"#l{lid}")
+
+
+@bp.route("/<int:sid>/uitstellen", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def postpone(sid):
+    from datetime import timedelta
+    inv = query("SELECT * FROM sales_invoices WHERE id = ?", (sid,), one=True) or abort(404)
+    w = request.form.get("when")
+    t = _today()
+    until = {"1w": t + timedelta(days=7), "2w": t + timedelta(days=14), "1m": t + timedelta(days=30)}.get(w)
+    if w == "datum":
+        until = _parse_iso(request.form.get("until"))
+    if w == "geen":
+        execute("UPDATE sales_invoices SET postpone_until = NULL, postpone_reason = NULL WHERE id = ?", (sid,))
+        flash("Uitstel opgeheven.", "ok")
+    elif not until or until <= t:
+        flash("Kies een datum in de toekomst.", "error")
+    else:
+        reason = (request.form.get("reason") or "").strip()[:500] or None
+        execute("UPDATE sales_invoices SET postpone_until = ?, postpone_reason = ? WHERE id = ?", (until.isoformat(), reason, sid))
+        execute("UPDATE dunning_letters SET status = 'vervallen', note = ?, updated_at = ? WHERE invoice_id = ? AND status = 'voorstel'",
+                (f"Uitgesteld tot {until.strftime('%d-%m-%Y')}", now_iso(), sid))
+        audit("aanmanen uitgesteld", "sales_invoice", sid, f"{inv['number']} tot {until.isoformat()}" + (f": {reason}" if reason else ""))
+        flash(f"Geen herinneringen voor factuur {inv['number']} tot {until.strftime('%d-%m-%Y')}.", "ok")
+    return redirect(_safe_next(request.form.get("next")) or url_for("debiteuren.detail", sid=sid))
+
+
+def _parse_iso(v):
+    try:
+        return date.fromisoformat((v or "")[:10])
+    except ValueError:
+        return None
+
+
+@bp.route("/<int:sid>/niet-aanmanen", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def toggle_no_dunning(sid):
+    inv = query("SELECT * FROM sales_invoices WHERE id = ?", (sid,), one=True) or abort(404)
+    new = 0 if inv["no_dunning"] else 1
+    execute("UPDATE sales_invoices SET no_dunning = ? WHERE id = ?", (new, sid))
+    if new:
+        execute("UPDATE dunning_letters SET status = 'vervallen', note = 'Niet aanmanen', updated_at = ? WHERE invoice_id = ? AND status = 'voorstel'", (now_iso(), sid))
+    audit("niet aanmanen " + ("aan" if new else "uit"), "sales_invoice", sid, inv["number"])
+    flash(f"Factuur {inv['number']}: " + ("wordt niet aangemaand." if new else "wordt weer meegenomen bij herinneringen."), "ok")
+    return redirect(_safe_next(request.form.get("next")) or url_for("debiteuren.detail", sid=sid))
+
+
+@bp.route("/<int:sid>/betaald", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def mark_paid(sid):
+    inv = query("SELECT * FROM sales_invoices WHERE id = ?", (sid,), one=True) or abort(404)
+    now = now_iso()
+    execute("UPDATE sales_invoices SET status = 'betaald', open_amount = 0, paid_at = ?, status_source = 'handmatig', status_at = ? WHERE id = ?", (now, now, sid))
+    execute("UPDATE dunning_letters SET status = 'vervallen', note = 'Handmatig op betaald', updated_at = ? WHERE invoice_id = ? AND status = 'voorstel'", (now, sid))
+    audit("handmatig op betaald", "sales_invoice", sid, inv["number"])
+    flash(f"Factuur {inv['number']} staat op betaald. Staat hij bij de volgende import nog open in SnelStart, dan gaat hij weer op open.", "ok")
+    return redirect(url_for("debiteuren.detail", sid=sid))

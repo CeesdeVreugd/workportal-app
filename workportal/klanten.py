@@ -19,7 +19,7 @@ def _f(name):
 
 
 CUSTOMER_FIELDS = ["name", "short_name", "debtor_no", "relation_type", "relation_group", "address", "postcode",
-                   "city", "phone", "email", "website", "notes", "alert", "language"]
+                   "city", "phone", "email", "invoice_email", "website", "notes", "alert", "language"]
 
 
 def customer_options(include_id=None):

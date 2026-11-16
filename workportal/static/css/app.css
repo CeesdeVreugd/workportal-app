@@ -1320,3 +1320,7 @@ section.card, form.card, .card.form { container-type: inline-size; }
 /* iPad/tablet als app (beginscherm): ruimte voor de statusbalk (tijd, batterij) boven de bovenbalk en het menu */
 .topbar { height: calc(68px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
 .sidebar { padding-top: calc(24px + env(safe-area-inset-top)); }
+.ticon { display: inline-flex; vertical-align: -2px; color: var(--muted); }
+.ticon svg, .table td .ticon svg { width: 16px; height: 16px; flex: none; }
+.dunmk { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dunmk select { width: auto; min-width: 180px; }

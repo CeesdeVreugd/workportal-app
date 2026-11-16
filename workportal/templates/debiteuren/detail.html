@@ -34,6 +34,29 @@
   {% else %}<div class="prose" style="white-space:pre-line">{{ s.note or '–' }}</div>{% endif %}
 </section>
 </div>
+{% if s.status == 'open' or letters %}
+<section class="card" id="aanmanen">
+  <div class="card-head"><div><h2>Herinneren en aanmanen</h2>
+    <div class="small muted">{% if s.dun_level %}Laatst: {{ LEVELS[s.dun_level] }} op {{ s.dunned_at|dt }}{% else %}Nog geen herinnering verstuurd{% endif %}
+      {% if s.no_dunning %} · <b>niet aanmanen</b>{% elif s.postpone_until and s.postpone_until > today %} · uitgesteld tot {{ s.postpone_until|date }}{% if s.postpone_reason %} ({{ s.postpone_reason }}){% endif %}{% endif %}
+      · factuur-e-mail: {% if cust and cust.invoice_email %}{{ cust.invoice_email }}{% elif s.customer_id %}<a href="{{ url_for('klanten.edit', cid=s.customer_id) }}">nog invullen bij de relatie</a>{% else %}klant niet gekoppeld{% endif %}</div></div></div>
+  {% if can('debiteuren', 2) and s.status == 'open' %}
+  <div class="actions" style="margin:0 0 10px">
+    <form method="post" action="{{ url_for('debiteuren.make_letter', sid=s.id) }}" class="inline dunmk"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="level" aria-label="Soort">{% for k, v in LEVELS.items() %}<option value="{{ k }}" {{ 'selected' if k == [s.dun_level + 1, 3]|min }}>{{ v }}</option>{% endfor %}</select>
+      <button class="btn primary sm">{{ icon('mail') }}Opstellen</button></form>
+    <form method="post" action="{{ url_for('debiteuren.toggle_no_dunning', sid=s.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ 'Weer aanmanen' if s.no_dunning else 'Niet aanmanen' }}</button></form>
+    <form method="post" action="{{ url_for('debiteuren.mark_paid', sid=s.id) }}" class="inline" data-confirm="Factuur {{ s.number }} op betaald zetten?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('check') }}Op betaald zetten</button></form>
+  </div>
+  <form method="post" action="{{ url_for('debiteuren.postpone', sid=s.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fgrid"><label class="f">Uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option>{% if s.postpone_until %}<option value="geen">uitstel opheffen</option>{% endif %}</select></label>
+      <label class="f dund" hidden>Tot<input type="date" name="until"></label>
+      <label class="f">Reden<input type="text" name="reason" placeholder="bijv. afspraak met klant"></label></div>
+    <div class="actions"><button class="btn sm">Opslaan</button></div></form>
+  {% endif %}
+  {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else '#' }}"><div class="grow"><div class="t">{{ LEVELS[l.level] }}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
+</section>
+{% endif %}
 {% if others %}
 <section class="card flush tablewrap">
   <div class="card-head" style="padding:16px 16px 0"><h2>Meer open bij deze klant</h2></div>

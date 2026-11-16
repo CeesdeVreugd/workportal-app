@@ -1020,6 +1020,24 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V200 (2.16.0)
+- Verkoopfacturen: **herinneren en aanmanen** (Verkoopfacturen > Herinneren en aanmanen).
+  - **Voorstellen:** elk uur maakt WorkPortal voorstellen voor open facturen die aan de beurt zijn: herinnering na 7 dagen, aanmaning na 21 en laatste aanmaning na 35 dagen over de vervaldatum (aanpasbaar). Tussen twee brieven zit minstens een week.
+  - **Melding:** de directie (beheer op debiteuren) krijgt een melding. Op het dashboard staat een balk zolang er voorstellen klaarstaan.
+  - **Goedkeuren:** aan, onderwerp en tekst zijn aan te passen. Goedkeuren en versturen mag alleen de directie; administratie kan opstellen en opslaan.
+  - **Zelf opstellen:** op de factuur kies je herinnering, aanmaning of laatste aanmaning en klik je 'Opstellen'.
+  - **Taal:** de brief komt in de taal van de relatie (NL/EN/DE/FR), met IBAN.
+  - **Versturen:** vanaf administratie@devreugd-pt.nl (aanpasbaar) met de handtekening van Administratie, met de factuur-PDF als bijlage.
+  - **Controle in SnelStart:** vlak voor versturen wordt in SnelStart gecontroleerd of de factuur al betaald is (als gekoppeld). Is hij betaald, dan gaat de brief niet weg en staat de factuur op betaald.
+  - **Uitstellen:** 1 week, 2 weken, 1 maand of tot een datum, met reden. Daarnaast 'Niet aanmanen' en 'Op betaald zetten'. Per factuur zie je welke brieven verstuurd zijn.
+- **Relaties:** nieuw veld **Factuur-e-mail**. Herinneringen gaan naar dat adres; staat het er niet, dan het e-mailadres van de factuur zelf, anders vul je het in bij het voorstel.
+- Databasemigratie 47 (customers.invoice_email, uitstel/niet aanmanen per factuur, dunning_letters).
+- Nodig in Microsoft 365: de app-registratie moet mogen versturen vanaf administratie@ (Mail.Send, adres in de ApplicationAccessPolicy-groep).
+
+## V199 (2.15.4)
+- Verkoopfacturen: het PDF-icoontje in de lijst was veel te groot en liep over de klantnaam heen. Nu is het klein, naast het factuurnummer.
+- DigiDossier: het script haalt facturen op vanaf 2020 (instelling $FactuurVanaf), in plaats van alleen dit jaar en vorig jaar. Per run worden nu 50 PDF's opgehaald, de nieuwste eerst. **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
+
 ## V198 (2.15.3)
 - Beheer > DC01 heeft nu twee tabbladen: **Orders** (zoals het was) en **Facturen**.
   - Status: laatste run, aantal factuurmappen, met PDF, wacht nog op PDF, laatste PDF, niet leesbaar, klant niet herkend.

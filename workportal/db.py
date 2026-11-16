@@ -868,6 +868,35 @@ MIGRATIONS = [
     ALTER TABLE sales_invoices ADD COLUMN attn TEXT;
     CREATE INDEX idx_sales_inv_project ON sales_invoices(project_id);
     """,
+    # 47 - herinneren en aanmanen: factuur-e-mail bij de relatie, uitstel/niet aanmanen per factuur, verstuurde brieven
+    """
+    ALTER TABLE customers ADD COLUMN invoice_email TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN postpone_until TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN postpone_reason TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN no_dunning INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE sales_invoices ADD COLUMN dun_level INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE sales_invoices ADD COLUMN dunned_at TEXT;
+    CREATE TABLE dunning_letters (
+        id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES sales_invoices(id) ON DELETE CASCADE,
+        level INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'voorstel',
+        auto INTEGER NOT NULL DEFAULT 0,
+        language TEXT,
+        to_addr TEXT,
+        subject TEXT,
+        body TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        sent_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        sent_at TEXT,
+        error TEXT,
+        note TEXT
+    );
+    CREATE INDEX idx_dunning_invoice ON dunning_letters(invoice_id, status);
+    CREATE INDEX idx_dunning_status ON dunning_letters(status);
+    """,
 ]
 
 

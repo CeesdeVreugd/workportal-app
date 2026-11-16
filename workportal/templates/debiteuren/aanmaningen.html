@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Herinneren en aanmanen{% endblock %}
+{% block content %}
+{% set boss = can('debiteuren', 3) %}
+<div class="pagehead">
+  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a></div><h1>Herinneren en aanmanen</h1>
+    <p>Voorstellen: herinnering na {{ days[0] }}, aanmaning na {{ days[1] }} en laatste aanmaning na {{ days[2] }} dagen over de vervaldatum. {% if boss %}Controleer de tekst en verstuur.{% else %}De directie keurt goed en verstuurt.{% endif %}</p></div>
+  <div class="actions"><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" name="action" value="voorstellen">{{ icon('refresh') }}Nu controleren</button></form></div>
+</div>
+{% if not has_data %}<div class="flash info">Nog geen openstaande posten ingelezen. Importeer eerst de Excel (of koppel SnelStart); daarna komen hier de voorstellen.</div>{% endif %}
+
+{% for l in items %}
+<section class="card dunitem" id="l{{ l.id }}">
+  <div class="card-head"><div>
+    <h2><span class="badge {{ 'b-bad' if l.level == 3 else 'b-warn' if l.level == 2 else 'b-blue' }}">{{ LEVELS[l.level] }}</span> Factuur <a href="{{ url_for('debiteuren.detail', sid=l.invoice_id) }}">{{ l.number }}</a></h2>
+    <div class="small muted">{{ l.cname or l.customer_name or '' }} · open {{ l.open_amount|eur(2) if l.open_amount is not none else '–' }} · vervallen {{ l.due_date|date }}{% if l.days_over %} ({{ l.days_over }} dagen){% endif %} · {{ 'automatisch voorstel' if l.auto else 'gemaakt door ' ~ (l.creator or '') }}{% if not l.pdf_file_id %} · <span style="color:var(--bad)">geen PDF om mee te sturen</span>{% endif %}</div></div>
+    {% if l.pdf_file_id %}<a class="btn sm ghost" href="{{ url_for('main.file', fid=l.pdf_file_id) }}" target="_blank" data-pdf="Factuur {{ l.number }}">{{ icon('pdf') }}Factuur</a>{% endif %}</div>
+  <form method="post" action="{{ url_for('debiteuren.letter_action', lid=l.id) }}" class="form" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="f">Aan<input type="text" name="to_addr" value="{{ l.to_addr or '' }}" inputmode="email" placeholder="factuur-e-mail van de klant">
+      {% if not l.invoice_email %}<span class="hint">{% if l.customer_id %}Geen factuur-e-mail bij <a href="{{ url_for('klanten.edit', cid=l.customer_id) }}">de relatie</a>. Vul die daar in, dan staat hij er de volgende keer vanzelf.{% else %}Klant niet gekoppeld; vul het adres hier in.{% endif %}</span>{% endif %}</label>
+    <label class="f">Onderwerp<input type="text" name="subject" value="{{ l.subject }}"></label>
+    <label class="f">Tekst<textarea name="body" rows="9">{{ l.body }}</textarea><span class="hint">Taal: {{ l.language|upper }} · vanaf {{ sender }} met de handtekening van Administratie{% if l.pdf_file_id %}, factuur als bijlage{% endif %}.</span></label>
+    {% if l.error %}<div class="flash error">Vorige poging mislukt: {{ l.error }}</div>{% endif %}
+    <div class="actions">
+      {% if boss %}<button class="btn primary" name="action" value="versturen" data-confirm="{{ LEVELS[l.level] }} voor factuur {{ l.number }} versturen?">{{ icon('mail') }}Goedkeuren en versturen</button>{% endif %}
+      <button class="btn" name="action" value="opslaan">Opslaan</button>
+      <button class="btn ghost" name="action" value="verwijderen" formnovalidate>Weggooien</button>
+    </div>
+  </form>
+  <details class="dunmore"><summary class="tksum">Uitstellen of niet aanmanen</summary>
+    <form method="post" action="{{ url_for('debiteuren.postpone', sid=l.invoice_id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('debiteuren.dunning') }}">
+      <div class="fgrid"><label class="f">Uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option></select></label>
+        <label class="f dund" hidden>Tot<input type="date" name="until"></label>
+        <label class="f">Reden<input type="text" name="reason" placeholder="bijv. klant betaalt eind van de maand"></label></div>
+      <div class="actions"><button class="btn sm">Uitstellen</button></div></form>
+    <form method="post" action="{{ url_for('debiteuren.toggle_no_dunning', sid=l.invoice_id) }}" class="inline" data-confirm="Factuur {{ l.number }} nooit meer aanmanen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('debiteuren.dunning') }}"><button class="btn sm ghost">Niet aanmanen</button></form>
+  </details>
+</section>
+{% else %}
+<div class="card"><div class="empty">Er staan geen herinneringen of aanmaningen klaar.</div></div>
+{% endfor %}
+
+{% if sent %}
+<section class="card"><div class="card-head"><h2>Laatst verstuurd</h2></div>
+  <div class="rows">{% for s in sent %}<a class="rowitem" href="{{ url_for('debiteuren.detail', sid=s.invoice_id) }}"><div class="grow"><div class="t">{{ LEVELS[s.level] }} · factuur {{ s.number }}</div><div class="s">{{ s.cname or s.customer_name or '' }} · {{ s.sent_at|dt }} door {{ s.who or '' }} aan {{ s.to_addr }}</div></div></a>{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if boss %}
+<section class="card"><details><summary class="tksum">{{ icon('beheer') }}Instellingen</summary>
+  <form method="post" class="form" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="instellingen">
+    <div class="fgrid three">
+      <label class="f">Herinnering na (dagen)<input type="number" name="d1" min="0" max="365" value="{{ days[0] }}"></label>
+      <label class="f">Aanmaning na<input type="number" name="d2" min="0" max="365" value="{{ days[1] }}"></label>
+      <label class="f">Laatste aanmaning na<input type="number" name="d3" min="0" max="365" value="{{ days[2] }}"></label>
+    </div>
+    <label class="f">Versturen vanaf<input type="email" name="sender" value="{{ sender }}"><span class="hint">De Microsoft-koppeling moet vanaf dit adres mogen versturen (Mail.Send, ApplicationAccessPolicy).</span></label>
+    <div class="actions"><button class="btn primary sm">Opslaan</button></div>
+  </form></details></section>
+{% endif %}
+{% endblock %}

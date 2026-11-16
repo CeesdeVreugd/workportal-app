@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.15.3"
+VERSION = "2.16.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie", "debiteuren.api_dossiers", "debiteuren.api_pdf",
                     "extern.visit", "extern.done", "extern.photo"}
@@ -93,14 +93,14 @@ def create_app(test_config=None, start_scheduler=True):
     from . import werk
     from .extern import bp as extern_bp
     from .taken import bp as taken_bp, open_count as task_count
-    from .debiteuren import bp as deb_bp, open_counts as deb_counts
+    from .debiteuren import bp as deb_bp, open_counts as deb_counts, pending_count as dun_count
     app.register_blueprint(extern_bp)
     for bp in (auth_bp, main_bp, klanten_bp, service_bp, druktest_bp, calc_bp, nacalc_bp, kennis_bp, beheer_bp, komdex_bp, models3d_bp, cred_bp, taken_bp, deb_bp):
         app.register_blueprint(bp)
     # Projecten en Orders: dezelfde code, twee modules
     app.register_blueprint(werk.bp, url_prefix="/projecten", name="projecten")
     app.register_blueprint(werk.bp, url_prefix="/orders", name="orders")
-    app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count, cred_counts=cred_counts, task_count=task_count, deb_counts=deb_counts)
+    app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count, cred_counts=cred_counts, task_count=task_count, deb_counts=deb_counts, dun_count=dun_count)
     from .util import on_phone_ok, is_phone
     app.jinja_env.globals.update(navok=lambda m: can(m) and on_phone_ok(m), is_phone=is_phone)
     from .auth import idle_minutes, device_label

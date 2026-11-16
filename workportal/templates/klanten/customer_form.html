@@ -19,6 +19,7 @@
     <label class="f">Plaats<input type="text" name="city" value="{{ c.city or '' }}"></label>
     <label class="f">Telefoon<input type="tel" name="phone" value="{{ c.phone or '' }}"></label>
     <label class="f">Algemeen e-mailadres<input type="email" name="email" value="{{ c.email or '' }}"></label>
+    <label class="f">Factuur-e-mail<input type="email" name="invoice_email" value="{{ c.invoice_email or '' }}" placeholder="bijv. crediteuren@klant.nl"><span class="hint">Herinneringen en aanmaningen gaan naar dit adres.</span></label>
     <label class="f">Website<input type="text" name="website" value="{{ c.website or '' }}"></label>
     <label class="f">Taal werkbonnen en mails<select name="language">{% for k, l in LANGS %}{{ opt(k, l, c.language or 'nl') }}{% endfor %}</select><span class="hint">De klant krijgt de werkbon en de mail erbij in deze taal.</span></label>
     <label class="f full">Notities<textarea name="notes">{{ c.notes or '' }}</textarea></label>
