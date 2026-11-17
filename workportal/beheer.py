@@ -292,6 +292,49 @@ def sharepoint_snelstart():
     return render_template("beheer/sharepoint_snelstart.html", plan=plan, counts=counts, extra=extra)
 
 
+def _dc01_relations():
+    """DC01 > Relaties: het Komdex-rapport 'Relatie Overzicht' (PDF) uit de gedeelde map."""
+    import json as _json
+    from . import komdex
+    conn = get_db()
+    if request.method == "POST":
+        act = request.form.get("action")
+        if act == "instellingen":
+            sp.set_setting(conn, "rel_auto_new", "1" if request.form.get("auto_new") == "1" else "0")
+            audit("instellingen", "komdex", None, "Relaties uit PDF: nieuwe relaties " + ("automatisch toevoegen" if request.form.get("auto_new") == "1" else "eerst beoordelen"))
+            flash("Opgeslagen.", "ok")
+        elif act == "opnieuw":
+            sp.set_setting(conn, "rel_pdf_sig", "")
+            flash("De relatie-PDF wordt bij de volgende run van het script opnieuw opgehaald en verwerkt.", "ok")
+        elif act == "upload":
+            f = request.files.get("file")
+            data = f.read() if f and f.filename else b""
+            if data[:4] != b"%PDF":
+                flash("Kies de PDF 'Relatie Overzicht' uit Komdex.", "error")
+            else:
+                try:
+                    info = komdex.process_relations_pdf(conn, data, f.filename[:200], source="handmatig")
+                    audit("relaties geïmporteerd", "customer", None, f"{f.filename}: {info['nieuw']} nieuw, {info['bijgewerkt']} bijgewerkt")
+                    flash(f"Verwerkt: {info['records']} relaties, {info['nieuw']} nieuw, {info['bijgewerkt']} bijgewerkt"
+                          + (f", {info['twijfel'] + info['nieuw_wacht']} te beoordelen." if info['twijfel'] + info['nieuw_wacht'] else "."), "ok")
+                except Exception as exc:  # noqa: BLE001
+                    flash(f"Inlezen mislukt: {exc}", "error")
+        conn.commit()
+        return redirect(url_for("beheer.dc01", tab="relaties"))
+    def js(key):
+        try:
+            return _json.loads(sp.setting(conn, key) or "null")
+        except ValueError:
+            return None
+    last, seen = js("rel_pdf_last"), js("rel_pdf_seen")
+    from . import relaties
+    pending = relaties.load(last["token"]) if last and last.get("token") else None
+    err = (sp.setting(conn, "rel_pdf_error") or "").split("|", 1)
+    counts = query("SELECT COUNT(*) AS alle, SUM(komdex_id IS NOT NULL) AS komdex, SUM(IFNULL(invoice_email, '') <> '') AS factuur FROM customers", one=True)
+    return render_template("beheer/dc01_relaties.html", last=last, seen=seen, pending=pending, err=err if err[0] else None,
+                           auto_new=(sp.setting(conn, "rel_auto_new") or "1") == "1", counts=counts)
+
+
 def _dc01_invoices():
     """DC01 > Facturen: verkoopfacturen uit het DigiDossier (via hetzelfde script)."""
     import json as _json
@@ -360,6 +403,8 @@ def dc01():
     from . import komdex
     if request.args.get("tab") == "facturen" or request.form.get("tab") == "facturen":
         return _dc01_invoices()
+    if request.args.get("tab") == "relaties" or request.form.get("tab") == "relaties":
+        return _dc01_relations()
     if request.method == "POST" and request.form.get("action") == "meldingen":
         import json as _json
         conn = get_db()

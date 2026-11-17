@@ -11,9 +11,9 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.16.3"
+VERSION = "2.17.0"
 
-PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie", "debiteuren.api_dossiers", "debiteuren.api_pdf",
+PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie", "komdex.relations_api", "debiteuren.api_dossiers", "debiteuren.api_pdf",
                     "extern.visit", "extern.done", "extern.photo"}
 
 

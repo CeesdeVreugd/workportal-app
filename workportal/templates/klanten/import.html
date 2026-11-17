@@ -7,8 +7,8 @@
 <div class="grid g2 stack">
   <form method="post" enctype="multipart/form-data" class="card form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <h2>Stap 1 · Excel kiezen</h2>
-    <label class="f">Relatie-export uit Komdex (.xlsx)<input type="file" name="file" accept=".xlsx" required></label>
+    <h2>Stap 1 · Bestand kiezen</h2>
+    <label class="f">Relatie-export uit Komdex: Excel (.xlsx) of het rapport Relatie Overzicht (.pdf)<input type="file" name="file" accept=".xlsx,.pdf" required></label>
     <div><button class="btn primary">{{ icon('upload') }}Inlezen en controleren</button></div>
     <p class="hint">Er wordt nog niets opgeslagen. Je krijgt eerst een overzicht van wat er verandert.</p>
   </form>

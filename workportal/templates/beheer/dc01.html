@@ -5,7 +5,7 @@
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
 {% include "beheer/_nav.html" %}
-<nav class="tabs" style="margin-bottom:16px"><a href="{{ url_for('beheer.dc01') }}" class="active">Orders</a><a href="{{ url_for('beheer.dc01', tab='facturen') }}">Facturen</a></nav>
+<nav class="tabs" style="margin-bottom:16px"><a href="{{ url_for('beheer.dc01') }}" class="active">Orders</a><a href="{{ url_for('beheer.dc01', tab='facturen') }}">Facturen</a><a href="{{ url_for('beheer.dc01', tab='relaties') }}">Relaties</a></nav>
 
 <div class="grid g2 stack">
   <section class="card">

@@ -53,7 +53,7 @@ HEADERS = {
 FIELDS = ["short_name", "name", "address", "postcode", "city", "phone", "email", "website",
           "relation_type", "relation_group", "active"]
 FIELD_LABELS = {"short_name": "Verkorte naam", "name": "Naam", "address": "Adres", "postcode": "Postcode",
-                "city": "Plaats", "phone": "Telefoon", "email": "E-mail", "website": "Website",
+                "city": "Plaats", "phone": "Telefoon", "email": "E-mail", "invoice_email": "Factuur-e-mail", "website": "Website",
                 "relation_type": "Type", "relation_group": "Groep", "active": "Actief"}
 
 LEGAL = r"\b(b\.?\s?v\.?|v\.?\s?o\.?\s?f\.?|n\.?\s?v\.?|holding|groep|group|nederland|the|de|het)\b"
@@ -195,6 +195,70 @@ def parse_relations(data: bytes):
     return out, warnings
 
 
+PDF_COLS = [("komdex_id", r"^id$"), ("name", r"^naam$"), ("address", r"^bezoekadres|^adres"), ("postcode", r"^postcode"),
+            ("city", r"^plaats"), ("phone", r"^tel"), ("email", r"^algemeen"), ("invoice_email", r"^factuur")]
+PDF_FIELDS = ["name", "address", "postcode", "city", "phone", "email", "invoice_email"]
+
+
+def parse_relations_pdf(data: bytes):
+    """Leest het Komdex-rapport 'Relatie Overzicht' (PDF): kolommen ID, Naam, Bezoekadres, Postcode, Plaats, Tel.,
+    Algemeen E-mail, Factuur E-mail. Kolommen op positie van de kop. Geeft (records, waarschuwingen)."""
+    import pdfplumber
+    out, warnings, seen = [], [], set()
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for pno, page in enumerate(pdf.pages, start=1):
+            words = page.extract_words()
+            head = [w for w in words if w["text"] == "ID" and w["x0"] < page.width / 4]
+            if not head:
+                continue
+            htop = head[0]["top"]
+            hwords = sorted([w for w in words if abs(w["top"] - htop) < 3], key=lambda w: w["x0"])
+            starts = []
+            for key, pat in PDF_COLS:
+                hw = next((w for w in hwords if re.match(pat, w["text"], re.I)), None)
+                if hw:
+                    starts.append((hw["x0"] - 3, key))
+            starts.sort()
+            if len(starts) < 4 or starts[0][1] != "komdex_id":
+                raise ValueError("Kolomkoppen niet herkend. Is dit het Komdex-rapport 'Relatie Overzicht'?")
+            lines = {}
+            for w in words:
+                if w["top"] > htop + 5:
+                    lines.setdefault(round(w["top"] / 2), []).append(w)
+            for k in sorted(lines):
+                ws = sorted(lines[k], key=lambda w: w["x0"])
+                if not re.fullmatch(r"\d+", ws[0]["text"]) or ws[0]["x0"] > starts[1][0]:
+                    continue
+                rec = {}
+                for w in ws:
+                    key = [key for x, key in starts if x <= w["x0"]]
+                    key = key[-1] if key else "komdex_id"
+                    rec[key] = (rec.get(key, "") + " " + w["text"]).strip()
+                if not rec.get("name"):
+                    continue   # bijv. de totaalregel onderaan
+                kid = rec["komdex_id"]
+                if kid in seen:
+                    warnings.append(f"Pagina {pno}: ID {kid} komt dubbel voor, overgeslagen")
+                    continue
+                seen.add(kid)
+                r = {"komdex_id": kid, "_row": f"p{pno}", "_fields": PDF_FIELDS}
+                for f in PDF_FIELDS:
+                    r[f] = _text(rec.get(f))
+                for f in ("email", "invoice_email"):
+                    if r[f] and "@" not in r[f]:
+                        r[f] = None
+                # ontbrekende velden in de rest van het overzicht leeg laten (niet: type/groep/taal)
+                r.update({"short_name": None, "relation_type": None, "relation_group": None, "active": 1, "language": None, "website": None})
+                out.append(r)
+    if not out:
+        raise ValueError("Geen relaties gevonden in de PDF.")
+    return out, warnings
+
+
+def parse_any(data: bytes):
+    return parse_relations_pdf(data) if data[:4] == b"%PDF" else parse_relations(data)
+
+
 # ---------------------------------------------------------------- tijdelijke opslag tussen stap 1 en 2
 
 def _dir():
@@ -229,6 +293,18 @@ def discard(token):
 
 # ---------------------------------------------------------------- plan en uitvoeren
 
+def _fields(rec):
+    """Velden die deze bron levert (de PDF-export heeft bijv. geen type/groep, maar wel de factuur-e-mail)."""
+    return rec.get("_fields") or FIELDS
+
+
+def _snap_json(row, rec):
+    """Snapshot bijwerken voor de velden uit deze bron; andere velden uit de vorige snapshot houden."""
+    snap = _snapshot(row) if row is not None else {}
+    snap.update({f: rec.get(f) for f in _fields(rec)})
+    return json.dumps(snap)
+
+
 def _snapshot(row):
     try:
         return json.loads(row["komdex_snapshot"] or "{}")
@@ -240,7 +316,7 @@ def _changes(row, rec):
     """Velden die in Komdex zijn gewijzigd t.o.v. de vorige import (of t.o.v. de app als er nog niets is)."""
     snap = _snapshot(row)
     out = {}
-    for f in FIELDS:
+    for f in _fields(rec):
         new = rec.get(f)
         base = snap[f] if f in snap else row[f]
         if (new or None) != (base or None) and (new or None) != (row[f] or None):
@@ -283,43 +359,49 @@ def plan(records):
 
 
 def _insert(db, rec, now):
-    vals = [rec.get(f) for f in FIELDS]
-    snap = json.dumps({f: rec.get(f) for f in FIELDS})
-    db.execute(f"INSERT INTO customers (komdex_id, komdex_snapshot, {', '.join(FIELDS)}, created_at, updated_at)"
-               f" VALUES (?, ?, {', '.join('?' * len(FIELDS))}, ?, ?)", [rec["komdex_id"], snap] + vals + [now, now])
+    fl = _fields(rec)
+    vals = [rec.get(f) for f in fl]
+    snap = json.dumps({f: rec.get(f) for f in fl})
+    db.execute(f"INSERT INTO customers (komdex_id, komdex_snapshot, {', '.join(fl)}, created_at, updated_at)"
+               f" VALUES (?, ?, {', '.join('?' * len(fl))}, ?, ?)", [rec["komdex_id"], snap] + vals + [now, now])
 
 
-def apply(records, decisions):
-    """decisions: {komdex_id: 'app:<id>' | 'excel:<id>' | 'apart'}"""
+def apply(records, decisions, safe_only=False, add_new=True):
+    """decisions: {komdex_id: 'app:<id>' | 'excel:<id>' | 'apart'}
+    safe_only: twijfelgevallen (lijkt op een bestaande relatie zonder Komdex-ID) overslaan; die komen in stats['conflicts']."""
     db = get_db()
     now = now_iso()
     p = plan(records)
     stats = {"nieuw": 0, "bijgewerkt": 0, "ongewijzigd": p["unchanged"], "gekoppeld": 0, "namen": [], "dubbel": []}
-    for rec in p["new"]:
+    stats["conflicts"] = [c["rec"] for c in p["conflicts"]] if safe_only else []
+    stats["new_skipped"] = [] if add_new else list(p["new"])
+    for rec in (p["new"] if add_new else []):
         _insert(db, rec, now)
         stats["nieuw"] += 1
     for u in p["updates"]:
         sets = {f: new for f, (_, new) in u["changes"].items()}
         if "name" in sets:
             stats["namen"].append((u["changes"]["name"][0], sets["name"]))
-        snap = json.dumps({f: u["rec"].get(f) for f in FIELDS})
+        row = db.execute("SELECT * FROM customers WHERE id = ?", (u["id"],)).fetchone()
+        snap = _snap_json(row, u["rec"])
         db.execute(f"UPDATE customers SET {', '.join(f + ' = ?' for f in sets)}, komdex_snapshot = ?, updated_at = ?"
                    f" WHERE id = ?", list(sets.values()) + [snap, now, u["id"]])
         stats["bijgewerkt"] += 1
     used = set()
-    for c in p["conflicts"]:
+    for c in ([] if safe_only else p["conflicts"]):
         rec = c["rec"]
         choice = decisions.get(rec["komdex_id"], "")
         kind, _, cid = choice.partition(":")
         cid = int(cid) if cid.isdigit() else None
         valid = {cand["id"] for cand in c["candidates"]}
-        snap = json.dumps({f: rec.get(f) for f in FIELDS})
+        snap = json.dumps({f: rec.get(f) for f in _fields(rec)})
         if kind in ("app", "excel") and cid in valid and cid not in used:
             used.add(cid)
             if kind == "excel":
+                fl = _fields(rec)
                 db.execute(f"UPDATE customers SET komdex_id = ?, komdex_snapshot = ?, "
-                           f"{', '.join(f + ' = ?' for f in FIELDS)}, updated_at = ? WHERE id = ?",
-                           [rec["komdex_id"], snap] + [rec.get(f) for f in FIELDS] + [now, cid])
+                           f"{', '.join(f + ' = ?' for f in fl)}, updated_at = ? WHERE id = ?",
+                           [rec["komdex_id"], snap] + [rec.get(f) for f in fl] + [now, cid])
             else:
                 db.execute("UPDATE customers SET komdex_id = ?, komdex_snapshot = ?, updated_at = ? WHERE id = ?",
                            (rec["komdex_id"], snap, now, cid))

@@ -1020,6 +1020,17 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V204 (2.17.0)
+- **Relaties uit het Komdex-rapport 'Relatie Overzicht' (PDF)** in plaats van de Excel.
+  - **Ophalen:** het script op DC01 pakt de nieuwste PDF uit `GedeeldeMap\Komdex relatie's export` ($RelatieMap) en stuurt hem alleen als hij nieuw of gewijzigd is.
+  - **Wat wordt overgenomen:** naam, bezoekadres, postcode, plaats, telefoon, algemeen e-mail en **factuur-e-mail** (voor herinneringen en aanmaningen).
+  - **Wat blijft staan:** type, groep, taal en notities blijven zoals ze in WorkPortal staan.
+  - **Komdex is leidend:** wat in Komdex gewijzigd is sinds de vorige keer, wordt overgenomen bij relaties die al aan het Komdex-ID gekoppeld zijn. Nieuwe relaties worden automatisch toegevoegd (instelling).
+  - **Twijfelgevallen:** lijkt een nieuwe Komdex-relatie op een bestaande relatie zonder Komdex-ID, dan blijft die staan om te beoordelen (koppelen of apart).
+- Beheer > DC01 heeft een derde tabblad **Relaties**: status, resultaat van de laatste PDF, 'te beoordelen', instelling, 'Opnieuw ophalen en verwerken' en handmatig inlezen.
+- Relaties > Importeren accepteert nu ook de PDF.
+- **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
+
 ## V203 (2.16.3)
 - DigiDossier: herinneringen en aanmaningen in een factuurmap worden niet meer als factuur opgehaald.
   - Het script kiest de PDF zonder 'herinnering/aanmaning/sommatie/reminder/mahnung/rappel' in de naam, liefst met 'factuur/invoice' erin, en daarvan de nieuwste.

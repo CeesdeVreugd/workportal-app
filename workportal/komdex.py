@@ -532,3 +532,65 @@ def push():
     if not isinstance(folders, list):
         return jsonify({"error": "Verwacht {\"folders\": [...]}"}), 400
     return jsonify(receive(get_db(), folders))
+
+
+# ---------------------------------------------------------------- relaties (PDF 'Relatie Overzicht' uit de gedeelde map)
+
+def process_relations_pdf(conn, data, filename, sig=None, source="DC01"):
+    """PDF verwerken: wijzigingen bij gekoppelde relaties en (instelling) nieuwe relaties direct overnemen;
+    twijfelgevallen (lijkt op een bestaande relatie zonder Komdex-ID) blijven staan om te beoordelen."""
+    from . import relaties
+    records, warnings = relaties.parse_any(data)
+    auto_new = (sp.setting(conn, "rel_auto_new") or "1") == "1"
+    stats = relaties.apply(records, {}, safe_only=True, add_new=auto_new)
+    pending = stats["conflicts"] + stats["new_skipped"]
+    token = relaties.store(pending, warnings, filename) if pending else None
+    info = {"at": now_iso(), "filename": filename, "source": source, "records": len(records), "nieuw": stats["nieuw"],
+            "bijgewerkt": stats["bijgewerkt"], "ongewijzigd": stats["ongewijzigd"], "twijfel": len(stats["conflicts"]),
+            "nieuw_wacht": len(stats["new_skipped"]), "token": token, "warnings": warnings[:20],
+            "factuur_email": sum(1 for r in records if r.get("invoice_email"))}
+    old = sp.setting(conn, "rel_pdf_last")
+    try:
+        old_token = json.loads(old).get("token") if old else None
+        if old_token and old_token != token:
+            relaties.discard(old_token)
+    except ValueError:
+        pass
+    sp.set_setting(conn, "rel_pdf_last", json.dumps(info))
+    if sig:
+        sp.set_setting(conn, "rel_pdf_sig", sig)
+    conn.commit()
+    return info
+
+
+@bp.route("/api/komdex/relaties", methods=["POST"])
+def relations_api():
+    """Het script stuurt de nieuwste relatie-PDF (eerst alleen naam/datum/grootte; met data als WorkPortal erom vraagt)."""
+    if not _key_ok():
+        return jsonify({"error": "Ongeldige sleutel"}), 401
+    js = request.get_json(silent=True) or {}
+    conn = get_db()
+    sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
+    sp.set_setting(conn, "rel_pdf_seen", json.dumps({"at": now_iso(), "filename": str(js.get("filename") or "")[:200]}))
+    conn.commit()
+    if not js.get("data"):
+        return jsonify({"ok": True, "want": sp.setting(conn, "rel_pdf_sig") != sig})
+    try:
+        data = base64.b64decode(js.get("data") or "", validate=True)
+    except (binascii.Error, ValueError):
+        return jsonify({"error": "Ongeldige inhoud"}), 400
+    if data[:4] != b"%PDF":
+        return jsonify({"error": "Geen PDF"}), 400
+    try:
+        info = process_relations_pdf(conn, data, str(js.get("filename") or "relaties.pdf")[:200], sig)
+    except Exception as exc:  # noqa: BLE001 - reden terug naar het script
+        conn.rollback()
+        import traceback
+        traceback.print_exc()
+        sp.set_setting(conn, "rel_pdf_error", f"{now_iso()}|{type(exc).__name__}: {str(exc)[:200]}")
+        conn.commit()
+        return jsonify({"ok": False, "resultaat": f"FOUT in WorkPortal: {type(exc).__name__}: {str(exc)[:200]}"})
+    sp.set_setting(conn, "rel_pdf_error", "")
+    conn.commit()
+    return jsonify({"ok": True, "resultaat": f"{info['records']} relaties: {info['nieuw']} nieuw, {info['bijgewerkt']} bijgewerkt"
+                                             f"{', ' + str(info['twijfel']) + ' te beoordelen' if info['twijfel'] else ''}"})

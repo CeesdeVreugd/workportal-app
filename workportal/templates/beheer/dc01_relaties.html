@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}DC01 – relaties{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
+{% include "beheer/_nav.html" %}
+<nav class="tabs" style="margin-bottom:16px"><a href="{{ url_for('beheer.dc01') }}">Orders</a><a href="{{ url_for('beheer.dc01', tab='facturen') }}">Facturen</a><a href="{{ url_for('beheer.dc01', tab='relaties') }}" class="active">Relaties</a></nav>
+
+{% if err %}<div class="flash error">Laatste verwerking mislukt ({{ err[0]|dt }}): {{ err[1] }}</div>{% endif %}
+{% if pending and pending.records %}
+<a class="actionbar" href="{{ url_for('klanten.import_review', token=last.token) }}">{{ icon('klanten') }}<span><b>{{ pending.records|length }} relatie{{ 's' if pending.records|length != 1 }} te beoordelen</b>{% if last.twijfel %}: lijkt op een bestaande relatie zonder Komdex-ID{% endif %}{% if last.nieuw_wacht %}{{ ',' if last.twijfel else ':' }} nieuw in Komdex{% endif %}.</span><span class="go">Beoordelen →</span></a>
+{% endif %}
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Status</h2>
+    <dl class="dl">
+      <dt>Script ziet</dt><dd>{% if seen %}{{ seen.filename }} <span class="muted">· {{ seen.at|dt }}</span>{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
+      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">…\DigiDossier\GedeeldeMap\Komdex relatie's export <span class="muted">($RelatieMap in het script)</span></dd>
+      <dt>Laatst verwerkt</dt><dd>{% if last %}{{ last.at|dt }} <span class="muted">· {{ last.filename }}{% if last.source == 'handmatig' %} (handmatig){% endif %}</span>{% else %}–{% endif %}</dd>
+      {% if last %}
+      <dt>Relaties in de PDF</dt><dd>{{ last.records }} <span class="muted">({{ last.factuur_email }} met factuur-e-mail)</span></dd>
+      <dt>Resultaat</dt><dd>{{ last.nieuw }} nieuw · {{ last.bijgewerkt }} bijgewerkt · {{ last.ongewijzigd }} ongewijzigd{% if last.twijfel or last.nieuw_wacht %} · <b>{{ last.twijfel + last.nieuw_wacht }} te beoordelen</b>{% endif %}</dd>
+      {% if last.warnings %}<dt>Meldingen</dt><dd class="small">{{ last.warnings|join('; ') }}</dd>{% endif %}
+      {% endif %}
+      <dt>Relaties in WorkPortal</dt><dd>{{ counts.alle }} <span class="muted">({{ counts.komdex or 0 }} gekoppeld aan Komdex, {{ counts.factuur or 0 }} met factuur-e-mail)</span></dd>
+    </dl>
+    <form method="post" class="actions" style="margin-top:12px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tab" value="relaties">
+      <button class="btn sm" name="action" value="opnieuw">{{ icon('refresh') }}Opnieuw ophalen en verwerken</button></form>
+  </section>
+  <section class="card">
+    <h2>Zo werkt de sync</h2>
+    <ul class="steps-list" style="margin-top:0">
+      <li>Zet in Komdex het rapport <i>Relatie Overzicht</i> als PDF in de gedeelde map <code>Komdex relatie's export</code>.</li>
+      <li>Het script <code>komdex-orders.ps1</code> pakt de nieuwste PDF en stuurt hem naar WorkPortal (alleen als hij nieuw of gewijzigd is).</li>
+      <li>Gegevens uit de PDF: naam, bezoekadres, postcode, plaats, telefoon, algemeen e-mail en <b>factuur-e-mail</b>. Type, groep, taal en notities blijven zoals ze in WorkPortal staan.</li>
+      <li>Komdex is leidend: wat in Komdex is gewijzigd sinds de vorige keer, wordt overgenomen bij relaties die al aan het Komdex-ID gekoppeld zijn.</li>
+      <li>Lijkt een nieuwe Komdex-relatie op een bestaande relatie zonder Komdex-ID, dan beoordeel je zelf: koppelen of apart toevoegen.</li>
+    </ul>
+  </section>
+</div>
+
+<div class="grid g2 stack">
+  <section class="card">
+    <h2>Instellingen</h2>
+    <form method="post" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tab" value="relaties"><input type="hidden" name="action" value="instellingen">
+      <label class="check"><input type="checkbox" name="auto_new" value="1" {{ 'checked' if auto_new }}> Nieuwe relaties uit Komdex automatisch toevoegen</label>
+      <p class="hint" style="margin:0">Uit: nieuwe relaties komen eerst bij 'te beoordelen'.</p>
+      <div class="actions"><button class="btn primary sm">Opslaan</button></div></form>
+  </section>
+  <section class="card">
+    <h2>Handmatig inlezen</h2>
+    <form method="post" enctype="multipart/form-data" class="form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="tab" value="relaties"><input type="hidden" name="action" value="upload">
+      <label class="f">PDF Relatie Overzicht<input type="file" name="file" accept=".pdf" required></label>
+      <div class="actions"><button class="btn sm">{{ icon('upload') }}Inlezen en verwerken</button></div></form>
+  </section>
+</div>
+{% endblock %}

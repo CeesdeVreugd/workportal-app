@@ -456,7 +456,7 @@ def import_upload():
             flash("Kies de Excel-export uit Komdex.", "error")
             return redirect(url_for("klanten.import_upload"))
         try:
-            records, warnings = relaties.parse_relations(f.read())
+            records, warnings = relaties.parse_any(f.read())
         except Exception as exc:
             flash(f"Inlezen mislukt: {exc}", "error")
             return redirect(url_for("klanten.import_upload"))

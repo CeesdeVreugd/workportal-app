@@ -9,6 +9,7 @@
   Komdex-map (alleen lezen).
   Daarnaast: de verkoopfacturen uit het DigiDossier ($FactuurMap, jaarmappen > factuurmap > PDF) voor de module
   Verkoopfacturen. Ook alleen lezen; per keer hooguit 50 PDF's.
+  En de nieuwste PDF 'Relatie Overzicht' uit $RelatieMap (relaties bijwerken, met factuur-e-mail).
 
   Instellen:
     1. Vul hieronder $OrderMap en $Sleutel in ($Sleutel = KOMDEX_KEY uit Portainer).
@@ -27,6 +28,7 @@ $Sleutel    = "VUL-HIER-KOMDEX_KEY-IN"                         # zelfde waarde a
 $Jaren      = 2                                                 # aantal recente jaarmappen dat wordt bekeken (2 = dit jaar en vorig jaar)
 $FactuurMap = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\facturen"   # DigiDossier verkoopfacturen (jaarmappen > factuurmap > PDF); leeg = overslaan
 $FactuurVanaf = 2020                                            # facturen vanaf dit jaar (jaarmappen 2020, 2021, ...)
+$RelatieMap = "D:\Shares\Komdex\Administraties\DeVreugd\DigiDossier\GedeeldeMap\Komdex relatie's export"   # Komdex-rapport 'Relatie Overzicht' (PDF); leeg = overslaan
 $Logbestand = "$PSScriptRoot\komdex-orders.log"
 # -------------------------------------------------------------------------
 
@@ -181,6 +183,26 @@ try {
             }
         }
         catch { Log ("Facturen: FOUT " + $_.Exception.Message) }
+    }
+
+    # Relaties: nieuwste PDF 'Relatie Overzicht' uit de gedeelde map (alleen als WorkPortal hem nog niet heeft)
+    if ($RelatieMap -and (Test-Path -LiteralPath $RelatieMap)) {
+        try {
+            $rp = Get-ChildItem -LiteralPath $RelatieMap -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($rp) {
+                $meta = @{ filename = $rp.Name; modified = $rp.LastWriteTimeUtc.ToString("o"); size = $rp.Length }
+                $r5 = Invoke-RestMethod -Uri "$WorkPortal/api/komdex/relaties" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Compress))) `
+                    -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 60
+                if ($r5.want) {
+                    $meta.data = [Convert]::ToBase64String((LeesBestand $rp.FullName))
+                    $r6 = Invoke-RestMethod -Uri "$WorkPortal/api/komdex/relaties" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Compress))) `
+                        -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 180
+                    Log ("Relaties {0}: {1}" -f $rp.Name, $r6.resultaat)
+                }
+            }
+        }
+        catch { Log ("Relaties: FOUT " + $_.Exception.Message) }
     }
 }
 catch {
