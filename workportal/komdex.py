@@ -147,29 +147,64 @@ def order_props(row):
         return {}
 
 
-def _enrich(conn, pid, it):
-    """Bestaand project/order aanvullen met de orderbon (alleen lege velden)."""
+def _enrich(conn, pid, it, old_bon=None):
+    """Bestaand project/order bijwerken met de (nieuwe) orderbon. Lege velden worden aangevuld. Is een veld nog gelijk
+    aan wat de vorige orderbon zei (dus niet zelf aangepast in WorkPortal), dan volgt het de nieuwe orderbon: Komdex is
+    leidend. Wijzigt zo de omschrijving, dan krijgen het project/de order en de map in SharePoint de nieuwe naam."""
     bon = bon_of(it) or {}
+    old_bon = old_bon or {}
+    changed = []
     if it["customer_id"]:
         conn.execute("UPDATE projects SET customer_id = COALESCE(customer_id, ?) WHERE id = ?", (it["customer_id"], pid))
+    p = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
     fields = {"order_type": "order_type", "executor": "executor", "order_date": "order_date", "delivery_date": "delivery_date",
               "delivery_week": "delivery_week", "reference": "reference", "contact_name": "contact", "work_description": "work"}
     for col, key in fields.items():
-        if bon.get(key):
-            conn.execute(f"UPDATE projects SET {col} = COALESCE(NULLIF({col}, ''), ?) WHERE id = ?", (bon[key], pid))
+        new = bon.get(key)
+        if not new:
+            continue
+        cur = p[col]
+        if not cur or (old_bon.get(key) and str(cur).strip() == str(old_bon[key]).strip() and str(new).strip() != str(cur).strip()):
+            conn.execute(f"UPDATE projects SET {col} = ? WHERE id = ?", (new, pid))
+            if cur:
+                changed.append(col)
+    new_name, old_name = (bon.get("description") or "").strip(), (old_bon.get("description") or "").strip()
+    if new_name and old_name and new_name != old_name and (p["name"] or "").strip() == old_name:
+        conn.execute("UPDATE projects SET name = ? WHERE id = ?", (new_name, pid))
+        changed.append("name")
     _set_props(conn, pid, bon)
     if it["bon_file_id"]:  # altijd de nieuwste orderbon
         conn.execute("UPDATE projects SET bon_file_id = ? WHERE id = ?", (it["bon_file_id"], pid))
-        conn.execute("UPDATE files SET entity = 'project', entity_id = ? WHERE id = ?", (pid, it["bon_file_id"]))
+        conn.execute("UPDATE files SET entity = 'project', entity_id = ? WHERE id = ?", (it["bon_file_id"], pid))
     conn.commit()
+    msg = ""
+    if changed:
+        labels = {"name": "omschrijving", "order_type": "ordertype", "executor": "uitvoerder", "order_date": "orderdatum",
+                  "delivery_date": "leverdatum", "delivery_week": "leverweek", "reference": "referentie",
+                  "contact_name": "contactpersoon", "work_description": "werkomschrijving"}
+        conn.execute("INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?,?,?,?,?,?)",
+                     (None, "bijgewerkt uit nieuwe orderbon", "project", pid, ", ".join(labels.get(c, c) for c in changed), now_iso()))
+        conn.commit()
+        msg = "bijgewerkt (" + ", ".join(labels.get(c, c) for c in changed) + ")"
+    if "name" in changed:
+        try:
+            r = sp.rename_project_folder(conn, pid)
+        except Exception as exc:  # pragma: no cover - netwerk
+            r = f"Map in SharePoint niet hernoemd: {exc}"
+        if r:
+            conn.execute("INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?,?,?,?,?,?)",
+                         (None, "SharePoint-map", "project", pid, r, now_iso()))
+            conn.commit()
+            msg += "; " + r
+    return msg
 
 
-def auto_process(conn, iid):
+def auto_process(conn, iid, old_bon=None):
     """Na ontvangst van de orderbon: automatisch aanmaken als ordertype en klant bekend zijn. Geeft een melding terug."""
     it = conn.execute("SELECT * FROM order_inbox WHERE id = ?", (iid,)).fetchone()
     if it["project_id"]:
-        _enrich(conn, it["project_id"], it)
-        return "aangevuld"
+        m = _enrich(conn, it["project_id"], it, old_bon)
+        return "aangevuld" + (f"; {m}" if m else "")
     if it["status"] == "bestaand":
         return _from_existing(conn, it)
     if it["status"] != "nieuw":
@@ -443,6 +478,18 @@ def orderbon():
         conn.execute("UPDATE order_inbox SET status = 'nieuw', handled_by = NULL, handled_at = NULL,"
                      " note = 'Was genegeerd; er staat nu een orderbon in de map, dus opnieuw opgepakt.' WHERE id = ?", (it["id"],))
         conn.commit()
+    old_bon = bon_of(it) or {}
+    old_hash = None
+    if it["bon_file_id"]:
+        try:
+            import hashlib
+            from .util import file_path
+            frow = conn.execute("SELECT * FROM files WHERE id = ?", (it["bon_file_id"],)).fetchone()
+            if frow:
+                with open(file_path(frow), "rb") as fh:
+                    old_hash = hashlib.sha256(fh.read()).hexdigest()
+        except Exception:  # noqa: BLE001
+            old_hash = None
     fid = save_bytes("order_inbox", it["id"], data, fname, kind="orderbon", mime="application/pdf")
     cid = it["customer_id"]
     if bon.get("customer"):
@@ -454,7 +501,7 @@ def orderbon():
     conn.execute("UPDATE order_inbox SET note = NULL WHERE id = ? AND note LIKE 'Orderbon ''%'' ontvangen (%'", (it["id"],))
     conn.commit()
     try:
-        result = auto_process(conn, it["id"])
+        result = auto_process(conn, it["id"], old_bon)
     except Exception as exc:  # noqa: BLE001 - bon is opgeslagen; fout tonen in plaats van het script te laten falen
         print(f"[WorkPortal] Orderbon {fname} verwerken mislukt: {exc!r}", flush=True)
         conn.rollback()
@@ -464,13 +511,19 @@ def orderbon():
         result = "actie nodig (fout bij verwerken)"
     # nieuwe order (geen bestaande map van vóór de koppeling), eerste keer dat de orderbon binnenkomt: automatisch printen
     from . import printix
-    if (it["status"] != "bestaand" and not it["printed_at"] and not it["bon_received_at"] and printix.configured()
+    # en opnieuw printen als er een gewijzigde orderbon komt bij een order die al eerder is geprint/verwerkt
+    import hashlib
+    first = not it["printed_at"] and not it["bon_received_at"]
+    changed_bon = bool(it["bon_received_at"] and old_hash and old_hash != hashlib.sha256(data).hexdigest())
+    if (it["status"] != "bestaand" and (first or changed_bon) and printix.configured()
             and printix.setting(conn, "printix_auto_orderbon") == "1" and printix.printer(conn)):
-        printix.print_background(current_app.config["DB_PATH"], data, f"Orderbon {it['number']}", it["id"])
+        printix.print_background(current_app.config["DB_PATH"], data, f"Orderbon {it['number']}" + (" (gewijzigd)" if changed_bon else ""), it["id"])
         result = (result or "") + " · wordt geprint"
         try:
-            from .util import audit
-            audit("afgedrukt", "order_inbox", it["id"], f"{it['number']} · Orderbon · automatisch bij binnenkomst")
+            conn.execute("INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?,?,?,?,?,?)",
+                         (None, "afgedrukt", "order_inbox", it["id"],
+                          f"{it['number']} · Orderbon · " + ("gewijzigde orderbon, automatisch opnieuw" if changed_bon else "automatisch bij binnenkomst"), now_iso()))
+            conn.commit()
         except Exception:
             pass
     return jsonify({"ok": True, "ordertype": bon.get("order_type"), "resultaat": result})

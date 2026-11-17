@@ -1020,6 +1020,17 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V213 (2.20.1)
+- **Gewijzigde orderbon** voor een bestaand project of een bestaande order:
+  - **Velden:** wat Komdex wijzigt, wordt overgenomen (omschrijving, leverdatum/-week, uitvoerder, referentie, contactpersoon, ordertype, werkomschrijving). Dat geldt alleen als het veld in WorkPortal nog gelijk was aan de vorige orderbon; wat iemand zelf heeft aangepast, blijft staan. Lege velden worden zoals altijd aangevuld.
+  - **Omschrijving gewijzigd:** het project/de order krijgt de nieuwe naam en de **map in SharePoint wordt hernoemd**.
+  - **Logboek:** in het logboek van het project staat wat er is bijgewerkt.
+  - **Opnieuw printen:** staat automatisch printen aan, dan wordt een gewijzigde orderbon (andere inhoud) opnieuw geprint met '(gewijzigd)' in de titel. Hetzelfde bestand opnieuw opgeslagen geeft geen nieuwe afdruk.
+- **Inkoopfacturen uitlezen:**
+  - **Al betaalde factuur** ('Payments -216,00', 'Amount due 0,00'): het bedrag is nu het factuurtotaal in plaats van 0.
+  - **Engelse datums** zoals 'Nov 15, 2026' worden herkend.
+  - **Geen btw** (verlegd / reverse charge / 0%): excl. = incl.
+
 ## V212 (2.20.0)
 - **Inkoopfacturen: archief ophalen** (beheer, knop 'Archief ophalen'). WorkPortal haalt de facturen op die al in de map **01-Verwerkt** van de factuurmailbox staan, vanaf een gekozen datum (standaard 1 januari vorig jaar).
   - **Status:** ze krijgen de status Afgerond (Komdex en SnelStart). Staat de Outlook-categorie Afgewezen erop, dan Afgewezen. De categorieën Komdex en buiten Komdex om worden overgenomen.

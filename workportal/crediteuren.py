@@ -41,8 +41,11 @@ _poll_lock = threading.Lock()
 # ------------------------------------------------------------------ PDF uitlezen
 
 _AMOUNT = r"(?:€|eur|euro)?\s*(-?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})|-?\d+(?:,\d{2})|-?\d{1,3}(?:,\d{3})*\.\d{2})"
-_DATE = r"(\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|oct|nov|dec)[a-z]*\.?\s+\d{4})"
-_MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "apr": 4, "mei": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "okt": 10, "oct": 10, "nov": 11, "dec": 12}
+_MON = r"(?:jan|feb|mrt|maa|mar|apr|mei|may|mai|jun|jul|aug|sep|okt|oct|nov|dec|dez)"
+_DATE = (r"(\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\.?\s+" + _MON + r"[a-zä]*\.?,?\s+\d{4}"
+         r"|" + _MON + r"[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})")
+_MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "mar": 3, "mär": 3, "apr": 4, "mei": 5, "may": 5, "mai": 5, "jun": 6, "jul": 7, "aug": 8,
+           "sep": 9, "okt": 10, "oct": 10, "nov": 11, "dec": 12, "dez": 12}
 
 
 def parse_amount(s):
@@ -87,10 +90,14 @@ def parse_date(s):
         if m:
             d, mo, y = int(m[1]), int(m[2]), int(m[3])
         else:
-            m = re.match(r"(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})$", s)
-            if not m or m[2][:3] not in _MONTHS:
-                return None
-            d, mo, y = int(m[1]), _MONTHS[m[2][:3]], int(m[3])
+            m = re.match(r"(\d{1,2})\.?\s+([a-zä]+)\.?,?\s+(\d{4})$", s)
+            if m and m[2][:3] in _MONTHS:
+                d, mo, y = int(m[1]), _MONTHS[m[2][:3]], int(m[3])
+            else:   # Engels: "Nov 15, 2026"
+                m = re.match(r"([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$", s)
+                if not m or m[1][:3] not in _MONTHS:
+                    return None
+                d, mo, y = int(m[2]), _MONTHS[m[1][:3]], int(m[3])
     if y < 100:
         y += 2000
     try:
@@ -376,6 +383,13 @@ def extract(data):
             incl = incl or _below_amount(ws, r"(?<![\w.])(?:totaal|total)(?![\w ]*(?:btw|vat|excl|netto))")
     out["amount_incl"] = parse_amount(incl)
     out["amount_excl"] = parse_amount(excl)
+    # al (deels) betaald: 'Amount due' / 'Te betalen' is dan 0 of minder dan de factuur zelf; de kosten zijn het factuurtotaal
+    tot = parse_amount(_find([r"(?:invoice\s*amount|factuurbedrag|rechnungsbetrag)" + gap + _AMOUNT_SL,
+                              r"^\s*(?:grand\s*)?total(?!\s*(?:due|vat|excl|net|payable|outstanding))[^\n\d€-]{0,15}" + _AMOUNT_SL,
+                              r"^\s*totaal(?!\s*(?:btw|vat|excl|netto|te\s*betalen|openstaand))[^\n\d€-]{0,15}" + _AMOUNT_SL], text))
+    if tot and tot > 0 and (out["amount_incl"] is None or (abs(out["amount_incl"]) < tot - 0.004
+                                                           and re.search(r"\bpayments?\b|\bpaid\b|betaald|voldaan|ontvangen|bezahlt|received", text, re.I))):
+        out["amount_incl"] = tot
     # creditfactuur: bedragen eerst zonder minteken narekenen, aan het eind negatief maken
     credit = is_credit_text(text) or any(v is not None and v < 0 for v in (out["amount_incl"], out["amount_excl"]))
     for k in ("amount_incl", "amount_excl"):
@@ -414,6 +428,9 @@ def extract(data):
             out["amount_excl"] = round(inc - vat, 2)
         elif _close_vat(ex, vat):
             out["amount_incl"] = round(ex + vat, 2)   # incl. verkeerd gelezen (bijv. een regelbedrag): excl. + btw klopt wel
+    if out["amount_excl"] is None and out["amount_incl"] and re.search(
+            r"reverse[\s-]*charge|btw\s*verlegd|verlegde\s*btw|vat\s*(?:is\s*)?not\s*applicable|\b0\s*%\s*(?:btw|vat)", text, re.I):
+        out["amount_excl"] = out["amount_incl"]   # geen btw (verlegd / buitenland): excl. = incl.
     if credit:
         for k in ("amount_incl", "amount_excl"):
             if out[k]:
