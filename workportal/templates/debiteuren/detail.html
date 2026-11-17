@@ -13,7 +13,7 @@
 <section class="card">
   <dl class="dl">
     <dt>Factuurdatum</dt><dd>{{ s.invoice_date|date if s.invoice_date else '–' }}</dd>
-    <dt>Vervaldatum</dt><dd>{{ s.due_date|date if s.due_date else '–' }}</dd>
+    <dt>Vervaldatum</dt><dd>{{ s.due_date|date if s.due_date else '–' }}{% if info.due_from_terms and s.status_source != 'snelstart' %} <span class="small muted">(berekend: {{ info.due_from_terms }}{{ ' dagen' if info.due_from_terms is number }} na factuurdatum)</span>{% endif %}</dd>
     <dt>Bedrag</dt><dd>{{ s.amount|eur(2) if s.amount is not none else '–' }}</dd>
     <dt>Betaald</dt><dd>{{ s.paid|eur(2) if s.paid is not none else '–' }}</dd>
     <dt>Openstaand</dt><dd><b>{{ s.open_amount|eur(2) if s.open_amount is not none else '–' }}</b></dd>

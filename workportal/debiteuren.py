@@ -231,6 +231,28 @@ def _date_txt(v):
     return _d(v.replace("/", "-").replace(".", "-"))
 
 
+def _due_txt(v, inv_date):
+    """Vervaldatum; sommige (oudere) facturen hebben de Amerikaanse volgorde '11-16-2025'. Kies de lezing die
+    0-180 dagen na de factuurdatum valt (eerst dag-maand-jaar)."""
+    v = (v or "").strip()
+    m = re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$", v)
+    if not m:
+        return _date_txt(v)
+    a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    cands = []
+    for d_, m_ in ((a, b), (b, a)):
+        try:
+            cands.append(date(y, m_, d_))
+        except ValueError:
+            pass
+    if inv_date:
+        base = date.fromisoformat(inv_date)
+        for c in cands:
+            if 0 <= (c - base).days <= 180:
+                return c.isoformat()
+    return cands[0].isoformat() if cands else None
+
+
 def _address_block(page):
     """Linkerkolom onder 'Factuuradres:' (rechts staat het werk-/afleveradres)."""
     words = page.extract_words()
@@ -276,7 +298,16 @@ def parse_pdf(data):
     m = (re.search(r"(?:vervaldatum|due\s*date|f[äa]llig(?:keitsdatum)?|[ée]ch[ée]ance)\s*[:.]?\s*" + DATE_TXT, text, re.I)
          or re.search(r"(?:betaling\s+v[oó][oó]r|payment\s+(?:before|by)|zahlung\s+bis(?:\s+zum)?|paiement\s+avant\s+le)\s+" + DATE_TXT, text, re.I))
     if m:
-        out["due_date"] = _date_txt(m.group(1))
+        out["due_date"] = _due_txt(m.group(1), out.get("invoice_date"))
+    if not out.get("due_date") and out.get("invoice_date"):
+        # geen vervaldatum op de factuur: betalingstermijn ('binnen 30 dagen', '30 dagen netto', 'within 14 days'), anders 30 dagen
+        m = re.search(r"(?:binnen|within|innerhalb(?:\s+von)?|sous|dans\s+les)\s+(\d{1,3})\s*(?:dagen|days|tagen|jours)", text, re.I) \
+            or re.search(r"(\d{1,3})\s*(?:dagen|days|tage|jours)\s*(?:netto|net|na\s+factuurdatum|after\s+invoice)", text, re.I) \
+            or re.search(r"(?:betalingstermijn|betalingsconditie|payment\s+terms?|zahlungsziel|zahlungsbedingung)[^\n\d]{0,30}(\d{1,3})", text, re.I)
+        days = int(m.group(1)) if m and 0 < int(m.group(1)) <= 180 else 30
+        from datetime import timedelta
+        out["due_date"] = (date.fromisoformat(out["invoice_date"]) + timedelta(days=days)).isoformat()
+        out["due_from_terms"] = days if m else "standaard 30"
     m = re.search(r"^\s*(?:totaal|total|gesamt(?:betrag)?|te betalen)\b[^\n\d€-]*€?\s*(-?\s*[\d.]+,\d{2})", text, re.I | re.M)
     if m:
         out["amount"] = _amount(m.group(1).replace(" ", ""))
@@ -445,9 +476,11 @@ def apply_info(conn, inv, info):
                  " amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
                  (cid, info.get("customer"), pid, info.get("order_no"), info.get("attn"), json.dumps(info, ensure_ascii=False),
                   info.get("invoice_date"), info.get("due_date"), info.get("amount"), info.get("mail_to"), now_iso(), inv["id"]))
+    # betaald gemeld voordat het bedrag bekend was: betaald = factuurbedrag
+    conn.execute("UPDATE sales_invoices SET paid = amount WHERE id = ? AND status = 'betaald' AND paid IS NULL AND amount IS NOT NULL", (inv["id"],))
 
 
-PARSE_VERSION = "3"
+PARSE_VERSION = "5"
 
 
 def reparse(conn, ids=None, upload_dir=None):

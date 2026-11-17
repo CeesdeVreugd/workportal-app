@@ -1020,6 +1020,13 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V205 (2.17.1)
+- Verkoopfacturen: de vervaldatum ontbrak bij oudere facturen.
+  - **Oorzaak:** daarop staat de datum in de Amerikaanse volgorde ('betaling voor 11-16-2025' = 16 november). WorkPortal kiest nu de lezing die na de factuurdatum valt.
+  - **Geen vervaldatum op de factuur:** dan rekent WorkPortal met de betalingstermijn ('binnen 30 dagen', '14 dagen netto'), en anders met 30 dagen. Bij de factuur staat dan '(berekend …)'.
+- Factuur die op betaald ging voordat het bedrag bekend was: bij 'Betaald' staat nu het factuurbedrag in plaats van '–'.
+- Bij het bijwerken worden alle opgeslagen factuur-PDF's eenmalig opnieuw uitgelezen.
+
 ## V204 (2.17.0)
 - **Relaties uit het Komdex-rapport 'Relatie Overzicht' (PDF)** in plaats van de Excel.
   - **Ophalen:** het script op DC01 pakt de nieuwste PDF uit `GedeeldeMap\Komdex relatie's export` ($RelatieMap) en stuurt hem alleen als hij nieuw of gewijzigd is.
