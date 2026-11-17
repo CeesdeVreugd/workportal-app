@@ -1020,6 +1020,19 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V209 (2.19.0)
+- **Herinneringen zijn nu een eigen onderdeel met een nummer** (H-2026-0001, H-2026-0002, …), gekoppeld aan de facturen die erin staan.
+  - Het nummer komt bij het versturen. Het staat in het onderwerp, op de PDF-brief en in de bestandsnaam.
+  - Bestaande verstuurde herinneringen krijgen alsnog een nummer.
+- **Verkoopfacturen heeft drie tabbladen:**
+  - **Facturen**;
+  - **Te versturen** (de voorstellen, met teller);
+  - **Herinneringen**: alle verstuurde herinneringen met nummer, klant, facturen (met 'betaald'), datum, nog open en antwoorden van de klant. Met filters en zoeken; klik voor het mailgesprek.
+- **Opnieuw versturen** (directie): op de herinnering, met hetzelfde nummer en dezelfde tekst. De brief wordt bijgewerkt met de facturen die nu nog openstaan. Het staat in het gesprek als 'mail aan klant'.
+- Facturenoverzicht: nieuwe kolom **Termijn**, met 'nog 4 dagen', 'vandaag' of 'x dg vervallen'.
+- De eerste zin van de mailtekst is grammaticaal netter bij meerdere facturen (alle talen).
+- Databasemigratie 51 (dunning_letters.number).
+
 ## V208 (2.18.2)
 - **Mailgesprek bij een herinnering**, zoals bij de servicetickets. Na het versturen staat elke herinnering/aanmaning als gesprek in WorkPortal: de verstuurde mail (met bijlagen), de antwoorden van de klant en jullie antwoorden en notities.
   - **Antwoorden ophalen:** het onderwerp krijgt [WP-H..] erbij. Antwoorden van de klant (ook met bijlagen) worden elke 5 minuten uit de mailbox van de afzender (administratie@) opgehaald en naar de WorkPortal-map verplaatst, net als bij service. De verstuurder krijgt een melding.

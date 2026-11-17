@@ -1,0 +1,7 @@
+{% macro deb_tabs(active) %}{% set nd = dun_count() %}
+<nav class="tabs" style="margin-bottom:16px" aria-label="Verkoopfacturen">
+  <a href="{{ url_for('debiteuren.index') }}" class="{{ 'active' if active == 'facturen' }}">Facturen</a>
+  <a href="{{ url_for('debiteuren.dunning') }}" class="{{ 'active' if active == 'voorstellen' }}">Te versturen{% if nd %} <span class="navbadge" style="position:static;margin-left:4px">{{ nd }}</span>{% endif %}</a>
+  <a href="{{ url_for('debiteuren.letters') }}" class="{{ 'active' if active == 'herinneringen' }}">Herinneringen</a>
+</nav>
+{% endmacro %}

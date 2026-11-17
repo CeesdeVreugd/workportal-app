@@ -5,10 +5,16 @@
 {% block content %}
 {% set edit = can('debiteuren', 2) %}
 <div class="pagehead">
-  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.dunning') }}">Herinneren en aanmanen</a></div>
-    <h1>{{ LEVELS[L.level] }}{% if cust %} · {{ cust.name }}{% endif %}</h1>
+  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.letters') }}">Herinneringen</a>{% if L.number %} · {{ L.number }}{% endif %}</div>
+    <h1>{{ LEVELS[L.level] }} {{ L.number or '' }}</h1>
+    <p>{% if cust %}<a href="{{ url_for('klanten.customer', cid=cust.id) }}">{{ cust.name }}</a> · {% endif %}{{ invs|length }} factu{{ 'ur' if invs|length == 1 else 'ren' }}</p>
     <p>Verstuurd {{ L.sent_at|dt }}{% if who %} door {{ who.name }}{% endif %} aan {{ L.to_addr }}</p></div>
-  <div class="actions"><a class="btn" href="{{ url_for('debiteuren.letter_preview', lid=L.id) }}" target="_blank" data-pdf="{{ LEVELS[L.level] }}">{{ icon('pdf') }}Brief (PDF)</a></div>
+  <div class="actions"><a class="btn" href="{{ url_for('debiteuren.letter_preview', lid=L.id) }}" target="_blank" data-pdf="{{ LEVELS[L.level] }} {{ L.number or '' }}">{{ icon('pdf') }}Brief (PDF)</a>
+    {% if can('debiteuren', 3) %}<details class="cred-pop"><summary class="btn primary">{{ icon('refresh') }}Opnieuw versturen</summary>
+      <form method="post" class="form" data-confirm="{{ L.number or 'Herinnering' }} opnieuw versturen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="opnieuw">
+        <label class="f">Aan<input type="text" name="to" value="{{ L.to_addr }}" required></label>
+        <p class="hint" style="margin:0">Zelfde nummer en tekst; de brief wordt bijgewerkt met de facturen die nu nog openstaan.</p>
+        <div class="actions"><button class="btn primary sm">Versturen</button></div></form></details>{% endif %}</div>
 </div>
 
 <section class="card flush tablewrap">

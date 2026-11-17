@@ -757,7 +757,7 @@ DUN = {
         "subject": {1: "Herinnering openstaande facturen", 2: "Aanmaning openstaande facturen", 3: "Laatste aanmaning openstaande facturen"},
         "subject1": {1: "Herinnering factuur {nr}", 2: "Aanmaning factuur {nr}", 3: "Laatste aanmaning factuur {nr}"},
         "body": {
-            1: "Geachte heer/mevrouw,\n\nVolgens onze administratie staat er nog {what} open met een totaalbedrag van {total}. "
+            1: "Geachte heer/mevrouw,\n\nVolgens onze administratie staat er nog een bedrag van {total} open ({what}). "
                "In de bijlage vindt u een overzicht en de {docs}.\n\nWilt u het openstaande bedrag binnen 7 dagen overmaken op {iban} "
                "onder vermelding van de factuurnummers? Heeft u inmiddels betaald, dan kunt u deze herinnering als niet verzonden beschouwen.",
             2: "Geachte heer/mevrouw,\n\nOndanks onze eerdere herinnering hebben wij de betaling van {what} (totaal {total}) nog niet ontvangen. "
@@ -791,7 +791,7 @@ DUN = {
         "subject": {1: "Payment reminder outstanding invoices", 2: "Second reminder outstanding invoices", 3: "Final notice outstanding invoices"},
         "subject1": {1: "Payment reminder invoice {nr}", 2: "Second reminder invoice {nr}", 3: "Final notice invoice {nr}"},
         "body": {
-            1: "Dear Sir/Madam,\n\nAccording to our records, {what} with a total of {total} is still outstanding. "
+            1: "Dear Sir/Madam,\n\nAccording to our records, an amount of {total} is still outstanding ({what}). "
                "Please find attached an overview and the {docs}.\n\nPlease transfer the outstanding amount within 7 days to {iban} "
                "(BIC RABONL2U), stating the invoice numbers. If you have already paid, please disregard this reminder.",
             2: "Dear Sir/Madam,\n\nDespite our earlier reminder, we have not yet received payment of {what} (total {total}). "
@@ -823,7 +823,7 @@ DUN = {
         "subject": {1: "Zahlungserinnerung offene Rechnungen", 2: "Mahnung offene Rechnungen", 3: "Letzte Mahnung offene Rechnungen"},
         "subject1": {1: "Zahlungserinnerung Rechnung {nr}", 2: "Mahnung Rechnung {nr}", 3: "Letzte Mahnung Rechnung {nr}"},
         "body": {
-            1: "Sehr geehrte Damen und Herren,\n\nlaut unserer Buchhaltung ist {what} über insgesamt {total} noch offen. "
+            1: "Sehr geehrte Damen und Herren,\n\nlaut unserer Buchhaltung ist noch ein Betrag von {total} offen ({what}). "
                "Im Anhang finden Sie eine Übersicht und die {docs}.\n\nBitte überweisen Sie den offenen Betrag innerhalb von 7 Tagen auf {iban} "
                "(BIC RABONL2U) unter Angabe der Rechnungsnummern. Sollten Sie bereits bezahlt haben, betrachten Sie diese Erinnerung bitte als gegenstandslos.",
             2: "Sehr geehrte Damen und Herren,\n\ntrotz unserer Erinnerung haben wir die Zahlung von {what} (insgesamt {total}) noch nicht erhalten. "
@@ -854,7 +854,7 @@ DUN = {
         "subject": {1: "Rappel factures impayées", 2: "Relance factures impayées", 3: "Dernière relance factures impayées"},
         "subject1": {1: "Rappel facture {nr}", 2: "Relance facture {nr}", 3: "Dernière relance facture {nr}"},
         "body": {
-            1: "Madame, Monsieur,\n\nSelon notre comptabilité, {what} d'un total de {total} reste impayé(e). "
+            1: "Madame, Monsieur,\n\nSelon notre comptabilité, un montant de {total} reste impayé ({what}). "
                "Vous trouverez en pièce jointe un récapitulatif et les {docs}.\n\nNous vous prions de virer le montant dû sous 7 jours sur {iban} "
                "(BIC RABONL2U) en indiquant les numéros de facture. Si vous avez déjà payé, veuillez ne pas tenir compte de ce rappel.",
             2: "Madame, Monsieur,\n\nMalgré notre rappel, nous n'avons pas encore reçu le paiement de {what} (total {total}). "
@@ -1107,8 +1107,9 @@ def letter_pdf(conn, L, invs):
                      "days": T["days"].format(n=days) if days and days > 0 else T["notdue"], "open": _eur(_open(i)),
                      "late": bool(days and days > 0), "selected": i["id"] in ids})
     total = sum(_open(i) for i in alle)
+    num = L["number"] if "number" in L.keys() else None
     return dunning_pdf(T, L["level"], addr, rows, _eur(total), IBAN, _today().strftime("%d-%m-%Y"),
-                       overdue=_eur(over) if abs(over - total) > 0.004 else None)
+                       overdue=_eur(over) if abs(over - total) > 0.004 else None, number=num)
 
 
 def send_letter(conn, lid):
@@ -1147,10 +1148,52 @@ def send_letter(conn, lid):
                      (json.dumps(keep), keep[0], subject, body, now, lid))
         conn.commit()
         return False, f"Niet verstuurd: factuur {', '.join(paid)} is volgens SnelStart inmiddels betaald. Het voorstel is aangepast; controleer het en verstuur opnieuw."
+    number = L["number"] or next_number(conn)
+    L = dict(L, number=number)
+    pdf, atts = _attachments(conn, L, invs)
+    fname = atts[0][0]
+    subject = _subject_with(L["subject"], number, lid)
+    ok, err = send_mail_with_files(sender(conn), to, subject, L["body"], atts, signer="administratie")
+    if not ok:
+        conn.execute("UPDATE dunning_letters SET error = ?, updated_at = ? WHERE id = ?", (str(err)[:400], now, lid))
+        conn.commit()
+        return False, f"Versturen mislukt: {err}"
+    fid = save_bytes("dunning_letter", lid, pdf, fname, kind="brief", mime="application/pdf")
+    conn = get_db()
+    conn.execute("UPDATE dunning_letters SET status = 'verstuurd', number = ?, sent_by = ?, sent_at = ?, error = NULL, pdf_file_id = ?, subject = ?,"
+                 " invoice_ids = ?, updated_at = ? WHERE id = ?", (number, g.user["id"], now, fid, subject, json.dumps([i["id"] for i in invs]), now, lid))
+    conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_by, created_at) VALUES (?, 'mail_uit', ?, ?, ?, ?)",
+                 (lid, L["body"], json.dumps({"to": to, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now))
+    for inv in invs:
+        conn.execute("UPDATE sales_invoices SET dun_level = MAX(dun_level, ?), dunned_at = ? WHERE id = ?", (L["level"], now, inv["id"]))
+    conn.commit()
+    nrs = ", ".join(i["number"] for i in invs)
+    for inv in invs:
+        audit(f"{LEVELS[L['level']].lower()} verstuurd", "sales_invoice", inv["id"], f"{inv['number']} aan {', '.join(to)}")
+    return True, f"{LEVELS[L['level']]} {number} verstuurd aan {', '.join(to)} (factuur {nrs})."
+
+
+def next_number(conn):
+    """Volgend herinneringnummer: H-<jaar>-0001, H-<jaar>-0002, ..."""
+    y = _today().year
+    r = conn.execute("SELECT MAX(CAST(substr(number, 8) AS INTEGER)) AS m FROM dunning_letters WHERE number LIKE ?", (f"H-{y}-%",)).fetchone()
+    return f"H-{y}-{(r['m'] or 0) + 1:04d}"
+
+
+def _subject_with(subject, number, lid):
+    s_ = DUN_TAG.sub("", subject or "").strip()
+    if number and number not in s_:
+        s_ = f"{s_} ({number})"
+    return f"{s_} [WP-H{lid}]"
+
+
+def _attachments(conn, L, invs):
+    """Brief (PDF) + de factuur-PDF's."""
+    from .util import file_path
     pdf = letter_pdf(conn, L, invs)
     title = DUN.get(L["language"] or "nl", DUN["nl"])["title"][L["level"]]
     cname = re.sub(r"[^\w .-]+", "", (invs[0]["customer_name"] or "")).strip()[:60]
-    fname = f"{title} - {cname} - {_today().strftime('%d-%m-%Y')}.pdf".replace("  ", " ")
+    fname = f"{title} {L.get('number') or ''} - {cname} - {_today().strftime('%d-%m-%Y')}.pdf".replace("  ", " ")
     atts = [(fname, pdf, "application/pdf")]
     for inv in invs:
         if inv["pdf_file_id"]:
@@ -1161,25 +1204,38 @@ def send_letter(conn, lid):
                         atts.append((f"Factuur_{inv['number']}.pdf", fh.read(), "application/pdf"))
                 except OSError:
                     pass
-    subject = L["subject"] if DUN_TAG.search(L["subject"] or "") else f"{L['subject']} [WP-H{lid}]"
-    ok, err = send_mail_with_files(sender(conn), to, subject, L["body"], atts, signer="administratie")
+    return pdf, atts
+
+
+def resend_letter(conn, lid, to):
+    """Verstuurde herinnering opnieuw sturen (zelfde nummer), met de facturen die nu nog openstaan."""
+    from .mail import send_mail_with_files
+    L = conn.execute("SELECT * FROM dunning_letters WHERE id = ?", (lid,)).fetchone()
+    if not L or L["status"] != "verstuurd":
+        return False, "Alleen een verstuurde herinnering kan opnieuw worden verstuurd."
+    if not to or any(not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
+        return False, "Vul een geldig e-mailadres in."
+    ids = letter_ids(L)
+    invs = [r for r in conn.execute(f"SELECT * FROM sales_invoices WHERE id IN ({','.join('?' * len(ids))}) ORDER BY due_date, number", ids)
+            if r["status"] == "open"]
+    if not invs:
+        return False, "Alle facturen van deze herinnering zijn inmiddels betaald."
+    pdf, atts = _attachments(conn, dict(L), invs)
+    ok, err = send_mail_with_files(sender(conn), to, L["subject"], L["body"], atts, signer="administratie")
     if not ok:
-        conn.execute("UPDATE dunning_letters SET error = ?, updated_at = ? WHERE id = ?", (str(err)[:400], now, lid))
-        conn.commit()
         return False, f"Versturen mislukt: {err}"
-    fid = save_bytes("dunning_letter", lid, pdf, fname, kind="brief", mime="application/pdf")
+    now = now_iso()
+    fid = save_bytes("dunning_letter", lid, pdf, atts[0][0], kind="brief", mime="application/pdf")
     conn = get_db()
-    conn.execute("UPDATE dunning_letters SET status = 'verstuurd', sent_by = ?, sent_at = ?, error = NULL, pdf_file_id = ?, subject = ?,"
-                 " invoice_ids = ?, updated_at = ? WHERE id = ?", (g.user["id"], now, fid, subject, json.dumps([i["id"] for i in invs]), now, lid))
+    conn.execute("UPDATE dunning_letters SET pdf_file_id = ?, updated_at = ? WHERE id = ?", (fid, now, lid))
     conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_by, created_at) VALUES (?, 'mail_uit', ?, ?, ?, ?)",
-                 (lid, L["body"], json.dumps({"to": to, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now))
+                 (lid, L["body"], json.dumps({"to": to, "subject": L["subject"], "files": [a[0] for a in atts], "resend": True}, ensure_ascii=False),
+                  g.user["id"], now))
     for inv in invs:
-        conn.execute("UPDATE sales_invoices SET dun_level = MAX(dun_level, ?), dunned_at = ? WHERE id = ?", (L["level"], now, inv["id"]))
+        conn.execute("UPDATE sales_invoices SET dunned_at = ? WHERE id = ?", (now, inv["id"]))
     conn.commit()
-    nrs = ", ".join(i["number"] for i in invs)
-    for inv in invs:
-        audit(f"{LEVELS[L['level']].lower()} verstuurd", "sales_invoice", inv["id"], f"{inv['number']} aan {', '.join(to)}")
-    return True, f"{LEVELS[L['level']]} verstuurd aan {', '.join(to)} (factuur {nrs})."
+    audit("herinnering opnieuw verstuurd", "dunning_letter", lid, f"{L['number']} aan {', '.join(to)}")
+    return True, f"{L['number'] or LEVELS[L['level']]} opnieuw verstuurd aan {', '.join(to)}."
 
 
 def pending_count():
@@ -1593,6 +1649,12 @@ def conversation(lid):
                     flash(f"{n} nieuw{'e' if n != 1 else ''} antwoord{'en' if n != 1 else ''} opgehaald." if n else "Geen nieuwe antwoorden.", "ok")
                 except Exception as exc:  # noqa: BLE001
                     flash(f"Ophalen mislukt: {str(exc)[:300]}", "error")
+        elif act == "opnieuw":
+            if not can("debiteuren", BEHEER):
+                abort(403)
+            to = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
+            ok, msg = resend_letter(conn, lid, to)
+            flash(msg, "ok" if ok else "error")
         elif act == "notitie" and text:
             execute("INSERT INTO dunning_messages (letter_id, kind, body, created_by, created_at) VALUES (?, 'notitie', ?, ?, ?)",
                     (lid, text, g.user["id"], now_iso()))
@@ -1633,3 +1695,31 @@ def conversation(lid):
     state = {"last": _setting("deb_mail_last"), "error": _setting("deb_mail_error"), "on": graph_configured()}
     return render_template("debiteuren/gesprek.html", L=L, invs=invs, cust=cust, msgs=msgs, reply_to=reply_to, LEVELS=LEVELS,
                            who=who, box=sender(), state=state)
+
+
+@bp.route("/herinneringen")
+@require("debiteuren")
+def letters():
+    """Overzicht van alle verstuurde herinneringen/aanmaningen (met nummer), gekoppeld aan de facturen."""
+    q = (request.args.get("q") or "").strip()
+    flt = request.args.get("f") or "alle"
+    rows = query("SELECT l.*, c.name AS cname, u.name AS who, (SELECT COUNT(*) FROM dunning_messages m WHERE m.letter_id = l.id AND m.kind = 'mail_in') AS replies,"
+                 " (SELECT MAX(created_at) FROM dunning_messages m WHERE m.letter_id = l.id AND m.kind = 'mail_in') AS last_reply"
+                 " FROM dunning_letters l LEFT JOIN customers c ON c.id = l.customer_id LEFT JOIN users u ON u.id = l.sent_by"
+                 " WHERE l.status = 'verstuurd' ORDER BY l.sent_at DESC LIMIT 1000")
+    inv = {r["id"]: r for r in query("SELECT id, number, status, open_amount, amount, customer_name FROM sales_invoices")}
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["invs"] = [inv[i] for i in letter_ids(r) if i in inv]
+        d["open"] = sum((i["open_amount"] if i["open_amount"] is not None else (i["amount"] or 0)) for i in d["invs"] if i["status"] == "open")
+        d["all_paid"] = bool(d["invs"]) and all(i["status"] == "betaald" for i in d["invs"])
+        d["cname"] = d["cname"] or (d["invs"][0]["customer_name"] if d["invs"] else "")
+        if flt == "open" and d["all_paid"]:
+            continue
+        if flt == "antwoord" and not d["replies"]:
+            continue
+        if q and q.lower() not in " ".join([d["number"] or "", d["cname"] or "", d["to_addr"] or ""] + [i["number"] for i in d["invs"]]).lower():
+            continue
+        out.append(d)
+    return render_template("debiteuren/herinneringen.html", rows=out, q=q, flt=flt, LEVELS=LEVELS)

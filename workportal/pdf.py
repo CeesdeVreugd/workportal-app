@@ -582,7 +582,7 @@ def delivery_pdf(d, lines, sig_dv=None, sig_cust=None, lang="nl", number_label=N
     return buf.getvalue()
 
 
-def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str, overdue=None):
+def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str, overdue=None, number=None):
     """Herinnering/aanmaning als brief: factuuradres, tekst, alle openstaande facturen (met dagen vervallen), totaal.
     T = teksten in de taal van de klant (debiteuren.DUN[lang])."""
     buf = io.BytesIO()
@@ -594,7 +594,7 @@ def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str, overdue=None)
     head = Table([[addr, company]], colWidths=[W * 0.62, W * 0.38])
     head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     story = [head, Spacer(1, 14), Paragraph(esc(title), S["h1"]),
-             Paragraph(esc(f"Dodewaard, {date_str}"), S["small"]), Spacer(1, 10),
+             Paragraph(esc(f"Dodewaard, {date_str}" + (f" · {number}" if number else "")), S["small"]), Spacer(1, 10),
              Paragraph(esc(T["salute"]), S["body"]), Spacer(1, 6), Paragraph(esc(T["intro"][level]), S["body"]), Spacer(1, 10)]
     c = T["cols"]
     hs = ParagraphStyle("dh", parent=S["cell"], fontName="Helvetica-Bold", fontSize=7.8, leading=9.5, textColor=MUTED)

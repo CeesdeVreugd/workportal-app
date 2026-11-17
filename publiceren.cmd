@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V208: mailgesprek bij herinneringen"
+set "OMSCHRIJVING=WorkPortal V209: herinneringen met nummer, tabblad Herinneringen, opnieuw versturen, kolom termijn"
 
 echo.
 echo ============================================

@@ -927,6 +927,15 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_dunning_msg ON dunning_messages(letter_id, id);
     """,
+    # 51 - herinneringen krijgen een eigen nummer (H-jaar-volgnummer) bij het versturen
+    """
+    ALTER TABLE dunning_letters ADD COLUMN number TEXT;
+    UPDATE dunning_letters SET number = (SELECT 'H-' || substr(x.sent_at, 1, 4) || '-' || printf('%04d', x.rn) FROM
+        (SELECT id, sent_at, ROW_NUMBER() OVER (PARTITION BY substr(sent_at, 1, 4) ORDER BY sent_at, id) AS rn
+         FROM dunning_letters WHERE status = 'verstuurd') x WHERE x.id = dunning_letters.id)
+        WHERE status = 'verstuurd';
+    CREATE UNIQUE INDEX idx_dunning_number ON dunning_letters(number) WHERE number IS NOT NULL;
+    """,
 ]
 
 

@@ -57,7 +57,7 @@
 </div>
 
   {% endif %}
-  {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else url_for('debiteuren.conversation', lid=l.id) }}"><div class="grow"><div class="t">{{ LEVELS[l.level] }}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% if l.replies %} · <b>{{ l.replies }} antwoord{{ 'en' if l.replies != 1 }} van de klant</b>{% endif %}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
+  {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else url_for('debiteuren.conversation', lid=l.id) }}"><div class="grow"><div class="t">{{ LEVELS[l.level] }}{% if l.number %} {{ l.number }}{% endif %}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% if l.replies %} · <b>{{ l.replies }} antwoord{{ 'en' if l.replies != 1 }} van de klant</b>{% endif %}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
 </section>
 {% endif %}
 {% if others %}

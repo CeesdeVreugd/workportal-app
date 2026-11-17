@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "debiteuren/_tabs.html" import deb_tabs %}
+{% block title %}Herinneringen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Verkoopfacturen</h1><p>Verstuurde herinneringen en aanmaningen, met de facturen en het mailgesprek.</p></div></div>
+{{ deb_tabs('herinneringen') }}
+{% macro fbtn(key, label) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('debiteuren.letters', f=key, q=q or None) }}">{{ label }}</a>{% endmacro %}
+<div class="fchips" style="margin-bottom:12px">{{ fbtn('alle', 'Alle') }}{{ fbtn('open', 'Nog niet (alles) betaald') }}{{ fbtn('antwoord', 'Met antwoord van de klant') }}</div>
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:520px"><input type="hidden" name="f" value="{{ flt }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek op nummer, klant of factuurnummer" style="flex:1"><button class="btn">{{ icon('search') }}Zoeken</button></form>
+<section class="card flush tablewrap">
+  <table class="table">
+    <thead><tr><th>Nummer</th><th>Klant</th><th class="hide-m">Facturen</th><th class="hide-m">Verstuurd</th><th class="num">Nog open</th><th class="hide-m">Antwoord</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr class="link" data-href="{{ url_for('debiteuren.conversation', lid=r.id) }}">
+      <td class="nowrap"><b>{{ r.number or '–' }}</b><div><span class="badge {{ 'b-bad' if r.level == 3 else 'b-warn' if r.level == 2 else 'b-blue' }}">{{ LEVELS[r.level] }}</span></div></td>
+      <td>{{ r.cname or '–' }}<div class="small muted">{{ r.to_addr }}</div><div class="small muted show-m">{{ r.sent_at|dt('%d-%m-%Y') }} · {{ r.invs|map(attribute='number')|join(', ') }}</div></td>
+      <td class="hide-m small">{% for i in r.invs %}<a href="{{ url_for('debiteuren.detail', sid=i.id) }}">{{ i.number }}</a>{% if i.status == 'betaald' %} <span class="badge b-ok">betaald</span>{% endif %}{{ '' if loop.last else ', ' }}{% endfor %}</td>
+      <td class="hide-m nowrap">{{ r.sent_at|dt }}<div class="small muted">{{ r.who or '' }}</div></td>
+      <td class="num nowrap">{% if r.all_paid %}<span class="badge b-ok">Alles betaald</span>{% else %}{{ r.open|eur(2) }}{% endif %}</td>
+      <td class="hide-m">{% if r.replies %}<span class="badge b-purple">{{ r.replies }}</span> <span class="small muted">{{ r.last_reply|dt('%d-%m') }}</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="empty">Nog geen herinneringen verstuurd.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

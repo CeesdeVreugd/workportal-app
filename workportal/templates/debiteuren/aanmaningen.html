@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "debiteuren/_tabs.html" import deb_tabs %}
 {% block title %}Herinneren en aanmanen{% endblock %}
 {% block content %}
 {% set boss = can('debiteuren', 3) %}
 <div class="pagehead">
-  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a></div><h1>Herinneren en aanmanen</h1>
+  <div><h1>Verkoopfacturen</h1>
     <p>Voorstellen: herinnering na {{ days[0] }}, aanmaning na {{ days[1] }} en laatste aanmaning na {{ days[2] }} dagen over de vervaldatum. {% if boss %}Controleer de tekst en verstuur.{% else %}De directie keurt goed en verstuurt.{% endif %}</p></div>
   <div class="actions"><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" name="action" value="voorstellen">{{ icon('refresh') }}Nu controleren</button></form></div>
 </div>
+{{ deb_tabs('voorstellen') }}
 {% if not has_data %}<div class="flash info">Nog geen openstaande posten ingelezen. Importeer eerst de Excel (of koppel SnelStart); daarna komen hier de voorstellen.</div>{% endif %}
 
 {% for l in items %}
@@ -59,7 +61,7 @@
 
 {% if sent %}
 <section class="card"><div class="card-head"><h2>Laatst verstuurd</h2></div>
-  <div class="rows">{% for s in sent %}<a class="rowitem" href="{{ url_for('debiteuren.conversation', lid=s.id) }}"><div class="grow"><div class="t">{{ LEVELS[s.level] }} · {{ s.cname or (s.first.customer_name if s.first else '') }}</div><div class="s">{{ s.n }} factu{{ 'ur' if s.n == 1 else 'ren' }}{% if s.n == 1 and s.first %} ({{ s.first.number }}){% endif %} · {{ s.sent_at|dt }} door {{ s.who or '' }} aan {{ s.to_addr }}{% if s.replies %} · <b>{{ s.replies }} antwoord{{ 'en' if s.replies != 1 }}</b>{% endif %}</div></div>{{ icon('mail') }}</a>{% endfor %}</div>
+  <div class="rows">{% for s in sent %}<a class="rowitem" href="{{ url_for('debiteuren.conversation', lid=s.id) }}"><div class="grow"><div class="t">{{ s.number or LEVELS[s.level] }} · {{ LEVELS[s.level] }} · {{ s.cname or (s.first.customer_name if s.first else '') }}</div><div class="s">{{ s.n }} factu{{ 'ur' if s.n == 1 else 'ren' }}{% if s.n == 1 and s.first %} ({{ s.first.number }}){% endif %} · {{ s.sent_at|dt }} door {{ s.who or '' }} aan {{ s.to_addr }}{% if s.replies %} · <b>{{ s.replies }} antwoord{{ 'en' if s.replies != 1 }}</b>{% endif %}</div></div>{{ icon('mail') }}</a>{% endfor %}</div>
 </section>
 {% endif %}
 
