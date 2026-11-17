@@ -1329,8 +1329,9 @@ FILTERS = [
 @bp.route("/")
 @require(MODULE)
 def index():
-    flt = request.args.get("filter") or "open"
     q = (request.args.get("q") or "").strip()
+    # zoeken zonder gekozen filter: overal zoeken (ook afgerond en vorig jaar)
+    flt = request.args.get("filter") or ("alle" if q else "open")
     where, params = [], []
     uid = g.user["id"]
     cond = {
@@ -1352,8 +1353,12 @@ def index():
     if flt == "mij":
         params.append(uid)
     if q:
-        where.append("(i.supplier LIKE ? OR i.invoice_no LIKE ? OR i.erp_ref LIKE ? OR i.description LIKE ? OR i.mail_subject LIKE ?)")
-        params += [f"%{q}%"] * 5
+        terms = [t for t in q.split() if t][:6]
+        for t in terms:   # elk woord moet ergens voorkomen (leverancier, nummer, inkoopnummer, omschrijving, onderwerp, afzender, bedrag)
+            amt = t.replace("€", "").replace(".", "").replace(",", ".")
+            where.append("(i.supplier LIKE ? OR i.invoice_no LIKE ? OR i.erp_ref LIKE ? OR i.description LIKE ? OR i.mail_subject LIKE ?"
+                         " OR i.mail_from LIKE ? OR printf('%.2f', i.amount_incl) LIKE ? OR i.invoice_date LIKE ?)")
+            params += [f"%{t}%"] * 6 + [f"%{amt}%", f"%{t}%"]
     rows = query(
         "SELECT i.*, q.name AS question_name, (SELECT name FROM users WHERE id = i.rejected_by) AS rejected_name,"
         " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0) AS acc_notes,"
@@ -1387,7 +1392,10 @@ def index():
     conn = get_db()
     mail = {"on": _setting(conn, "cred_mail_on", "0") == "1", "box": _setting(conn, "cred_mailbox", DEFAULT_MAILBOX),
             "last": _setting(conn, "cred_last_poll"), "error": _setting(conn, "cred_last_error"), "configured": mail_configured()}
-    return render_template("crediteuren/index.html", items=items, flt=flt, q=q, counts=counts, FILTERS=FILTERS,
+    hist = hist_state(conn)
+    if not hist["from"]:
+        hist["from"] = f"{now_utc().year - 1}-01-01"
+    return render_template("crediteuren/index.html", hist=hist, done_folder=_archive_folder(conn), items=items, flt=flt, q=q, counts=counts, FILTERS=FILTERS,
                            STATUS_BADGE=STATUS_BADGE, mail=mail, cat_colors=category_colors(get_db()), cat_hide=set(category_map(get_db()).values()),
                            step_color=_step_colors(get_db()), soon=(now_utc() + timedelta(days=7)).strftime("%Y-%m-%d"))
 
@@ -2324,3 +2332,137 @@ def delete(iid):
     execute("DELETE FROM invoices WHERE id = ?", (iid,))
     flash(f"Factuur {r['supplier'] or ''} {r['invoice_no'] or ''} verwijderd.".replace("  ", " "), "success")
     return redirect(url_for("crediteuren.index"))
+
+
+# ------------------------------------------------------------------ archief: facturen uit de map 'Verwerkt' ophalen
+
+HIST_BATCH = 20
+
+
+def hist_state(conn):
+    return {"state": _setting(conn, "cred_hist_state", "") or "", "from": _setting(conn, "cred_hist_from", "") or "",
+            "cursor": _setting(conn, "cred_hist_cursor", "") or "", "n": int(_setting(conn, "cred_hist_n", "0") or 0),
+            "seen": int(_setting(conn, "cred_hist_seen", "0") or 0), "error": _setting(conn, "cred_hist_error", "") or "",
+            "done_at": _setting(conn, "cred_hist_done", "") or ""}
+
+
+def hist_batch(conn, upload_dir):
+    """Eén portie mails uit de Verwerkt-map (nieuwste eerst, tot de gekozen datum) als afgeronde factuurkaart opslaan.
+    Er wordt niets in de mailbox veranderd. Dubbele facturen (zelfde PDF of zelfde nummer+leverancier) worden overgeslagen."""
+    from .mail import _graph_token, graph_retry, graph_error_text, graph_folder_id
+    st = hist_state(conn)
+    if st["state"] != "bezig":
+        return 0
+    box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    fid = graph_folder_id(box, _archive_folder(conn))
+    headers = {"Authorization": f"Bearer {_graph_token()}"}
+    flt = f"receivedDateTime ge {st['from']}T00:00:00Z"
+    if st["cursor"]:
+        flt += f" and receivedDateTime lt {st['cursor']}"
+    r = graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/{fid}/messages?$filter={flt}"
+                           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,categories"
+                           f"&$orderby=receivedDateTime desc&$top={HIST_BATCH}", headers=headers, timeout=60)
+    if r.status_code >= 400:
+        raise RuntimeError(f"Map '{_archive_folder(conn)}' lezen: " + graph_error_text(r.status_code, "mislukt"))
+    msgs = r.json().get("value", [])
+    if not msgs:
+        _set(conn, "cred_hist_state", "klaar")
+        _set(conn, "cred_hist_done", now_iso())
+        return 0
+    cmap = category_map(conn)
+    new = 0
+    for m in msgs:
+        _set(conn, "cred_hist_cursor", m.get("receivedDateTime") or st["cursor"])
+        _set(conn, "cred_hist_seen", str(int(_setting(conn, "cred_hist_seen", "0") or 0) + 1))
+        if not m.get("hasAttachments"):
+            continue
+        ar = _graph_get(f"https://graph.microsoft.com/v1.0/users/{box}/messages/{m['id']}/attachments", headers=headers, timeout=60)
+        if ar.status_code >= 400:
+            continue
+        files = []
+        for a in ar.json().get("value", []):
+            if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
+                continue
+            data = base64.b64decode(a.get("contentBytes") or "")
+            if data:
+                files.append((a.get("name") or "bijlage", data, a.get("contentType") or "application/octet-stream"))
+        pdfs = [f for f in files if f[1].startswith(b"%PDF")]
+        if not pdfs:
+            continue
+        scored = sorted(((invoice_score(extract(f[1]), f[0]), f) for f in pdfs), key=lambda t: -t[0])
+        main = scored[0][1]
+        frm = (m.get("from") or {}).get("emailAddress") or {}
+        received = (m.get("receivedDateTime") or "").replace("Z", "+00:00")
+        maildata = {"key": m["id"], "conv": m.get("conversationId"), "from_addr": (frm.get("address") or "").lower(),
+                    "from_name": frm.get("name"), "subject": m.get("subject"), "received": received or None}
+        iid, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", extra=[f for f in files if f is not main], mail=maildata)
+        if not created:
+            continue
+        cats = set(m.get("categories") or [])
+        route = "komdex" if cmap.get("komdex") in cats else ("buiten" if cmap.get("buiten") in cats else None)
+        when = m.get("receivedDateTime") or now_iso()
+        if cmap.get("afgewezen") and cmap["afgewezen"] in cats:
+            conn.execute("UPDATE invoices SET status = 'afgewezen', rejected_at = ?, reject_reason = 'Afgewezen (uit het archief)', mail_archive = 'afgerond' WHERE id = ?",
+                         (when, iid))
+            status_txt = "Afgewezen"
+        else:
+            conn.execute("UPDATE invoices SET status = 'snelstart', route = ?, erp_at = ?, snelstart_at = ?, mail_archive = 'afgerond' WHERE id = ?",
+                         (route, when, when, iid))
+            status_txt = STATUS["snelstart"]
+        log(conn, iid, f"Uit het archief opgehaald (map '{_archive_folder(conn)}'): status {status_txt}")
+        conn.commit()
+        new += 1
+    _set(conn, "cred_hist_n", str(int(_setting(conn, "cred_hist_n", "0") or 0) + new))
+    conn.commit()
+    return new
+
+
+def scheduled_hist(conn, app, state):
+    """Archief ophalen op de achtergrond: elke minuut een portie, tot de gekozen datum."""
+    if _setting(conn, "cred_hist_state", "") != "bezig" or not mail_configured():
+        return
+    t = now_utc().timestamp()
+    if t - state.get("cred_hist", 0) < 60:
+        return
+    state["cred_hist"] = t
+    try:
+        hist_batch(conn, _upload_dir(app))
+        _set(conn, "cred_hist_error", "")
+    except Exception as exc:  # noqa: BLE001
+        conn.rollback()
+        _set(conn, "cred_hist_error", str(exc)[:300])
+        traceback.print_exc()
+    conn.commit()
+
+
+@bp.route("/archief", methods=["POST"])
+@require(MODULE, BEHEER)
+def hist_start():
+    conn = get_db()
+    act = request.form.get("action")
+    if act == "stop":
+        _set(conn, "cred_hist_state", "gestopt")
+        flash("Archief ophalen gestopt. Je kunt het later verder laten gaan.", "ok")
+    else:
+        frm = (request.form.get("vanaf") or "")[:10]
+        try:
+            datetime.strptime(frm, "%Y-%m-%d")
+        except ValueError:
+            flash("Kies een geldige datum.", "error")
+            return redirect(url_for("crediteuren.index"))
+        st = hist_state(conn)
+        if act == "verder" and st["from"] == frm and st["cursor"]:
+            pass   # verder vanaf waar hij was
+        else:
+            _set(conn, "cred_hist_cursor", "")
+            _set(conn, "cred_hist_n", "0")
+            _set(conn, "cred_hist_seen", "0")
+        _set(conn, "cred_hist_from", frm)
+        _set(conn, "cred_hist_state", "bezig")
+        _set(conn, "cred_hist_error", "")
+        from .util import audit
+        audit("archief ophalen gestart", "crediteuren", None, f"vanaf {frm}")
+        flash(f"Archief ophalen gestart: facturen uit '{_archive_folder(conn)}' vanaf {datetime.strptime(frm, '%Y-%m-%d').strftime('%d-%m-%Y')}. "
+              "Dit loopt op de achtergrond (ongeveer 20 mails per minuut).", "ok")
+    conn.commit()
+    return redirect(url_for("crediteuren.index", filter="alle"))

@@ -1020,6 +1020,16 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V212 (2.20.0)
+- **Inkoopfacturen: archief ophalen** (beheer, knop 'Archief ophalen'). WorkPortal haalt de facturen op die al in de map **01-Verwerkt** van de factuurmailbox staan, vanaf een gekozen datum (standaard 1 januari vorig jaar).
+  - **Status:** ze krijgen de status Afgerond (Komdex en SnelStart). Staat de Outlook-categorie Afgewezen erop, dan Afgewezen. De categorieën Komdex en buiten Komdex om worden overgenomen.
+  - **Hoe het loopt:** op de achtergrond, ongeveer 20 mails per minuut, nieuwste eerst, met een voortgangsbalk en een knop Stoppen / Verder.
+  - **Veilig:** er verandert niets in de mailbox en dubbele facturen worden overgeslagen.
+- **Zoeken in één keer:**
+  - Zoeken zonder gekozen filter zoekt in alle facturen, ook afgerond en uit het archief. Dat geldt voor inkoop- en verkoopfacturen.
+  - Inkoopfacturen: elk woord moet ergens voorkomen (leverancier, factuurnummer, inkoopnummer, omschrijving, onderwerp, afzender, bedrag of datum).
+- **Direct zoeken:** de lijst filtert al tijdens het typen. Met het kruisje in het zoekveld is de zoekopdracht meteen weg. Dit werkt bij Inkoopfacturen, Verkoopfacturen en Herinneringen.
+
 ## V211 (2.19.2)
 - Herinneringen: knop **Annuleren** bij Antwoord allen / Mail klant, Notitie, Opnieuw versturen en Uitstellen. De ingevulde tekst wordt leeggemaakt en het formulier gaat dicht.
 

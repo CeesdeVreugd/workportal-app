@@ -602,8 +602,8 @@ def open_counts():
 @bp.route("/")
 @require("debiteuren")
 def index():
-    view = request.args.get("v", "open")
     q = (request.args.get("q") or "").strip()
+    view = request.args.get("v") or ("alle" if q else "open")   # zoeken zonder filter: in alle facturen
     today = _today()
     where, params = [], []
     if view == "open":

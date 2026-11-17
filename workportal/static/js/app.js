@@ -1033,3 +1033,34 @@ document.addEventListener("click", function (e) {
     i.dispatchEvent(new Event("input", { bubbles: true }));
   });
 });
+
+/* Direct zoeken: formulier met data-live="#a,#b" ververst die blokken tijdens het typen (en meteen bij het kruisje). */
+(function () {
+  document.querySelectorAll("form[data-live]").forEach(function (form) {
+    var input = form.querySelector('input[type=search], input[name=q]');
+    if (!input) return;
+    var targets = form.getAttribute("data-live").split(","), timer = null, ctrl = null, last = input.value;
+    function run() {
+      if (input.value === last) return;
+      last = input.value;
+      var params = new URLSearchParams(new FormData(form));
+      Array.from(params.keys()).forEach(function (k) { if (!String(params.get(k) || "").trim()) params.delete(k); });
+      var url = (form.getAttribute("action") || location.pathname) + (params.toString() ? "?" + params.toString() : "");
+      if (ctrl) ctrl.abort();
+      ctrl = window.AbortController ? new AbortController() : null;
+      fetch(url, { credentials: "same-origin", signal: ctrl ? ctrl.signal : undefined, headers: { "X-Live-Search": "1" } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, "text/html");
+          targets.forEach(function (sel) {
+            var cur = document.querySelector(sel.trim()), nw = doc.querySelector(sel.trim());
+            if (cur && nw) cur.replaceWith(nw);
+          });
+          try { history.replaceState(null, "", url); } catch (e) {}
+        }).catch(function () {});
+    }
+    input.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(run, input.value ? 250 : 0); });
+    input.addEventListener("search", function () { clearTimeout(timer); run(); });   // kruisje in het zoekveld
+    form.addEventListener("submit", function (e) { e.preventDefault(); clearTimeout(timer); last = null; run(); });
+  });
+})();

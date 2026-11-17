@@ -112,6 +112,7 @@ def _loop(app):
             sharepoint.scheduled_sync(conn, state)
             komdex.notify_pending(conn)
             crediteuren.scheduled_poll(conn, app, state)
+            crediteuren.scheduled_hist(conn, app, state)
             service.scheduled_poll(conn, app, state)
             debiteuren.scheduled_snelstart(conn, state)
             debiteuren.scheduled_dunning(conn, state)

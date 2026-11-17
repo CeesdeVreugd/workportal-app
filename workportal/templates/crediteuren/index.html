@@ -34,17 +34,31 @@
   <div class="card kpi"><div class="label">Vervalt binnen 7 dagen</div><div class="value" style="color:#E53935">{{ counts.verval }}</div><div class="sub">{{ counts.af_maand }} afgewezen deze maand</div></div>
 </div>
 
+{% if can('crediteuren', 3) and mail.configured %}
+{% if hist.state == 'bezig' %}<div class="actionbar" style="cursor:default">{{ icon('refresh') }}<span><b>Archief ophalen uit '{{ done_folder }}'</b>: {{ hist.n }} factu{{ 'ur' if hist.n == 1 else 'ren' }} toegevoegd ({{ hist.seen }} mails bekeken){% if hist.cursor %}, nu bij {{ hist.cursor|dt('%d-%m-%Y') }}{% endif %}, tot {{ hist['from']|date }}.{% if hist.error %} <span style="color:var(--bad)">Fout: {{ hist.error }}</span>{% endif %}</span>
+  <form method="post" action="{{ url_for('crediteuren.hist_start') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="stop">Stoppen</button></form></div>
+{% else %}
+<details class="cred-pop" style="margin-bottom:12px"><summary class="btn sm ghost">{{ icon('folder') }}Archief ophalen{% if hist.state == 'klaar' %} <span class="small muted">(klaar {{ hist.done_at|dt('%d-%m') }}: {{ hist.n }} toegevoegd)</span>{% elif hist.state == 'gestopt' %} <span class="small muted">(gestopt)</span>{% endif %}</summary>
+  <form method="post" action="{{ url_for('crediteuren.hist_start') }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="hint" style="margin:0">Haalt de facturen op die al in de map <b>{{ done_folder }}</b> staan, zodat je ook oudere facturen hier kunt zoeken. Ze krijgen de status Afgerond (of Afgewezen als die categorie erop staat). Er verandert niets in de mailbox; dubbele facturen worden overgeslagen.</p>
+    <label class="f">Vanaf<input type="date" name="vanaf" value="{{ hist['from'] }}"></label>
+    <div class="actions"><button class="btn primary sm" name="action" value="start">Starten</button>{% if hist.state == 'gestopt' and hist.cursor %}<button class="btn sm" name="action" value="verder">Verder waar hij was</button>{% endif %}
+      <button type="button" class="btn ghost sm" onclick="this.closest('details').open=false">Annuleren</button></div></form></details>
+{% endif %}{% endif %}
+<div id="cred-results">
 {% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('crediteuren.index', filter=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
 <div class="fchips cred-chips" style="margin-bottom:12px">
   {% for key, label in FILTERS %}{{ fbtn(key, label, counts[key]) }}{% endfor %}
 </div>
-<form method="get" class="inline-form" style="margin-bottom:12px;max-width:480px">
-  <input type="hidden" name="filter" value="{{ flt }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="Zoek leverancier, factuurnummer, inkooporder" style="flex:1">
+</div>
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:560px" data-live="#cred-results,#cred-table" role="search">
+  {% if flt not in ('open', 'alle') %}<input type="hidden" name="filter" value="{{ flt }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek in alle facturen: leverancier, nummer, bedrag, inkooporder…" style="flex:1" autocomplete="off" aria-label="Zoeken">
   <button class="btn">{{ icon('search') }}Zoeken</button>
 </form>
 
-<section class="card flush tablewrap">
+
+<section class="card flush tablewrap" id="cred-table">
   <table class="table">
     <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th class="hide-m">Vervalt</th><th class="hide-m">Status</th><th class="hide-m">Laatste actie</th></tr></thead>
     <tbody>

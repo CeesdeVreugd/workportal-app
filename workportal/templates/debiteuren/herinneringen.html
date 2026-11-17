@@ -7,9 +7,9 @@
 {{ deb_tabs('herinneringen') }}
 {% macro fbtn(key, label) %}<a class="fchip {{ 'active' if flt == key }}" href="{{ url_for('debiteuren.letters', f=key, q=q or None) }}">{{ label }}</a>{% endmacro %}
 <div class="fchips" style="margin-bottom:12px">{{ fbtn('alle', 'Alle') }}{{ fbtn('open', 'Nog niet (alles) betaald') }}{{ fbtn('antwoord', 'Met antwoord van de klant') }}</div>
-<form method="get" class="inline-form" style="margin-bottom:12px;max-width:520px"><input type="hidden" name="f" value="{{ flt }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="Zoek op nummer, klant of factuurnummer" style="flex:1"><button class="btn">{{ icon('search') }}Zoeken</button></form>
-<section class="card flush tablewrap">
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:520px" data-live="#her-table" role="search"><input type="hidden" name="f" value="{{ flt }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek op nummer, klant of factuurnummer" style="flex:1" autocomplete="off" aria-label="Zoeken"><button class="btn">{{ icon('search') }}Zoeken</button></form>
+<section class="card flush tablewrap" id="her-table">
   <table class="table">
     <thead><tr><th>Nummer</th><th>Klant</th><th class="hide-m">Facturen</th><th class="hide-m">Verstuurd</th><th class="num">Nog open</th><th class="hide-m">Antwoord</th></tr></thead>
     <tbody>

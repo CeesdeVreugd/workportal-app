@@ -22,17 +22,17 @@
 </div>
 
 {% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if view == key }}" href="{{ url_for('debiteuren.index', v=key, q=q or None, jaar=year or None) }}">{{ label }}{% if n is not none %} <span>{{ n }}</span>{% endif %}</a>{% endmacro %}
-<div class="fchips" style="margin-bottom:12px">
+<div class="fchips" style="margin-bottom:12px" id="deb-chips">
   {{ fbtn('open', 'Open', counts.open) }}{{ fbtn('vervallen', 'Vervallen', kpi.n_over) }}{{ fbtn('onbekend', 'Nog niet in overzicht', counts.onbekend) }}{{ fbtn('betaald', 'Betaald', counts.betaald) }}{{ fbtn('alle', 'Alle', none) }}
 </div>
-<form method="get" class="inline-form" style="margin-bottom:12px;max-width:640px">
-  <input type="hidden" name="v" value="{{ view }}">
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:640px" data-live="#deb-chips,#deb-table" role="search">
+  {% if view not in ('open', 'alle') %}<input type="hidden" name="v" value="{{ view }}">{% endif %}
   <select name="jaar" aria-label="Jaar" style="width:auto" onchange="this.form.submit()"><option value="">Alle jaren</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
-  <input type="search" name="q" value="{{ q }}" placeholder="Zoek klant, debiteurnummer of factuurnummer" style="flex:1">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek klant, debiteurnummer of factuurnummer" style="flex:1" autocomplete="off" aria-label="Zoeken">
   <button class="btn">{{ icon('search') }}Zoeken</button>
 </form>
 
-<section class="card flush tablewrap">
+<section class="card flush tablewrap" id="deb-table">
   <table class="table">
     <thead><tr><th>Factuur</th><th class="hide-m">Klant</th><th class="hide-m">Datum</th><th class="hide-m">Vervalt</th><th class="hide-m">Termijn</th><th class="num hide-m">Bedrag</th><th class="num">Openstaand</th><th class="hide-m"></th></tr></thead>
     <tbody>
