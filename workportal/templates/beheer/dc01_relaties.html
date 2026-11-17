@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "beheer/_dc01_status.html" import dc01_status %}
 {% block title %}DC01 – relaties{% endblock %}
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
@@ -15,8 +16,8 @@
   <section class="card">
     <h2>Status</h2>
     <dl class="dl">
-      <dt>Script ziet</dt><dd>{% if seen %}{{ seen.filename }} <span class="muted">· {{ seen.at|dt }}</span>{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
-      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">…\DigiDossier\GedeeldeMap\Komdex relatie's export <span class="muted">($RelatieMap in het script)</span></dd>
+      {{ dc01_status(configured, seen.at if seen else None, (seen.folder if seen and seen.folder else "D:\\Shares\\Komdex\\Administraties\\DeVreugd\\DigiDossier\\GedeeldeMap\\Komdex relatie's export"), '$RelatieMap in het script') }}
+      <dt>Nieuwste PDF</dt><dd>{{ seen.filename if seen else '–' }}</dd>
       <dt>Laatst verwerkt</dt><dd>{% if last %}{{ last.at|dt }} <span class="muted">· {{ last.filename }}{% if last.source == 'handmatig' %} (handmatig){% endif %}</span>{% else %}–{% endif %}</dd>
       {% if last %}
       <dt>Relaties in de PDF</dt><dd>{{ last.records }} <span class="muted">({{ last.factuur_email }} met factuur-e-mail)</span></dd>

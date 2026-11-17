@@ -43,7 +43,7 @@ def esc(s):
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>"))
 
 
-def _doc(buf, title, doc_no, page_word="Pagina"):
+def _doc(buf, title, doc_no, page_word="Pagina", brand=True):
     doc = BaseDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=30 * mm,
                           bottomMargin=18 * mm, title=title, author="De Vreugd Productietechniek")
     # geen zijmarge in het frame: tekst en tabellen beginnen allemaal precies op de linkermarge (lijn met het logo)
@@ -55,12 +55,13 @@ def _doc(buf, title, doc_no, page_word="Pagina"):
         logo = os.path.join(STATIC, "logo.png")
         if os.path.exists(logo):
             canvas.drawImage(logo, 18 * mm, h - 22 * mm, width=58 * mm, height=58 * mm * 207 / 900, mask="auto")
-        canvas.setFont("Helvetica-Bold", 8.5)
-        canvas.setFillColor(ACCENT)
-        canvas.drawRightString(w - 18 * mm, h - 14 * mm, "WORKPORTAL")
-        canvas.setFont("Helvetica", 8.5)
-        canvas.setFillColor(MUTED)
-        canvas.drawRightString(w - 18 * mm, h - 19 * mm, f"{title} · {doc_no}")
+        if brand:
+            canvas.setFont("Helvetica-Bold", 8.5)
+            canvas.setFillColor(ACCENT)
+            canvas.drawRightString(w - 18 * mm, h - 14 * mm, "WORKPORTAL")
+            canvas.setFont("Helvetica", 8.5)
+            canvas.setFillColor(MUTED)
+            canvas.drawRightString(w - 18 * mm, h - 19 * mm, f"{title} · {doc_no}")
         canvas.setStrokeColor(LINE)
         canvas.setLineWidth(0.8)
         canvas.line(18 * mm, h - 25 * mm, w - 18 * mm, h - 25 * mm)
@@ -577,5 +578,34 @@ def delivery_pdf(d, lines, sig_dv=None, sig_cust=None, lang="nl", number_label=N
                             ("FONTSIZE", (0, 0), (-1, -1), 9), ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                             ("VALIGN", (0, 1), (-1, -1), "MIDDLE"), ("BACKGROUND", (0, 0), (-1, 0), LIGHT)]))
     story += [Spacer(1, 14), KeepTogether([st])]
+    doc.build(story)
+    return buf.getvalue()
+
+
+def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str):
+    """Herinnering/aanmaning als brief: factuuradres, tekst, overzicht openstaande facturen, totaal.
+    T = teksten in de taal van de klant (debiteuren.DUN[lang])."""
+    buf = io.BytesIO()
+    title = T["title"][level]
+    doc = _doc(buf, title, date_str, T["page"], brand=False)
+    W = doc.width
+    company = Paragraph("<br/>".join(esc(x) if i else f"<b>{esc(x)}</b>" for i, x in enumerate(COMPANY_LINES)), S["small"])
+    addr = [Paragraph(f"<b>{esc(T['address'])}</b>", S["body"])] + [Paragraph(esc(x), S["body"]) for x in addr_lines]
+    head = Table([[addr, company]], colWidths=[W * 0.62, W * 0.38])
+    head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    story = [head, Spacer(1, 14), Paragraph(esc(title), S["h1"]),
+             Paragraph(esc(f"Dodewaard, {date_str}"), S["small"]), Spacer(1, 10),
+             Paragraph(esc(T["salute"]), S["body"]), Spacer(1, 6), Paragraph(esc(T["intro"][level]), S["body"]), Spacer(1, 10)]
+    c = T["cols"]
+    hs = ParagraphStyle("dh", parent=S["cell"], fontName="Helvetica-Bold", fontSize=7.8, leading=9.5, textColor=MUTED)
+    hr = ParagraphStyle("dhr", parent=hs, alignment=2)
+    data = [[Paragraph(esc(c[0]), hs), Paragraph(esc(c[1]), hs), Paragraph(esc(c[2]), hs), Paragraph(esc(c[3]), hs),
+             Paragraph(esc(c[4]), hr), Paragraph(esc(c[5]), hr)]]
+    for r in rows:
+        data.append([esc(r["number"]), Paragraph(esc(r["desc"]), S["cell"]), r["date"], r["due"], r["amount"], r["open"]])
+    data.append(["", Paragraph(f"<b>{esc(T['total'])}</b>", S["cell"]), "", "", "", Paragraph(f"<b>{esc(total)}</b>", ParagraphStyle("tr", parent=S["cell"], alignment=2))])
+    t = _grid(data, [W * 0.15, W * 0.31, W * 0.13, W * 0.13, W * 0.14, W * 0.14], align_right=(4, 5))
+    story += [t, Spacer(1, 12), Paragraph(esc(T["close"][level].format(iban=iban)), S["body"]), Spacer(1, 18),
+              Paragraph(esc(T["terms"]), S["small"])]
     doc.build(story)
     return buf.getvalue()

@@ -1,0 +1,7 @@
+{# Gelijke kop van het statusblok op de drie DC01-tabbladen #}
+{% macro dc01_status(configured, last_at, folder, folder_hint='') %}
+{% set st = dc01_state(last_at) %}
+<dt>Koppeling</dt><dd>{% if not configured %}<span class="badge b-warn">KOMDEX_KEY niet ingesteld</span>{% elif st == 'stil' %}<span class="badge b-warn">Script stil (langer dan een uur)</span>{% elif st == 'actief' %}<span class="badge b-ok">Actief</span>{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
+<dt>Laatste run script</dt><dd>{{ last_at|dt if last_at else '–' }}</dd>
+<dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">{{ folder or '–' }}{% if folder_hint %} <span class="muted">({{ folder_hint }})</span>{% endif %}</dd>
+{% endmacro %}

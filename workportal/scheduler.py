@@ -116,6 +116,7 @@ def _loop(app):
             debiteuren.scheduled_snelstart(conn, state)
             debiteuren.scheduled_dunning(conn, state)
             debiteuren.scheduled_reparse(conn, app)
+            debiteuren.scheduled_rematch(conn, state)
             _nightly_backup(app, state)
             conn.execute("DELETE FROM login_codes WHERE created_at < datetime('now', '-2 days')")
             conn.commit()

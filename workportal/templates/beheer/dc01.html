@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/orderprops.html" import order_props %}
+{% from "beheer/_dc01_status.html" import dc01_status %}
 {% block title %}DC01{% endblock %}
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
@@ -11,9 +12,7 @@
   <section class="card">
     <h2>Status</h2>
     <dl class="dl">
-      <dt>Koppeling</dt><dd>{% if not status.configured %}<span class="badge b-warn">KOMDEX_KEY niet ingesteld</span>{% elif status.stale %}<span class="badge b-warn">Script stil (langer dan een uur)</span>{% elif status.last_push %}<span class="badge b-ok">Actief</span>{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
-      <dt>Laatste run script</dt><dd>{{ status.last_push|dt if status.last_push else '–' }}</dd>
-      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">{{ order_dir or '–' }}</dd>
+      {{ dc01_status(status.configured, status.last_push, order_dir, '$OrderMap in het script') }}
       <dt>Ordermappen gezien</dt><dd>{{ status.count or 0 }} <span class="muted">(bij laatste run)</span></dd>
       <dt>Om orderbon gevraagd</dt><dd>{{ status.want or 0 }} <span class="muted">mappen (bij laatste run)</span></dd>
       <dt>Laatste orderbon binnen</dt><dd>{% if status.last_bon %}{% set lb = status.last_bon.split('|') %}{{ lb[0]|dt }} <span class="muted">· {{ lb[1] }}</span>{% else %}<span class="muted">–</span>{% endif %}</dd>
@@ -26,7 +25,7 @@
   <section class="card">
     <h2>Zo werkt de sync</h2>
     <ul class="steps-list" style="margin-top:0">
-      <li>Het script <code>komdex-orders.ps1</code> draait elke paar minuten op DC01 en stuurt de lijst met ordermappen (dit jaar en vorig jaar).</li>
+      <li>Het script <code>komdex-orders.ps1</code> draait elke paar minuten op DC01 en stuurt de lijst met ordermappen (dit jaar en vorig jaar). Alleen lezen: in de Komdex-map wordt niets gewijzigd.</li>
       <li>Staat er een PDF met <i>orderbon</i> in de naam in een map, dan stuurt het script die mee.</li>
       <li><b>Nieuwe map met orderbon:</b> automatisch project/order volgens het ordertype, anders naar het actievenster.</li>
       <li><b>Bestaande map met orderbon:</b> altijd in WorkPortal gezet (onbekend type = order), zonder SharePoint-map en zonder melding.</li>

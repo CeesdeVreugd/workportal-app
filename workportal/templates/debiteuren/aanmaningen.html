@@ -13,30 +13,44 @@
 {% for l in items %}
 <section class="card dunitem" id="l{{ l.id }}">
   <div class="card-head"><div>
-    <h2><span class="badge {{ 'b-bad' if l.level == 3 else 'b-warn' if l.level == 2 else 'b-blue' }}">{{ LEVELS[l.level] }}</span> Factuur <a href="{{ url_for('debiteuren.detail', sid=l.invoice_id) }}">{{ l.number }}</a></h2>
-    <div class="small muted">{{ l.cname or l.customer_name or '' }} · open {{ l.open_amount|eur(2) if l.open_amount is not none else '–' }} · vervallen {{ l.due_date|date }}{% if l.days_over %} ({{ l.days_over }} dagen){% endif %} · {{ 'automatisch voorstel' if l.auto else 'gemaakt door ' ~ (l.creator or '') }}{% if not l.pdf_file_id %} · <span style="color:var(--bad)">geen PDF om mee te sturen</span>{% endif %}</div></div>
-    {% if l.pdf_file_id %}<a class="btn sm ghost" href="{{ url_for('main.file', fid=l.pdf_file_id) }}" target="_blank" data-pdf="Factuur {{ l.number }}">{{ icon('pdf') }}Factuur</a>{% endif %}</div>
+    <h2><span class="badge {{ 'b-bad' if l.level == 3 else 'b-warn' if l.level == 2 else 'b-blue' }}">{{ LEVELS[l.level] }}</span> {% if l.customer_id %}<a href="{{ url_for('klanten.customer', cid=l.customer_id) }}">{{ l.cname }}</a>{% else %}{{ l.cname or 'Klant onbekend' }}{% endif %}</h2>
+    <div class="small muted">{{ l.invs|length }} factu{{ 'ur' if l.invs|length == 1 else 'ren' }} · open {{ l.total|eur(2) }} · {{ 'automatisch voorstel' if l.auto else 'gemaakt door ' ~ (l.creator or '') }}</div></div>
+    <a class="btn sm" href="{{ url_for('debiteuren.letter_preview', lid=l.id) }}" target="_blank" data-pdf="{{ LEVELS[l.level] }} {{ l.cname }}">{{ icon('pdf') }}Brief bekijken</a></div>
   <form method="post" action="{{ url_for('debiteuren.letter_action', lid=l.id) }}" class="form" data-no-draft>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label class="f">Aan<input type="text" name="to_addr" value="{{ l.to_addr or '' }}" inputmode="email" placeholder="factuur-e-mail van de klant">
-      {% if not l.invoice_email and not l.customer_id %}<span class="hint">Klant niet gekoppeld; vul het adres hier in.</span>{% endif %}</label>
-    {% if l.customer_id and not l.invoice_email %}<label class="check"><input type="checkbox" name="save_to_customer" value="1" checked> Dit adres opslaan als factuur-e-mail bij {{ l.cname or 'de relatie' }} (ook voor de andere voorstellen van deze klant)</label>{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="has_invoices" value="1">
+    <div class="tablewrap"><table class="table compact">
+      <thead><tr><th class="chk"></th><th>Factuur</th><th class="hide-m">Datum</th><th>Vervalt</th><th class="num">Openstaand</th><th class="hide-m"></th></tr></thead><tbody>
+      {% for i in l.invs %}<tr><td class="chk"><input type="checkbox" name="inv" value="{{ i.id }}" checked aria-label="Factuur {{ i.number }} meenemen"></td>
+        <td><a href="{{ url_for('debiteuren.detail', sid=i.id) }}"><b>{{ i.number }}</b></a>{% if i.pdf_file_id %} <a class="ticon" href="{{ url_for('main.file', fid=i.pdf_file_id) }}" target="_blank" data-pdf="Factuur {{ i.number }}" title="Factuur">{{ icon('pdf') }}</a>{% else %} <span class="small" style="color:var(--bad)">geen PDF</span>{% endif %}</td>
+        <td class="hide-m">{{ i.invoice_date|date if i.invoice_date else '–' }}</td><td class="nowrap">{{ i.due_date|date if i.due_date else '–' }}{% if i.days_over %} <span class="small muted">({{ i.days_over }} dg)</span>{% endif %}</td>
+        <td class="num nowrap">{{ (i.open_amount if i.open_amount is not none else i.amount)|eur(2) }}</td>
+        <td class="hide-m small muted">{% if i.dun_level %}{{ LEVELS[i.dun_level] }} {{ i.dunned_at|dt('%d-%m') }}{% endif %}</td></tr>{% endfor %}
+      {% for i in l.extra %}<tr class="muted"><td class="chk"><input type="checkbox" name="inv" value="{{ i.id }}" aria-label="Factuur {{ i.number }} meenemen"></td>
+        <td>{{ i.number }} <span class="small">(ook vervallen)</span></td><td class="hide-m">{{ i.invoice_date|date if i.invoice_date else '–' }}</td><td>{{ i.due_date|date if i.due_date else '–' }}</td>
+        <td class="num">{{ (i.open_amount if i.open_amount is not none else i.amount)|eur(2) }}</td><td class="hide-m"></td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="fgrid">
+      <label class="f">Soort<select name="level">{% for k, v in LEVELS.items() %}<option value="{{ k }}" {{ 'selected' if k == l.level }}>{{ v }}</option>{% endfor %}</select></label>
+      <label class="f">Aan<input type="text" name="to_addr" value="{{ l.to_addr or '' }}" inputmode="email" placeholder="factuur-e-mail van de klant">
+        {% if not l.invoice_email and not l.customer_id %}<span class="hint">Klant niet gekoppeld; vul het adres hier in.</span>{% endif %}</label>
+    </div>
+    {% if l.customer_id and not l.invoice_email %}<label class="check"><input type="checkbox" name="save_to_customer" value="1" checked> Dit adres opslaan als factuur-e-mail bij {{ l.cname or 'de relatie' }}</label>{% endif %}
     <label class="f">Onderwerp<input type="text" name="subject" value="{{ l.subject }}"></label>
-    <label class="f">Tekst<textarea name="body" rows="9">{{ l.body }}</textarea><span class="hint">Taal: {{ l.language|upper }} · vanaf {{ sender }} met de handtekening van Administratie{% if l.pdf_file_id %}, factuur als bijlage{% endif %}.</span></label>
+    <label class="f">Mailtekst<textarea name="body" rows="8">{{ l.body }}</textarea><span class="hint">Taal: {{ (l.language or 'nl')|upper }} · vanaf {{ sender }} met de handtekening van Administratie. Bijlagen: de brief (PDF) met het overzicht en de facturen. Facturen aan- of uitgevinkt of soort gewijzigd? Klik 'Tekst opnieuw'.</span></label>
     {% if l.error %}<div class="flash error">Vorige poging mislukt: {{ l.error }}</div>{% endif %}
     <div class="actions">
-      {% if boss %}<button class="btn primary" name="action" value="versturen" data-confirm="{{ LEVELS[l.level] }} voor factuur {{ l.number }} versturen?">{{ icon('mail') }}Goedkeuren en versturen</button>{% endif %}
+      {% if boss %}<button class="btn primary" name="action" value="versturen" data-confirm="{{ LEVELS[l.level] }} aan {{ l.cname }} versturen?">{{ icon('mail') }}Goedkeuren en versturen</button>{% endif %}
       <button class="btn" name="action" value="opslaan">Opslaan</button>
+      <button class="btn" name="action" value="tekst">{{ icon('refresh') }}Tekst opnieuw</button>
       <button class="btn ghost" name="action" value="verwijderen" formnovalidate>Weggooien</button>
     </div>
   </form>
-  <details class="dunmore"><summary class="tksum">Uitstellen of niet aanmanen</summary>
-    <form method="post" action="{{ url_for('debiteuren.postpone', sid=l.invoice_id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('debiteuren.dunning') }}">
-      <div class="fgrid"><label class="f">Uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option></select></label>
+  <details class="dunmore"><summary class="tksum">Uitstellen</summary>
+    <form method="post" action="{{ url_for('debiteuren.letter_postpone', lid=l.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="fgrid"><label class="f">Alle facturen in deze brief uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option></select></label>
         <label class="f dund" hidden>Tot<input type="date" name="until"></label>
         <label class="f">Reden<input type="text" name="reason" placeholder="bijv. klant betaalt eind van de maand"></label></div>
-      <div class="actions"><button class="btn sm">Uitstellen</button></div></form>
-    <form method="post" action="{{ url_for('debiteuren.toggle_no_dunning', sid=l.invoice_id) }}" class="inline" data-confirm="Factuur {{ l.number }} nooit meer aanmanen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('debiteuren.dunning') }}"><button class="btn sm ghost">Niet aanmanen</button></form>
+      <div class="actions"><button class="btn sm">Uitstellen</button><span class="hint">Eén factuur niet aanmanen? Open de factuur en kies 'Niet aanmanen'.</span></div></form>
   </details>
 </section>
 {% else %}
@@ -45,7 +59,7 @@
 
 {% if sent %}
 <section class="card"><div class="card-head"><h2>Laatst verstuurd</h2></div>
-  <div class="rows">{% for s in sent %}<a class="rowitem" href="{{ url_for('debiteuren.detail', sid=s.invoice_id) }}"><div class="grow"><div class="t">{{ LEVELS[s.level] }} · factuur {{ s.number }}</div><div class="s">{{ s.cname or s.customer_name or '' }} · {{ s.sent_at|dt }} door {{ s.who or '' }} aan {{ s.to_addr }}</div></div></a>{% endfor %}</div>
+  <div class="rows">{% for s in sent %}<a class="rowitem" href="{{ url_for('debiteuren.letter_preview', lid=s.id) }}" target="_blank" data-pdf="{{ LEVELS[s.level] }}"><div class="grow"><div class="t">{{ LEVELS[s.level] }} · {{ s.cname or (s.first.customer_name if s.first else '') }}</div><div class="s">{{ s.n }} factu{{ 'ur' if s.n == 1 else 'ren' }}{% if s.n == 1 and s.first %} ({{ s.first.number }}){% endif %} · {{ s.sent_at|dt }} door {{ s.who or '' }} aan {{ s.to_addr }}</div></div>{{ icon('pdf') }}</a>{% endfor %}</div>
 </section>
 {% endif %}
 

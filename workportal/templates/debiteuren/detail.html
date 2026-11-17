@@ -55,7 +55,7 @@
       <label class="f">Reden<input type="text" name="reason" placeholder="bijv. afspraak met klant"></label></div>
     <div class="actions"><button class="btn sm">Opslaan</button></div></form>
   {% endif %}
-  {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else '#' }}"><div class="grow"><div class="t">{{ LEVELS[l.level] }}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
+  {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else url_for('debiteuren.letter_preview', lid=l.id) }}"{% if l.status != 'voorstel' %} target="_blank" data-pdf="{{ LEVELS[l.level] }}"{% endif %}><div class="grow"><div class="t">{{ LEVELS[l.level] }}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
 </section>
 {% endif %}
 {% if others %}

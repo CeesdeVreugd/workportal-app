@@ -1020,6 +1020,18 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V206 (2.18.0)
+- **Herinneren en aanmanen per klant**, net als de herinneringen uit het ERP: één voorstel per klant met alle vervallen facturen van die klant.
+  - Je kunt facturen aan- en uitvinken (ook andere vervallen facturen van de klant) en de soort kiezen. Met 'Tekst opnieuw' wordt de mailtekst bijgewerkt.
+  - Bij het versturen gaat er een **PDF-brief** mee zoals jullie voorbeeld: factuuradres met T.a.v., overzicht van de openstaande facturen (nummer, omschrijving uit 'Onze ref.', datum, vervaldatum, bedrag, openstaand) met het totaal, betaalverzoek met IBAN en de Metaalunievoorwaarden. Dit alles in de taal van de klant (NL/EN/DE/FR).
+  - **Bijlagen:** de brief en de factuur-PDF's. 'Brief bekijken' toont de PDF vooraf. Verstuurde brieven worden bewaard en zijn terug te zien.
+  - **Uitstellen** geldt voor alle facturen in de brief. 'Niet aanmanen' zet je per factuur.
+- **Verkoopfacturen bij projecten/orders** zijn alleen zichtbaar voor de rollen directie en administratie.
+- **Factuur-PDF:** alle pagina's worden gelezen (het totaal en de vervaldatum staan op de laatste pagina van lange facturen). De vervaldatum in de Amerikaanse volgorde wordt goed gelezen. Alle PDF's worden eenmalig opnieuw uitgelezen.
+- **Klant koppelen:** beter op naam (met en zonder rechtsvorm, verkorte naam). Elk uur, en direct na het verwerken van de relatie-PDF, worden facturen zonder klant opnieuw gekoppeld. Het klantnummer SnelStart uit de Excel wordt ingevuld bij de relatie als dat nog leeg is.
+- **Beheer > DC01:** de drie tabbladen hebben hetzelfde statusblok: koppeling (actief/stil), laatste run en de volledige map op DC01.
+- Databasemigratie 49. **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
+
 ## V205 (2.17.1)
 - Verkoopfacturen: de vervaldatum ontbrak bij oudere facturen.
   - **Oorzaak:** daarop staat de datum in de Amerikaanse volgorde ('betaling voor 11-16-2025' = 16 november). WorkPortal kiest nu de lezing die na de factuurdatum valt.

@@ -331,7 +331,7 @@ def _dc01_relations():
     pending = relaties.load(last["token"]) if last and last.get("token") else None
     err = (sp.setting(conn, "rel_pdf_error") or "").split("|", 1)
     counts = query("SELECT COUNT(*) AS alle, SUM(komdex_id IS NOT NULL) AS komdex, SUM(IFNULL(invoice_email, '') <> '') AS factuur FROM customers", one=True)
-    return render_template("beheer/dc01_relaties.html", last=last, seen=seen, pending=pending, err=err if err[0] else None,
+    return render_template("beheer/dc01_relaties.html", configured=komdex.configured(), last=last, seen=seen, pending=pending, err=err if err[0] else None,
                            auto_new=(sp.setting(conn, "rel_auto_new") or "1") == "1", counts=counts)
 
 
@@ -391,7 +391,9 @@ def _dc01_invoices():
     year = request.args.get("jaar") or ""
     last = (sp.setting(conn, "deb_dc01_last") or "").split("|")
     lastpdf = (sp.setting(conn, "deb_dc01_lastpdf") or "").split("|")
-    return render_template("beheer/dc01_facturen.html", items=items, counts=counts, flt=flt, q=q,
+    from . import komdex
+    root = sp.setting(conn, "deb_dc01_root") or "D:\\Shares\\Komdex\\Administraties\\DeVreugd\\DigiDossier\\facturen"
+    return render_template("beheer/dc01_facturen.html", configured=komdex.configured(), root=root, items=items, counts=counts, flt=flt, q=q,
                            last=last if last[0] else None, lastpdf=lastpdf if lastpdf[0] else None,
                            years_dc=years_dc, years_wp=years_wp, year=year)
 

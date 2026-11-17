@@ -162,7 +162,7 @@ try {
                 }
                 $perJaar[$j.Name] = $n
             }
-            $fjson = @{ folders = @($fmappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+            $fjson = @{ root = $froot; folders = @($fmappen.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
             $fres = Invoke-RestMethod -Uri "$WorkPortal/debiteuren/api/dossiers" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($fjson)) `
                 -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 120
             if ($fres.fout) { Log ("Facturen: FOUT in WorkPortal: " + $fres.fout) }
@@ -191,7 +191,7 @@ try {
             $rp = Get-ChildItem -LiteralPath $RelatieMap -File -Filter "*.pdf" -ErrorAction SilentlyContinue |
                 Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($rp) {
-                $meta = @{ filename = $rp.Name; modified = $rp.LastWriteTimeUtc.ToString("o"); size = $rp.Length }
+                $meta = @{ filename = $rp.Name; modified = $rp.LastWriteTimeUtc.ToString("o"); size = $rp.Length; folder = $RelatieMap }
                 $r5 = Invoke-RestMethod -Uri "$WorkPortal/api/komdex/relaties" -Method Post -Body ([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Compress))) `
                     -ContentType "application/json; charset=utf-8" -Headers @{ "X-WorkPortal-Key" = $Sleutel } -TimeoutSec 60
                 if ($r5.want) {

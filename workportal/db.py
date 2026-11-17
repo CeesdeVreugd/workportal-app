@@ -901,6 +901,18 @@ MIGRATIONS = [
     """
     ALTER TABLE sales_invoices ADD COLUMN dossier_reminders TEXT;
     """,
+    # 49 - herinneringen per klant (meerdere facturen in één brief) met PDF-brief
+    """
+    ALTER TABLE dunning_letters ADD COLUMN invoice_ids TEXT;
+    ALTER TABLE dunning_letters ADD COLUMN group_key TEXT;
+    ALTER TABLE dunning_letters ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+    ALTER TABLE dunning_letters ADD COLUMN pdf_file_id INTEGER;
+    UPDATE dunning_letters SET invoice_ids = '[' || invoice_id || ']',
+        customer_id = (SELECT customer_id FROM sales_invoices s WHERE s.id = dunning_letters.invoice_id),
+        group_key = (SELECT CASE WHEN s.customer_id IS NOT NULL THEN 'c' || s.customer_id WHEN s.debtor_no IS NOT NULL THEN 'd' || s.debtor_no
+                     ELSE 'i' || s.id END FROM sales_invoices s WHERE s.id = dunning_letters.invoice_id);
+    CREATE INDEX idx_dunning_group ON dunning_letters(group_key, status);
+    """,
 ]
 
 

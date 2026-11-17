@@ -556,6 +556,11 @@ def process_relations_pdf(conn, data, filename, sig=None, source="DC01"):
             relaties.discard(old_token)
     except ValueError:
         pass
+    try:
+        from .debiteuren import rematch
+        info["facturen_gekoppeld"] = rematch(conn)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WorkPortal] Facturen koppelen na relaties mislukt: {exc!r}", flush=True)
     sp.set_setting(conn, "rel_pdf_last", json.dumps(info))
     if sig:
         sp.set_setting(conn, "rel_pdf_sig", sig)
@@ -571,7 +576,8 @@ def relations_api():
     js = request.get_json(silent=True) or {}
     conn = get_db()
     sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
-    sp.set_setting(conn, "rel_pdf_seen", json.dumps({"at": now_iso(), "filename": str(js.get("filename") or "")[:200]}))
+    sp.set_setting(conn, "rel_pdf_seen", json.dumps({"at": now_iso(), "filename": str(js.get("filename") or "")[:200],
+                                                     "folder": str(js.get("folder") or "")[:400]}))
     conn.commit()
     if not js.get("data"):
         return jsonify({"ok": True, "want": sp.setting(conn, "rel_pdf_sig") != sig})

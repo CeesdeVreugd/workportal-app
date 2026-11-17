@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "beheer/_dc01_status.html" import dc01_status %}
 {% block title %}DC01 – facturen{% endblock %}
 {% block content %}
 <div class="pagehead"><div><h1>Beheer</h1><p>Sync met de Komdex-mappen op DC01</p></div></div>
@@ -10,8 +11,7 @@
   <section class="card">
     <h2>Status</h2>
     <dl class="dl">
-      <dt>Laatste run script</dt><dd>{% if last %}{{ last[0]|dt }}{% else %}<span class="badge b-warn">Nog niets ontvangen</span>{% endif %}</dd>
-      <dt>Map op DC01</dt><dd style="font-weight:400;overflow-wrap:anywhere">…\DigiDossier\facturen <span class="muted">(instelling $FactuurMap in het script)</span></dd>
+      {{ dc01_status(configured, last[0] if last else None, root, '$FactuurMap in het script') }}
       <dt>Factuurmappen gezien</dt><dd>{{ last[1] if last else 0 }} <span class="muted">(bij laatste run{% if last and last[2] != '0' %}, {{ last[2] }} nieuw{% endif %})</span></dd>
       <dt>Met PDF in WorkPortal</dt><dd>{{ counts.pdf or 0 }}</dd>
       <dt>Wacht nog op PDF</dt><dd>{{ counts.wacht or 0 }} <span class="muted">(hooguit 50 per run, nieuwste eerst)</span></dd>

@@ -11,7 +11,7 @@ from .util import (fmt_dt, fmt_date, fmt_eur, fmt_num, csrf_token, check_csrf, l
 from .permissions import load_permissions, can, MODULES, LEVEL_NAMES
 from .integrations import sharepoint_configured, nacalc_configured
 
-VERSION = "2.17.1"
+VERSION = "2.18.0"
 
 PUBLIC_ENDPOINTS = {"static", "sw", "manifest", "health", "favicon", "apple_icon", "komdex.push", "komdex.orderbon", "komdex.nacalculatie", "komdex.relations_api", "debiteuren.api_dossiers", "debiteuren.api_pdf",
                     "extern.visit", "extern.done", "extern.photo"}
@@ -100,6 +100,12 @@ def create_app(test_config=None, start_scheduler=True):
     # Projecten en Orders: dezelfde code, twee modules
     app.register_blueprint(werk.bp, url_prefix="/projecten", name="projecten")
     app.register_blueprint(werk.bp, url_prefix="/orders", name="orders")
+    def _dc01_state(last_at):
+        from .util import parse_iso as _pi, now_utc as _nu
+        from datetime import timedelta as _td
+        dt = _pi(last_at) if last_at else None
+        return None if not dt else ("stil" if _nu() - dt > _td(hours=1) else "actief")
+    app.jinja_env.globals.update(dc01_state=_dc01_state)
     app.jinja_env.globals.update(werk_url=werk.werk_url, inbox_count=werk.inbox_count, cred_counts=cred_counts, task_count=task_count, deb_counts=deb_counts, dun_count=dun_count)
     from .util import on_phone_ok, is_phone
     app.jinja_env.globals.update(navok=lambda m: can(m) and on_phone_ok(m), is_phone=is_phone)
