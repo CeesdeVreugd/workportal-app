@@ -1020,6 +1020,19 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V215 (2.21.0)
+- **Inkoopfacturen: betalingsherinneringen van leveranciers apart.**
+  - **Herkennen:** een herinnering/aanmaning (onderwerp van de mail, of 'Betalingsherinnering' / 'Herinnering' / 'Aanmaning' / 'Reminder' in de kop van de PDF) wordt geen gewone factuurkaart. Hij komt in het nieuwe tabblad **Herinneringen**, gekoppeld aan de factuur met hetzelfde nummer.
+  - **Op de kaart:** een gele balk met de status van de bijbehorende factuur (bijv. al in SnelStart), en de knoppen **Afgehandeld** (met opmerking, daarna door naar de volgende) en **Is geen herinnering**.
+  - **Handmatig:** op een gewone kaart staat **Is een herinnering**.
+  - **Waar ze (niet) staan:** herinneringen tellen niet mee in Alles open / Nog in SnelStart enz. De boekhouder ziet de open herinneringen wel in zijn teller. Bij Alle en bij zoeken staan ze erbij, met het label 'Herinnering'.
+  - **Bestaande kaarten:** kaarten met herinnering/aanmaning in het onderwerp worden eenmalig gemarkeerd. Al afgeronde kaarten gelden als afgehandeld.
+- **Verkoopfactuur-kaart in dezelfde indeling als een inkoopfactuur:**
+  - statusbalk: gefactureerd → vervaldatum → herinnering → betaald;
+  - statuslabel rechtsboven;
+  - links de PDF, rechts Gegevens, Herinneren en aanmanen en Notitie.
+- Databasemigratie 52.
+
 ## V214 (2.20.2)
 - Omschrijving uit de orderbon:
   - **Knop:** wijkt de omschrijving van de nieuwste orderbon af van die van het project of de order, dan staat er bovenaan een balk met de knop **Overnemen (en map hernoemen)**. Dat is handig voor orderbonnen die al binnen waren vóór V213.

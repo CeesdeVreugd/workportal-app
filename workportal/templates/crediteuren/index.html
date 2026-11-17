@@ -65,7 +65,7 @@
     {% for r in items %}
     <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">
       <td class="nowrap small muted hide-m">{{ r.received_at|dt('%d-%m %H:%M') }}</td>
-      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
+      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.is_reminder %} <span class="badge b-warn">Herinnering{% if r.reminder_done_at %} · afgehandeld{% endif %}</span>{% endif %}{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
         <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div>
         <div class="show-m stchips row-m">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</div></td>
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>

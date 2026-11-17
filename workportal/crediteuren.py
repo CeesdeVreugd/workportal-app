@@ -713,6 +713,20 @@ def log(conn, invoice_id, text, user_id=None):
                  (invoice_id, user_id, text, now_iso()))
 
 
+REMINDER_RE = re.compile(r"(?<![a-z])(?:\d+\s*(?:e|ste|de)\s*)?(?:betalings?herinnering|herinnering|aanmaning|sommatie|ingebrekestelling"
+                         r"|payment\s*reminder|reminder|overdue\s*(?:invoice|notice)|zahlungserinnerung|mahnung|rappel|relance)(?![a-z])", re.I)
+
+
+def is_reminder_doc(subject, text):
+    """Betalingsherinnering van een leverancier (geen nieuwe factuur): op het onderwerp van de mail, of in de kop van de PDF."""
+    if REMINDER_RE.search(_FWD_SUBJ.sub("", subject or "")):
+        return True
+    head = "\n".join((text or "").splitlines()[:30])
+    return bool(re.search(r"^\s*(?:\d+\s*(?:e|ste|de)\s*)?(?:betalings?herinnering|herinnering|aanmaning|sommatie|payment reminder|reminder"
+                          r"|zahlungserinnerung|mahnung)\b", head, re.I | re.M)
+                or re.search(r"betalingsherinnering|(?:de|uw)\s*betaling\s*van\s*(?:bijgesloten|onderstaande)\s*factu|nog\s*niet\s*(?:hebben\s*)?ontvangen", text or "", re.I))
+
+
 def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=None, mail=None, extra=None, x=None):
     """Maakt een factuurkaart van een PDF (bij mail: één kaart per mail, de overige bestanden als bijlage).
     extra = [(naam, bytes, mime), ...]. Geeft (id, nieuw?) terug; dubbele PDF's worden herkend."""
@@ -739,10 +753,17 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     if m:
         supplier_id, supplier, why = m
         supplier_match = ", ".join(why)
+    reminder = is_reminder_doc(mail.get("subject"), x.get("text"))
+    original = None
     if x["invoice_no"] and supplier:
-        same = conn.execute("SELECT id FROM invoices WHERE invoice_no = ? AND supplier = ?", (x["invoice_no"], supplier)).fetchone()
-        if same:
+        same = conn.execute("SELECT id FROM invoices WHERE invoice_no = ? AND supplier = ? AND IFNULL(is_reminder, 0) = 0 ORDER BY id",
+                            (x["invoice_no"], supplier)).fetchone()
+        if same and not reminder:
             return same["id"], False
+        original = same["id"] if same else None
+        if reminder and conn.execute("SELECT 1 FROM invoices WHERE invoice_no = ? AND supplier = ? AND is_reminder = 1 AND reminder_done_at IS NULL",
+                                     (x["invoice_no"], supplier)).fetchone():
+            pass   # al een open herinnering voor deze factuur: toch als nieuwe herinnering bewaren (bijv. 2e herinnering)
     now = now_iso()
     cur = conn.execute(
         "INSERT INTO invoices (status, supplier, invoice_no, invoice_date, due_date, amount_incl, amount_excl, erp_ref, source,"
@@ -751,6 +772,8 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
         (supplier, x["invoice_no"], x["invoice_date"], x["due_date"], x["amount_incl"], x["amount_excl"], x["erp_ref"], source,
          mail.get("key"), mail.get("from_addr"), mail.get("subject"), mail.get("received") or now, sha, user_id, now, now))
     iid = cur.lastrowid
+    if reminder:
+        conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = ? WHERE id = ?", (original, iid))
     if supplier_id:
         conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
     if mail.get("conv"):
@@ -769,6 +792,9 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
                        + (f"; {len(extra)} andere bijlage(n) bij deze kaart: " + ", ".join(e[0] for e in extra) if extra else ""))
     else:
         log(conn, iid, "Geüpload", user_id)
+    if reminder:
+        log(conn, iid, "Herkend als betalingsherinnering van de leverancier" + (" (bij een factuur die al in WorkPortal staat)" if original else "")
+            + ": staat bij Herinneringen")
     labels = {"invoice_no": "factuurnummer", "invoice_date": "factuurdatum", "due_date": "vervaldatum",
               "amount_excl": "bedrag excl.", "amount_incl": "bedrag incl.", "erp_ref": "inkoopnummer"}
     found = [k for k in labels if x.get(k)]
@@ -1220,6 +1246,10 @@ def _mail_hint(status, box):
 
 def scheduled_poll(conn, app, state):
     """Vanuit de planner: elke 5 minuten de mailbox, als dat aanstaat."""
+    try:
+        mark_existing_reminders(conn)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
     if _setting(conn, "cred_mail_on", "0") != "1" or not mail_configured():
         return
     t = now_utc().timestamp()
@@ -1304,8 +1334,11 @@ def open_counts():
               " SUM(status IN ('nieuw','ss_eerst') AND ext_question = 0 AND question_to IS NULL) AS komdex_todo,"
               " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NULL) AS ss_todo,"
               " SUM(" + SQL_FINISH.replace("i.", "") + " AND ext_question = 0 AND question_to IS NULL) AS fin_todo,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND question_to = ?) AS mij FROM invoices", (uid,), one=True)
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND question_to = ?) AS mij FROM invoices"
+              " WHERE IFNULL(is_reminder, 0) = 0", (uid,), one=True)
+    rem = query("SELECT COUNT(*) AS n FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL", one=True)["n"] or 0
     out = {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
+    out["herinneringen"] = 0
     owner = archive_owner(get_db())
     parts = []
     if out["mij"]:
@@ -1317,6 +1350,9 @@ def open_counts():
             parts.append(f"{r['ss_todo']} nog boeken in SnelStart")
         if r["fin_todo"]:
             parts.append(f"{r['fin_todo']} af te ronden")
+        if rem:
+            todo += rem
+            parts.append(f"{rem} betalingsherinnering{'en' if rem != 1 else ''} af te werken")
     elif can(MODULE, BEWERKEN):
         todo += r["komdex_todo"] or 0
         if r["komdex_todo"]:
@@ -1339,6 +1375,7 @@ FILTERS = [
     ("boekhouding", "Voor de boekhouding"),
     ("afgewezen", "Afgewezen"),
     ("klaar", "Afgerond"),
+    ("herinneringen", "Herinneringen"),
     ("alle", "Alle"),
 ]
 
@@ -1364,9 +1401,13 @@ def index():
         "klaar": "i.status = 'snelstart' AND NOT (" + SQL_FINISH + ")",
         "alle": "1=1",
     }
+    cond["herinneringen"] = "i.is_reminder = 1 AND i.reminder_done_at IS NULL"
+    cond["herinneringen_af"] = "i.is_reminder = 1 AND i.reminder_done_at IS NOT NULL"
     if flt not in cond:
         flt = "open"
     where.append(cond[flt])
+    if flt not in ("alle", "herinneringen", "herinneringen_af"):
+        where.append("IFNULL(i.is_reminder, 0) = 0")   # betalingsherinneringen staan apart
     if flt == "mij":
         params.append(uid)
     if q:
@@ -1393,8 +1434,11 @@ def index():
               " SUM(status='snelstart' AND NOT (" + fin + ")) AS klaar, COUNT(*) AS alle,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
               " SUM(status = 'afgewezen' AND rejected_at >= date('now','start of month')) AS af_maand"
-              " FROM invoices", (uid,), one=True)
+              " FROM invoices WHERE IFNULL(is_reminder, 0) = 0", (uid,), one=True)
     counts = {k: (c[k] or 0) for k in c.keys()}
+    rc = query("SELECT SUM(reminder_done_at IS NULL) AS o, SUM(reminder_done_at IS NOT NULL) AS d, COUNT(*) AS a FROM invoices WHERE is_reminder = 1", one=True)
+    counts["herinneringen"], counts["herinneringen_af"] = rc["o"] or 0, rc["d"] or 0
+    counts["alle"] = (counts.get("alle") or 0) + (rc["a"] or 0)
     counts["boekhouding"] = query("SELECT COUNT(DISTINCT n.invoice_id) AS n FROM invoice_notes n JOIN invoices i ON i.id = n.invoice_id"
                                   " WHERE n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0 AND i.status <> 'snelstart'", one=True)["n"] or 0
     items = []
@@ -1531,7 +1575,16 @@ def detail(iid):
     suppliers = query("SELECT id, name, city, email, relation_type FROM customers WHERE IFNULL(active, 1) = 1 OR id = ?"
                       " ORDER BY CASE WHEN relation_type IN ('leverancier', 'beide') THEN 0 WHEN relation_type IS NULL THEN 1 ELSE 2 END,"
                       " name", (r["supplier_id"] or 0,))
-    return render_template("crediteuren/detail.html", r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
+    orig = None
+    if r["is_reminder"]:
+        orig = query("SELECT * FROM invoices WHERE id = ?", (r["reminder_of"],), one=True) if r["reminder_of"] else None
+        if not orig and r["invoice_no"]:
+            orig = query("SELECT * FROM invoices WHERE invoice_no = ? AND IFNULL(is_reminder, 0) = 0 AND id <> ? ORDER BY id LIMIT 1",
+                         (r["invoice_no"], iid), one=True)
+        if orig:
+            orig = dict(orig, label=STATUS.get(orig["status"], orig["status"]))
+    rem_done_by = query("SELECT name FROM users WHERE id = ?", (r["reminder_done_by"],), one=True) if r["reminder_done_by"] else None
+    return render_template("crediteuren/detail.html", orig=orig, rem_done_by=rem_done_by, r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
                            metas=metas, cred_box=cred_box, reply_note=reply_note, reply_all=reply_all,
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
@@ -2483,3 +2536,56 @@ def hist_start():
               "Dit loopt op de achtergrond (ongeveer 20 mails per minuut).", "ok")
     conn.commit()
     return redirect(url_for("crediteuren.index", filter="alle"))
+
+
+@bp.route("/<int:iid>/herinnering", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def reminder(iid):
+    """Betalingsherinnering van de leverancier: afhandelen (met opmerking), toch een gewone factuur, of handmatig markeren."""
+    r = _load(iid)
+    conn = get_db()
+    act = request.form.get("action")
+    now = now_iso()
+    if act == "af":
+        note = (request.form.get("note") or "").strip()[:1000] or None
+        conn.execute("UPDATE invoices SET reminder_done_at = ?, reminder_done_by = ?, reminder_note = ?, updated_at = ? WHERE id = ?",
+                     (now, g.user["id"], note, now, iid))
+        log(conn, iid, "Betalingsherinnering afgehandeld" + (f": {note}" if note else ""), g.user["id"])
+        flash("Herinnering afgehandeld.", "ok")
+    elif act == "open":
+        conn.execute("UPDATE invoices SET reminder_done_at = NULL, reminder_done_by = NULL, updated_at = ? WHERE id = ?", (now, iid))
+        log(conn, iid, "Betalingsherinnering weer open", g.user["id"])
+    elif act == "geen":
+        conn.execute("UPDATE invoices SET is_reminder = 0, reminder_done_at = NULL, updated_at = ? WHERE id = ?", (now, iid))
+        log(conn, iid, "Geen herinnering: als gewone factuur behandelen", g.user["id"])
+        flash("Staat weer bij de gewone facturen.", "ok")
+    elif act == "wel":
+        orig = None
+        if r["invoice_no"]:
+            o = conn.execute("SELECT id FROM invoices WHERE invoice_no = ? AND IFNULL(is_reminder, 0) = 0 AND id <> ? ORDER BY id LIMIT 1",
+                             (r["invoice_no"], iid)).fetchone()
+            orig = o["id"] if o else None
+        conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = COALESCE(reminder_of, ?), reminder_done_at = NULL, updated_at = ? WHERE id = ?",
+                     (orig, now, iid))
+        log(conn, iid, "Gemarkeerd als betalingsherinnering", g.user["id"])
+        flash("Gemarkeerd als betalingsherinnering: staat nu bij Herinneringen.", "ok")
+    conn.commit()
+    if act == "af":
+        nxt = conn.execute("SELECT id FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL ORDER BY received_at LIMIT 1").fetchone()
+        return redirect(url_for("crediteuren.detail", iid=nxt["id"]) if nxt else url_for("crediteuren.index", filter="herinneringen"))
+    return redirect(url_for("crediteuren.detail", iid=iid))
+
+
+def mark_existing_reminders(conn):
+    """Eenmalig: bestaande kaarten met 'herinnering'/'aanmaning' in het onderwerp markeren als betalingsherinnering."""
+    if _setting(conn, "cred_rem_scan", "") == "1":
+        return
+    for r in conn.execute("SELECT id, mail_subject, status, invoice_no, supplier FROM invoices WHERE IFNULL(is_reminder, 0) = 0").fetchall():
+        if r["mail_subject"] and REMINDER_RE.search(_FWD_SUBJ.sub("", r["mail_subject"])):
+            o = conn.execute("SELECT id FROM invoices WHERE invoice_no = ? AND supplier = ? AND IFNULL(is_reminder, 0) = 0 AND id <> ? ORDER BY id LIMIT 1",
+                             (r["invoice_no"], r["supplier"], r["id"])).fetchone() if r["invoice_no"] else None
+            done = now_iso() if r["status"] in ("snelstart", "afgewezen") else None
+            conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = ?, reminder_done_at = ? WHERE id = ?", (o["id"] if o else None, done, r["id"]))
+            log(conn, r["id"], "Herkend als betalingsherinnering (onderwerp van de mail)")
+    _set(conn, "cred_rem_scan", "1")
+    conn.commit()

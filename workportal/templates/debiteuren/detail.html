@@ -2,15 +2,48 @@
 {% from "partials/icons.html" import icon %}
 {% block title %}Factuur {{ s.number }}{% endblock %}
 {% block content %}
+{% set pdf_url = url_for('main.file', fid=s.pdf_file_id) if s.pdf_file_id else None %}
+{% set cname = s.cname or s.customer_name or 'Klant onbekend' %}
+{% set over = days and days > 0 %}
 <div class="pagehead">
-  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.index') }}">Verkoopfacturen</a> ·
-    {% if s.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% elif s.status == 'open' %}<span class="badge {{ 'b-bad' if days and days > 30 else 'b-warn' if days and days > 0 else 'b-blue' }}">{% if days and days > 0 %}{{ days }} dagen vervallen{% else %}Open{% endif %}</span>{% else %}<span class="badge">{{ STATUS_LABEL[s.status] }}</span>{% endif %}</div>
-    <h1>Factuur {{ s.number }}</h1>
-    <p>{% if s.customer_id %}<a href="{{ url_for('klanten.customer', cid=s.customer_id) }}">{{ s.cname }}</a>{% else %}{{ s.customer_name or 'Klant onbekend' }}{% endif %}{% if s.debtor_no %} · debiteur {{ s.debtor_no }}{% endif %}</p></div>
-  <div class="actions">{% if s.pdf_file_id %}<a class="btn primary" href="{{ url_for('main.file', fid=s.pdf_file_id) }}" target="_blank" data-pdf="Factuur {{ s.number }}">{{ icon('pdf') }}Factuur (PDF)</a>{% endif %}</div>
+  <div>
+    <div class="crumbs"><a href="{{ url_for('debiteuren.index') }}">{{ icon('back') }}Verkoopfacturen</a></div>
+    <h1>{{ cname }} · {{ s.number }}</h1>
+    <p>{% if s.customer_id %}<a href="{{ url_for('klanten.customer', cid=s.customer_id) }}">Relatie openen</a> · {% endif %}{% if s.debtor_no %}debiteur {{ s.debtor_no }} · {% endif %}factuurdatum {{ s.invoice_date|date if s.invoice_date else '–' }}{% if s.attn %} · t.a.v. {{ s.attn }}{% endif %}</p>
+  </div>
+  <div class="actions"><span class="stchips row">
+    {% if s.status == 'betaald' %}<span class="stchip lg" style="--c:#1E7A3C">Betaald</span>
+    {% elif s.status == 'open' %}<span class="stchip lg" style="--c:{{ '#C62828' if over and days > 30 else ('#E0A800' if over else '#0080FF') }}">{% if over %}{{ days }} dagen vervallen{% else %}Open{% endif %}</span>
+    {% else %}<span class="stchip lg" style="--c:#9AA0A6">{{ STATUS_LABEL[s.status] }}</span>{% endif %}
+    {% if s.dun_level and s.status == 'open' %}<span class="stchip lg" style="--c:#7B3FBF">{{ LEVELS[s.dun_level] }} verstuurd</span>{% endif %}
+  </span></div>
 </div>
-<div class="grid g2">
-<section class="card">
+
+{% set due_passed = s.due_date and s.due_date <= today %}
+<div class="card cred-flow lin" aria-label="Voortgang">
+  <span class="cf-node done"><b>{{ icon('check') }}</b>Gefactureerd{% if s.invoice_date %} {{ s.invoice_date|date }}{% endif %}</span>
+  <i class="cf-line {{ 'on' if due_passed or s.status == 'betaald' }}"></i>
+  <span class="cf-node {{ 'done' if due_passed or s.status == 'betaald' else 'todo' }}"><b>{% if due_passed or s.status == 'betaald' %}{{ icon('check') }}{% else %}2{% endif %}</b>{% if s.due_date %}{{ 'Vervallen' if due_passed else 'Vervalt' }} {{ s.due_date|date }}{% else %}Vervaldatum onbekend{% endif %}</span>
+  <i class="cf-line {{ 'on' if s.dun_level }}"></i>
+  <span class="cf-node {{ 'done' if s.dun_level else ('todo' if s.status == 'open' and over else 'off') }}"><b>{% if s.dun_level %}{{ icon('check') }}{% else %}3{% endif %}</b>{% if s.dun_level %}{{ LEVELS[s.dun_level] }} {{ s.dunned_at|dt('%d-%m') }}{% elif s.status == 'open' and over %}Nog herinneren{% else %}Herinnering{% endif %}</span>
+  <i class="cf-line {{ 'on' if s.status == 'betaald' }}"></i>
+  <span class="cf-node {{ 'done' if s.status == 'betaald' else 'todo' }}"><b>{% if s.status == 'betaald' %}{{ icon('check') }}{% else %}4{% endif %}</b>{% if s.status == 'betaald' %}Betaald{% if s.paid_at %} {{ s.paid_at|dt('%d-%m-%Y') }}{% endif %}{% else %}Nog open: {{ (s.open_amount if s.open_amount is not none else s.amount)|eur(2) }}{% endif %}</span>
+</div>
+
+<div class="grid g2 stack cred-grid">
+  <section class="card cred-pdf">
+    <div class="card-head"><h2>Factuur (PDF)</h2>
+      {% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel='Factuur ' ~ s.number) }}">Openen</a> · <a href="{{ pdf_url }}?download=1&naam=Factuur_{{ s.number }}.pdf">Downloaden</a></div>{% endif %}
+    </div>
+    {% if pdf_url %}
+    <iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
+    <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel='Factuur ' ~ s.number) }}">{{ icon('pdf') }}Factuur bekijken</a>
+    {% else %}<div class="empty">Nog geen PDF uit het DigiDossier.</div>{% endif %}
+  </section>
+
+  <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    <section class="card">
+      <div class="card-head"><h2>Gegevens</h2><span class="small muted">uit SnelStart/Excel en de factuur</span></div>
   <dl class="dl">
     <dt>Factuurdatum</dt><dd>{{ s.invoice_date|date if s.invoice_date else '–' }}</dd>
     <dt>Vervaldatum</dt><dd>{{ s.due_date|date if s.due_date else '–' }}{% if info.due_from_terms and s.status_source != 'snelstart' %} <span class="small muted">(berekend: {{ info.due_from_terms }}{{ ' dagen' if info.due_from_terms is number }} na factuurdatum)</span>{% endif %}</dd>
@@ -25,16 +58,7 @@
     {% if s.dossier_reminders %}{% set rems = s.dossier_reminders|fromjson %}<dt>Al herinnerd (DigiDossier)</dt><dd class="small">{% for r in rems %}{{ r.name }}{% if r.modified %} · {{ (r.modified[:19] ~ 'Z')|dt('%d-%m-%Y') }}{% endif %}<br>{% endfor %}</dd>{% endif %}
   </dl>
   {% if s.status == 'onbekend' %}<p class="hint">Deze factuur staat in het DigiDossier, maar is nog niet gezien in een overzicht met openstaande posten. Na de volgende import of SnelStart-ronde staat hij op open of betaald.</p>{% endif %}
-</section>
-<section class="card">
-  <div class="card-head"><h2>Notitie</h2></div>
-  {% if can('debiteuren', 2) %}
-  <form method="post" action="{{ url_for('debiteuren.note', sid=s.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <textarea name="note" rows="4" placeholder="bijv. klant belt terug, betaalt eind van de maand">{{ s.note or '' }}</textarea>
-    <div class="actions"><button class="btn sm primary">Opslaan</button></div></form>
-  {% else %}<div class="prose" style="white-space:pre-line">{{ s.note or '–' }}</div>{% endif %}
-</section>
-</div>
+    </section>
 {% if s.status == 'open' or letters %}
 <section class="card" id="aanmanen">
   <div class="card-head"><div><h2>Herinneren en aanmanen</h2>
@@ -60,12 +84,15 @@
   {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else url_for('debiteuren.conversation', lid=l.id) }}"><div class="grow"><div class="t">{{ LEVELS[l.level] }}{% if l.number %} {{ l.number }}{% endif %}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% if l.replies %} · <b>{{ l.replies }} antwoord{{ 'en' if l.replies != 1 }} van de klant</b>{% endif %}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
 </section>
 {% endif %}
-{% if others %}
-<section class="card flush tablewrap">
-  <div class="card-head" style="padding:16px 16px 0"><h2>Meer open bij deze klant</h2></div>
-  <table class="table"><thead><tr><th>Factuur</th><th class="hide-m">Datum</th><th>Vervalt</th><th class="num">Openstaand</th></tr></thead><tbody>
-  {% for o in others %}<tr class="link" data-href="{{ url_for('debiteuren.detail', sid=o.id) }}"><td><b>{{ o.number }}</b></td><td class="hide-m">{{ o.invoice_date|date if o.invoice_date else '–' }}</td><td>{{ o.due_date|date if o.due_date else '–' }}</td><td class="num">{{ o.open_amount|eur(2) if o.open_amount is not none else '–' }}</td></tr>{% endfor %}
-  </tbody></table>
+    <section class="card">
+  <div class="card-head"><h2>Notitie</h2></div>
+  {% if can('debiteuren', 2) %}
+  <form method="post" action="{{ url_for('debiteuren.note', sid=s.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="note" rows="4" placeholder="bijv. klant belt terug, betaalt eind van de maand">{{ s.note or '' }}</textarea>
+    <div class="actions"><button class="btn sm primary">Opslaan</button></div></form>
+  {% else %}<div class="prose" style="white-space:pre-line">{{ s.note or '–' }}</div>{% endif %}
 </section>
-{% endif %}
+
+  </div>
+</div>
 {% endblock %}

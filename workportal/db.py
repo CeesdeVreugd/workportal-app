@@ -936,6 +936,15 @@ MIGRATIONS = [
         WHERE status = 'verstuurd';
     CREATE UNIQUE INDEX idx_dunning_number ON dunning_letters(number) WHERE number IS NOT NULL;
     """,
+    # 52 - inkoopfacturen: betalingsherinneringen van leveranciers apart (tabblad Herinneringen voor de boekhouding)
+    """
+    ALTER TABLE invoices ADD COLUMN is_reminder INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE invoices ADD COLUMN reminder_of INTEGER;
+    ALTER TABLE invoices ADD COLUMN reminder_done_at TEXT;
+    ALTER TABLE invoices ADD COLUMN reminder_done_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE invoices ADD COLUMN reminder_note TEXT;
+    CREATE INDEX idx_invoices_reminder ON invoices(is_reminder, reminder_done_at);
+    """,
 ]
 
 
