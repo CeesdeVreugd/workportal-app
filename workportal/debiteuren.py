@@ -745,6 +745,7 @@ def snelstart_now():
 # ---------------------------------------------------------------- herinneren en aanmanen
 
 LEVELS = {1: "Herinnering", 2: "Aanmaning", 3: "Laatste aanmaning"}
+DUN_TAG = re.compile(r"\[WP-H(\d+)\]")
 DEFAULT_DAYS = (7, 21, 35)
 DEFAULT_SENDER = "administratie@devreugd-pt.nl"
 IBAN = "NL70 RABO 0133 9900 36"
@@ -1160,15 +1161,18 @@ def send_letter(conn, lid):
                         atts.append((f"Factuur_{inv['number']}.pdf", fh.read(), "application/pdf"))
                 except OSError:
                     pass
-    ok, err = send_mail_with_files(sender(conn), to, L["subject"], L["body"], atts, signer="administratie")
+    subject = L["subject"] if DUN_TAG.search(L["subject"] or "") else f"{L['subject']} [WP-H{lid}]"
+    ok, err = send_mail_with_files(sender(conn), to, subject, L["body"], atts, signer="administratie")
     if not ok:
         conn.execute("UPDATE dunning_letters SET error = ?, updated_at = ? WHERE id = ?", (str(err)[:400], now, lid))
         conn.commit()
         return False, f"Versturen mislukt: {err}"
     fid = save_bytes("dunning_letter", lid, pdf, fname, kind="brief", mime="application/pdf")
     conn = get_db()
-    conn.execute("UPDATE dunning_letters SET status = 'verstuurd', sent_by = ?, sent_at = ?, error = NULL, pdf_file_id = ?,"
-                 " invoice_ids = ?, updated_at = ? WHERE id = ?", (g.user["id"], now, fid, json.dumps([i["id"] for i in invs]), now, lid))
+    conn.execute("UPDATE dunning_letters SET status = 'verstuurd', sent_by = ?, sent_at = ?, error = NULL, pdf_file_id = ?, subject = ?,"
+                 " invoice_ids = ?, updated_at = ? WHERE id = ?", (g.user["id"], now, fid, subject, json.dumps([i["id"] for i in invs]), now, lid))
+    conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_by, created_at) VALUES (?, 'mail_uit', ?, ?, ?, ?)",
+                 (lid, L["body"], json.dumps({"to": to, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now))
     for inv in invs:
         conn.execute("UPDATE sales_invoices SET dun_level = MAX(dun_level, ?), dunned_at = ? WHERE id = ?", (L["level"], now, inv["id"]))
     conn.commit()
@@ -1187,7 +1191,13 @@ def pending_count():
 def _letters_for_invoice(sid, statuses=("voorstel", "verstuurd")):
     rows = query("SELECT l.*, u.name AS who FROM dunning_letters l LEFT JOIN users u ON u.id = COALESCE(l.sent_by, l.created_by)"
                  f" WHERE l.status IN ({','.join('?' * len(statuses))}) ORDER BY l.id DESC", list(statuses))
-    return [r for r in rows if sid in letter_ids(r)]
+    out = []
+    for r in rows:
+        if sid in letter_ids(r):
+            d = dict(r)
+            d["replies"] = query("SELECT COUNT(*) c FROM dunning_messages WHERE letter_id = ? AND kind = 'mail_in'", (r["id"],), one=True)["c"]
+            out.append(d)
+    return out
 
 
 @bp.route("/aanmaningen", methods=["GET", "POST"])
@@ -1242,7 +1252,8 @@ def dunning():
         items.append(d)
     sent = query("SELECT l.*, c.name AS cname, u.name AS who FROM dunning_letters l LEFT JOIN customers c ON c.id = l.customer_id"
                  " LEFT JOIN users u ON u.id = l.sent_by WHERE l.status = 'verstuurd' ORDER BY l.sent_at DESC LIMIT 50")
-    sent = [dict(s, n=len(letter_ids(s)), first=query("SELECT number, customer_name FROM sales_invoices WHERE id = ?", (letter_ids(s)[0],), one=True)) for s in sent]
+    sent = [dict(s, n=len(letter_ids(s)), first=query("SELECT number, customer_name FROM sales_invoices WHERE id = ?", (letter_ids(s)[0],), one=True),
+                 replies=query("SELECT COUNT(*) c FROM dunning_messages WHERE letter_id = ? AND kind = 'mail_in'", (s["id"],), one=True)["c"]) for s in sent]
     return render_template("debiteuren/aanmaningen.html", items=items, sent=sent, LEVELS=LEVELS, days=dun_days(), sender=sender(),
                            has_data=bool(_setting("deb_last_update")))
 
@@ -1422,3 +1433,203 @@ def mark_paid(sid):
     audit("handmatig op betaald", "sales_invoice", sid, inv["number"])
     flash(f"Factuur {inv['number']} staat op betaald. Staat hij bij de volgende import nog open in SnelStart, dan gaat hij weer op open.", "ok")
     return redirect(url_for("debiteuren.detail", sid=sid))
+
+
+# ---------------------------------------------------------------- mailgesprek bij een herinnering
+
+def poll_replies(conn, upload_dir, lookback_days=None):
+    """Antwoorden op herinneringen uit de mailbox (afzender, bijv. administratie@) ophalen: mails met [WP-H..] in het
+    onderwerp of uit dezelfde mailwisseling. Alleen lezen (en naar de WorkPortal-map verplaatsen, zoals bij service)."""
+    import base64 as _b64
+    from datetime import timedelta
+    from .crediteuren import _reply_text
+    from .mail import _graph_token, graph_retry, graph_error_text
+    from .service import svc_folder, _move_to_folder, _save_file_conn
+    from .util import safe_filename
+    box = sender(conn)
+    since = _setting("deb_mail_since", conn) or (now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if lookback_days:
+        since = min(since, (now_utc() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    headers = {"Authorization": f"Bearer {_graph_token()}"}
+    skip = set()
+    for wk in ("sentitems", "drafts", "outbox"):
+        try:
+            rf = graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/mailFolders/{wk}?$select=id", headers=headers, timeout=30)
+            if rf.status_code < 400 and rf.json().get("id"):
+                skip.add(rf.json()["id"])
+        except Exception:  # noqa: BLE001
+            pass
+    own = box.rpartition("@")[2]
+    url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
+           f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId,internetMessageId&$orderby=receivedDateTime asc&$top=50")
+    folder, mcache = svc_folder(conn), {}
+    n, newest, pages = 0, since, 0
+    while url and pages < 10:
+        pages += 1
+        r = graph_retry("GET", url, headers=headers, timeout=30)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Mailbox {box} lezen: " + graph_error_text(r.status_code, "mislukt"))
+        js = r.json()
+        for m in js.get("value", []):
+            newest = max(newest, m.get("receivedDateTime") or newest)
+            mid, imid = m["id"], (m.get("internetMessageId") or "")[:300]
+            if conn.execute("SELECT 1 FROM dunning_messages WHERE kind = 'mail_in' AND (mail_meta LIKE ? OR (? <> '' AND mail_meta LIKE ?))",
+                            (f'%"{mid}"%', imid, f'%"{imid}"%')).fetchone():
+                continue
+            tag = DUN_TAG.search(m.get("subject") or "")
+            lid = int(tag.group(1)) if tag else None
+            if lid and not conn.execute("SELECT 1 FROM dunning_letters WHERE id = ? AND status = 'verstuurd'", (lid,)).fetchone():
+                lid = None
+            if not lid and m.get("conversationId"):
+                hit = conn.execute("SELECT id FROM dunning_letters WHERE mail_conv = ? ORDER BY id DESC LIMIT 1", (m["conversationId"],)).fetchone()
+                lid = hit["id"] if hit else None
+            if not lid:
+                continue
+            frm = (m.get("from") or {}).get("emailAddress") or {}
+            fa = (frm.get("address") or "").lower()
+            if m.get("parentFolderId") in skip or fa == box.lower() or fa.startswith("/o=") or (own and fa.endswith("@" + own)):
+                continue
+            rb = graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
+                             headers=dict(headers, Prefer='outlook.body-content-type="text"'), timeout=30)
+            js2 = rb.json() if rb.status_code < 400 else {}
+            body = _reply_text((js2.get("uniqueBody") or {}).get("content") or (js2.get("body") or {}).get("content") or "")
+            rc = lambda k: [((x.get("emailAddress") or {}).get("address") or "").lower() for x in (js2.get(k) or [])]   # noqa: E731
+            meta = {"from": fa, "from_name": frm.get("name") or "", "subject": m.get("subject") or "", "msg_id": mid, "imid": imid,
+                    "to": [a for a in rc("toRecipients") if a], "cc": [a for a in rc("ccRecipients") if a]}
+            cur = conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_at) VALUES (?, 'mail_in', ?, ?, ?)",
+                               (lid, body or "(geen tekst)", json.dumps(meta, ensure_ascii=False), m.get("receivedDateTime") or now_iso()))
+            msg_id = cur.lastrowid
+            if m.get("hasAttachments"):
+                ar = graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}/attachments", headers=headers, timeout=60)
+                names = []
+                for a in (ar.json().get("value", []) if ar.status_code < 400 else []):
+                    if a.get("@odata.type") != "#microsoft.graph.fileAttachment" or a.get("isInline"):
+                        continue
+                    data = _b64.b64decode(a.get("contentBytes") or "")
+                    if data:
+                        nm = safe_filename(a.get("name") or "bijlage")
+                        _save_file_conn(conn, upload_dir, "dunning_message", msg_id, data, nm, a.get("contentType") or "application/octet-stream")
+                        names.append(nm)
+                if names:
+                    meta["files"] = names
+            conn.execute("UPDATE dunning_letters SET mail_conv = COALESCE(mail_conv, ?) WHERE id = ?", (m.get("conversationId"), lid))
+            conn.commit()
+            n += 1
+            if folder:
+                newid = _move_to_folder(box, mid, folder, mcache)
+                if newid:
+                    meta.update(msg_id=newid, folder=folder)
+            conn.execute("UPDATE dunning_messages SET mail_meta = ? WHERE id = ?", (json.dumps(meta, ensure_ascii=False), msg_id))
+            conn.commit()
+            try:
+                from .notify import notify_user
+                L = conn.execute("SELECT * FROM dunning_letters WHERE id = ?", (lid,)).fetchone()
+                who = frm.get("name") or fa or "klant"
+                if L["sent_by"]:
+                    notify_user(conn, L["sent_by"], f"Reactie op {LEVELS[L['level']].lower()}", f"{who}: " + (body[:140] or "(bijlage)"),
+                                url=f"/debiteuren/aanmaningen/{lid}/gesprek", email=False)
+            except Exception as exc:  # pragma: no cover
+                print(f"[WorkPortal] Melding reactie herinnering mislukt: {exc}", flush=True)
+        url = js.get("@odata.nextLink")
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_since', ?)", (newest,))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_last', ?)", (now_iso(),))
+    conn.commit()
+    return n
+
+
+def scheduled_replies(conn, app, state):
+    """Elke 5 minuten (als er de laatste 6 maanden herinneringen zijn verstuurd) de mailbox op antwoorden controleren."""
+    from .mail import graph_configured
+    import time
+    if not graph_configured() or time.time() - state.get("deb_mail", 0) < 300:
+        return
+    state["deb_mail"] = time.time()
+    if not conn.execute("SELECT 1 FROM dunning_letters WHERE status = 'verstuurd' AND sent_at > datetime('now', '-180 days')").fetchone():
+        return
+    try:
+        poll_replies(conn, app.config["UPLOAD_DIR"])
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_error', '')")
+    except Exception as exc:  # noqa: BLE001
+        conn.rollback()
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_error', ?)", (str(exc)[:300],))
+    conn.commit()
+
+
+def _thread(lid):
+    from .util import files_for
+    msgs = query("SELECT m.*, u.name AS author FROM dunning_messages m LEFT JOIN users u ON u.id = m.created_by WHERE m.letter_id = ? ORDER BY m.created_at, m.id", (lid,))
+    out = []
+    for m in msgs:
+        d = dict(m)
+        try:
+            d["meta"] = json.loads(m["mail_meta"] or "{}")
+        except ValueError:
+            d["meta"] = {}
+        d["files"] = files_for("dunning_message", m["id"])
+        out.append(d)
+    return out
+
+
+@bp.route("/aanmaningen/<int:lid>/gesprek", methods=["GET", "POST"])
+@require("debiteuren")
+def conversation(lid):
+    L = _letter(lid)
+    if L["status"] != "verstuurd":
+        return redirect(url_for("debiteuren.dunning") + f"#l{lid}")
+    conn = get_db()
+    if request.method == "POST":
+        if not can("debiteuren", BEWERKEN):
+            abort(403)
+        act = request.form.get("action")
+        text = (request.form.get("body") or "").strip()[:10000]
+        if act == "ophalen":
+            from flask import current_app
+            from .mail import graph_configured
+            if not graph_configured():
+                flash("De Microsoft-koppeling is niet ingesteld; antwoorden kunnen niet worden opgehaald.", "error")
+            else:
+                try:
+                    n = poll_replies(conn, current_app.config["UPLOAD_DIR"], lookback_days=30)
+                    flash(f"{n} nieuw{'e' if n != 1 else ''} antwoord{'en' if n != 1 else ''} opgehaald." if n else "Geen nieuwe antwoorden.", "ok")
+                except Exception as exc:  # noqa: BLE001
+                    flash(f"Ophalen mislukt: {str(exc)[:300]}", "error")
+        elif act == "notitie" and text:
+            execute("INSERT INTO dunning_messages (letter_id, kind, body, created_by, created_at) VALUES (?, 'notitie', ?, ?, ?)",
+                    (lid, text, g.user["id"], now_iso()))
+            flash("Notitie toegevoegd.", "ok")
+        elif act == "mail" and text:
+            from .mail import reply_in_thread, send_mail_with_files
+            to = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
+            if not to or any(not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
+                flash("Vul een geldig e-mailadres in.", "error")
+                return redirect(url_for("debiteuren.conversation", lid=lid) + "#antwoord")
+            atts = [(f.filename, f.read(), f.mimetype) for f in request.files.getlist("files") if f and f.filename][:10]
+            last_in = next((m for m in reversed(_thread(lid)) if m["kind"] == "mail_in" and m["meta"].get("msg_id")), None)
+            if last_in:
+                ok, err = reply_in_thread(sender(conn), last_in["meta"]["msg_id"], to, text, atts, signer="administratie")
+                subject = "RE: " + (last_in["meta"].get("subject") or L["subject"])
+            else:
+                subject = "RE: " + L["subject"]
+                ok, err = send_mail_with_files(sender(conn), to, subject, text, atts, signer="administratie")
+            if not ok:
+                flash(f"Versturen mislukt: {err}", "error")
+                return redirect(url_for("debiteuren.conversation", lid=lid) + "#antwoord")
+            cur = conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_by, created_at) VALUES (?, 'mail_uit', ?, ?, ?, ?)",
+                               (lid, text, json.dumps({"to": to, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now_iso()))
+            for name, data, mime in atts:
+                save_bytes("dunning_message", cur.lastrowid, data, name, mime=mime)
+            conn.commit()
+            audit("mail over herinnering", "dunning_letter", lid, ", ".join(to))
+            flash(f"Verstuurd aan {', '.join(to)}.", "ok")
+        return redirect(url_for("debiteuren.conversation", lid=lid))
+    ids = letter_ids(L)
+    invs = query(f"SELECT * FROM sales_invoices WHERE id IN ({','.join('?' * len(ids))}) ORDER BY due_date, number", ids)
+    cust = query("SELECT id, name, invoice_email FROM customers WHERE id = ?", (L["customer_id"],), one=True) if L["customer_id"] else None
+    msgs = _thread(lid)
+    last_in = next((m for m in reversed(msgs) if m["kind"] == "mail_in"), None)
+    reply_to = (last_in["meta"].get("from") if last_in else None) or L["to_addr"]
+    who = query("SELECT name FROM users WHERE id = ?", (L["sent_by"],), one=True) if L["sent_by"] else None
+    from .mail import graph_configured
+    state = {"last": _setting("deb_mail_last"), "error": _setting("deb_mail_error"), "on": graph_configured()}
+    return render_template("debiteuren/gesprek.html", L=L, invs=invs, cust=cust, msgs=msgs, reply_to=reply_to, LEVELS=LEVELS,
+                           who=who, box=sender(), state=state)

@@ -913,6 +913,20 @@ MIGRATIONS = [
                      ELSE 'i' || s.id END FROM sales_invoices s WHERE s.id = dunning_letters.invoice_id);
     CREATE INDEX idx_dunning_group ON dunning_letters(group_key, status);
     """,
+    # 50 - mailgesprek bij een herinnering (verstuurde brief, antwoorden van de klant, onze antwoorden en notities)
+    """
+    ALTER TABLE dunning_letters ADD COLUMN mail_conv TEXT;
+    CREATE TABLE dunning_messages (
+        id INTEGER PRIMARY KEY,
+        letter_id INTEGER NOT NULL REFERENCES dunning_letters(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        body TEXT,
+        mail_meta TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_dunning_msg ON dunning_messages(letter_id, id);
+    """,
 ]
 
 

@@ -1020,6 +1020,14 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V208 (2.18.2)
+- **Mailgesprek bij een herinnering**, zoals bij de servicetickets. Na het versturen staat elke herinnering/aanmaning als gesprek in WorkPortal: de verstuurde mail (met bijlagen), de antwoorden van de klant en jullie antwoorden en notities.
+  - **Antwoorden ophalen:** het onderwerp krijgt [WP-H..] erbij. Antwoorden van de klant (ook met bijlagen) worden elke 5 minuten uit de mailbox van de afzender (administratie@) opgehaald en naar de WorkPortal-map verplaatst, net als bij service. De verstuurder krijgt een melding.
+  - **Vanuit WorkPortal:** 'Antwoorden' stuurt een antwoord in dezelfde mailwisseling. Met 'Notitie' leg je bijvoorbeeld een telefoongesprek vast.
+  - **Waar je het vindt:** bij de factuur onder 'Herinneren en aanmanen' en onder 'Laatst verstuurd', met het aantal antwoorden van de klant.
+- Nodig in Microsoft 365: de app mag de mailbox van administratie@ lezen (Mail.Read, en Mail.ReadWrite voor verplaatsen), net als bij de service-mailbox.
+- Databasemigratie 50 (dunning_messages).
+
 ## V207 (2.18.1)
 - Herinnering/aanmaning (PDF-brief): **alle openstaande facturen** van de klant staan erin, ook die nog niet vervallen zijn, met een kolom **Vervallen** ('37 dagen' in rood, of 'nog niet'). Onderaan staat het totaal openstaand en 'waarvan vervallen'.
 - Uitstellen staat niet meer standaard open, maar onder de knop **Uitstellen** (op de factuur en bij de voorstellen).

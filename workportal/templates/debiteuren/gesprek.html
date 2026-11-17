@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import photos %}
+{% block title %}{{ LEVELS[L.level] }} – {{ cust.name if cust else '' }}{% endblock %}
+{% block content %}
+{% set edit = can('debiteuren', 2) %}
+<div class="pagehead">
+  <div><div class="eyebrow"><a href="{{ url_for('debiteuren.dunning') }}">Herinneren en aanmanen</a></div>
+    <h1>{{ LEVELS[L.level] }}{% if cust %} · {{ cust.name }}{% endif %}</h1>
+    <p>Verstuurd {{ L.sent_at|dt }}{% if who %} door {{ who.name }}{% endif %} aan {{ L.to_addr }}</p></div>
+  <div class="actions"><a class="btn" href="{{ url_for('debiteuren.letter_preview', lid=L.id) }}" target="_blank" data-pdf="{{ LEVELS[L.level] }}">{{ icon('pdf') }}Brief (PDF)</a></div>
+</div>
+
+<section class="card flush tablewrap">
+  <table class="table compact"><thead><tr><th>Factuur</th><th class="hide-m">Datum</th><th>Vervalt</th><th class="num">Openstaand</th><th>Status</th></tr></thead><tbody>
+  {% for i in invs %}<tr class="link" data-href="{{ url_for('debiteuren.detail', sid=i.id) }}"><td><b>{{ i.number }}</b></td><td class="hide-m">{{ i.invoice_date|date if i.invoice_date else '–' }}</td>
+    <td>{{ i.due_date|date if i.due_date else '–' }}</td><td class="num">{{ (i.open_amount if i.open_amount is not none else i.amount)|eur(2) }}</td>
+    <td>{% if i.status == 'betaald' %}<span class="badge b-ok">Betaald</span>{% else %}<span class="badge b-warn">Open</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="card" id="gesprek">
+  <div class="card-head"><h2>Gesprek ({{ msgs|length }})</h2><span class="small muted">mail met de klant · {{ box }}</span></div>
+  {% if edit %}<div class="svcstate small {{ 'bad' if state.error or not state.on }}">
+    {% if not state.on %}De Microsoft-koppeling is niet ingesteld: antwoorden worden niet opgehaald.
+    {% elif state.error %}Antwoorden ophalen mislukt: {{ state.error }}
+    {% else %}Antwoorden van de klant komen hier vanzelf binnen (elke 5 minuten){% if state.last %} · laatst {{ state.last|dt }}{% endif %}.{% endif %}
+    <form method="post" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="ophalen">{{ icon('refresh') }}Nu ophalen</button></form></div>{% endif %}
+  <div class="notes">
+  {% for m in msgs|reverse %}{% set mm = m.meta %}
+    <article class="note {{ 'note-in' if m.kind == 'mail_in' else 'note-out' }}" id="m{{ m.id }}">
+      <div class="notehead">
+        {% if m.kind == 'mail_in' %}<span class="badge b-purple">{{ icon('mail') }} van de klant</span><b>{{ mm.from_name or mm['from'] or 'Klant' }}</b>
+        {% elif m.kind == 'mail_uit' %}<span class="badge b-blue">{{ icon('mail') }} mail aan klant</span><b>{{ m.author or 'Onbekend' }}</b>
+        {% else %}<span class="badge">{{ icon('edit') }} notitie</span><b>{{ m.author or '' }}</b>{% endif %}
+        <span class="small muted">{{ m.created_at|dt }}</span>
+      </div>
+      {% if m.kind != 'notitie' %}<div class="small muted mailmeta">{% if m.kind == 'mail_uit' %}Aan {{ (mm.to or [])|join(', ') }}{% else %}Van {{ mm['from'] }}{% endif %} · <i>{{ (mm.subject or '')|replace('[WP-H' ~ L.id ~ ']', '')|trim }}</i></div>{% endif %}
+      {% set cb = m.body|mailclean if m.kind == 'mail_in' else m.body %}
+      <div class="notebody" style="white-space:pre-line">{{ cb }}</div>
+      {% if m.kind == 'mail_in' and cb|length + 40 < (m.body or '')|length %}<details class="mailfull"><summary>Volledige mail tonen</summary><div class="notebody" style="white-space:pre-line">{{ m.body }}</div></details>{% endif %}
+      {% if m.files %}<div style="margin-top:8px">{{ photos(m.files) }}</div>{% elif mm.files and m.kind == 'mail_uit' %}<div class="small muted" style="margin-top:6px">{{ icon('clip') }} {{ mm.files|join(', ') }}</div>{% endif %}
+    </article>
+  {% else %}<div class="empty">Nog geen berichten.</div>{% endfor %}
+  </div>
+  {% if edit %}
+  <div class="actions" style="margin-top:14px">
+  <details class="cred-mail" id="antwoord">
+    <summary class="btn primary">{{ icon('mail') }}Antwoorden</summary>
+    <form method="post" enctype="multipart/form-data" class="form" style="margin-top:12px" data-no-draft>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="mail">
+      <label class="f">Aan *<input type="text" name="to" value="{{ reply_to or '' }}" required></label>
+      <label class="f">Tekst *<textarea name="body" rows="6" required></textarea><span class="hint">Gaat als antwoord in dezelfde mailwisseling, vanaf {{ box }} met de handtekening van Administratie.</span></label>
+      <label class="f">Bijlagen<input type="file" name="files" multiple></label>
+      <div class="actions"><button class="btn primary">Versturen</button></div>
+    </form>
+  </details>
+  <details class="cred-mail">
+    <summary class="btn">{{ icon('edit') }}Notitie</summary>
+    <form method="post" class="form" style="margin-top:12px" data-no-draft>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="notitie">
+      <label class="f">Interne notitie<textarea name="body" rows="3" required placeholder="bijv. klant gebeld, betaalt vrijdag"></textarea></label>
+      <div class="actions"><button class="btn primary sm">Opslaan</button></div>
+    </form>
+  </details>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
