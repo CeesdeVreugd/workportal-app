@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V214 (2.20.2)
+- Omschrijving uit de orderbon:
+  - **Knop:** wijkt de omschrijving van de nieuwste orderbon af van die van het project of de order, dan staat er bovenaan een balk met de knop **Overnemen (en map hernoemen)**. Dat is handig voor orderbonnen die al binnen waren vóór V213.
+  - **Automatisch:** bij een nieuwe orderbon wordt de omschrijving ook overgenomen als hij nooit met de hand in WorkPortal is gewijzigd (via Bewerken). Eerst gebeurde dat alleen als hij gelijk was aan de vorige orderbon.
+
 ## V213 (2.20.1)
 - **Gewijzigde orderbon** voor een bestaand project of een bestaande order:
   - **Velden:** wat Komdex wijzigt, wordt overgenomen (omschrijving, leverdatum/-week, uitvoerder, referentie, contactpersoon, ordertype, werkomschrijving). Dat geldt alleen als het veld in WorkPortal nog gelijk was aan de vorige orderbon; wat iemand zelf heeft aangepast, blijft staan. Lege velden worden zoals altijd aangevuld.

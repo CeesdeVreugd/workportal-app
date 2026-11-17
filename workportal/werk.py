@@ -196,9 +196,13 @@ def detail(pid):
     actions, deliveries = items_for(pid), deliveries_for(pid)
     history = query("SELECT a.*, u.name AS who FROM audit_log a LEFT JOIN users u ON u.id = a.user_id"
                     " WHERE a.entity = 'project' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 300", (pid,))
+    from .komdex import bon_of
+    ib = query("SELECT * FROM order_inbox WHERE project_id = ? AND bon_json IS NOT NULL ORDER BY bon_received_at DESC LIMIT 1", (pid,), one=True)
+    bon_name = ((bon_of(ib) or {}).get("description") or "").strip() if ib else ""
+    bon_name = bon_name if bon_name and bon_name != (p["name"] or "").strip() else ""
     from .debiteuren import finance_role
     sales = query("SELECT * FROM sales_invoices WHERE project_id = ? ORDER BY number", (pid,)) if finance_role() else []
-    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, sales=sales, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, history=history, tests=tests, calcs=calcs,
+    return render_template("werk/detail.html", K=k, B=request.blueprint, p=p, sales=sales, bon_name=bon_name, tickets=tickets, open_tickets=open_tickets, actions=actions, deliveries=deliveries, history=history, tests=tests, calcs=calcs,
                            annots=annotations_for(pid), ANNOT_STATUS=STATUS_LABEL,
                            toolcalcs=calcs_for(project_id=p["id"]),
                            nacalcs=nacalcs, sp_on=on, folder=folder, notes=notes, contacts=contacts, replies=replies, staff=staff,
@@ -243,6 +247,23 @@ def edit(pid):
                     return r
             return redirect(target)
     return render_template("werk/form.html", K=k, B=request.blueprint, p=p, customers=customers, edit=True, sp_on=on)
+
+
+@bp.route("/<int:pid>/omschrijving-orderbon", methods=["POST"])
+def name_from_bon(pid):
+    """Omschrijving van de nieuwste orderbon overnemen (en de map in SharePoint hernoemen)."""
+    p = _row(pid)
+    _need(BEWERKEN, KINDS[BP_OF_KIND[p["kind"]]]["module"])
+    from .komdex import bon_of
+    ib = query("SELECT * FROM order_inbox WHERE project_id = ? AND bon_json IS NOT NULL ORDER BY bon_received_at DESC LIMIT 1", (pid,), one=True)
+    new = ((bon_of(ib) or {}).get("description") or "").strip() if ib else ""
+    if new and new != p["name"]:
+        execute("UPDATE projects SET name = ? WHERE id = ?", (new, pid))
+        audit("omschrijving uit orderbon", "project", pid, f"{p['name']} → {new}")
+        flash(f"Omschrijving bijgewerkt naar '{new}'.", "ok")
+        if p["sp_item_id"] and not p["sp_missing"]:
+            _rename(pid)
+    return redirect(werk_url("detail", p, pid=pid))
 
 
 def _rename(pid):

@@ -147,6 +147,12 @@ def order_props(row):
         return {}
 
 
+def name_edited(conn, pid):
+    """Is de omschrijving ooit met de hand gewijzigd in WorkPortal? Dan volgt hij de orderbon niet meer."""
+    return bool(conn.execute("SELECT 1 FROM audit_log WHERE entity = 'project' AND entity_id = ? AND action = 'gewijzigd'"
+                             " AND user_id IS NOT NULL AND details LIKE '%omschrijving%'", (pid,)).fetchone())
+
+
 def _enrich(conn, pid, it, old_bon=None):
     """Bestaand project/order bijwerken met de (nieuwe) orderbon. Lege velden worden aangevuld. Is een veld nog gelijk
     aan wat de vorige orderbon zei (dus niet zelf aangepast in WorkPortal), dan volgt het de nieuwe orderbon: Komdex is
@@ -169,7 +175,8 @@ def _enrich(conn, pid, it, old_bon=None):
             if cur:
                 changed.append(col)
     new_name, old_name = (bon.get("description") or "").strip(), (old_bon.get("description") or "").strip()
-    if new_name and old_name and new_name != old_name and (p["name"] or "").strip() == old_name:
+    if new_name and new_name != (p["name"] or "").strip() and ((old_name and (p["name"] or "").strip() == old_name)
+                                                               or not name_edited(conn, pid)):
         conn.execute("UPDATE projects SET name = ? WHERE id = ?", (new_name, pid))
         changed.append("name")
     _set_props(conn, pid, bon)

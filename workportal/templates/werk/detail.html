@@ -18,6 +18,10 @@
     {% if can(K.module, 2) %}<a class="btn primary" href="{{ url_for(B ~ '.edit', pid=p.id) }}">{{ icon('edit') }}Bewerken</a>{% endif %}
   </div>
 </div>
+{% if bon_name and can(K.module, 2) %}
+<div class="actionbar" style="cursor:default">{{ icon('refresh') }}<span>De nieuwste orderbon heeft een andere omschrijving: <b>{{ bon_name }}</b></span>
+  <form method="post" action="{{ url_for(B ~ '.name_from_bon', pid=p.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm primary">Overnemen{% if p.sp_item_id %} en map hernoemen{% endif %}</button></form></div>
+{% endif %}
 {% if p.order_type or p.executor or p.delivery_date or p.work_description or p.bon_file_id %}
 <div class="grid g2 stack">
   <section class="card"><div class="card-head"><h2>Ordergegevens</h2>{% if p.bon_file_id %}<div class="actions"><a class="btn sm" href="{{ url_for('main.file', fid=p.bon_file_id) }}" data-pdf="Orderbon {{ p.number }}" target="_blank" rel="noopener">{{ icon('pdf') }}Orderbon</a>{% if can_print %}<form method="post" action="{{ url_for(B ~ '.print_bon', pid=p.id) }}" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" title="Orderbon printen via Printix">Printen</button></form>{% endif %}</div>{% endif %}</div>
