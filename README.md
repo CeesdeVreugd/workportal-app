@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V202 (2.16.2)
+- Verkoopfacturen: de klant werd op Engelse facturen niet gevonden ('Invoiceadres:' / 'Invoice address:'). Dat wordt nu herkend, net als 'Attn:' en 'payment before'.
+- Wordt de klantnaam niet herkend bij de relaties (bijv. 'NewCold Piacenza S.R.L.'), dan neemt WorkPortal de klant van de order of het project uit 'Our reference'.
+- Na het bijwerken leest WorkPortal alle opgeslagen factuur-PDF's eenmalig opnieuw uit. In Beheer > DC01 > Facturen kan dat ook met 'Opnieuw uitlezen' voor de geselecteerde facturen.
+
 ## V201 (2.16.1)
 - DigiDossier: het script vindt nu ook facturen die anders zijn opgeslagen: een PDF dieper in de factuurmap, of een PDF direct in de jaarmap (oudere jaren). In het logboek op DC01 staat per jaar hoeveel factuurmappen het script ziet. **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
 - Beheer > DC01 > Facturen: tabel per jaar met het aantal mappen op DC01, het aantal in WorkPortal en het aantal met PDF, plus een jaarfilter.

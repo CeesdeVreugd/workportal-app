@@ -301,6 +301,11 @@ def _dc01_invoices():
         if request.form.get("action") == "opnieuw" and ids:
             execute(f"UPDATE sales_invoices SET pdf_sig = NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
             flash(f"De PDF wordt bij de volgende run van het script opnieuw opgehaald ({len(ids)} factuur/facturen).", "ok")
+        elif request.form.get("action") == "uitlezen" and ids:
+            from .debiteuren import reparse
+            from .util import upload_dir
+            n = reparse(conn, ids, upload_dir())
+            flash(f"{n} factuur-PDF('s) opnieuw uitgelezen.", "ok")
         return redirect(url_for("beheer.dc01", tab="facturen", filter=request.form.get("filter"), q=request.form.get("q") or None))
     flt = request.args.get("filter") or "alle"
     q = (request.args.get("q") or "").strip()

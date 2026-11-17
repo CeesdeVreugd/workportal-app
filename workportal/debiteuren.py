@@ -234,7 +234,12 @@ def _date_txt(v):
 def _address_block(page):
     """Linkerkolom onder 'Factuuradres:' (rechts staat het werk-/afleveradres)."""
     words = page.extract_words()
-    head = next((w for w in words if re.match(r"(factuuradres|invoice\s*address|rechnungsadresse|adresse)", w["text"], re.I)), None)
+    head = next((w for w in words if re.match(r"(factuuradres|invoice-?adres|invoice-?address|billing|rechnungsadresse|adresse)", w["text"], re.I)), None)
+    if not head:   # 'Invoice address:' als twee woorden
+        for i, w in enumerate(words[:-1]):
+            if re.match(r"^(invoice|billing|rechnungs?)$", w["text"], re.I) and re.match(r"^(address|adres|adresse)\b", words[i + 1]["text"], re.I):
+                head = dict(w, x1=words[i + 1]["x1"])
+                break
     if not head:
         return []
     right = min([w["x0"] for w in words if abs(w["top"] - head["top"]) < 3 and w["x0"] > head["x1"] + 20] or [page.width / 2])
@@ -391,19 +396,8 @@ def _pdf(js):
     except Exception as exc:  # noqa: BLE001 - PDF bewaren, uitlezen is bijzaak
         info = {"fout": f"{type(exc).__name__}: {str(exc)[:150]}"}
     sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
-    cid = inv["customer_id"] or (_match_customer(conn, None, info.get("customer")) if info.get("customer") else None)
-    pid = inv["project_id"]
-    if not pid and info.get("order_no"):
-        pr = conn.execute("SELECT id FROM projects WHERE number = ?", (info["order_no"],)).fetchone()
-        pid = pr["id"] if pr else None
-    conn.execute("UPDATE sales_invoices SET customer_id = ?, customer_name = COALESCE(customer_name, ?), project_id = ?,"
-                 " order_no = COALESCE(order_no, ?), attn = COALESCE(attn, ?) WHERE id = ?",
-                 (cid, info.get("customer"), pid, info.get("order_no"), info.get("attn"), inv["id"]))
-    # gegevens uit de PDF alleen invullen waar SnelStart/Excel nog niets gaf
-    conn.execute("UPDATE sales_invoices SET pdf_file_id = ?, pdf_sig = ?, pdf_json = ?, invoice_date = COALESCE(invoice_date, ?),"
-                 " due_date = COALESCE(due_date, ?), amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
-                 (fid, sig, json.dumps(info, ensure_ascii=False), info.get("invoice_date"), info.get("due_date"), info.get("amount"),
-                  info.get("mail_to"), now_iso(), inv["id"]))
+    conn.execute("UPDATE sales_invoices SET pdf_file_id = ?, pdf_sig = ? WHERE id = ?", (fid, sig, inv["id"]))
+    apply_info(conn, inv, info)
     conn.commit()
     if old and old != fid:
         try:
@@ -414,6 +408,58 @@ def _pdf(js):
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_lastpdf', ?)", (f"{now_iso()}|{inv['number']}",))
     conn.commit()
     return jsonify({"ok": True, "resultaat": f"Factuur {inv['number']} opgeslagen"})
+
+
+def apply_info(conn, inv, info):
+    """Gegevens uit de factuur-PDF opslaan. Klant: herkend op naam, anders de klant van de order uit 'Onze ref.'.
+    Datums/bedrag alleen waar SnelStart/Excel nog niets gaf."""
+    pid = inv["project_id"]
+    if not pid and info.get("order_no"):
+        pr = conn.execute("SELECT id FROM projects WHERE number = ?", (info["order_no"],)).fetchone()
+        pid = pr["id"] if pr else None
+    cid = inv["customer_id"] or (_match_customer(conn, inv["debtor_no"], info.get("customer")) if info.get("customer") or inv["debtor_no"] else None)
+    if not cid and pid:
+        pr = conn.execute("SELECT customer_id FROM projects WHERE id = ?", (pid,)).fetchone()
+        cid = pr["customer_id"] if pr else None
+    conn.execute("UPDATE sales_invoices SET customer_id = ?, customer_name = COALESCE(customer_name, ?), project_id = ?, order_no = COALESCE(order_no, ?),"
+                 " attn = COALESCE(attn, ?), pdf_json = ?, invoice_date = COALESCE(invoice_date, ?), due_date = COALESCE(due_date, ?),"
+                 " amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
+                 (cid, info.get("customer"), pid, info.get("order_no"), info.get("attn"), json.dumps(info, ensure_ascii=False),
+                  info.get("invoice_date"), info.get("due_date"), info.get("amount"), info.get("mail_to"), now_iso(), inv["id"]))
+
+
+PARSE_VERSION = "2"
+
+
+def reparse(conn, ids=None, upload_dir=None):
+    """Opgeslagen factuur-PDF's opnieuw uitlezen (na een betere herkenning). Geeft het aantal."""
+    import os
+    sql = "SELECT s.*, f.stored_name FROM sales_invoices s JOIN files f ON f.id = s.pdf_file_id"
+    rows = conn.execute(sql + (f" WHERE s.id IN ({','.join('?' * len(ids))})" if ids else ""), ids or []).fetchall()
+    n = 0
+    for r in rows:
+        try:
+            with open(os.path.join(upload_dir, r["stored_name"]), "rb") as fh:
+                info = parse_pdf(fh.read())
+        except Exception as exc:  # noqa: BLE001
+            info = {"fout": f"{type(exc).__name__}: {str(exc)[:150]}"}
+        apply_info(conn, r, info)
+        n += 1
+    conn.commit()
+    return n
+
+
+def scheduled_reparse(conn, app):
+    """Eenmalig na een nieuwe versie van de herkenning: alle factuur-PDF's opnieuw uitlezen."""
+    if _setting("deb_parse_version", conn) == PARSE_VERSION:
+        return
+    with app.app_context():
+        from .util import upload_dir
+        d = upload_dir()
+    n = reparse(conn, upload_dir=d)
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_parse_version', ?)", (PARSE_VERSION,))
+    conn.commit()
+    print(f"[WorkPortal] Verkoopfacturen: {n} PDF's opnieuw uitgelezen", flush=True)
 
 
 # ---------------------------------------------------------------- pagina's
