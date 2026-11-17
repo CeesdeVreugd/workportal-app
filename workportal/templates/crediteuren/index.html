@@ -1,5 +1,6 @@
 {% from "crediteuren/_cats.html" import cats, has_cats %}{% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "crediteuren/_tabs.html" import cred_tabs %}
 {% block title %}Inkoopfacturen{% endblock %}
 {% block content %}
 <div class="pagehead">
@@ -27,6 +28,7 @@
   {% endif %}
 </div>
 
+{{ cred_tabs('facturen') }}
 <div class="grid g4" style="margin-bottom:16px">
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='komdex') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in Komdex</div><div class="value" style="color:{{ step_color.komdex }}">{{ counts.komdex }}</div><div class="sub">waarvan {{ counts.ss_klaar }} al in SnelStart</div></a>
   <a class="card kpi" href="{{ url_for('crediteuren.index', filter='erp') }}" style="text-decoration:none;color:inherit"><div class="label">Nog in SnelStart</div><div class="value" style="color:{{ step_color.snelstart }}">{{ counts.erp }}</div><div class="sub">waarvan {{ counts.erp_klaar }} al in (of buiten) Komdex</div></a>
@@ -65,7 +67,7 @@
     {% for r in items %}
     <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">
       <td class="nowrap small muted hide-m">{{ r.received_at|dt('%d-%m %H:%M') }}</td>
-      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.is_reminder %} <span class="badge b-warn">Herinnering{% if r.reminder_done_at %} · afgehandeld{% endif %}</span>{% endif %}{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
+      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b>{% if r.acc_notes %} <span class="badge b-purple" title="Er is een opmerking voor de boekhouding">boekhouding</span>{% endif %}
         <div class="small muted show-m">{{ r.received_at|dt('%d-%m') }} · {{ r.invoice_no or '' }}{% if r.due_date %} · vervalt {{ r.due_date|date }}{% endif %}</div>
         <div class="show-m stchips row-m">{% for t, col in r.chips %}<span class="stchip" style="--c:{{ col }}">{{ t }}</span>{% endfor %}</div></td>
       <td class="hide-m">{{ r.invoice_no or '–' }}</td>

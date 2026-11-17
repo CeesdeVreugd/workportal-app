@@ -7,7 +7,7 @@
 {% set pdf_url = url_for('main.file', fid=r.file_id) if r.file_id else None %}
 <div class="pagehead">
   <div>
-    <div class="crumbs"><a href="{{ back }}">{{ icon('back') }}Inkoopfacturen</a></div>
+    <div class="crumbs">{% if r.is_reminder %}<a href="{{ url_for('crediteuren.reminders') }}">{{ icon('back') }}Herinneringen</a>{% else %}<a href="{{ back }}">{{ icon('back') }}Inkoopfacturen</a>{% endif %}</div>
     <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}{% if r.amount_incl is not none and r.amount_incl < 0 %} <span class="badge b-purple" style="vertical-align:middle">Creditfactuur</span>{% endif %}</h1>
     <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_fwd_by %} (doorgestuurd door {{ r.mail_fwd_by }}){% endif %}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
   </div>
@@ -17,7 +17,7 @@
 {% if r.is_reminder %}
 <div class="card" style="border-color:#E0A800;background:#FFF9E6;margin-bottom:16px">
   <div class="card-head"><div><h2>Betalingsherinnering van de leverancier</h2>
-    <div class="small muted">Dit is geen nieuwe factuur. {% if r.reminder_done_at %}Afgehandeld {{ r.reminder_done_at|dt }}{% if rem_done_by %} door {{ rem_done_by.name }}{% endif %}{% if r.reminder_note %}: {{ r.reminder_note }}{% endif %}{% else %}De boekhouding werkt hem af bij Inkoopfacturen › Herinneringen.{% endif %}</div></div></div>
+    <div class="small muted">Dit is geen nieuwe factuur. {% if r.reminder_done_at %}Afgehandeld {{ r.reminder_done_at|dt }}{% if rem_done_by %} door {{ rem_done_by.name }}{% endif %}{% if r.reminder_note %}: {{ r.reminder_note }}{% endif %}{% else %}De boekhouding werkt hem af op het tabblad Herinneringen.{% endif %}</div></div></div>
   <p style="margin:0 0 10px">{% if orig %}Hoort bij factuur <a href="{{ url_for('crediteuren.detail', iid=orig.id) }}"><b>{{ orig.invoice_no }}</b></a> ({{ orig.supplier }}, {{ orig.amount_incl|eur(2) if orig.amount_incl is not none else '–' }}): <span class="badge {{ STATUS_BADGE.get(orig.status, '') }}">{{ orig.label }}</span>{% if orig.snelstart_at %} · in SnelStart sinds {{ orig.snelstart_at|dt('%d-%m-%Y') }}{% endif %}
      {% else %}De bijbehorende factuur staat (nog) niet in WorkPortal.{% endif %}</p>
   {% if edit %}<div class="actions" style="margin:0">

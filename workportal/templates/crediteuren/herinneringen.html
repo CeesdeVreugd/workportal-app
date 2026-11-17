@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "crediteuren/_tabs.html" import cred_tabs %}
+{% block title %}Herinneringen – Inkoopfacturen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Inkoopfacturen</h1><p>Betalingsherinneringen van leveranciers: geen nieuwe facturen, apart af te werken door de boekhouding.</p></div></div>
+{{ cred_tabs('herinneringen') }}
+{% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if f == key }}" href="{{ url_for('crediteuren.reminders', f=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
+<div class="fchips" style="margin-bottom:12px" id="rem-chips">{{ fbtn('open', 'Af te werken', counts.open) }}{{ fbtn('af', 'Afgehandeld', counts.af) }}{{ fbtn('alle', 'Alle', counts.alle) }}</div>
+<form method="get" class="inline-form" style="margin-bottom:12px;max-width:560px" data-live="#rem-chips,#rem-table" role="search">
+  {% if f != 'open' %}<input type="hidden" name="f" value="{{ f }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek leverancier, factuurnummer, bedrag…" style="flex:1" autocomplete="off" aria-label="Zoeken">
+  <button class="btn">{{ icon('search') }}Zoeken</button>
+</form>
+<section class="card flush tablewrap" id="rem-table">
+  <table class="table">
+    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th>Bijbehorende factuur</th><th class="hide-m">Afgehandeld</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">
+      <td class="hide-m nowrap small muted">{{ r.received_at|dt('%d-%m-%Y') }}</td>
+      <td><b>{{ r.supplier or 'Onbekende leverancier' }}</b><div class="small muted">{{ r.mail_subject or '' }}</div></td>
+      <td class="hide-m">{{ r.invoice_no or '–' }}</td>
+      <td class="num nowrap">{{ r.amount_incl|eur(2) if r.amount_incl is not none else '–' }}</td>
+      <td>{% if r.orig_id %}<span class="badge {{ STATUS_BADGE.get(r.orig_status, '') }}">{{ STATUS.get(r.orig_status, r.orig_status) }}</span>{% if r.orig_ss %} <span class="small muted">in SnelStart {{ r.orig_ss|dt('%d-%m') }}</span>{% endif %}{% else %}<span class="small muted">niet in WorkPortal</span>{% endif %}</td>
+      <td class="hide-m small">{% if r.reminder_done_at %}{{ r.reminder_done_at|dt('%d-%m-%Y') }} · {{ r.done_name or '' }}{% if r.reminder_note %}<div class="muted">{{ r.reminder_note }}</div>{% endif %}{% else %}<span class="badge b-warn">Af te werken</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="empty">{% if f == 'open' %}Geen herinneringen af te werken.{% else %}Geen herinneringen.{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

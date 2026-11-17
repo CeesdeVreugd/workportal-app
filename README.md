@@ -1020,6 +1020,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V216 (2.21.1)
+- Inkoopfacturen heeft nu twee echte tabbladen: **Facturen** en **Herinneringen** (met teller), net als bij Verkoopfacturen.
+  - **Herinneringen staan helemaal apart.** Ze komen niet meer voor op het tabblad Facturen, ook niet bij Alle of bij zoeken.
+  - **Tabblad Herinneringen:** Af te werken / Afgehandeld / Alle, direct zoeken, en per herinnering de status van de bijbehorende factuur (bijv. in SnelStart sinds …) en wie hem heeft afgehandeld.
+  - Vanuit een herinnering ga je terug naar het tabblad Herinneringen. Na 'Afgehandeld' ga je meteen door naar de volgende.
+
 ## V215 (2.21.0)
 - **Inkoopfacturen: betalingsherinneringen van leveranciers apart.**
   - **Herkennen:** een herinnering/aanmaning (onderwerp van de mail, of 'Betalingsherinnering' / 'Herinnering' / 'Aanmaning' / 'Reminder' in de kop van de PDF) wordt geen gewone factuurkaart. Hij komt in het nieuwe tabblad **Herinneringen**, gekoppeld aan de factuur met hetzelfde nummer.

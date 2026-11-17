@@ -1375,7 +1375,6 @@ FILTERS = [
     ("boekhouding", "Voor de boekhouding"),
     ("afgewezen", "Afgewezen"),
     ("klaar", "Afgerond"),
-    ("herinneringen", "Herinneringen"),
     ("alle", "Alle"),
 ]
 
@@ -1401,13 +1400,12 @@ def index():
         "klaar": "i.status = 'snelstart' AND NOT (" + SQL_FINISH + ")",
         "alle": "1=1",
     }
-    cond["herinneringen"] = "i.is_reminder = 1 AND i.reminder_done_at IS NULL"
-    cond["herinneringen_af"] = "i.is_reminder = 1 AND i.reminder_done_at IS NOT NULL"
+    if flt in ("herinneringen", "herinneringen_af"):
+        return redirect(url_for("crediteuren.reminders", f="af" if flt == "herinneringen_af" else None, q=q or None))
     if flt not in cond:
         flt = "open"
     where.append(cond[flt])
-    if flt not in ("alle", "herinneringen", "herinneringen_af"):
-        where.append("IFNULL(i.is_reminder, 0) = 0")   # betalingsherinneringen staan apart
+    where.append("IFNULL(i.is_reminder, 0) = 0")   # betalingsherinneringen staan op een eigen tabblad
     if flt == "mij":
         params.append(uid)
     if q:
@@ -1438,7 +1436,7 @@ def index():
     counts = {k: (c[k] or 0) for k in c.keys()}
     rc = query("SELECT SUM(reminder_done_at IS NULL) AS o, SUM(reminder_done_at IS NOT NULL) AS d, COUNT(*) AS a FROM invoices WHERE is_reminder = 1", one=True)
     counts["herinneringen"], counts["herinneringen_af"] = rc["o"] or 0, rc["d"] or 0
-    counts["alle"] = (counts.get("alle") or 0) + (rc["a"] or 0)
+
     counts["boekhouding"] = query("SELECT COUNT(DISTINCT n.invoice_id) AS n FROM invoice_notes n JOIN invoices i ON i.id = n.invoice_id"
                                   " WHERE n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0 AND i.status <> 'snelstart'", one=True)["n"] or 0
     items = []
@@ -2572,7 +2570,7 @@ def reminder(iid):
     conn.commit()
     if act == "af":
         nxt = conn.execute("SELECT id FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL ORDER BY received_at LIMIT 1").fetchone()
-        return redirect(url_for("crediteuren.detail", iid=nxt["id"]) if nxt else url_for("crediteuren.index", filter="herinneringen"))
+        return redirect(url_for("crediteuren.detail", iid=nxt["id"]) if nxt else url_for("crediteuren.reminders"))
     return redirect(url_for("crediteuren.detail", iid=iid))
 
 
@@ -2589,3 +2587,28 @@ def mark_existing_reminders(conn):
             log(conn, r["id"], "Herkend als betalingsherinnering (onderwerp van de mail)")
     _set(conn, "cred_rem_scan", "1")
     conn.commit()
+
+
+@bp.route("/herinneringen")
+@require(MODULE)
+def reminders():
+    """Tabblad Herinneringen: betalingsherinneringen van leveranciers, apart af te werken door de boekhouding."""
+    f = request.args.get("f") or "open"
+    q = (request.args.get("q") or "").strip()
+    where = ["i.is_reminder = 1", "i.reminder_done_at IS NULL" if f == "open" else ("i.reminder_done_at IS NOT NULL" if f == "af" else "1=1")]
+    params = []
+    for t in [t for t in q.split() if t][:6]:
+        where.append("(i.supplier LIKE ? OR i.invoice_no LIKE ? OR i.mail_subject LIKE ? OR i.mail_from LIKE ? OR printf('%.2f', i.amount_incl) LIKE ?)")
+        params += [f"%{t}%"] * 4 + [f"%{t.replace('.', '').replace(',', '.')}%"]
+    rows = query("SELECT i.*, o.id AS orig_id, o.status AS orig_status, o.snelstart_at AS orig_ss, u.name AS done_name FROM invoices i"
+                 " LEFT JOIN invoices o ON o.id = i.reminder_of LEFT JOIN users u ON u.id = i.reminder_done_by"
+                 " WHERE " + " AND ".join(where) + " ORDER BY i.received_at DESC LIMIT 500", params)
+    c = query("SELECT SUM(reminder_done_at IS NULL) AS o, SUM(reminder_done_at IS NOT NULL) AS a, COUNT(*) AS t FROM invoices WHERE is_reminder = 1", one=True)
+    counts = {"open": c["o"] or 0, "af": c["a"] or 0, "alle": c["t"] or 0}
+    return render_template("crediteuren/herinneringen.html", rows=rows, f=f, q=q, counts=counts, STATUS=STATUS, STATUS_BADGE=STATUS_BADGE)
+
+
+def reminder_count():
+    if "_cred_rem" not in g:
+        g._cred_rem = (query("SELECT COUNT(*) AS n FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL", one=True)["n"] or 0) if can(MODULE) else 0
+    return g._cred_rem
