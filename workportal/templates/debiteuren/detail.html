@@ -22,6 +22,7 @@
     {% if s.mail_to %}<dt>Factuur-e-mail</dt><dd>{{ s.mail_to }}</dd>{% endif %}
     <dt>Status bijgewerkt</dt><dd>{% if s.status_at %}{{ s.status_at|dt }} uit {{ 'SnelStart' if s.status_source == 'snelstart' else 'Excel' }}{% else %}nog niet{% endif %}{% if s.paid_at %} · betaald gemeld {{ s.paid_at|dt }}{% endif %}</dd>
     <dt>DigiDossier</dt><dd class="small">{{ s.dossier_path or 'nog niet gevonden op DC01' }}</dd>
+    {% if s.dossier_reminders %}{% set rems = s.dossier_reminders|fromjson %}<dt>Al herinnerd (DigiDossier)</dt><dd class="small">{% for r in rems %}{{ r.name }}{% if r.modified %} · {{ (r.modified[:19] ~ 'Z')|dt('%d-%m-%Y') }}{% endif %}<br>{% endfor %}</dd>{% endif %}
   </dl>
   {% if s.status == 'onbekend' %}<p class="hint">Deze factuur staat in het DigiDossier, maar is nog niet gezien in een overzicht met openstaande posten. Na de volgende import of SnelStart-ronde staat hij op open of betaald.</p>{% endif %}
 </section>

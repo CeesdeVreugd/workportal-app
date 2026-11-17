@@ -60,6 +60,15 @@ function Map($dir) {
     if ($ob) { $info.bon = @{ name = $ob.Name; modified = $ob.LastWriteTimeUtc.ToString("o"); size = $ob.Length } }
     return [pscustomobject]$info
 }
+# Herinneringen/aanmaningen in een factuurmap zijn niet de factuur zelf
+$HerinneringPatroon = '(herinnering|aanmaning|sommatie|reminder|mahnung|zahlungserinnerung|rappel|relance)'
+function FactuurPdf($bestanden) {
+    # de factuur: geen herinnering; liefst met 'factuur'/'invoice' in de naam; daarvan de nieuwste
+    $kand = @($bestanden | Where-Object { $_.Name -notmatch $HerinneringPatroon })
+    $voorkeur = @($kand | Where-Object { $_.Name -match '(factuur|invoice|rechnung|facture|credit)' })
+    if ($voorkeur.Count) { $kand = $voorkeur }
+    return ($kand | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+}
 function LeesBestand($pad) {
     # ook lezen als het bestand in Excel openstaat (komma: als byte[] teruggeven, niet uitgerold)
     $fs = [IO.File]::Open($pad, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
@@ -135,14 +144,16 @@ try {
                 $n = 0
                 # factuurmap per factuur (de PDF mag ook een niveau dieper staan)
                 foreach ($fm in Get-ChildItem -LiteralPath $j.FullName -Directory -ErrorAction SilentlyContinue) {
-                    $pdf = Get-ChildItem -LiteralPath $fm.FullName -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue |
-                        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                    $alle = @(Get-ChildItem -LiteralPath $fm.FullName -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue)
+                    $herinn = @($alle | Where-Object { $_.Name -match $HerinneringPatroon })
+                    $pdf = FactuurPdf $alle
                     $info = [ordered]@{ path = $fm.FullName; name = $fm.Name; year = $j.Name }
                     if ($pdf) { $info.pdf = @{ name = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length } }
+                    if ($herinn.Count) { $info.reminders = @($herinn | ForEach-Object { @{ name = $_.Name; modified = $_.LastWriteTimeUtc.ToString("o") } }) }
                     $fmappen.Add([pscustomobject]$info); $n++
                 }
                 # oudere jaren: PDF's direct in de jaarmap (zonder factuurmap)
-                foreach ($pdf in Get-ChildItem -LiteralPath $j.FullName -File -Filter "*.pdf" -ErrorAction SilentlyContinue) {
+                foreach ($pdf in Get-ChildItem -LiteralPath $j.FullName -File -Filter "*.pdf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch $HerinneringPatroon }) {
                     $info = [ordered]@{ path = $pdf.FullName; name = $pdf.BaseName; year = $j.Name
                                         pdf = @{ name = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length } }
                     $fmappen.Add([pscustomobject]$info); $n++
@@ -157,10 +168,7 @@ try {
             foreach ($pad in @($fres.want)) {
                 if (-not $pad -or -not (Test-Path -LiteralPath $pad)) { continue }
                 if (Test-Path -LiteralPath $pad -PathType Leaf) { $pdf = Get-Item -LiteralPath $pad }
-                else {
-                    $pdf = Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue |
-                        Sort-Object LastWriteTime -Descending | Select-Object -First 1
-                }
+                else { $pdf = FactuurPdf @(Get-ChildItem -LiteralPath $pad -File -Filter "*.pdf" -Recurse -ErrorAction SilentlyContinue) }
                 if (-not $pdf) { continue }
                 try {
                     $body = @{ path = $pad; filename = $pdf.Name; modified = $pdf.LastWriteTimeUtc.ToString("o"); size = $pdf.Length

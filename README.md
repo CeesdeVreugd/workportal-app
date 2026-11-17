@@ -1020,6 +1020,14 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V203 (2.16.3)
+- DigiDossier: herinneringen en aanmaningen in een factuurmap worden niet meer als factuur opgehaald.
+  - Het script kiest de PDF zonder 'herinnering/aanmaning/sommatie/reminder/mahnung/rappel' in de naam, liefst met 'factuur/invoice' erin, en daarvan de nieuwste.
+  - WorkPortal controleert ook de tekst: begint de PDF met 'Herinnering' of 'Aanmaning', dan wordt de factuur niet vervangen.
+- De herinneringen die al in het DigiDossier staan (uit het ERP verstuurd), staan bij de factuur onder 'Al herinnerd'. Ze tellen mee: WorkPortal begint dan niet opnieuw met een eerste herinnering, maar gaat verder vanaf het volgende niveau en de datum van de laatste.
+- Bij het bijwerken worden alle opgeslagen PDF's eenmalig opnieuw uitgelezen. Blijkt een opgeslagen PDF een herinnering, dan wordt de echte factuur opnieuw opgehaald.
+- Databasemigratie 48 (sales_invoices.dossier_reminders). **Zet de nieuwe scripts\komdex-orders.ps1 op DC01** (en vul $Sleutel weer in).
+
 ## V202 (2.16.2)
 - Verkoopfacturen: de klant werd op Engelse facturen niet gevonden ('Invoiceadres:' / 'Invoice address:'). Dat wordt nu herkend, net als 'Attn:' en 'payment before'.
 - Wordt de klantnaam niet herkend bij de relaties (bijv. 'NewCold Piacenza S.R.L.'), dan neemt WorkPortal de klant van de order of het project uit 'Our reference'.

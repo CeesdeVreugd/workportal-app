@@ -897,6 +897,10 @@ MIGRATIONS = [
     CREATE INDEX idx_dunning_invoice ON dunning_letters(invoice_id, status);
     CREATE INDEX idx_dunning_status ON dunning_letters(status);
     """,
+    # 48 - herinneringen/aanmaningen die al in het DigiDossier staan (uit het ERP verstuurd)
+    """
+    ALTER TABLE sales_invoices ADD COLUMN dossier_reminders TEXT;
+    """,
 ]
 
 

@@ -264,6 +264,9 @@ def parse_pdf(data):
         text = "\n".join((p.extract_text() or "") for p in pdf.pages[:3])
         block = _address_block(pdf.pages[0]) if pdf.pages else []
     out = {}
+    head = "\n".join(text.splitlines()[:25])
+    if re.search(r"^\s*(herinnering|aanmaning|betalingsherinnering|sommatie|payment reminder|reminder|zahlungserinnerung|mahnung|rappel)\b", head, re.I | re.M):
+        out["reminder"] = True
     m = re.search(r"(?:factuur\s*(?:nummer|nr\.?)|invoice\s*(?:number|no\.?)|rechnungs?\s*(?:nummer|nr\.?)|num[ée]ro\s*de\s*facture)\s*[:.]?\s*(\d{6,10})", text, re.I)
     if m:
         out["number"] = m.group(1)
@@ -339,7 +342,7 @@ def _dossiers(folders):
         key = (exact, str(pdf.get("modified") or ""))
         if num not in best or key > best[num][0]:
             best[num] = (key, f, path)
-    known = {r["number"]: r for r in conn.execute("SELECT number, pdf_sig, dossier_path FROM sales_invoices")}
+    known = {r["number"]: r for r in conn.execute("SELECT number, pdf_sig, dossier_path, dossier_reminders FROM sales_invoices")}
     want, new = [], 0
     for num, (_, f, path) in sorted(best.items(), reverse=True):   # nieuwste facturen eerst
         cur = known.get(num)
@@ -348,6 +351,17 @@ def _dossiers(folders):
             new += 1
         elif cur["dossier_path"] != path:
             conn.execute("UPDATE sales_invoices SET dossier_path = ? WHERE number = ?", (path, num))
+        rem = [r for r in (f.get("reminders") or []) if isinstance(r, dict) and r.get("name")][:20]
+        rem_js = json.dumps(sorted(({"name": str(r["name"])[:200], "modified": str(r.get("modified") or "")[:40]} for r in rem),
+                                   key=lambda r: r["modified"]), ensure_ascii=False) if rem else None
+        if rem_js != (cur["dossier_reminders"] if cur else None):
+            conn.execute("UPDATE sales_invoices SET dossier_reminders = ? WHERE number = ?", (rem_js, num))
+            if rem:   # al eerder herinnerd vanuit het ERP: niveau en datum meenemen, zodat WorkPortal niet opnieuw begint
+                last = max(str(r.get("modified") or "") for r in rem)[:19].replace("T", " ")
+                last_iso = (last[:10] + "T" + last[11:19] + "Z") if len(last) >= 19 else None
+                conn.execute("UPDATE sales_invoices SET dun_level = MAX(dun_level, ?), dunned_at = CASE WHEN ? IS NOT NULL AND"
+                             " (dunned_at IS NULL OR dunned_at < ?) THEN ? ELSE dunned_at END WHERE number = ?",
+                             (min(len(rem), 3), last_iso, last_iso, last_iso, num))
         sig = _sig(f)
         if sig and (not cur or cur["pdf_sig"] != sig) and len(want) < PDF_PER_RUN:
             want.append(path)
@@ -388,14 +402,19 @@ def _pdf(js):
         return jsonify({"error": "Ongeldige inhoud"}), 400
     if data[:4] != b"%PDF":
         return jsonify({"error": "Geen PDF"}), 400
-    fname = f"Factuur_{inv['number']}.pdf"
-    old = inv["pdf_file_id"]
-    fid = save_bytes("sales_invoice", inv["id"], data, fname, kind="factuur", mime="application/pdf")
     try:
         info = parse_pdf(data)
     except Exception as exc:  # noqa: BLE001 - PDF bewaren, uitlezen is bijzaak
         info = {"fout": f"{type(exc).__name__}: {str(exc)[:150]}"}
     sig = f"{js.get('filename')}|{js.get('modified') or ''}|{js.get('size') or ''}"[:400]
+    if info.get("reminder") and inv["pdf_file_id"]:
+        # een herinnering is niet de factuur: de opgeslagen factuur houden, deze niet opnieuw vragen
+        conn.execute("UPDATE sales_invoices SET pdf_sig = ? WHERE id = ?", (sig, inv["id"]))
+        conn.commit()
+        return jsonify({"ok": True, "resultaat": f"Factuur {inv['number']}: dit is een herinnering, factuur niet vervangen"})
+    fname = f"Factuur_{inv['number']}.pdf"
+    old = inv["pdf_file_id"]
+    fid = save_bytes("sales_invoice", inv["id"], data, fname, kind="factuur", mime="application/pdf")
     conn.execute("UPDATE sales_invoices SET pdf_file_id = ?, pdf_sig = ? WHERE id = ?", (fid, sig, inv["id"]))
     apply_info(conn, inv, info)
     conn.commit()
@@ -428,7 +447,7 @@ def apply_info(conn, inv, info):
                   info.get("invoice_date"), info.get("due_date"), info.get("amount"), info.get("mail_to"), now_iso(), inv["id"]))
 
 
-PARSE_VERSION = "2"
+PARSE_VERSION = "3"
 
 
 def reparse(conn, ids=None, upload_dir=None):
@@ -443,6 +462,8 @@ def reparse(conn, ids=None, upload_dir=None):
                 info = parse_pdf(fh.read())
         except Exception as exc:  # noqa: BLE001
             info = {"fout": f"{type(exc).__name__}: {str(exc)[:150]}"}
+        if info.get("reminder"):   # opgeslagen PDF blijkt een herinnering: de echte factuur opnieuw laten ophalen
+            conn.execute("UPDATE sales_invoices SET pdf_sig = NULL WHERE id = ?", (r["id"],))
         apply_info(conn, r, info)
         n += 1
     conn.commit()
