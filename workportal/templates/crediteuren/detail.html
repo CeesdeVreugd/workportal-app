@@ -8,10 +8,10 @@
 <div class="pagehead">
   <div>
     <div class="crumbs">{% if r.is_reminder %}<a href="{{ url_for('crediteuren.reminders') }}">{{ icon('back') }}Herinneringen</a>{% else %}<a href="{{ back }}">{{ icon('back') }}Inkoopfacturen</a>{% endif %}</div>
-    <h1>{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}{% if r.amount_incl is not none and r.amount_incl < 0 %} <span class="badge b-purple" style="vertical-align:middle">Creditfactuur</span>{% endif %}</h1>
+    <h1>{% if r.is_reminder %}Herinnering · {% endif %}{{ r.supplier or 'Onbekende leverancier' }}{% if r.invoice_no %} · {{ r.invoice_no }}{% endif %}{% if r.amount_incl is not none and r.amount_incl < 0 %} <span class="badge b-purple" style="vertical-align:middle">Creditfactuur</span>{% endif %}</h1>
     <p>Ontvangen {{ r.received_at|dt }}{% if r.source == 'mail' %} via {{ r.mail_from or 'mail' }}{% if r.mail_fwd_by %} (doorgestuurd door {{ r.mail_fwd_by }}){% endif %}{% if r.mail_subject %} · “{{ r.mail_subject }}”{% endif %}{% else %} · geüpload{% endif %}</p>
   </div>
-  <div class="actions">{% if edit and not r.is_reminder %}<form method="post" action="{{ url_for('crediteuren.reminder', iid=r.id) }}" class="inline" data-confirm="Dit is een betalingsherinnering (geen nieuwe factuur)? Hij gaat dan naar het tabblad Herinneringen."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="wel" title="Betalingsherinnering van de leverancier, geen nieuwe factuur">Is een herinnering</button></form>{% endif %}{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="stchips row">{% if r.is_reminder %}<span class="stchip lg" style="--c:{{ '#1E7A3C' if r.reminder_done_at else '#E0A800' }}">{{ 'Herinnering afgewerkt' if r.reminder_done_at else 'Herinnering – af te werken' }}</span>{% else %}{% for t, col in r.chips %}<span class="stchip lg" style="--c:{{ col }}">{{ t }}</span>{% endfor %}{% endif %}</span></div>
+  <div class="actions">{% if edit and not r.is_reminder %}<form method="post" action="{{ url_for('crediteuren.reminder', iid=r.id) }}" class="inline" data-confirm="Dit is een betalingsherinnering (geen nieuwe factuur)? Hij gaat dan naar het tabblad Herinneringen."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="wel" title="Betalingsherinnering van de leverancier, geen nieuwe factuur">Is een herinnering</button></form>{% endif %}{% if has_cats(r, cat_hide)|int > 0 %}<span class="ocats" title="Categorieën van de mail in Outlook"><span class="small muted">Outlook:</span>{{ cats(r, cat_colors, cat_hide) }}</span>{% endif %}<span class="stchips row">{% if r.is_reminder %}{% else %}{% for t, col in r.chips %}<span class="stchip lg" style="--c:{{ col }}">{{ t }}</span>{% endfor %}{% endif %}</span></div>
 </div>
 
 {% if r.is_reminder %}
@@ -105,6 +105,7 @@
     {% elif r.to_finish %}
     <div class="cred-arch-ask"><span class="cred-arch-ic">{{ icon('check') }}</span><span class="cred-arch-txt"><b>Af te ronden door {{ archive_owner_name }}</b> Komdex en SnelStart zijn klaar; {{ archive_owner_name }} rondt de factuur af{{ ' en zet de mail in ' ~ archive_folder if r.source == 'mail' }}.</span></div>
     {% endif %}
+{% if not r.is_reminder %}
     <form method="post" action="{{ url_for('crediteuren.save', iid=r.id) }}" class="card form" data-no-draft>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="card-head"><h2>Gegevens</h2><span class="small muted">automatisch uitgelezen{% if edit %} · aan te passen{% endif %}</span></div>
@@ -129,6 +130,7 @@
         <button class="btn ghost" formaction="{{ url_for('crediteuren.reread_one', iid=r.id) }}" formnovalidate title="De PDF opnieuw uitlezen en de leverancier opnieuw zoeken in de relaties">{{ icon('refresh') }}Opnieuw uitlezen</button></div>{% endif %}
       </fieldset>
     </form>
+    {% endif %}
 
     {% if edit and not r.is_reminder %}
     <section class="card">

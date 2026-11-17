@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V217: herinneringen leveranciers eenvoudig afwerken, naar 02-Aanmaningen"
+set "OMSCHRIJVING=WorkPortal V218: herinneringskaart inkoop zonder gegevensformulier, alleen intern/extern gesprek"
 
 echo.
 echo ============================================
