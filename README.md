@@ -1020,6 +1020,13 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V220 (2.22.0)
+- Inkoopfacturen › zelflerend uitlezen. Op de factuurkaart staat naast "Gegevens opslaan" de knop **Leren**: de gegevens worden opgeslagen en per veld wordt voor deze leverancier onthouden waar de waarde in de PDF staat (achter een kopje op dezelfde regel, onder een kopje, of op een vaste plek). Volgende facturen van die leverancier worden eerst zo uitgelezen; daarna pas het gewone uitlezen.
+- Onder een geleerd veld staat "✓ geleerd · achter ‘…’". In het logboek staat wanneer een factuur met geleerde regels is uitgelezen.
+- Nieuw tabblad **Geleerd** (Facturen | Herinneringen | Geleerd): per leverancier wat er geleerd is, hoe vaak gebruikt, met wissen.
+- Werkt ook bij "Opnieuw uitlezen". De leverancier moet aan een relatie gekoppeld zijn.
+- Database: migratie 53 (extract_rules).
+
 ## V219 (2.21.4)
 - Inkoopfacturen: PDF's waarin vette tekst als dubbel over elkaar gedrukte letters staat (o.a. Loxam: "FFaaccttuuuurr NNrr..") worden nu goed uitgelezen: factuurnummer, totaal incl. en excl. (subtotaal) worden gevonden. Bestaande kaarten: knop "Opnieuw uitlezen".
 

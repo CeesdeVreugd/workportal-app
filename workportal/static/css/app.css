@@ -1330,3 +1330,4 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .dunpost-form { min-width: min(520px, 86vw); }
 .dunpost[open] { flex-basis: 100%; }
 .dunpost[open] > form { width: min(560px, 100%); }
+.hint.learned { color: var(--ok, #1E7A3C); }

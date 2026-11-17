@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "crediteuren/_tabs.html" import cred_tabs %}
+{% block title %}Geleerd – Inkoopfacturen{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Inkoopfacturen</h1><p>Wat WorkPortal per leverancier heeft geleerd met de knop <b>Leren</b> op een factuurkaart. Deze regels gaan vóór het gewone uitlezen; klopt een regel niet meer, wis hem dan of leer opnieuw.</p></div></div>
+{{ cred_tabs('geleerd') }}
+<section class="card flush tablewrap">
+  <table class="table">
+    <thead><tr><th>Leverancier</th><th>Veld</th><th>Hoe gevonden</th><th class="hide-m">Voorbeeld</th><th class="hide-m num">Gebruikt</th><th class="hide-m">Geleerd</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows|sort(attribute='supplier') %}
+    <tr>
+      <td><b>{{ r.supplier }}</b></td>
+      <td>{{ LABELS.get(r.field, r.field) }}</td>
+      <td>{{ describe(r) }}</td>
+      <td class="hide-m small muted">{{ r.sample or '' }}{% if r.invoice_id %} · <a href="{{ url_for('crediteuren.detail', iid=r.invoice_id) }}">factuur</a>{% endif %}</td>
+      <td class="hide-m num">{{ r.used }}×</td>
+      <td class="hide-m small muted nowrap">{{ r.created_at|dt('%d-%m-%Y') }}{% if r.by_name %} · {{ r.by_name }}{% endif %}</td>
+      <td class="num">{% if can('crediteuren', 2) %}<form method="post" action="{{ url_for('crediteuren.learned_delete', rid=r.id) }}" class="inline" data-confirm="Deze geleerde regel wissen?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" title="Wissen">{{ icon('trash') }}</button></form>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">Nog niets geleerd. Verbeter op een factuurkaart de gegevens en klik op <b>Leren</b>.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

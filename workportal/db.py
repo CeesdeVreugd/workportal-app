@@ -945,6 +945,26 @@ MIGRATIONS = [
     ALTER TABLE invoices ADD COLUMN reminder_note TEXT;
     CREATE INDEX idx_invoices_reminder ON invoices(is_reminder, reminder_done_at);
     """,
+    # 53 - inkoopfacturen: zelflerend uitlezen (per leverancier en veld: waar staat de waarde in de PDF)
+    """
+    CREATE TABLE extract_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supplier_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        field TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        label TEXT,
+        page INTEGER,
+        x REAL,
+        y REAL,
+        sample TEXT,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        last_used_at TEXT,
+        UNIQUE(supplier_id, field)
+    );
+    """,
 ]
 
 

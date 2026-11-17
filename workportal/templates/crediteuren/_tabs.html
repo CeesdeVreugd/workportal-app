@@ -2,5 +2,6 @@
 <nav class="tabs" style="margin-bottom:16px" aria-label="Inkoopfacturen">
   <a href="{{ url_for('crediteuren.index') }}" class="{{ 'active' if active == 'facturen' }}">Facturen</a>
   <a href="{{ url_for('crediteuren.reminders') }}" class="{{ 'active' if active == 'herinneringen' }}">Herinneringen{% if nr %} <span class="navbadge" style="position:static;margin-left:4px">{{ nr }}</span>{% endif %}</a>
+  <a href="{{ url_for('crediteuren.learned') }}" class="{{ 'active' if active == 'geleerd' }}">Geleerd</a>
 </nav>
 {% endmacro %}

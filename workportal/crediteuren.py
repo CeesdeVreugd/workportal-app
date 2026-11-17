@@ -758,6 +758,11 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     if m:
         supplier_id, supplier, why = m
         supplier_match = ", ".join(why)
+        try:
+            from .leren import apply as learned_apply
+            learned_apply(conn, supplier_id, data, x)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
     reminder = is_reminder_doc(mail.get("subject"), x.get("text"))
     original = None
     if x["invoice_no"] and supplier:
@@ -806,6 +811,8 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
     if found:
         log(conn, iid, "Gegevens automatisch uitgelezen: " + ", ".join(
             labels[k] + (" (niet op de factuur: factuurdatum + 30 dagen)" if k == "due_date" and x.get("due_assumed") else "") for k in found))
+    if x.get("learned"):
+        log(conn, iid, "Uitgelezen met wat eerder is geleerd van deze leverancier: " + ", ".join(labels[k] for k in x["learned"] if k in labels))
     if supplier_id:
         log(conn, iid, f"Leverancier herkend uit de relaties: {supplier} (op {supplier_match})")
     conn.commit()
@@ -892,11 +899,6 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
     manual = " ".join(l["action"] for l in conn.execute(
         "SELECT action FROM invoice_log WHERE invoice_id = ? AND action LIKE 'Gegevens aangepast:%'", (iid,)))
     upd = {}
-    for k in ("invoice_no", "invoice_date", "due_date", "amount_incl", "amount_excl", "erp_ref"):
-        lab = labels[k] if isinstance(labels[k], tuple) else (labels[k],)
-        by_hand = any(l in manual for l in lab)
-        if x.get(k) is not None and (overwrite or r[k] in (None, "") or not by_hand) and x[k] != r[k]:
-            upd[k] = x[k]
     if overwrite or not r["supplier_id"]:
         m = match_supplier(conn, x["text"], r["mail_from"], hint=None if r["supplier_id"] else r["supplier"])
         if m and m[0] != r["supplier_id"]:
@@ -906,6 +908,18 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
             upd.update(supplier_id=None, supplier=x["supplier_guess"] or None, supplier_match=None)
         elif not m and not r["supplier_id"] and x["supplier_guess"] and _bad_supplier(r["supplier"]):
             upd["supplier"] = x["supplier_guess"]   # bijv. "Invoice ." vervangen door de naam uit de kop
+    sid = upd["supplier_id"] if "supplier_id" in upd else r["supplier_id"]
+    if sid and not r["is_reminder"]:
+        try:
+            from .leren import apply as learned_apply
+            learned_apply(conn, sid, data, x)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+    for k in ("invoice_no", "invoice_date", "due_date", "amount_incl", "amount_excl", "erp_ref"):
+        lab = labels[k] if isinstance(labels[k], tuple) else (labels[k],)
+        by_hand = any(l in manual for l in lab)
+        if x.get(k) is not None and (overwrite or r[k] in (None, "") or not by_hand) and x[k] != r[k]:
+            upd[k] = x[k]
     if upd:
         conn.execute("UPDATE invoices SET " + ", ".join(f"{k} = ?" for k in upd) + ", updated_at = ? WHERE id = ?",
                      list(upd.values()) + [now_iso(), iid])
@@ -913,7 +927,8 @@ def reread(conn, upload_dir, iid, overwrite=False, user_id=None):
                  "amount_excl": "bedrag excl.", "erp_ref": "inkoopnummer", "supplier": "leverancier"}
         log(conn, iid, "Opnieuw uitgelezen: " + ", ".join(names[k] for k in upd if k in names)
             + (f" (leverancier uit de relaties, op {upd['supplier_match']})" if upd.get("supplier_match") else "")
-            + (" (koppeling via gedeeld afzenderadres losgemaakt)" if "supplier_id" in upd and not upd["supplier_id"] else ""), user_id)
+            + (" (koppeling via gedeeld afzenderadres losgemaakt)" if "supplier_id" in upd and not upd["supplier_id"] else "")
+            + (" – met wat eerder is geleerd van deze leverancier" if x.get("learned") else ""), user_id)
         conn.commit()
     return [k for k in upd if k not in ("supplier_match", "supplier_id")]
 
@@ -1589,7 +1604,9 @@ def detail(iid):
         if orig:
             orig = dict(orig, label=STATUS.get(orig["status"], orig["status"]))
     rem_done_by = query("SELECT name FROM users WHERE id = ?", (r["reminder_done_by"],), one=True) if r["reminder_done_by"] else None
-    return render_template("crediteuren/detail.html", orig=orig, rem_done_by=rem_done_by, r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
+    from .leren import rules_for, describe as learned_describe
+    learned = {k: learned_describe(v) for k, v in rules_for(get_db(), r["supplier_id"]).items()}
+    return render_template("crediteuren/detail.html", learned=learned, orig=orig, rem_done_by=rem_done_by, r=d, notes=notes, logs=logs, users=_users(), STATUS_BADGE=STATUS_BADGE,
                            back=back, suppliers=suppliers, attachments=attachments, mail_to=mail_to, mail_subject=mail_subject,
                            metas=metas, cred_box=cred_box, reply_note=reply_note, reply_all=reply_all,
                            drag_name=_drag_name(r), mail_options=mail_options, changed_msg=changed_msg, next_inv=next_inv,
@@ -1658,6 +1675,58 @@ def save(iid):
         conn.commit()
         flash("Gegevens opgeslagen.", "success")
     return redirect(url_for("crediteuren.detail", iid=iid))
+
+
+@bp.route("/<int:iid>/leren", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def learn(iid):
+    """Eerst de gegevens opslaan, dan per veld onthouden waar de waarde in de PDF staat (voor deze leverancier)."""
+    save(iid)
+    from .leren import learn_from, save_rules, LABELS, describe
+    conn = get_db()
+    r = conn.execute("SELECT i.*, f.stored_name FROM invoices i LEFT JOIN files f ON f.id = i.file_id WHERE i.id = ?", (iid,)).fetchone()
+    if not r["supplier_id"]:
+        flash("Koppel eerst de leverancier aan een relatie: er wordt per leverancier geleerd.", "error")
+        return redirect(url_for("crediteuren.detail", iid=iid))
+    from .util import file_path
+    try:
+        with open(file_path(r), "rb") as fh:
+            data = fh.read()
+        rules = learn_from(data, dict(r))
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        flash("De PDF kon niet gelezen worden om van te leren.", "error")
+        return redirect(url_for("crediteuren.detail", iid=iid))
+    missing = [LABELS[k] for k in ("invoice_no", "invoice_date", "amount_incl", "amount_excl", "erp_ref") if r[k] not in (None, "") and k not in rules]
+    if rules:
+        save_rules(conn, r["supplier_id"], iid, rules, g.user["id"])
+        log(conn, iid, "Geleerd voor " + (r["supplier"] or "deze leverancier") + ": "
+            + "; ".join(f"{LABELS[k]} {describe(v)}" for k, v in rules.items()), g.user["id"])
+        conn.commit()
+        msg = f"Geleerd voor {r['supplier']}: " + ", ".join(LABELS[k] for k in rules)
+        msg = msg.rstrip(".") + (". Niet in de PDF teruggevonden: " + ", ".join(missing) if missing else "")
+        flash(msg.rstrip(".") + ".", "success")
+    else:
+        flash("Geen van de ingevulde waarden is in de PDF teruggevonden; er is niets geleerd.", "error")
+    return redirect(url_for("crediteuren.detail", iid=iid))
+
+
+@bp.route("/geleerd")
+@require(MODULE)
+def learned():
+    from .leren import LABELS, describe
+    rows = query("SELECT e.*, c.name AS supplier, u.name AS by_name FROM extract_rules e JOIN customers c ON c.id = e.supplier_id"
+                 " LEFT JOIN users u ON u.id = e.created_by ORDER BY c.name, e.field")
+    return render_template("crediteuren/geleerd.html", rows=rows, LABELS=LABELS, describe=describe,
+                           order={k: i for i, k in enumerate(LABELS)})
+
+
+@bp.route("/geleerd/<int:rid>/wissen", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def learned_delete(rid):
+    execute("DELETE FROM extract_rules WHERE id = ?", (rid,))
+    flash("Geleerde regel gewist.", "success")
+    return redirect(request.form.get("next") or url_for("crediteuren.learned"))
 
 
 @bp.route("/<int:iid>/opnieuw-uitlezen", methods=["POST"])

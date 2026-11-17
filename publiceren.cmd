@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V219: inkoopfacturen met dubbel gedrukte vette tekst (Loxam) goed uitlezen"
+set "OMSCHRIJVING=WorkPortal V220: inkoopfacturen zelflerend uitlezen (knop Leren, tabblad Geleerd)"
 
 echo.
 echo ============================================
