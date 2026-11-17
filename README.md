@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V219 (2.21.4)
+- Inkoopfacturen: PDF's waarin vette tekst als dubbel over elkaar gedrukte letters staat (o.a. Loxam: "FFaaccttuuuurr NNrr..") worden nu goed uitgelezen: factuurnummer, totaal incl. en excl. (subtotaal) worden gevonden. Bestaande kaarten: knop "Opnieuw uitlezen".
+
 ## V218 (2.21.3)
 - Inkoopfacturen › herinnering: kaart sterk vereenvoudigd. Geen statuschips, geen voortgangsbalk, geen formulier met bedrag/leverancier/inkoopnummer meer. Alleen de gele herinneringsbalk (Afgewerkt / Is geen herinnering), de PDF en de secties Intern (vragen/opmerkingen) en Extern (mail met leverancier).
 

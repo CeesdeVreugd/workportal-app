@@ -300,6 +300,11 @@ def extract(data):
             # kop staat op de eerste pagina('s), de totalen op de laatste: bij lange facturen beide lezen
             idx = sorted({0, 1, len(allp) - 2, len(allp) - 1} & set(range(len(allp))))
             pages = [allp[i] for i in idx]
+            # vetgedrukt als dubbel over elkaar gedrukte letters (Loxam): anders "FFaaccttuuuurr NNrr.."
+            try:
+                pages = [p.dedupe_chars(tolerance=1) for p in pages]
+            except Exception:  # noqa: BLE001
+                pass
             text = "\n".join((p.extract_text() or "") for p in pages)
             # Kopjes in een kleinere letter dan de waarde (Heleon) raken bij de standaard regel-indeling door elkaar
             # ("F D O P a a e rd c k ..."). Daarom ook de tekst met een strakkere regel-indeling erachter, als reserve.
