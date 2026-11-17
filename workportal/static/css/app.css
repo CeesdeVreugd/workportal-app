@@ -1324,3 +1324,9 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .ticon svg, .table td .ticon svg { width: 16px; height: 16px; flex: none; }
 .dunmk { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .dunmk select { width: auto; min-width: 180px; }
+.dunmore > summary, .dunpost > summary { list-style: none; display: inline-flex; margin-top: 6px; }
+.dunmore > summary::-webkit-details-marker, .dunpost > summary::-webkit-details-marker { display: none; }
+.dunmore[open] > summary { margin-bottom: 8px; }
+.dunpost-form { min-width: min(520px, 86vw); }
+.dunpost[open] { flex-basis: 100%; }
+.dunpost[open] > form { width: min(560px, 100%); }

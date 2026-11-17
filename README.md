@@ -1020,6 +1020,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V207 (2.18.1)
+- Herinnering/aanmaning (PDF-brief): **alle openstaande facturen** van de klant staan erin, ook die nog niet vervallen zijn, met een kolom **Vervallen** ('37 dagen' in rood, of 'nog niet'). Onderaan staat het totaal openstaand en 'waarvan vervallen'.
+- Uitstellen staat niet meer standaard open, maar onder de knop **Uitstellen** (op de factuur en bij de voorstellen).
+
 ## V206 (2.18.0)
 - **Herinneren en aanmanen per klant**, net als de herinneringen uit het ERP: één voorstel per klant met alle vervallen facturen van die klant.
   - Je kunt facturen aan- en uitvinken (ook andere vervallen facturen van de klant) en de soort kiezen. Met 'Tekst opnieuw' wordt de mailtekst bijgewerkt.

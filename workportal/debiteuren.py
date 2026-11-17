@@ -773,7 +773,7 @@ DUN = {
                   2: "Uit onze administratie is gebleken dat u geen gehoor heeft gegeven aan ons eerdere betalingsverzoek. "
                      "Hieronder geven we u een overzicht van de openstaande facturen.",
                   3: "Ondanks onze herinnering en aanmaning zijn de onderstaande facturen nog steeds niet betaald."},
-        "cols": ["Factuurnr.", "Omschrijving", "Datum", "Vervaldatum", "Bedrag", "Openstaand"],
+        "cols": ["Factuurnr.", "Omschrijving", "Datum", "Vervaldatum", "Vervallen", "Openstaand"], "days": "{n} dagen", "notdue": "nog niet", "overdue": "Waarvan vervallen",
         "total": "Totaal openstaand",
         "close": {1: "Wilt u het openstaande bedrag binnen 7 dagen overmaken op {iban} onder vermelding van de factuurnummers? "
                      "Heeft u inmiddels betaald, dan kunt u deze herinnering als niet verzonden beschouwen.",
@@ -806,7 +806,7 @@ DUN = {
                   2: "Our records indicate that you have not responded to our previous payment request. "
                      "Below is an overview of the outstanding invoices.",
                   3: "Despite our reminders, the invoices below are still unpaid."},
-        "cols": ["Invoice no.", "Description", "Date", "Due date", "Amount", "Outstanding"],
+        "cols": ["Invoice no.", "Description", "Date", "Due date", "Overdue", "Outstanding"], "days": "{n} days", "notdue": "not yet due", "overdue": "Of which overdue",
         "total": "Total outstanding balance",
         "close": {1: "Please transfer the outstanding amount within 7 days to {iban} (BIC RABONL2U), stating the invoice numbers. "
                      "If you have already paid, please disregard this reminder.",
@@ -838,7 +838,7 @@ DUN = {
                   2: "wir stellen fest, dass Sie auf unsere vorherige Zahlungserinnerung nicht reagiert haben. "
                      "Nachstehend eine Übersicht der offenen Rechnungen.",
                   3: "trotz Erinnerung und Mahnung sind die folgenden Rechnungen noch immer nicht bezahlt."},
-        "cols": ["Rechnungs-Nr.", "Beschreibung", "Datum", "Fällig am", "Betrag", "Offen"],
+        "cols": ["Rechnung", "Beschreibung", "Datum", "Fällig am", "Überfällig", "Offen"], "days": "{n} Tage", "notdue": "noch nicht fällig", "overdue": "Davon überfällig",
         "total": "Offener Gesamtbetrag",
         "close": {1: "Bitte überweisen Sie den offenen Betrag innerhalb von 7 Tagen auf {iban} (BIC RABONL2U) unter Angabe der Rechnungsnummern.",
                   2: "Wir bitten Sie, die offene(n) Rechnung(en) umgehend auf {iban} (BIC RABONL2U) zu bezahlen.",
@@ -869,7 +869,7 @@ DUN = {
                   2: "Nous constatons que vous n'avez pas donné suite à notre précédente demande de paiement. "
                      "Voici un récapitulatif des factures impayées.",
                   3: "Malgré nos rappels, les factures ci-dessous restent impayées."},
-        "cols": ["N° facture", "Description", "Date", "Échéance", "Montant", "Restant dû"],
+        "cols": ["N° facture", "Description", "Date", "Échéance", "Retard", "Restant dû"], "days": "{n} jours", "notdue": "non échue", "overdue": "Dont échu",
         "total": "Total restant dû",
         "close": {1: "Nous vous prions de virer le montant dû sous 7 jours sur {iban} (BIC RABONL2U) en indiquant les numéros de facture.",
                   2: "Nous vous prions de régler immédiatement la ou les facture(s) impayée(s) sur {iban} (BIC RABONL2U).",
@@ -1088,9 +1088,26 @@ def letter_pdf(conn, L, invs):
         pc = " ".join(x for x in (c["postcode"], c["city"]) if x)
         if pc:
             addr.append(pc)
-    rows = [{"number": i["number"], "desc": _invoice_desc(conn, i), "date": _ddmm(i["invoice_date"]), "due": _ddmm(i["due_date"]),
-             "amount": _eur(i["amount"]), "open": _eur(_open(i))} for i in invs]
-    return dunning_pdf(T, L["level"], addr, rows, _eur(sum(_open(i) for i in invs)), IBAN, _today().strftime("%d-%m-%Y"))
+    # alle openstaande facturen van de klant, met hoeveel dagen vervallen
+    key = L["group_key"] or group_key(invs[0])
+    alle = [r for r in conn.execute("SELECT * FROM sales_invoices WHERE status = 'open' ORDER BY due_date, number").fetchall()
+            if group_key(r) == key and _open(r) > 0.004]
+    ids = {i["id"] for i in invs}
+    alle += [i for i in invs if i["id"] not in {r["id"] for r in alle}]
+    alle.sort(key=lambda r: (r["due_date"] or "9999", r["number"]))
+    today = _today()
+    rows, over = [], 0.0
+    for i in alle:
+        dd = _d(i["due_date"])
+        days = (today - date.fromisoformat(dd)).days if dd else None
+        if days and days > 0:
+            over += _open(i)
+        rows.append({"number": i["number"], "desc": _invoice_desc(conn, i), "date": _ddmm(i["invoice_date"]), "due": _ddmm(i["due_date"]),
+                     "days": T["days"].format(n=days) if days and days > 0 else T["notdue"], "open": _eur(_open(i)),
+                     "late": bool(days and days > 0), "selected": i["id"] in ids})
+    total = sum(_open(i) for i in alle)
+    return dunning_pdf(T, L["level"], addr, rows, _eur(total), IBAN, _today().strftime("%d-%m-%Y"),
+                       overdue=_eur(over) if abs(over - total) > 0.004 else None)
 
 
 def send_letter(conn, lid):

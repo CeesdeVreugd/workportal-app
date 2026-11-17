@@ -582,8 +582,8 @@ def delivery_pdf(d, lines, sig_dv=None, sig_cust=None, lang="nl", number_label=N
     return buf.getvalue()
 
 
-def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str):
-    """Herinnering/aanmaning als brief: factuuradres, tekst, overzicht openstaande facturen, totaal.
+def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str, overdue=None):
+    """Herinnering/aanmaning als brief: factuuradres, tekst, alle openstaande facturen (met dagen vervallen), totaal.
     T = teksten in de taal van de klant (debiteuren.DUN[lang])."""
     buf = io.BytesIO()
     title = T["title"][level]
@@ -599,12 +599,18 @@ def dunning_pdf(T, level, addr_lines, rows, total, iban, date_str):
     c = T["cols"]
     hs = ParagraphStyle("dh", parent=S["cell"], fontName="Helvetica-Bold", fontSize=7.8, leading=9.5, textColor=MUTED)
     hr = ParagraphStyle("dhr", parent=hs, alignment=2)
+    rs = ParagraphStyle("dr", parent=S["cell"], alignment=2)
+    rb = ParagraphStyle("drb", parent=rs, fontName="Helvetica-Bold")
+    late = ParagraphStyle("dl", parent=S["cell"], textColor=BAD)
     data = [[Paragraph(esc(c[0]), hs), Paragraph(esc(c[1]), hs), Paragraph(esc(c[2]), hs), Paragraph(esc(c[3]), hs),
-             Paragraph(esc(c[4]), hr), Paragraph(esc(c[5]), hr)]]
+             Paragraph(esc(c[4]), hs), Paragraph(esc(c[5]), hr)]]
     for r in rows:
-        data.append([esc(r["number"]), Paragraph(esc(r["desc"]), S["cell"]), r["date"], r["due"], r["amount"], r["open"]])
-    data.append(["", Paragraph(f"<b>{esc(T['total'])}</b>", S["cell"]), "", "", "", Paragraph(f"<b>{esc(total)}</b>", ParagraphStyle("tr", parent=S["cell"], alignment=2))])
-    t = _grid(data, [W * 0.15, W * 0.31, W * 0.13, W * 0.13, W * 0.14, W * 0.14], align_right=(4, 5))
+        data.append([esc(r["number"]), Paragraph(esc(r["desc"]), S["cell"]), r["date"], r["due"],
+                     Paragraph(esc(r["days"]), late if r.get("late") else S["cell"]), Paragraph(esc(r["open"]), rs)])
+    data.append(["", Paragraph(f"<b>{esc(T['total'])}</b>", S["cell"]), "", "", "", Paragraph(esc(total), rb)])
+    if overdue:
+        data.append(["", Paragraph(esc(T["overdue"]), S["cell"]), "", "", "", Paragraph(esc(overdue), rs)])
+    t = _grid(data, [W * 0.13, W * 0.33, W * 0.12, W * 0.13, W * 0.13, W * 0.16], align_right=(5,))
     story += [t, Spacer(1, 12), Paragraph(esc(T["close"][level].format(iban=iban)), S["body"]), Spacer(1, 18),
               Paragraph(esc(T["terms"]), S["small"])]
     doc.build(story)

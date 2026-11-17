@@ -45,7 +45,7 @@
       <button class="btn ghost" name="action" value="verwijderen" formnovalidate>Weggooien</button>
     </div>
   </form>
-  <details class="dunmore"><summary class="tksum">Uitstellen</summary>
+  <details class="dunmore"><summary class="btn sm ghost">{{ icon('timer') }}Uitstellen</summary>
     <form method="post" action="{{ url_for('debiteuren.letter_postpone', lid=l.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="fgrid"><label class="f">Alle facturen in deze brief uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option></select></label>
         <label class="f dund" hidden>Tot<input type="date" name="until"></label>

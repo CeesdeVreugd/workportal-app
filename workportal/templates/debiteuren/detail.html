@@ -48,12 +48,14 @@
       <button class="btn primary sm">{{ icon('mail') }}Opstellen</button></form>
     <form method="post" action="{{ url_for('debiteuren.toggle_no_dunning', sid=s.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ 'Weer aanmanen' if s.no_dunning else 'Niet aanmanen' }}</button></form>
     <form method="post" action="{{ url_for('debiteuren.mark_paid', sid=s.id) }}" class="inline" data-confirm="Factuur {{ s.number }} op betaald zetten?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('check') }}Op betaald zetten</button></form>
-  </div>
-  <form method="post" action="{{ url_for('debiteuren.postpone', sid=s.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <details class="cred-pop dunpost"><summary class="btn sm ghost">{{ icon('timer') }}Uitstellen{% if s.postpone_until and s.postpone_until > today %} (tot {{ s.postpone_until|date }}){% endif %}</summary>
+  <form method="post" action="{{ url_for('debiteuren.postpone', sid=s.id) }}" class="form dunpost-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="fgrid"><label class="f">Uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option>{% if s.postpone_until %}<option value="geen">uitstel opheffen</option>{% endif %}</select></label>
       <label class="f dund" hidden>Tot<input type="date" name="until"></label>
       <label class="f">Reden<input type="text" name="reason" placeholder="bijv. afspraak met klant"></label></div>
-    <div class="actions"><button class="btn sm">Opslaan</button></div></form>
+    <div class="actions"><button class="btn sm">Opslaan</button></div></form></details>
+</div>
+
   {% endif %}
   {% if letters %}<div class="rows">{% for l in letters %}<a class="rowitem" href="{{ url_for('debiteuren.dunning') ~ '#l' ~ l.id if l.status == 'voorstel' else url_for('debiteuren.letter_preview', lid=l.id) }}"{% if l.status != 'voorstel' %} target="_blank" data-pdf="{{ LEVELS[l.level] }}"{% endif %}><div class="grow"><div class="t">{{ LEVELS[l.level] }}</div><div class="s">{% if l.status == 'verstuurd' %}verstuurd {{ l.sent_at|dt }} door {{ l.who or '' }} aan {{ l.to_addr }}{% else %}voorstel, wacht op goedkeuring{% endif %}</div></div><span class="badge {{ 'b-ok' if l.status == 'verstuurd' else 'b-warn' }}">{{ 'Verstuurd' if l.status == 'verstuurd' else 'Voorstel' }}</span></a>{% endfor %}</div>{% endif %}
 </section>
