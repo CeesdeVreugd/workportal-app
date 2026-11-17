@@ -1020,6 +1020,15 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V211 (2.19.2)
+- Herinneringen: knop **Annuleren** bij Antwoord allen / Mail klant, Notitie, Opnieuw versturen en Uitstellen. De ingevulde tekst wordt leeggemaakt en het formulier gaat dicht.
+
+## V210 (2.19.1)
+- Herinnering > gesprek: de knop heet **Antwoord allen** zodra de klant heeft geantwoord, zoals bij service.
+  - Aan = afzender van de laatste mail van de klant; Cc = iedereen die er verder op stond, behalve onze eigen mailbox.
+  - Het antwoord gaat in dezelfde mailwisseling. Zonder antwoord van de klant heet de knop 'Mail klant'.
+- In het gesprek staan cc en 'opnieuw verstuurd' bij de verstuurde mails.
+
 ## V209 (2.19.0)
 - **Herinneringen zijn nu een eigen onderdeel met een nummer** (H-2026-0001, H-2026-0002, …), gekoppeld aan de facturen die erin staan.
   - Het nummer komt bij het versturen. Het staat in het onderwerp, op de PDF-brief en in de bestandsnaam.

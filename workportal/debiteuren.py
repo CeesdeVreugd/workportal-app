@@ -1662,38 +1662,51 @@ def conversation(lid):
         elif act == "mail" and text:
             from .mail import reply_in_thread, send_mail_with_files
             to = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("to") or "") if a.strip()]
-            if not to or any(not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
+            cc = [a.strip() for a in re.split(r"[;,\s]+", request.form.get("cc") or "") if a.strip() and a.strip().lower() not in {x.lower() for x in to}]
+            if not to or any(not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to + cc):
                 flash("Vul een geldig e-mailadres in.", "error")
                 return redirect(url_for("debiteuren.conversation", lid=lid) + "#antwoord")
             atts = [(f.filename, f.read(), f.mimetype) for f in request.files.getlist("files") if f and f.filename][:10]
             last_in = next((m for m in reversed(_thread(lid)) if m["kind"] == "mail_in" and m["meta"].get("msg_id")), None)
             if last_in:
-                ok, err = reply_in_thread(sender(conn), last_in["meta"]["msg_id"], to, text, atts, signer="administratie")
+                ok, err = reply_in_thread(sender(conn), last_in["meta"]["msg_id"], to, text, atts, cc=cc or None, signer="administratie")
                 subject = "RE: " + (last_in["meta"].get("subject") or L["subject"])
             else:
                 subject = "RE: " + L["subject"]
-                ok, err = send_mail_with_files(sender(conn), to, subject, text, atts, signer="administratie")
+                ok, err = send_mail_with_files(sender(conn), to, subject, text, atts, cc=cc or None, signer="administratie")
             if not ok:
                 flash(f"Versturen mislukt: {err}", "error")
                 return redirect(url_for("debiteuren.conversation", lid=lid) + "#antwoord")
             cur = conn.execute("INSERT INTO dunning_messages (letter_id, kind, body, mail_meta, created_by, created_at) VALUES (?, 'mail_uit', ?, ?, ?, ?)",
-                               (lid, text, json.dumps({"to": to, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now_iso()))
+                               (lid, text, json.dumps({"to": to, "cc": cc, "subject": subject, "files": [a[0] for a in atts]}, ensure_ascii=False), g.user["id"], now_iso()))
             for name, data, mime in atts:
                 save_bytes("dunning_message", cur.lastrowid, data, name, mime=mime)
             conn.commit()
             audit("mail over herinnering", "dunning_letter", lid, ", ".join(to))
-            flash(f"Verstuurd aan {', '.join(to)}.", "ok")
+            flash(f"Verstuurd aan {', '.join(to + cc)}.", "ok")
         return redirect(url_for("debiteuren.conversation", lid=lid))
     ids = letter_ids(L)
     invs = query(f"SELECT * FROM sales_invoices WHERE id IN ({','.join('?' * len(ids))}) ORDER BY due_date, number", ids)
     cust = query("SELECT id, name, invoice_email FROM customers WHERE id = ?", (L["customer_id"],), one=True) if L["customer_id"] else None
     msgs = _thread(lid)
     last_in = next((m for m in reversed(msgs) if m["kind"] == "mail_in"), None)
-    reply_to = (last_in["meta"].get("from") if last_in else None) or L["to_addr"]
+    # antwoord allen: afzender van de laatste mail van de klant, plus iedereen die erop stond (behalve onze eigen mailbox)
+    box = sender().lower()
+    if last_in:
+        mm = last_in["meta"]
+        reply_to = mm.get("from") or L["to_addr"]
+        own = {box, DEFAULT_SENDER, (reply_to or "").lower()}
+        others = [a for a in (mm.get("to") or []) + (mm.get("cc") or []) if a and a.lower() not in own]
+    else:
+        reply_to = L["to_addr"]
+        last_out = next((m for m in reversed(msgs) if m["kind"] == "mail_uit"), None)
+        others = [a for a in ((last_out["meta"].get("cc") or []) if last_out else []) if a and a.lower() not in (box, DEFAULT_SENDER)]
+    reply_cc = ", ".join(dict.fromkeys(others))
     who = query("SELECT name FROM users WHERE id = ?", (L["sent_by"],), one=True) if L["sent_by"] else None
     from .mail import graph_configured
     state = {"last": _setting("deb_mail_last"), "error": _setting("deb_mail_error"), "on": graph_configured()}
-    return render_template("debiteuren/gesprek.html", L=L, invs=invs, cust=cust, msgs=msgs, reply_to=reply_to, LEVELS=LEVELS,
+    return render_template("debiteuren/gesprek.html", L=L, invs=invs, cust=cust, msgs=msgs, reply_to=reply_to, reply_cc=reply_cc,
+                           last_in=last_in, LEVELS=LEVELS,
                            who=who, box=sender(), state=state)
 
 

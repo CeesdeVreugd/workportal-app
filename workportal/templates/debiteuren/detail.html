@@ -53,7 +53,7 @@
     <div class="fgrid"><label class="f">Uitstellen<select name="when" onchange="this.form.querySelector('.dund').hidden=this.value!=='datum'"><option value="1w">1 week</option><option value="2w">2 weken</option><option value="1m">1 maand</option><option value="datum">tot datum…</option>{% if s.postpone_until %}<option value="geen">uitstel opheffen</option>{% endif %}</select></label>
       <label class="f dund" hidden>Tot<input type="date" name="until"></label>
       <label class="f">Reden<input type="text" name="reason" placeholder="bijv. afspraak met klant"></label></div>
-    <div class="actions"><button class="btn sm">Opslaan</button></div></form></details>
+    <div class="actions"><button class="btn sm">Opslaan</button><button type="button" class="btn ghost sm" onclick="var d=this.closest('details');d.querySelector('form').reset();d.open=false">Annuleren</button></div></form></details>
 </div>
 
   {% endif %}
