@@ -1020,6 +1020,12 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V217 (2.21.2)
+- Betalingsherinneringen van leveranciers (Inkoopfacturen > Herinneringen):
+  - **Geen statussen meer:** geen voortgangsbalk en geen Nieuw / Verwerkt in Komdex / Verwerkt in SnelStart / Afwijzen. Er is alleen **Afgewerkt** (met eventueel een opmerking), en daarmee ben je klaar.
+  - **Geen inkoopnummer:** dat wordt niet uitgelezen of getoond. Outlook-categorieën worden niet gezet of overgenomen.
+  - **Map 02-Aanmaningen:** de mail gaat bij binnenkomst meteen naar de map **02-Aanmaningen** in de factuurmailbox. Dat gebeurt ook bij 'Is een herinnering' en bij herinneringen die eerder al gemarkeerd waren en nog openstaan.
+
 ## V216 (2.21.1)
 - Inkoopfacturen heeft nu twee echte tabbladen: **Facturen** en **Herinneringen** (met teller), net als bij Verkoopfacturen.
   - **Herinneringen staan helemaal apart.** Ze komen niet meer voor op het tabblad Facturen, ook niet bij Alle of bij zoeken.

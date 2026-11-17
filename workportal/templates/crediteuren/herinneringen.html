@@ -6,7 +6,7 @@
 <div class="pagehead"><div><h1>Inkoopfacturen</h1><p>Betalingsherinneringen van leveranciers: geen nieuwe facturen, apart af te werken door de boekhouding.</p></div></div>
 {{ cred_tabs('herinneringen') }}
 {% macro fbtn(key, label, n) %}<a class="fchip {{ 'active' if f == key }}" href="{{ url_for('crediteuren.reminders', f=key, q=q or None) }}">{{ label }} <span>{{ n or 0 }}</span></a>{% endmacro %}
-<div class="fchips" style="margin-bottom:12px" id="rem-chips">{{ fbtn('open', 'Af te werken', counts.open) }}{{ fbtn('af', 'Afgehandeld', counts.af) }}{{ fbtn('alle', 'Alle', counts.alle) }}</div>
+<div class="fchips" style="margin-bottom:12px" id="rem-chips">{{ fbtn('open', 'Af te werken', counts.open) }}{{ fbtn('af', 'Afgewerkt', counts.af) }}{{ fbtn('alle', 'Alle', counts.alle) }}</div>
 <form method="get" class="inline-form" style="margin-bottom:12px;max-width:560px" data-live="#rem-chips,#rem-table" role="search">
   {% if f != 'open' %}<input type="hidden" name="f" value="{{ f }}">{% endif %}
   <input type="search" name="q" value="{{ q }}" placeholder="Zoek leverancier, factuurnummer, bedrag…" style="flex:1" autocomplete="off" aria-label="Zoeken">
@@ -14,7 +14,7 @@
 </form>
 <section class="card flush tablewrap" id="rem-table">
   <table class="table">
-    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th>Bijbehorende factuur</th><th class="hide-m">Afgehandeld</th></tr></thead>
+    <thead><tr><th class="hide-m">Ontvangen</th><th>Leverancier</th><th class="hide-m">Factuurnr.</th><th class="num">Bedrag</th><th>Bijbehorende factuur</th><th class="hide-m">Afgewerkt</th></tr></thead>
     <tbody>
     {% for r in rows %}
     <tr class="link" data-href="{{ url_for('crediteuren.detail', iid=r.id) }}">

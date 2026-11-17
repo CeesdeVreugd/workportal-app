@@ -773,7 +773,7 @@ def create_invoice(conn, upload_dir, data, filename, source="upload", user_id=No
          mail.get("key"), mail.get("from_addr"), mail.get("subject"), mail.get("received") or now, sha, user_id, now, now))
     iid = cur.lastrowid
     if reminder:
-        conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = ? WHERE id = ?", (original, iid))
+        conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = ?, erp_ref = NULL WHERE id = ?", (original, iid))
     if supplier_id:
         conn.execute("UPDATE invoices SET supplier_id = ?, supplier_match = ? WHERE id = ?", (supplier_id, supplier_match, iid))
     if mail.get("conv"):
@@ -1110,8 +1110,10 @@ def _poll(conn, upload_dir):
                     if fs:
                         maildata.update(fwd_by=maildata["from_addr"], fwd_name=maildata["from_name"],
                                         from_addr=fs[0], from_name=fs[1] or fs[0])
-                _, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail=maildata)
+                new_iid, created = create_invoice(conn, upload_dir, main[1], main[0], source="mail", x=mx, extra=extra, mail=maildata)
                 new += 1 if created else 0
+                if created and conn.execute("SELECT is_reminder FROM invoices WHERE id = ?", (new_iid,)).fetchone()["is_reminder"]:
+                    move_reminder_mail(conn, new_iid)
             conn.execute("INSERT OR IGNORE INTO invoice_mail_seen (message_id, received_at) VALUES (?,?)",
                          (mid, m.get("receivedDateTime")))
             conn.commit()
@@ -1976,7 +1978,7 @@ def apply_categories(conn, iid, box):
     import json
     from .mail import graph_configured, _gcall, GraphError
     r = conn.execute("SELECT * FROM invoices WHERE id = ?", (iid,)).fetchone()
-    if not r or r["source"] != "mail" or not r["mail_id"]:
+    if not r or r["source"] != "mail" or not r["mail_id"] or r["is_reminder"]:
         return
     cmap = category_map(conn)
     if not cmap:
@@ -2548,8 +2550,8 @@ def reminder(iid):
         note = (request.form.get("note") or "").strip()[:1000] or None
         conn.execute("UPDATE invoices SET reminder_done_at = ?, reminder_done_by = ?, reminder_note = ?, updated_at = ? WHERE id = ?",
                      (now, g.user["id"], note, now, iid))
-        log(conn, iid, "Betalingsherinnering afgehandeld" + (f": {note}" if note else ""), g.user["id"])
-        flash("Herinnering afgehandeld.", "ok")
+        log(conn, iid, "Betalingsherinnering afgewerkt" + (f": {note}" if note else ""), g.user["id"])
+        flash("Herinnering afgewerkt.", "ok")
     elif act == "open":
         conn.execute("UPDATE invoices SET reminder_done_at = NULL, reminder_done_by = NULL, updated_at = ? WHERE id = ?", (now, iid))
         log(conn, iid, "Betalingsherinnering weer open", g.user["id"])
@@ -2566,7 +2568,9 @@ def reminder(iid):
         conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = COALESCE(reminder_of, ?), reminder_done_at = NULL, updated_at = ? WHERE id = ?",
                      (orig, now, iid))
         log(conn, iid, "Gemarkeerd als betalingsherinnering", g.user["id"])
-        flash("Gemarkeerd als betalingsherinnering: staat nu bij Herinneringen.", "ok")
+        conn.commit()
+        moved = move_reminder_mail(conn, iid)
+        flash("Gemarkeerd als betalingsherinnering: staat nu bij Herinneringen" + (" en de mail staat in de map 02-Aanmaningen." if moved else "."), "ok")
     conn.commit()
     if act == "af":
         nxt = conn.execute("SELECT id FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL ORDER BY received_at LIMIT 1").fetchone()
@@ -2585,6 +2589,9 @@ def mark_existing_reminders(conn):
             done = now_iso() if r["status"] in ("snelstart", "afgewezen") else None
             conn.execute("UPDATE invoices SET is_reminder = 1, reminder_of = ?, reminder_done_at = ? WHERE id = ?", (o["id"] if o else None, done, r["id"]))
             log(conn, r["id"], "Herkend als betalingsherinnering (onderwerp van de mail)")
+            if not done:
+                conn.commit()
+                move_reminder_mail(conn, r["id"])
     _set(conn, "cred_rem_scan", "1")
     conn.commit()
 
@@ -2612,3 +2619,27 @@ def reminder_count():
     if "_cred_rem" not in g:
         g._cred_rem = (query("SELECT COUNT(*) AS n FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL", one=True)["n"] or 0) if can(MODULE) else 0
     return g._cred_rem
+
+
+REMINDER_FOLDER = "02-Aanmaningen"
+
+
+def move_reminder_mail(conn, iid):
+    """Mail van een betalingsherinnering naar de map 02-Aanmaningen (instelling cred_reminder_folder; leeg = laten staan)."""
+    folder = (_setting(conn, "cred_reminder_folder", REMINDER_FOLDER) or "").strip()
+    r = conn.execute("SELECT source, mail_id FROM invoices WHERE id = ?", (iid,)).fetchone()
+    if not folder or not r or r["source"] != "mail" or not r["mail_id"] or not mail_configured():
+        return None
+    from .mail import graph_folder_id, graph_move
+    box = _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    try:
+        new_id = graph_move(box, r["mail_id"].split(":")[0], graph_folder_id(box, folder))
+        if new_id:
+            conn.execute("UPDATE invoices SET mail_id = ? WHERE id = ?", (new_id, iid))
+        log(conn, iid, f"Mail verplaatst naar de map '{folder}'")
+        conn.commit()
+        return True
+    except Exception as exc:  # noqa: BLE001 - verplaatsen is bijzaak
+        log(conn, iid, f"Mail naar '{folder}' verplaatsen mislukt: {str(exc)[:200]}")
+        conn.commit()
+        return False
