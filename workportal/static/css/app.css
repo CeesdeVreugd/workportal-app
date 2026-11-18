@@ -418,7 +418,9 @@ body.authbody::before { content: ""; position: fixed; top: 0; left: 0; right: 0;
 
 /* Orders: actievenster */
 .navbadge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 700; margin-left: 6px; line-height: 1; }
-.nav a .navbadge { margin-left: auto; }
+.nav a .navbadge { margin-left: auto; flex-shrink: 0; min-width: 24px; padding: 0 7px; }
+.nav a > span:not(.navbadge) { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav a > svg { flex-shrink: 0; }
 .actionbar { display: flex; align-items: center; gap: 12px; padding: 14px 18px; margin: 0 0 16px; border-radius: var(--radius); background: var(--warn-bg); color: var(--warn); text-decoration: none; border: 1px solid #F5D9A8; }
 .actionbar svg { width: 20px; height: 20px; flex-shrink: 0; }
 .actionbar .go { margin-left: auto; font-weight: 600; white-space: nowrap; }
