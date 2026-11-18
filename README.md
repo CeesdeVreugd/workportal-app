@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V224 (2.22.4)
+- Debiteuren: antwoorden op herinneringen gaan in de mailbox van administratie@ naar de map **100-WorkPortal** (instelling deb_reply_folder; '-' = in Postvak IN laten). Eenmalig worden antwoorden die al in WorkPortal staan daarheen verplaatst. Lukt verplaatsen niet, dan staat de reden in het gesprek ("Let op: …"). Vervangt het terugzetten naar Postvak IN uit V223.
+
 ## V223 (2.22.3)
 - Projectmap: bestanden uit de map met "Machineveiligheid" in de naam (bijv. 3 Documenten/2 Machineveiligheids documenten) mailen, net als certificaten: knop "Mailen" bij de map en "Machineveiligheidsdocumenten mailen" in de map; aanvinken, tekst aanpassen, naar de contactpersoon; vastgelegd bij de gespreksnotities.
 - Debiteuren: antwoorden op herinneringen blijven in Postvak IN van administratie@ (niet meer naar de servicemap "03 - WorkPortal"). Eenmalig worden antwoorden die al verplaatst waren teruggezet naar Postvak IN. Instelling deb_reply_folder (leeg = laten staan).

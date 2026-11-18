@@ -29,8 +29,8 @@
   <div class="card-head"><h2>Gesprek ({{ msgs|length }})</h2><span class="small muted">mail met de klant · {{ box }}</span></div>
   {% if edit %}<div class="svcstate small {{ 'bad' if state.error or not state.on }}">
     {% if not state.on %}De Microsoft-koppeling is niet ingesteld: antwoorden worden niet opgehaald.
-    {% elif state.error %}Antwoorden ophalen mislukt: {{ state.error }}
-    {% else %}Antwoorden van de klant komen hier vanzelf binnen (elke 5 minuten){% if state.last %} · laatst {{ state.last|dt }}{% endif %}.{% endif %}
+    {% elif state.error %}Let op: {{ state.error }}
+    {% else %}Antwoorden van de klant komen hier vanzelf binnen (elke 5 minuten){% if state.folder %}; de mail gaat in de mailbox naar de map {{ state.folder }}{% endif %}{% if state.last %} · laatst {{ state.last|dt }}{% endif %}.{% endif %}
     <form method="post" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost" name="action" value="ophalen">{{ icon('refresh') }}Nu ophalen</button></form></div>{% endif %}
   <div class="notes">
   {% for m in msgs|reverse %}{% set mm = m.meta %}

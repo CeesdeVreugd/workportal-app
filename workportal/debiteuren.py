@@ -1556,8 +1556,7 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     own = box.rpartition("@")[2]
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
            f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId,internetMessageId&$orderby=receivedDateTime asc&$top=50")
-    # antwoorden blijven in Postvak IN van de afzender (administratie@); alleen verplaatsen als deb_reply_folder is ingesteld
-    folder, mcache = (_setting("deb_reply_folder", conn) or "").strip(), {}
+    folder, mcache = reply_folder(conn), {}
     n, newest, pages = 0, since, 0
     while url and pages < 10:
         pages += 1
@@ -1630,33 +1629,38 @@ def poll_replies(conn, upload_dir, lookback_days=None):
         url = js.get("@odata.nextLink")
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_since', ?)", (newest,))
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_last', ?)", (now_iso(),))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_move_error', ?)",
+                 (f"naar de map {folder} verplaatsen lukte niet ({mcache['err']})" if mcache.get("err") else "",))
     conn.commit()
     return n
 
 
-def _restore_inbox(conn):
-    """Eenmalig: antwoorden die eerder naar de servicemap (03 - WorkPortal) zijn verplaatst terug naar Postvak IN."""
-    if _setting("deb_inbox_restored", conn) == "1" or (_setting("deb_reply_folder", conn) or "").strip():
+REPLY_FOLDER = "100-WorkPortal"
+
+
+def reply_folder(conn):
+    """Map in de mailbox van administratie@ voor antwoorden op herinneringen (instelling deb_reply_folder; '-' = laten staan)."""
+    v = (_setting("deb_reply_folder", conn) or REPLY_FOLDER).strip()
+    return "" if v == "-" else v
+
+
+def _move_known(conn):
+    """Eenmalig: antwoorden die al in WorkPortal staan (en nog in Postvak IN of de oude servicemap) naar 100-WorkPortal."""
+    folder = reply_folder(conn)
+    if not folder or _setting("deb_moved_to", conn) == folder:
         return
-    from .mail import graph_wellknown_id, graph_move
-    box = sender(conn)
-    inbox = graph_wellknown_id(box, "inbox")
-    if not inbox:
-        return
-    for m in conn.execute("SELECT id, mail_meta FROM dunning_messages WHERE kind = 'mail_in' AND mail_meta LIKE '%\"folder\"%'").fetchall():
+    from .service import _move_to_folder
+    box, cache = sender(conn), {}
+    for m in conn.execute("SELECT id, mail_meta FROM dunning_messages WHERE kind = 'mail_in'").fetchall():
         meta = json.loads(m["mail_meta"] or "{}")
-        if not meta.get("folder") or not meta.get("msg_id"):
+        if not meta.get("msg_id") or meta.get("folder") == folder:
             continue
-        try:
-            newid = graph_move(box, meta["msg_id"], inbox)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[WorkPortal] Antwoord herinnering terugzetten: {exc}", flush=True)
-            continue
-        meta.pop("folder", None)
+        newid = _move_to_folder(box, meta["msg_id"], folder, cache)
         if newid:
-            meta["msg_id"] = newid
-        conn.execute("UPDATE dunning_messages SET mail_meta = ? WHERE id = ?", (json.dumps(meta, ensure_ascii=False), m["id"]))
-    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_inbox_restored', '1')")
+            meta.update(msg_id=newid, folder=folder)
+            conn.execute("UPDATE dunning_messages SET mail_meta = ? WHERE id = ?", (json.dumps(meta, ensure_ascii=False), m["id"]))
+        cache.pop("err", None)
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_moved_to', ?)", (folder,))
     conn.commit()
 
 
@@ -1670,7 +1674,7 @@ def scheduled_replies(conn, app, state):
     if not conn.execute("SELECT 1 FROM dunning_letters WHERE status = 'verstuurd' AND sent_at > datetime('now', '-180 days')").fetchone():
         return
     try:
-        _restore_inbox(conn)
+        _move_known(conn)
         poll_replies(conn, app.config["UPLOAD_DIR"])
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_error', '')")
     except Exception as exc:  # noqa: BLE001
@@ -1772,7 +1776,8 @@ def conversation(lid):
     reply_cc = ", ".join(dict.fromkeys(others))
     who = query("SELECT name FROM users WHERE id = ?", (L["sent_by"],), one=True) if L["sent_by"] else None
     from .mail import graph_configured
-    state = {"last": _setting("deb_mail_last"), "error": _setting("deb_mail_error"), "on": graph_configured()}
+    state = {"last": _setting("deb_mail_last"), "error": _setting("deb_mail_error") or _setting("deb_move_error"), "on": graph_configured(),
+             "folder": reply_folder(get_db())}
     return render_template("debiteuren/gesprek.html", L=L, invs=invs, cust=cust, msgs=msgs, reply_to=reply_to, reply_cc=reply_cc,
                            last_in=last_in, LEVELS=LEVELS,
                            who=who, box=sender(), state=state)
