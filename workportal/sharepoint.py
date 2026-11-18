@@ -136,6 +136,9 @@ class Graph:
         return self._json("POST", f"/drives/{drive}/items/{parent_id}/children",
                           json={"name": name, "folder": {}, "@microsoft.graph.conflictBehavior": "fail"})
 
+    def move(self, drive, item_id, parent_id):
+        return self._json("PATCH", f"/drives/{drive}/items/{item_id}", json={"parentReference": {"id": parent_id}})
+
     def rename(self, drive, item_id, name):
         return self._json("PATCH", f"/drives/{drive}/items/{item_id}", json={"name": name})
 

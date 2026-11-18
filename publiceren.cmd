@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V221: antwoorden op herinneringen ook herkennen zonder WP-label (automatische antwoorden)"
+set "OMSCHRIJVING=WorkPortal V222: opleverdocumenten in 3 Documenten/3 Opleverdocumten - restpuntenlijsten e.d"
 
 echo.
 echo ============================================

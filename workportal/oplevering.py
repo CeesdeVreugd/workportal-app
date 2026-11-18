@@ -176,21 +176,75 @@ def delivery_pdf_view(pid, did):
     return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
-def _to_sharepoint(p, fname, pdf):
-    conn = get_db()
+SP_DELIV_RE = re.compile(r"^\s*3(\D|$)")   # '3 Opleverdocumten - restpuntenlijsten e.d' (in 3 Documenten)
+SP_DELIV_DEFAULT = "3 Opleverdocumten - restpuntenlijsten e.d"
+
+
+def _deliv_folder(g_, drive, project_item):
+    """(map '3 Documenten', map '3 Opleverdocumenten …' daarin) van de projectmap; wordt aangemaakt als hij er niet is."""
+    from .aantekeningen import _find_or_make, SP_DOCS_RE, SP_DOCS_DEFAULT
+    docs = _find_or_make(g_, drive, project_item, SP_DOCS_RE, SP_DOCS_DEFAULT)
+    return docs, _find_or_make(g_, drive, docs["id"], SP_DELIV_RE, SP_DELIV_DEFAULT)
+
+
+def _to_sharepoint(p, fname, pdf, conn=None):
+    conn = conn or get_db()
     if not p["sp_item_id"] or p["sp_missing"] or not sp.connected(conn):
         return None
-    from .aantekeningen import _find_or_make, SP_DOCS_RE, SP_DOCS_DEFAULT
     try:
         g_ = sp.client()
         drive, _ = sp._ctx(conn)
-        docs = _find_or_make(g_, drive, p["sp_item_id"], SP_DOCS_RE, SP_DOCS_DEFAULT)
-        g_.upload(drive, docs["id"], fname, pdf, conflict="replace")
-        return True, f"In SharePoint gezet: {docs['name']}/{fname}"
+        docs, sub = _deliv_folder(g_, drive, p["sp_item_id"])
+        g_.upload(drive, sub["id"], fname, pdf, conflict="replace")
+        try:   # oude plek (los in 3 Documenten) opruimen
+            g_.delete_path(drive, docs["id"], fname)
+        except Exception:  # noqa: BLE001
+            pass
+        return True, f"In SharePoint gezet: {docs['name']}/{sub['name']}/{fname}"
     except sp.GraphError as exc:
         return False, f"Opslaan in SharePoint mislukt: {exc.message}"
     except (requests.RequestException, RuntimeError):
         return False, "SharePoint is op dit moment niet bereikbaar."
+
+
+def move_existing(conn):
+    """Eenmalig: opleverdocumenten die los in '3 Documenten' staan naar '3 Opleverdocumten …' verplaatsen."""
+    if not sp.connected(conn):
+        return
+    if (conn.execute("SELECT value FROM settings WHERE key = 'oplev_sp_moved'").fetchone() or {"value": ""})["value"] == "1":
+        return
+    g_ = sp.client()
+    drive, _ = sp._ctx(conn)
+    rows = conn.execute("SELECT d.id, f.filename, p.sp_item_id FROM deliveries d JOIN projects p ON p.id = d.project_id"
+                        " JOIN files f ON f.id = d.pdf_file_id WHERE p.sp_item_id IS NOT NULL AND IFNULL(p.sp_missing, 0) = 0"
+                        " AND d.sp_status LIKE 'In SharePoint gezet:%'").fetchall()
+    for r in rows:
+        try:
+            docs, sub = _deliv_folder(g_, drive, r["sp_item_id"])
+            it = None
+            for c in g_.children(drive, docs["id"]):
+                if "file" in c and c["name"] == r["filename"]:
+                    it = c
+                    break
+            if it:
+                g_.move(drive, it["id"], sub["id"])
+            conn.execute("UPDATE deliveries SET sp_status = ? WHERE id = ?",
+                         (f"In SharePoint gezet: {docs['name']}/{sub['name']}/{r['filename']}", r["id"]))
+            conn.commit()
+        except sp.GraphError as exc:
+            if exc.status == 409:   # staat er al: oude kopie weg
+                try:
+                    g_.delete_path(drive, docs["id"], r["filename"])
+                except Exception:  # noqa: BLE001
+                    pass
+            else:
+                print(f"[WorkPortal] Opleverdocument {r['id']} verplaatsen: {exc.message}", flush=True)
+                return   # later opnieuw
+        except (requests.RequestException, RuntimeError):
+            return
+    conn.execute("INSERT INTO settings (key, value) VALUES ('oplev_sp_moved', '1')"
+                 " ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    conn.commit()
 
 
 @bp.route("/<int:pid>/oplevering/<int:did>/tekenen", methods=["GET", "POST"])

@@ -119,6 +119,13 @@ def _loop(app):
             debiteuren.scheduled_reparse(conn, app)
             debiteuren.scheduled_rematch(conn, state)
             debiteuren.scheduled_replies(conn, app, state)
+            if not state.get("oplev_moved"):
+                state["oplev_moved"] = True
+                try:
+                    from . import oplevering
+                    oplevering.move_existing(conn)
+                except Exception:
+                    traceback.print_exc()
             _nightly_backup(app, state)
             conn.execute("DELETE FROM login_codes WHERE created_at < datetime('now', '-2 days')")
             conn.commit()

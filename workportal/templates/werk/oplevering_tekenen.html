@@ -24,7 +24,7 @@
   <div><canvas class="sigpad" id="scust" data-target="sigcust"></canvas><button type="button" class="btn ghost sm" data-clear="scust">Wissen</button></div>
   <label class="check"><input type="checkbox" name="mail" value="1" {{ 'checked' if mail_to }}> Getekend document mailen naar</label>
   <input type="text" name="mail_to" value="{{ mail_to }}" inputmode="email" placeholder="e-mailadres klant">
-  <span class="hint">Het document is in het {{ LANG_LABELS.get(d.language, d.language) }}. Na het tekenen gaat de PDF naar de {{ K.lower }}map (3 Documenten) als die gekoppeld is.</span>
+  <span class="hint">Het document is in het {{ LANG_LABELS.get(d.language, d.language) }}. Na het tekenen gaat de PDF naar de {{ K.lower }}map (3 Documenten / 3 Opleverdocumenten …) als die gekoppeld is.</span>
   <div class="actions"><button class="btn primary">{{ icon('check') }}Ondertekenen</button><a class="btn ghost" href="{{ url_for(B ~ '.detail', pid=p.id) }}#oplevering">Annuleren</a></div>
 </form>
 {% endblock %}
