@@ -2027,14 +2027,26 @@ def send_one(sid):
             return redirect(url_for("debiteuren.send_one", sid=sid))
         if s["send_state"] not in ("klaarzetten", "goedkeuren"):
             abort(400)
-        if s["send_state"] == "goedkeuren" and not (may_approve or act == "terugtrekken"):
-            abort(403)
+        if act == "verzenden":
+            abort(403)   # verzenden gaat altijd via goedkeuring
+        if s["send_state"] == "goedkeuren":
+            # ter goedkeuring: niets meer aanpassen; alleen goedkeuren/terugsturen (controleurs), intrekken of opnieuw aanbieden
+            if act in ("goedkeuren", "afkeuren") and not may_approve:
+                abort(403)
+            if act not in ("goedkeuren", "afkeuren", "terugtrekken", "opnieuw"):
+                abort(400)
+        elif act in ("goedkeuren", "afkeuren", "terugtrekken", "opnieuw"):
+            abort(400)
         if not may_edit and not may_approve:
             abort(403)
         f = request.form
-        to, cc = _addr_list(f.get("to")), _addr_list(f.get("cc"))
-        vals = (", ".join(to), ", ".join(cc), (f.get("subject") or "").strip()[:300], (f.get("body") or "").strip()[:10000])
-        if act in ("opslaan", "aanbieden", "goedkeuren", "verzenden"):
+        if s["send_state"] == "goedkeuren":   # vastgelegde mail gebruiken
+            to, cc = _addr_list(s["send_to"]), _addr_list(s["send_cc"])
+            vals = (s["send_to"] or "", s["send_cc"] or "", s["send_subject"] or "", s["send_body"] or "")
+        else:
+            to, cc = _addr_list(f.get("to")), _addr_list(f.get("cc"))
+            vals = (", ".join(to), ", ".join(cc), (f.get("subject") or "").strip()[:300], (f.get("body") or "").strip()[:10000])
+        if act in ("opslaan", "aanbieden") and s["send_state"] == "klaarzetten":
             conn.execute("UPDATE sales_invoices SET send_to = ?, send_cc = ?, send_subject = ?, send_body = ?, updated_at = ? WHERE id = ?",
                          vals + (now_iso(), sid))
             rel = invoice_relation(conn, s)
@@ -2048,7 +2060,7 @@ def send_one(sid):
                         from .util import safe_filename
                         save_bytes("sales_invoice", sid, data, safe_filename(up.filename) or "bijlage", kind="send_extra", mime=up.mimetype)
             conn.commit()
-        if act in ("aanbieden", "goedkeuren", "verzenden"):
+        if act in ("aanbieden", "goedkeuren"):
             bad = [a for a in to + cc if not _EMAIL.match(a)]
             if not to or bad or not vals[2] or not s["pdf_file_id"]:
                 flash(("Er is nog geen factuur-PDF. " if not s["pdf_file_id"] else "")
@@ -2079,7 +2091,7 @@ def send_one(sid):
             if s["send_state"] != "klaarzetten":
                 abort(400)
             if not appr:
-                flash("Er zijn nog geen controleurs ingesteld (Verkoopfacturen › Nieuwe facturen › Instellingen); de factuur kan nu direct verzonden worden.", "error")
+                flash("Er zijn nog geen goedkeurders ingesteld (Verkoopfacturen › Nieuwe facturen › Instellingen).", "error")
                 return redirect(url_for("debiteuren.send_one", sid=sid))
             conn.execute("UPDATE sales_invoices SET send_state = 'goedkeuren', send_prepared_by = ?, send_prepared_at = ?, send_note = NULL WHERE id = ?",
                          (uid, now_iso(), sid))
@@ -2088,13 +2100,21 @@ def send_one(sid):
             _notify_many(conn, appr, f"Factuur {s['number']} goedkeuren", f"{s['cname'] or s['customer_name'] or ''} · {g.user['name']} vraagt om goedkeuring.",
                          f"/debiteuren/{sid}/verzenden")
             flash("Ter goedkeuring aangeboden; de controleurs hebben een melding gekregen.", "ok")
+        elif act == "opnieuw":
+            if not may_edit:
+                abort(403)
+            _send_log(conn, sid, "Opnieuw ter goedkeuring aangeboden", uid)
+            conn.commit()
+            _notify_many(conn, appr, f"Factuur {s['number']} goedkeuren", f"{s['cname'] or s['customer_name'] or ''} · {g.user['name']} vraagt (opnieuw) om goedkeuring.",
+                         f"/debiteuren/{sid}/verzenden")
+            flash("Opnieuw ter goedkeuring aangeboden; de goedkeurders hebben weer een melding gekregen.", "ok")
         elif act == "terugtrekken":
-            if s["send_state"] != "goedkeuren" or not (may_edit and (uid == s["send_prepared_by"] or may_approve)):
+            if not may_edit:
                 abort(403)
             conn.execute("UPDATE sales_invoices SET send_state = 'klaarzetten' WHERE id = ?", (sid,))
-            _send_log(conn, sid, "Teruggetrokken (weer klaarzetten)", uid)
+            _send_log(conn, sid, "Goedkeuring ingetrokken om aan te passen", uid)
             conn.commit()
-            flash("De factuur staat weer op klaarzetten.", "ok")
+            flash("Goedkeuring ingetrokken: je kunt de mail weer aanpassen en opnieuw aanbieden.", "ok")
         elif act == "afkeuren":
             reason = (f.get("note") or "").strip()[:500]
             if not reason:
@@ -2106,11 +2126,7 @@ def send_one(sid):
             if s["send_prepared_by"]:
                 _notify_many(conn, [s["send_prepared_by"]], f"Factuur {s['number']} teruggestuurd", f"{g.user['name']}: {reason}", f"/debiteuren/{sid}/verzenden")
             flash("Teruggestuurd naar " + (query("SELECT name FROM users WHERE id = ?", (s["send_prepared_by"],), one=True) or {"name": "de opsteller"})["name"] + ".", "ok")
-        elif act in ("goedkeuren", "verzenden"):
-            if act == "verzenden" and (appr or s["send_state"] != "klaarzetten" or not may_edit):
-                abort(403)   # direct verzenden alleen als er (nog) geen controleurs zijn
-            if act == "goedkeuren" and not (s["send_state"] == "goedkeuren" and may_approve):
-                abort(403)
+        elif act == "goedkeuren":
             from .util import file_path, files_for
             from .mail import send_mail_with_files
             atts = []

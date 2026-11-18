@@ -4,7 +4,7 @@
 {% block content %}
 {% set pdf_url = url_for('main.file', fid=s.pdf_file_id) if s.pdf_file_id else None %}
 {% set st = s.send_state %}
-{% set editable = (st == 'klaarzetten' and may_edit) or (st == 'goedkeuren' and may_approve) %}
+{% set editable = st == 'klaarzetten' and may_edit %}
 <div class="pagehead">
   <div>
     <div class="crumbs"><a href="{{ url_for('debiteuren.sending') }}">{{ icon('back') }}Nieuwe facturen</a> · <a href="{{ url_for('debiteuren.detail', sid=s.id) }}">factuurkaart</a></div>
@@ -46,22 +46,20 @@
       {% if editable %}<input type="file" name="extra" multiple style="margin-top:6px"><span class="hint" style="display:block">Bijv. een werkbon of urenstaat; wordt bij Opslaan toegevoegd.</span>{% endif %}</div>
     </fieldset>
     {% if st == 'klaarzetten' and may_edit %}
-      <label class="f">Opmerking voor de controleur<input type="text" name="note" placeholder="optioneel"></label>
+      <label class="f">Opmerking voor de goedkeurder<input type="text" name="note" placeholder="optioneel"></label>
       <div class="actions"><button class="btn" name="action" value="opslaan">Opslaan</button>
-        {% if appr %}<button class="btn primary" name="action" value="aanbieden">{{ icon('check') }}Ter goedkeuring aanbieden</button>
-        {% else %}<button class="btn primary" name="action" value="verzenden" data-confirm="Factuur {{ s.number }} nu verzenden?">{{ icon('mail') }}Verzenden</button>{% endif %}</div>
-      {% if not appr %}<p class="hint">Er zijn nog geen controleurs ingesteld (Nieuwe facturen › Instellingen), daarom kan de factuur direct verzonden worden.</p>{% endif %}
+        <button class="btn primary" name="action" value="aanbieden">{{ icon('mail') }}Versturen · ter goedkeuring aanbieden</button></div>
+      <p class="hint">{% if appr %}De factuur gaat pas naar de klant als {{ appr_names|join(' of ') }} hem goedkeurt.{% else %}<b>Er zijn nog geen goedkeurders ingesteld</b> (Nieuwe facturen › Instellingen).{% endif %}</p>
     {% elif st == 'goedkeuren' %}
+      <div class="alertbox" style="display:block;background:var(--warn-bg)"><b>Ter goedkeuring</b> bij {{ appr_names|join(', ') }}{% if prep_name %} · aangeboden door {{ prep_name }}{% endif %}{% if s.send_prepared_at %} op {{ s.send_prepared_at|dt('%d-%m %H:%M') }}{% endif %}. De mail wordt pas verstuurd na goedkeuring.</div>
       {% if may_approve %}
-      <div class="actions"><button class="btn primary" name="action" value="goedkeuren" data-confirm="Factuur {{ s.number }} goedkeuren en verzenden aan de klant?">{{ icon('check') }}Goedkeuren en verzenden</button>
-        <button class="btn" name="action" value="opslaan">Opslaan</button></div>
-      <details class="cred-pop"><summary class="btn ghost sm">Terugsturen</summary>
+      <div class="actions"><button class="btn primary" name="action" value="goedkeuren" data-confirm="Factuur {{ s.number }} goedkeuren en verzenden aan de klant?">{{ icon('check') }}Goedkeuren en verzenden</button></div>
+      <details class="cred-pop"><summary class="btn ghost sm">Terugsturen met opmerking</summary>
         <label class="f">Wat moet er anders?<input type="text" name="note"></label>
         <div class="actions"><button class="btn sm" name="action" value="afkeuren">Terugsturen naar {{ prep_name or 'de opsteller' }}</button></div></details>
-      {% else %}
-      <p class="hint">Wacht op goedkeuring door {{ appr_names|join(' of ') }}.</p>
-      {% if may_edit %}<div class="actions"><button class="btn ghost sm" name="action" value="terugtrekken">Terugtrekken (weer aanpassen)</button></div>{% endif %}
       {% endif %}
+      {% if may_edit %}<div class="actions"><button class="btn" name="action" value="terugtrekken" formnovalidate>Goedkeuring intrekken en aanpassen</button>
+        <button class="btn ghost" name="action" value="opnieuw" formnovalidate>Opnieuw ter goedkeuring aanbieden</button></div>{% endif %}
     {% elif st == 'verzonden' %}<p class="hint">Verzonden op {{ s.sent_at|dt }}.</p>{% endif %}
   </form>
   <section class="card"><div class="card-head"><h2>Verloop</h2></div>
