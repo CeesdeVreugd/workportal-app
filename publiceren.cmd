@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V220: inkoopfacturen zelflerend uitlezen (knop Leren, tabblad Geleerd)"
+set "OMSCHRIJVING=WorkPortal V221: antwoorden op herinneringen ook herkennen zonder WP-label (automatische antwoorden)"
 
 echo.
 echo ============================================

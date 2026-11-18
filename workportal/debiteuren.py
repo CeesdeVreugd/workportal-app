@@ -13,7 +13,7 @@ import binascii
 import io
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, g, jsonify
 
@@ -1493,6 +1493,44 @@ def mark_paid(sid):
 
 # ---------------------------------------------------------------- mailgesprek bij een herinnering
 
+_REPLY_PREFIX = re.compile(r"^\s*(?:(?:re|aw|antw|antwoord|sv|fw|fwd|wg|tr|doorst)\s*:|(?:automatic\s+reply|automatisch\s+antwoord|autosvar|"
+                           r"automatische\s+antwort|r[ée]ponse\s+automatique|out\s+of\s+office|afwezig|abwesend|undeliverable|onbestelbaar)"
+                           r"[^:]{0,20}:)\s*", re.I)
+
+
+def _bare_subject(s_):
+    """Onderwerp zonder RE:/Automatic reply:-voorvoegsels, [WP-H..]-label en (H-jjjj-nnnn)."""
+    s_ = DUN_TAG.sub("", s_ or "")
+    s_ = re.sub(r"\(?H-\d{4}-\d{3,5}\)?", "", s_)
+    prev = None
+    while prev != s_:
+        prev, s_ = s_, _REPLY_PREFIX.sub("", s_)
+    return re.sub(r"\s+", " ", s_).strip(" -:").lower()
+
+
+def _match_by_subject(conn, subject, from_addr):
+    """Antwoord zonder [WP-H..] in het onderwerp en buiten de mailwisseling (bijv. een automatisch antwoord van een
+    crediteurenafdeling): herkennen op het herinneringsnummer, of op hetzelfde onderwerp van een herinnering die naar
+    hetzelfde domein is gestuurd (laatste 120 dagen)."""
+    subject = subject or ""
+    num = re.search(r"H-\d{4}-\d{3,5}", subject)
+    if num:
+        hit = conn.execute("SELECT id FROM dunning_letters WHERE number = ? AND status = 'verstuurd'", (num.group(0),)).fetchone()
+        if hit:
+            return hit["id"]
+    bare = _bare_subject(subject)
+    dom = (from_addr or "").rpartition("@")[2].lower()
+    if not bare:
+        return None
+    specific = bool(re.search(r"\d{5,}", bare))   # onderwerp met factuurnummer: ook van een ander adres/domein (bijv. AP-afdeling)
+    since = (now_utc() - timedelta(days=120)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for L in conn.execute("SELECT id, subject, to_addr FROM dunning_letters WHERE status = 'verstuurd' AND sent_at >= ? ORDER BY sent_at DESC", (since,)):
+        doms = {a.strip().rpartition("@")[2].lower() for a in re.split(r"[;,\s]+", L["to_addr"] or "") if "@" in a}
+        if (specific or (dom and dom in doms)) and _bare_subject(L["subject"]) == bare:
+            return L["id"]
+    return None
+
+
 def poll_replies(conn, upload_dir, lookback_days=None):
     """Antwoorden op herinneringen uit de mailbox (afzender, bijv. administratie@) ophalen: mails met [WP-H..] in het
     onderwerp of uit dezelfde mailwisseling. Alleen lezen (en naar de WorkPortal-map verplaatsen, zoals bij service)."""
@@ -1539,10 +1577,12 @@ def poll_replies(conn, upload_dir, lookback_days=None):
             if not lid and m.get("conversationId"):
                 hit = conn.execute("SELECT id FROM dunning_letters WHERE mail_conv = ? ORDER BY id DESC LIMIT 1", (m["conversationId"],)).fetchone()
                 lid = hit["id"] if hit else None
-            if not lid:
-                continue
             frm = (m.get("from") or {}).get("emailAddress") or {}
             fa = (frm.get("address") or "").lower()
+            if not lid:
+                lid = _match_by_subject(conn, m.get("subject"), fa)
+            if not lid:
+                continue
             if m.get("parentFolderId") in skip or fa == box.lower() or fa.startswith("/o=") or (own and fa.endswith("@" + own)):
                 continue
             rb = graph_retry("GET", f"https://graph.microsoft.com/v1.0/users/{box}/messages/{mid}?$select=uniqueBody,body,toRecipients,ccRecipients",
