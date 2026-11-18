@@ -37,7 +37,7 @@
     {% if rel and not rel.invoice_email %}<label class="check"><input type="checkbox" name="save_to_customer" value="1" checked> Dit adres opslaan als factuur-e-mail van {{ rel.name }}</label>{% endif %}
     <label class="f">Extra CC<input type="text" name="cc" value="{{ s.send_cc or '' }}">{% if fixed_cc %}<span class="hint">Altijd in CC: {{ fixed_cc|join(', ') }}</span>{% endif %}</label>
     <label class="f">Onderwerp *<input type="text" name="subject" value="{{ s.send_subject or '' }}"></label>
-    <label class="f">Tekst<textarea name="body" rows="9">{{ s.send_body or '' }}</textarea></label>
+    <label class="f">Tekst<textarea name="body" rows="9">{{ s.send_body or '' }}</textarea>{% if editable %}<span class="hint"><button class="linkbtn" name="action" value="tekst" formnovalidate>Standaardtekst terugzetten</button></span>{% endif %}</label>
     <div class="f"><span>Bijlagen</span>
       <div class="small">{{ icon('pdf') }} Factuur_{{ s.number }}.pdf</div>
       {% for x in extras %}<div class="small">{{ icon('file') }} <a href="{{ url_for('main.file', fid=x.id) }}" target="_blank" rel="noopener">{{ x.filename }}</a>

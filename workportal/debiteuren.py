@@ -1825,18 +1825,18 @@ def letters():
 
 SEND_STATES = {"klaarzetten": "Klaar te zetten", "goedkeuren": "Wacht op goedkeuring", "verzonden": "Verzonden"}
 INV_MAIL = {
-    "nl": ("Factuur {nr}", "Geachte heer/mevrouw,\n\nIn de bijlage vindt u factuur {nr}{ref}. Wij verzoeken u vriendelijk het bedrag van {amount}"
-                            " vóór {due} over te maken op {iban} onder vermelding van het factuurnummer.\n\nHeeft u vragen over deze factuur,"
-                            " neem dan gerust contact met ons op."),
-    "en": ("Invoice {nr}", "Dear Sir/Madam,\n\nPlease find attached invoice {nr}{ref}. We kindly ask you to transfer the amount of {amount}"
-                           " before {due} to {iban}, stating the invoice number.\n\nIf you have any questions about this invoice, please do not"
-                           " hesitate to contact us."),
-    "de": ("Rechnung {nr}", "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung {nr}{ref}. Bitte überweisen Sie den Betrag von"
-                            " {amount} bis zum {due} auf {iban} unter Angabe der Rechnungsnummer.\n\nBei Fragen zu dieser Rechnung stehen wir"
-                            " Ihnen gerne zur Verfügung."),
-    "fr": ("Facture {nr}", "Madame, Monsieur,\n\nVeuillez trouver ci-joint la facture {nr}{ref}. Nous vous prions de bien vouloir virer le"
-                           " montant de {amount} avant le {due} sur {iban} en mentionnant le numéro de facture.\n\nPour toute question"
-                           " concernant cette facture, n'hésitez pas à nous contacter."),
+    "nl": ("Factuur {nr}", "Geachte heer/mevrouw,\n\nIn de bijlage kunt u de factuur van onze verleende diensten (of geleverde producten) vinden.\n"
+                            "Wij verzoeken u vriendelijk het verschuldigde bedrag binnen de gestelde factuurtermijn te voldoen.\n"
+                            "Mocht u nog vragen of opmerkingen hebben naar aanleiding van de factuur, dan hoor ik u graag."),
+    "en": ("Invoice {nr}", "Dear Sir/Madam,\n\nPlease find attached the invoice for the services we provided (or products we delivered).\n"
+                           "We kindly ask you to pay the amount due within the stated payment term.\n"
+                           "Should you have any questions or comments regarding the invoice, please let me know."),
+    "de": ("Rechnung {nr}", "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung für unsere erbrachten Leistungen (bzw. gelieferten Produkte).\n"
+                            "Wir bitten Sie freundlich, den fälligen Betrag innerhalb der angegebenen Zahlungsfrist zu begleichen.\n"
+                            "Sollten Sie Fragen oder Anmerkungen zur Rechnung haben, stehe ich Ihnen gerne zur Verfügung."),
+    "fr": ("Facture {nr}", "Madame, Monsieur,\n\nVeuillez trouver ci-joint la facture de nos services rendus (ou produits livrés).\n"
+                           "Nous vous prions de bien vouloir régler le montant dû dans le délai de paiement indiqué.\n"
+                           "Pour toute question ou remarque concernant la facture, je reste à votre disposition."),
 }
 INV_REF = {"nl": " (uw order {o})", "en": " (your order {o})", "de": " (Ihre Bestellung {o})", "fr": " (votre commande {o})"}
 
@@ -2054,7 +2054,12 @@ def send_one(sid):
                 flash(("Er is nog geen factuur-PDF. " if not s["pdf_file_id"] else "")
                       + "Vul een geldig e-mailadres en onderwerp in." + (f" Ongeldig: {', '.join(bad)}" if bad else ""), "error")
                 return redirect(url_for("debiteuren.send_one", sid=sid))
-        if act == "adres":
+        if act == "tekst":
+            _, subj, body = _send_defaults(conn, s)
+            conn.execute("UPDATE sales_invoices SET send_subject = ?, send_body = ? WHERE id = ?", (subj, body, sid))
+            conn.commit()
+            flash("Standaard onderwerp en tekst teruggezet.", "ok")
+        elif act == "adres":
             c = invoice_relation(conn, s)
             to2 = (c["invoice_email"] or c["email"] or "") if c else ""
             conn.execute("UPDATE sales_invoices SET send_to = ? WHERE id = ?", (to2, sid))

@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V228 (2.23.2)
+- Nieuwe facturen verzenden: nieuwe standaardtekst ("In de bijlage kunt u de factuur van onze verleende diensten (of geleverde producten) vinden…"), ook in het Engels, Duits en Frans. Knop "Standaardtekst terugzetten" op de verzendpagina.
+
 ## V227 (2.23.1)
 - Nieuwe facturen verzenden: de ontvanger komt uit de relatie van de klantnaam bij het factuuradres op de factuur (factuur-e-mail, anders het algemene e-mailadres van die relatie). Op de verzendpagina staat welke relatie dat is, met "Opnieuw ophalen uit de relatie".
 - Vaste CC bij elke verzonden factuur (instelling *Altijd in CC* op het tabblad Nieuwe facturen; standaard boekhouding@, wim@ en cees@). Het veld CC op de verzendpagina heet nu *Extra CC*.

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V227: factuur-mailadres uit de relatie op het factuuradres, vaste CC"
+set "OMSCHRIJVING=WorkPortal V228: nieuwe standaardtekst bij het verzenden van facturen"
 
 echo.
 echo ============================================
