@@ -2015,7 +2015,7 @@ def send_one(sid):
     appr = approvers()
     is_appr = uid in appr
     others = [a for a in appr if a != s["send_prepared_by"]]
-    may_approve = is_appr and (uid != s["send_prepared_by"] or not others)   # vier ogen, tenzij er geen andere controleur is
+    may_approve = is_appr   # alle ingestelde controleurs keuren goed (ook als ze de factuur zelf klaarzetten)
     may_edit = can("debiteuren", BEWERKEN)
     if request.method == "POST":
         act = request.form.get("action")
@@ -2086,7 +2086,7 @@ def send_one(sid):
             _send_log(conn, sid, "Ter goedkeuring aangeboden" + (f": {f.get('note').strip()}" if (f.get("note") or "").strip() else ""), uid)
             conn.commit()
             _notify_many(conn, appr, f"Factuur {s['number']} goedkeuren", f"{s['cname'] or s['customer_name'] or ''} · {g.user['name']} vraagt om goedkeuring.",
-                         f"/debiteuren/{sid}/verzenden", skip=uid if others else None)
+                         f"/debiteuren/{sid}/verzenden")
             flash("Ter goedkeuring aangeboden; de controleurs hebben een melding gekregen.", "ok")
         elif act == "terugtrekken":
             if s["send_state"] != "goedkeuren" or not (may_edit and (uid == s["send_prepared_by"] or may_approve)):

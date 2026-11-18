@@ -59,7 +59,7 @@
         <label class="f">Wat moet er anders?<input type="text" name="note"></label>
         <div class="actions"><button class="btn sm" name="action" value="afkeuren">Terugsturen naar {{ prep_name or 'de opsteller' }}</button></div></details>
       {% else %}
-      <p class="hint">Wacht op goedkeuring door {{ appr_names|join(' of ') }}.{% if is_appr %} Je hebt deze factuur zelf klaargezet; een andere controleur keurt hem goed.{% endif %}</p>
+      <p class="hint">Wacht op goedkeuring door {{ appr_names|join(' of ') }}.</p>
       {% if may_edit %}<div class="actions"><button class="btn ghost sm" name="action" value="terugtrekken">Terugtrekken (weer aanpassen)</button></div>{% endif %}
       {% endif %}
     {% elif st == 'verzonden' %}<p class="hint">Verzonden op {{ s.sent_at|dt }}.</p>{% endif %}

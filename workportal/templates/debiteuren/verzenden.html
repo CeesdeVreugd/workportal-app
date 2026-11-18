@@ -32,7 +32,7 @@
         <p class="hint">{% if not prep_set %}Niets aangevinkt: iedereen met de rol administratie{% if prep %} ({{ users|selectattr('id', 'in', prep)|map(attribute='name')|join(', ') }}){% endif %}.{% endif %}</p></fieldset>
       <fieldset style="border:0;padding:0;margin:0"><legend class="small" style="font-weight:600;margin-bottom:6px">Goedkeuren (controle) · daarna wordt de factuur verzonden</legend>
         {% for u in users %}<label class="check"><input type="checkbox" name="appr" value="{{ u.id }}" {{ 'checked' if u.id in appr }}> {{ u.name }}</label>{% endfor %}
-        <p class="hint">{% if not appr %}<b>Nog niemand:</b> zonder controleurs kan wie klaarzet de factuur direct verzenden.{% else %}Wie een factuur klaarzet, kan hem niet zelf goedkeuren (tenzij er geen andere controleur is).{% endif %}</p></fieldset>
+        <p class="hint">{% if not appr %}<b>Nog niemand:</b> zonder controleurs kan wie klaarzet de factuur direct verzenden.{% else %}Alle aangevinkte controleurs krijgen een melding en kunnen goedkeuren.{% endif %}</p></fieldset>
     </div>
     <label class="f" style="margin-top:12px">Altijd in CC<input type="text" name="fixed_cc" value="{{ fixed_cc }}"><span class="hint">Gaat bij elke verzonden factuur mee in CC. Meerdere adressen scheiden met een komma.</span></label>
     <div class="actions"><button class="btn primary">Opslaan</button></div>
