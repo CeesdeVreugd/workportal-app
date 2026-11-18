@@ -614,7 +614,7 @@ def project_folder(pid):
     return render_template(tpl, K=k, B=BP_OF_KIND[p["kind"]], p=p, items=items, rel=rel, crumbs=crumbs, error=error,
                            photo_mode=photo_mode, can_print=_can_print(), print_opts=_print_opts(),
                            folder_name=sp.folder_name(p["number"], p["sp_name"] or p["name"], p["kind"]),
-                           can_upload=_can_upload(p), cert_root=_cert_root(rel))
+                           can_upload=_can_upload(p), cert_root=_cert_root(rel), mail_kind=mail_kind)
 
 
 # Fotomappen: '4 ...' t/m '8 ...' in de projectmap. Foto's als raster met groot beeld, en direct een foto maken.
@@ -799,7 +799,22 @@ def project_folder_upload(pid):
     return jsonify({"ok": True, "saved": saved})
 
 
-CERT_RE = re.compile(r"certifica", re.I)
+CERT_RE = re.compile(r"certifica|machine[\s_-]*veilighe", re.I)
+# Mappen in de projectmap waaruit je bestanden kunt mailen (aanvinken, tekst, naar de contactpersoon)
+MAIL_KINDS = [
+    (re.compile(r"machine[\s_-]*veilighe", re.I), {"title": "Machineveiligheidsdocumenten", "what": "machineveiligheidsdocumenten",
+                                                  "subject": "Machineveiligheidsdocumenten", "note": "Machineveiligheidsdocumenten gemaild"}),
+    (re.compile(r"certifica", re.I), {"title": "Certificaten", "what": "certificaten", "subject": "Certificaten", "note": "Certificaten gemaild"}),
+]
+
+
+def mail_kind(path):
+    """Soort mailbare map (dict) voor een pad of mapnaam, anders None."""
+    for part in reversed([x for x in (path or "").split("/") if x]):
+        for rx, info in MAIL_KINDS:
+            if rx.search(part):
+                return info
+    return None
 
 
 def _cert_root(rel):
@@ -853,6 +868,7 @@ def certificates_mail(pid):
     except ValueError:
         abort(400)
     root = _cert_root(rel) or rel
+    mk = mail_kind(root) or MAIL_KINDS[-1][1]
     conn = get_db()
     try:
         files = sp.list_files_deep(conn, pid, root)
@@ -877,10 +893,10 @@ def certificates_mail(pid):
         body = (request.form.get("body") or "").strip()
         bad = [a for a in to + cc if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a)]
         if not chosen or not to or bad or not subject:
-            flash("Vink minstens één certificaat aan en vul een geldig e-mailadres en onderwerp in."
+            flash("Vink minstens één bestand aan en vul een geldig e-mailadres en onderwerp in."
                   + (f" Ongeldig: {', '.join(bad)}" if bad else ""), "error")
             return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
-                                   chosen=set(chosen), sender=sender, contacts=contacts)
+                                   chosen=set(chosen), sender=sender, contacts=contacts, mk=mk)
         atts, total = [], 0
         for path in chosen:
             meta, r = sp.open_file(conn, pid, path)
@@ -890,26 +906,26 @@ def certificates_mail(pid):
         if total > 30 * 1024 * 1024:
             flash(f"De bijlagen zijn samen {total / 1048576:.0f} MB; dat is te groot voor één mail (max. ±30 MB). Verstuur ze in delen.", "error")
             return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
-                                   chosen=set(chosen), sender=sender, contacts=contacts)
+                                   chosen=set(chosen), sender=sender, contacts=contacts, mk=mk)
         from .mail import send_mail_with_files
         ok, err = send_mail_with_files(sender, to, subject, body, atts, cc=cc or None, signer="werkvoorbereiding")
         if not ok:
             flash(f"Versturen mislukt: {err}", "error")
             return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=request.form,
-                                   chosen=set(chosen), sender=sender, contacts=contacts)
+                                   chosen=set(chosen), sender=sender, contacts=contacts, mk=mk)
         names = [a[0] for a in atts]
         execute("INSERT INTO project_notes (date, kind, contact, body, project_id, created_by, created_at) VALUES (?,?,?,?,?,?,?)",
-                (now_iso()[:10], "mail", ", ".join(to), f"Certificaten gemaild: {', '.join(names)}" + (f"\n\n{body}" if body else ""),
+                (now_iso()[:10], "mail", ", ".join(to), f"{mk['note']}: {', '.join(names)}" + (f"\n\n{body}" if body else ""),
                  pid, g.user["id"], now_iso()))
-        audit("certificaten gemaild", "project", pid, f"aan {', '.join(to)}: {', '.join(names)}"[:300])
-        flash(f"{len(names)} certificaat/certificaten gemaild aan {', '.join(to)}.", "ok")
+        audit(mk["note"].lower(), "project", pid, f"aan {', '.join(to)}: {', '.join(names)}"[:300])
+        flash(f"{len(names)} bestand{'en' if len(names) != 1 else ''} gemaild aan {', '.join(to)}.", "ok")
         return redirect(url_for(B + ".project_folder", pid=pid, pad=rel or None))
     form = {"to": _contact_email(p), "cc_me": "1",
-            "subject": f"Certificaten {label} {p['number']} – {p['name']}",
-            "body": (f"Beste {p['contact_name'] or 'relatie'},\n\nBijgaand ontvangt u de certificaten voor {label} {p['number']}"
+            "subject": f"{mk['subject']} {label} {p['number']} – {p['name']}",
+            "body": (f"Beste {p['contact_name'] or 'relatie'},\n\nBijgaand ontvangt u de {mk['what']} voor {label} {p['number']}"
                      f" ({p['name']}).\n\nHeeft u vragen, neem dan gerust contact met ons op.")}
     return render_template("werk/certificaten.html", K=k, B=B, p=p, files=files, root=root, rel=rel, form=form,
-                           chosen={f["path"] for f in files}, sender=sender, contacts=contacts)
+                           chosen={f["path"] for f in files}, sender=sender, contacts=contacts, mk=mk)
 
 
 @bp.route("/<int:pid>/bestand")

@@ -1020,6 +1020,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V223 (2.22.3)
+- Projectmap: bestanden uit de map met "Machineveiligheid" in de naam (bijv. 3 Documenten/2 Machineveiligheids documenten) mailen, net als certificaten: knop "Mailen" bij de map en "Machineveiligheidsdocumenten mailen" in de map; aanvinken, tekst aanpassen, naar de contactpersoon; vastgelegd bij de gespreksnotities.
+- Debiteuren: antwoorden op herinneringen blijven in Postvak IN van administratie@ (niet meer naar de servicemap "03 - WorkPortal"). Eenmalig worden antwoorden die al verplaatst waren teruggezet naar Postvak IN. Instelling deb_reply_folder (leeg = laten staan).
+
 ## V222 (2.22.2)
 - Opleverdocumenten (afnamedocumenten) gaan in SharePoint naar `3 Documenten/3 Opleverdocumten - restpuntenlijsten e.d` (de bestaande map die met "3" begint; anders wordt hij aangemaakt). Een kopie die los in 3 Documenten staat wordt opgeruimd.
 - Eenmalig bij de start: bestaande opleverdocumenten die los in 3 Documenten staan worden naar die map verplaatst (instelling oplev_sp_moved).

@@ -1556,7 +1556,8 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     own = box.rpartition("@")[2]
     url = (f"https://graph.microsoft.com/v1.0/users/{box}/messages?$filter=receivedDateTime ge {since}"
            f"&$select=id,subject,from,receivedDateTime,hasAttachments,conversationId,parentFolderId,internetMessageId&$orderby=receivedDateTime asc&$top=50")
-    folder, mcache = svc_folder(conn), {}
+    # antwoorden blijven in Postvak IN van de afzender (administratie@); alleen verplaatsen als deb_reply_folder is ingesteld
+    folder, mcache = (_setting("deb_reply_folder", conn) or "").strip(), {}
     n, newest, pages = 0, since, 0
     while url and pages < 10:
         pages += 1
@@ -1633,6 +1634,32 @@ def poll_replies(conn, upload_dir, lookback_days=None):
     return n
 
 
+def _restore_inbox(conn):
+    """Eenmalig: antwoorden die eerder naar de servicemap (03 - WorkPortal) zijn verplaatst terug naar Postvak IN."""
+    if _setting("deb_inbox_restored", conn) == "1" or (_setting("deb_reply_folder", conn) or "").strip():
+        return
+    from .mail import graph_wellknown_id, graph_move
+    box = sender(conn)
+    inbox = graph_wellknown_id(box, "inbox")
+    if not inbox:
+        return
+    for m in conn.execute("SELECT id, mail_meta FROM dunning_messages WHERE kind = 'mail_in' AND mail_meta LIKE '%\"folder\"%'").fetchall():
+        meta = json.loads(m["mail_meta"] or "{}")
+        if not meta.get("folder") or not meta.get("msg_id"):
+            continue
+        try:
+            newid = graph_move(box, meta["msg_id"], inbox)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WorkPortal] Antwoord herinnering terugzetten: {exc}", flush=True)
+            continue
+        meta.pop("folder", None)
+        if newid:
+            meta["msg_id"] = newid
+        conn.execute("UPDATE dunning_messages SET mail_meta = ? WHERE id = ?", (json.dumps(meta, ensure_ascii=False), m["id"]))
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_inbox_restored', '1')")
+    conn.commit()
+
+
 def scheduled_replies(conn, app, state):
     """Elke 5 minuten (als er de laatste 6 maanden herinneringen zijn verstuurd) de mailbox op antwoorden controleren."""
     from .mail import graph_configured
@@ -1643,6 +1670,7 @@ def scheduled_replies(conn, app, state):
     if not conn.execute("SELECT 1 FROM dunning_letters WHERE status = 'verstuurd' AND sent_at > datetime('now', '-180 days')").fetchone():
         return
     try:
+        _restore_inbox(conn)
         poll_replies(conn, app.config["UPLOAD_DIR"])
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_mail_error', '')")
     except Exception as exc:  # noqa: BLE001

@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
-{% block title %}Certificaten mailen · {{ p.number }}{% endblock %}
+{% block title %}{{ mk.title }} mailen · {{ p.number }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=rel or None) }}">{{ K.label }}map</a> / Certificaten mailen</div>
-<div class="pagehead"><div><div class="eyebrow">{{ root }}</div><h1>Certificaten mailen</h1><p>{{ p.number }} · {{ p.name }}</p></div></div>
+<div class="crumbs"><a href="{{ url_for(B ~ '.index') }}">{{ K.plural }}</a> / <a href="{{ url_for(B ~ '.detail', pid=p.id) }}">{{ p.number }}</a> / <a href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=rel or None) }}">{{ K.label }}map</a> / {{ mk.title }} mailen</div>
+<div class="pagehead"><div><div class="eyebrow">{{ root }}</div><h1>{{ mk.title }} mailen</h1><p>{{ p.number }} · {{ p.name }}</p></div></div>
 <form method="post" class="grid g2 stack" style="align-items:start">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="pad" value="{{ rel }}">
   <section class="card">
-    <div class="card-head"><h2>Welke certificaten?</h2>
+    <div class="card-head"><h2>Welke {{ mk.what }}?</h2>
       {% if files %}<span class="small"><a href="#" onclick="document.querySelectorAll('.certlist input').forEach(function(c){c.checked=true});return false">Alles</a> · <a href="#" onclick="document.querySelectorAll('.certlist input').forEach(function(c){c.checked=false});return false">Niets</a></span>{% endif %}</div>
     <div class="certlist">
       {% set ns = namespace(sub=None) %}
