@@ -965,6 +965,26 @@ MIGRATIONS = [
         UNIQUE(supplier_id, field)
     );
     """,
+    # 54 - verkoopfacturen: nieuwe facturen klaarzetten, laten goedkeuren en verzenden
+    """
+    ALTER TABLE sales_invoices ADD COLUMN send_state TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_to TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_cc TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_subject TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_body TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_prepared_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE sales_invoices ADD COLUMN send_prepared_at TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE sales_invoices ADD COLUMN send_approved_at TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_note TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN sent_at TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN send_log TEXT;
+    CREATE INDEX idx_sales_inv_send ON sales_invoices(send_state);
+    INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_since', strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 day'));
+    UPDATE sales_invoices SET send_state = 'klaarzetten'
+     WHERE created_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 day') AND pdf_file_id IS NOT NULL
+       AND IFNULL(status, 'onbekend') <> 'betaald' AND (invoice_date IS NULL OR invoice_date >= date('now', '-14 days'));
+    """,
 ]
 
 

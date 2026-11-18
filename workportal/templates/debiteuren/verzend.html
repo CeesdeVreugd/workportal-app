@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Factuur {{ s.number }} verzenden{% endblock %}
+{% block content %}
+{% set pdf_url = url_for('main.file', fid=s.pdf_file_id) if s.pdf_file_id else None %}
+{% set st = s.send_state %}
+{% set editable = (st == 'klaarzetten' and may_edit) or (st == 'goedkeuren' and may_approve) %}
+<div class="pagehead">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('debiteuren.sending') }}">{{ icon('back') }}Nieuwe facturen</a> · <a href="{{ url_for('debiteuren.detail', sid=s.id) }}">factuurkaart</a></div>
+    <h1>{{ s.cname or s.customer_name or 'Klant onbekend' }} · {{ s.number }}</h1>
+    <p>{% set bits = [] %}{% if s.invoice_date %}{% set _ = bits.append('factuurdatum ' ~ s.invoice_date|date) %}{% endif %}{% if s.amount is not none %}{% set _ = bits.append(s.amount|eur(2)) %}{% endif %}{% if s.order_no %}{% set _ = bits.append('ref. ' ~ s.order_no) %}{% endif %}{{ bits|join(' · ') }}</p>
+  </div>
+  <div class="actions"><span class="stchips row"><span class="stchip lg" style="--c:{{ '#1E7A3C' if st == 'verzonden' else ('#E0A800' if st == 'goedkeuren' else '#0080FF') }}">{{ SEND_STATES[st] }}</span></span></div>
+</div>
+<div class="card cred-flow lin" aria-label="Voortgang">
+  <span class="cf-node done"><b>{{ icon('check') }}</b>Uit DigiDossier</span><i class="cf-line {{ 'on' if st != 'klaarzetten' }}"></i>
+  <span class="cf-node {{ 'done' if st != 'klaarzetten' else 'todo' }}"><b>{% if st != 'klaarzetten' %}{{ icon('check') }}{% else %}2{% endif %}</b>Klaarzetten{% if prep_name and st != 'klaarzetten' %} · {{ prep_name }}{% endif %}</span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
+  <span class="cf-node {{ 'done' if st == 'verzonden' else ('todo' if st == 'goedkeuren' else 'off') }}"><b>{% if st == 'verzonden' %}{{ icon('check') }}{% else %}3{% endif %}</b>Goedkeuren{% if appr_names %} ({{ appr_names|join(', ') }}){% endif %}</span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
+  <span class="cf-node {{ 'done' if st == 'verzonden' else 'off' }}"><b>{% if st == 'verzonden' %}{{ icon('check') }}{% else %}4{% endif %}</b>{% if st == 'verzonden' %}Verzonden {{ s.sent_at|dt('%d-%m %H:%M') }}{% else %}Verzenden{% endif %}</span>
+</div>
+{% if s.send_note and st == 'klaarzetten' %}<div class="alertbox" style="margin-bottom:12px;display:block"><b>Teruggestuurd:</b> {{ s.send_note }}</div>{% endif %}
+<div class="grid g2 stack cred-grid">
+  <section class="card cred-pdf">
+    <div class="card-head"><h2>Factuur (PDF)</h2>{% if pdf_url %}<div class="small"><a href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel='Factuur ' ~ s.number) }}">Openen</a></div>{% endif %}</div>
+    {% if pdf_url %}<iframe src="{{ pdf_url }}#view=FitH" title="Factuur" class="hide-m"></iframe>
+    <a class="btn show-m" href="{{ url_for('main.pdfview', src=pdf_url, terug=request.path, titel='Factuur ' ~ s.number) }}">{{ icon('pdf') }}Factuur bekijken</a>
+    {% else %}<div class="empty">Nog geen PDF uit het DigiDossier.</div>{% endif %}
+  </section>
+  <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+  <form method="post" enctype="multipart/form-data" class="card form" data-no-draft>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="card-head"><h2>Mail aan de klant</h2><span class="small muted">van {{ sender }}</span></div>
+    <fieldset {{ 'disabled' if not editable }} style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:12px">
+    <label class="f">Aan *<input type="text" name="to" value="{{ s.send_to or '' }}" placeholder="factuur@klant.nl">
+      <span class="hint">{% if s.invoice_email %}Factuur-e-mail van de relatie.{% elif s.send_to %}Uit de factuur of van de contactpersoon.{% else %}Geen factuur-e-mail bekend bij de relatie.{% endif %} Meerdere adressen scheiden met een komma.</span></label>
+    {% if s.customer_id and not s.invoice_email %}<label class="check"><input type="checkbox" name="save_to_customer" value="1" checked> Dit adres opslaan als factuur-e-mail van de relatie</label>{% endif %}
+    <label class="f">CC<input type="text" name="cc" value="{{ s.send_cc or '' }}"></label>
+    <label class="f">Onderwerp *<input type="text" name="subject" value="{{ s.send_subject or '' }}"></label>
+    <label class="f">Tekst<textarea name="body" rows="9">{{ s.send_body or '' }}</textarea></label>
+    <div class="f"><span>Bijlagen</span>
+      <div class="small">{{ icon('pdf') }} Factuur_{{ s.number }}.pdf</div>
+      {% for x in extras %}<div class="small">{{ icon('file') }} <a href="{{ url_for('main.file', fid=x.id) }}" target="_blank" rel="noopener">{{ x.filename }}</a>
+        {% if editable %}<button class="linkbtn" name="action" value="bijlage_weg" formnovalidate onclick="this.form.fid.value='{{ x.id }}'">verwijderen</button>{% endif %}</div>{% endfor %}
+      <input type="hidden" name="fid" value="">
+      {% if editable %}<input type="file" name="extra" multiple style="margin-top:6px"><span class="hint" style="display:block">Bijv. een werkbon of urenstaat; wordt bij Opslaan toegevoegd.</span>{% endif %}</div>
+    </fieldset>
+    {% if st == 'klaarzetten' and may_edit %}
+      <label class="f">Opmerking voor de controleur<input type="text" name="note" placeholder="optioneel"></label>
+      <div class="actions"><button class="btn" name="action" value="opslaan">Opslaan</button>
+        {% if appr %}<button class="btn primary" name="action" value="aanbieden">{{ icon('check') }}Ter goedkeuring aanbieden</button>
+        {% else %}<button class="btn primary" name="action" value="verzenden" data-confirm="Factuur {{ s.number }} nu verzenden?">{{ icon('mail') }}Verzenden</button>{% endif %}</div>
+      {% if not appr %}<p class="hint">Er zijn nog geen controleurs ingesteld (Nieuwe facturen › Instellingen), daarom kan de factuur direct verzonden worden.</p>{% endif %}
+    {% elif st == 'goedkeuren' %}
+      {% if may_approve %}
+      <div class="actions"><button class="btn primary" name="action" value="goedkeuren" data-confirm="Factuur {{ s.number }} goedkeuren en verzenden aan de klant?">{{ icon('check') }}Goedkeuren en verzenden</button>
+        <button class="btn" name="action" value="opslaan">Opslaan</button></div>
+      <details class="cred-pop"><summary class="btn ghost sm">Terugsturen</summary>
+        <label class="f">Wat moet er anders?<input type="text" name="note"></label>
+        <div class="actions"><button class="btn sm" name="action" value="afkeuren">Terugsturen naar {{ prep_name or 'de opsteller' }}</button></div></details>
+      {% else %}
+      <p class="hint">Wacht op goedkeuring door {{ appr_names|join(' of ') }}.{% if is_appr %} Je hebt deze factuur zelf klaargezet; een andere controleur keurt hem goed.{% endif %}</p>
+      {% if may_edit %}<div class="actions"><button class="btn ghost sm" name="action" value="terugtrekken">Terugtrekken (weer aanpassen)</button></div>{% endif %}
+      {% endif %}
+    {% elif st == 'verzonden' %}<p class="hint">Verzonden op {{ s.sent_at|dt }}.</p>{% endif %}
+  </form>
+  <section class="card"><div class="card-head"><h2>Verloop</h2></div>
+    <div class="small">{% for l in log|reverse %}<div style="padding:4px 0;border-bottom:1px solid var(--line-2)"><span class="muted">{{ l.at|dt('%d-%m %H:%M') }} · {{ l.who }}</span><br>{{ l.text }}</div>{% else %}<span class="muted">Nog niets.</span>{% endfor %}</div>
+  </section>
+  </div>
+</div>
+{% endblock %}

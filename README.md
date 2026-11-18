@@ -1020,6 +1020,15 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V226 (2.23.0)
+- Verkoopfacturen › nieuw tabblad **Nieuwe facturen**. Een nieuwe factuur uit het DigiDossier (factuurdatum niet ouder dan 30 dagen) komt op *Klaar te zetten*; de klaarzetters krijgen een melding. Zij vullen ontvanger (factuur-e-mail van de relatie, uit de factuur of de contactpersoon), CC, onderwerp en tekst aan (NL/EN/DE/FR), kunnen extra bijlagen toevoegen en bieden de factuur *ter goedkeuring* aan.
+- De controleurs krijgen een melding en kiezen **Goedkeuren en verzenden** (mail vanaf administratie@ met de factuur-PDF en bijlagen) of **Terugsturen** met een reden. Vier ogen: wie klaarzet keurt niet zelf goed, tenzij er geen andere controleur is. Zonder controleurs kan direct verzonden worden.
+- Instellingen (beheer debiteuren) op het tabblad: wie klaarzet (leeg = rol administratie) en wie goedkeurt.
+- Factuurkaart: blok "Verzenden aan de klant" (stand, of met de hand *Klaarzetten om te verzenden*). Verloop per factuur zichtbaar.
+- Een factuur die nog niet is verzonden komt niet in een herinnering.
+- Tabbladen: Facturen | Nieuwe facturen | Herinneringen versturen | Verstuurde herinneringen. Menu: blauwe teller voor klaar te zetten/goed te keuren.
+- Database: migratie 54 (verzendvelden); facturen die het afgelopen etmaal binnenkwamen (met PDF, factuurdatum ≤ 14 dagen oud) staan meteen op Klaar te zetten.
+
 ## V225 (2.22.5)
 - Menu (desktop): de rode tellers staan altijd rechts uitgelijnd en schuiven niet meer over de tekst (bijv. Inkoopfacturen 107); te lange menunamen worden afgekapt met …
 

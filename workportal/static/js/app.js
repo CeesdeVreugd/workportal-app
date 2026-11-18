@@ -45,7 +45,7 @@
 
   // Bevestigen
   document.addEventListener("submit", function (e) {
-    var msg = e.target.getAttribute("data-confirm");
+    var msg = (e.submitter && e.submitter.getAttribute("data-confirm")) || e.target.getAttribute("data-confirm");
     if (msg && !window.confirm(msg)) { e.preventDefault(); return; }
     var btn = e.target.querySelector("button[type=submit],button:not([type])");
     if (btn && !e.target.hasAttribute("data-no-disable")) { setTimeout(function () { btn.disabled = true; }, 0); }

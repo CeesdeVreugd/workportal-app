@@ -1,7 +1,8 @@
-{% macro deb_tabs(active) %}{% set nd = dun_count() %}
+{% macro deb_tabs(active) %}{% set nd = dun_count() %}{% set ns = deb_send_count() %}
 <nav class="tabs" style="margin-bottom:16px" aria-label="Verkoopfacturen">
   <a href="{{ url_for('debiteuren.index') }}" class="{{ 'active' if active == 'facturen' }}">Facturen</a>
-  <a href="{{ url_for('debiteuren.dunning') }}" class="{{ 'active' if active == 'voorstellen' }}">Te versturen{% if nd %} <span class="navbadge" style="position:static;margin-left:4px">{{ nd }}</span>{% endif %}</a>
-  <a href="{{ url_for('debiteuren.letters') }}" class="{{ 'active' if active == 'herinneringen' }}">Herinneringen</a>
+  <a href="{{ url_for('debiteuren.sending') }}" class="{{ 'active' if active == 'verzenden' }}">Nieuwe facturen{% if ns %} <span class="navbadge" style="position:static;margin-left:4px;background:var(--accent,#0080FF)">{{ ns }}</span>{% endif %}</a>
+  <a href="{{ url_for('debiteuren.dunning') }}" class="{{ 'active' if active == 'voorstellen' }}">Herinneringen versturen{% if nd %} <span class="navbadge" style="position:static;margin-left:4px">{{ nd }}</span>{% endif %}</a>
+  <a href="{{ url_for('debiteuren.letters') }}" class="{{ 'active' if active == 'herinneringen' }}">Verstuurde herinneringen</a>
 </nav>
 {% endmacro %}

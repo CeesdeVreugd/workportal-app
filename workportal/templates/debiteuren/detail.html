@@ -59,6 +59,14 @@
   </dl>
   {% if s.status == 'onbekend' %}<p class="hint">Deze factuur staat in het DigiDossier, maar is nog niet gezien in een overzicht met openstaande posten. Na de volgende import of SnelStart-ronde staat hij op open of betaald.</p>{% endif %}
     </section>
+<section class="card" id="verzenden">
+  <div class="card-head"><h2>Verzenden aan de klant</h2></div>
+  {% if s.send_state %}<p class="small" style="margin:0 0 8px">{% if s.send_state == 'verzonden' %}Verzonden op {{ s.sent_at|dt }} aan {{ s.send_to }}.{% elif s.send_state == 'goedkeuren' %}Wacht op goedkeuring.{% else %}Klaar te zetten.{% endif %}</p>
+    <a class="btn sm" href="{{ url_for('debiteuren.send_one', sid=s.id) }}">{{ icon('mail') }}{{ 'Bekijken' if s.send_state == 'verzonden' else 'Openen' }}</a>
+  {% elif can('debiteuren', 2) %}<p class="small muted" style="margin:0 0 8px">Deze factuur is niet via WorkPortal verzonden.</p>
+    <form method="post" action="{{ url_for('debiteuren.send_one', sid=s.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="action" value="start">{{ icon('mail') }}Klaarzetten om te verzenden</button></form>
+  {% else %}<p class="small muted" style="margin:0">Niet via WorkPortal verzonden.</p>{% endif %}
+</section>
 {% if s.status == 'open' or letters %}
 <section class="card" id="aanmanen">
   <div class="card-head"><div><h2>Herinneren en aanmanen</h2>

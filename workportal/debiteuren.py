@@ -513,6 +513,11 @@ def _pdf(js):
             pass
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_dc01_lastpdf', ?)", (f"{now_iso()}|{inv['number']}",))
     conn.commit()
+    try:
+        maybe_new(conn, inv)
+    except Exception:  # noqa: BLE001 - melding is bijzaak
+        import traceback
+        traceback.print_exc()
     return jsonify({"ok": True, "resultaat": f"Factuur {inv['number']} opgeslagen"})
 
 
@@ -950,6 +955,8 @@ def _dunnable(inv, today=None):
     """Mag deze factuur in een herinnering? (open, vervallen, niet uitgesteld, niet 'niet aanmanen')"""
     today = today or _today().isoformat()
     if inv["status"] != "open" or inv["no_dunning"] or (inv["open_amount"] is not None and inv["open_amount"] <= 0.004):
+        return False
+    if inv["send_state"] in ("klaarzetten", "goedkeuren"):   # nog niet naar de klant verstuurd
         return False
     if inv["postpone_until"] and inv["postpone_until"] > today:
         return False
@@ -1809,3 +1816,304 @@ def letters():
             continue
         out.append(d)
     return render_template("debiteuren/herinneringen.html", rows=out, q=q, flt=flt, LEVELS=LEVELS)
+
+
+# ---------------------------------------------------------------- nieuwe facturen: klaarzetten, goedkeuren, verzenden
+# Een nieuwe factuur uit het DigiDossier komt op 'klaarzetten': wie dat doet (instelling) krijgt een melding, vult
+# ontvanger en tekst aan en biedt hem ter goedkeuring aan. De controleurs (instelling) krijgen een melding en keuren
+# goed (= meteen verzenden) of sturen hem terug met een reden.
+
+SEND_STATES = {"klaarzetten": "Klaar te zetten", "goedkeuren": "Wacht op goedkeuring", "verzonden": "Verzonden"}
+INV_MAIL = {
+    "nl": ("Factuur {nr}", "Geachte heer/mevrouw,\n\nIn de bijlage vindt u factuur {nr}{ref}. Wij verzoeken u vriendelijk het bedrag van {amount}"
+                            " vóór {due} over te maken op {iban} onder vermelding van het factuurnummer.\n\nHeeft u vragen over deze factuur,"
+                            " neem dan gerust contact met ons op."),
+    "en": ("Invoice {nr}", "Dear Sir/Madam,\n\nPlease find attached invoice {nr}{ref}. We kindly ask you to transfer the amount of {amount}"
+                           " before {due} to {iban}, stating the invoice number.\n\nIf you have any questions about this invoice, please do not"
+                           " hesitate to contact us."),
+    "de": ("Rechnung {nr}", "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung {nr}{ref}. Bitte überweisen Sie den Betrag von"
+                            " {amount} bis zum {due} auf {iban} unter Angabe der Rechnungsnummer.\n\nBei Fragen zu dieser Rechnung stehen wir"
+                            " Ihnen gerne zur Verfügung."),
+    "fr": ("Facture {nr}", "Madame, Monsieur,\n\nVeuillez trouver ci-joint la facture {nr}{ref}. Nous vous prions de bien vouloir virer le"
+                           " montant de {amount} avant le {due} sur {iban} en mentionnant le numéro de facture.\n\nPour toute question"
+                           " concernant cette facture, n'hésitez pas à nous contacter."),
+}
+INV_REF = {"nl": " (uw order {o})", "en": " (your order {o})", "de": " (Ihre Bestellung {o})", "fr": " (votre commande {o})"}
+
+
+def _user_list(key, conn=None):
+    try:
+        return [int(x) for x in json.loads(_setting(key, conn) or "[]")]
+    except (ValueError, TypeError):
+        return []
+
+
+def preparers(conn=None):
+    """Wie nieuwe facturen klaarzet (melding bij binnenkomst). Niet ingesteld: iedereen met de rol administratie."""
+    ids = _user_list("deb_send_preparers", conn)
+    if ids:
+        return ids
+    sql = ("SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id"
+           " WHERE u.active = 1 AND r.key = 'administratie'")
+    return [r[0] for r in (conn.execute(sql).fetchall() if conn is not None else query(sql))]
+
+
+def approvers(conn=None):
+    return _user_list("deb_send_approvers", conn)
+
+
+def _send_log(conn, sid, text, uid=None):
+    r = conn.execute("SELECT send_log FROM sales_invoices WHERE id = ?", (sid,)).fetchone()
+    try:
+        log = json.loads(r["send_log"] or "[]") if r else []
+    except ValueError:
+        log = []
+    who = conn.execute("SELECT name FROM users WHERE id = ?", (uid,)).fetchone() if uid else None
+    log.append({"at": now_iso(), "who": who["name"] if who else "WorkPortal", "text": text})
+    conn.execute("UPDATE sales_invoices SET send_log = ? WHERE id = ?", (json.dumps(log[-50:], ensure_ascii=False), sid))
+
+
+def _send_defaults(conn, inv):
+    """Ontvanger, onderwerp en tekst voor een nieuwe factuur."""
+    c = conn.execute("SELECT * FROM customers WHERE id = ?", (inv["customer_id"],)).fetchone() if inv["customer_id"] else None
+    to = (c["invoice_email"] if c and c["invoice_email"] else None) or inv["mail_to"] or ""
+    if not to and inv["project_id"]:
+        p = conn.execute("SELECT * FROM projects WHERE id = ?", (inv["project_id"],)).fetchone()
+        if p:
+            try:
+                from .werk import _contact_email
+                to = _contact_email(p, inv["attn"]) or ""
+            except Exception:  # noqa: BLE001
+                to = ""
+    lang = _lang_of(conn, inv["customer_id"])
+    subj, body = INV_MAIL.get(lang) or INV_MAIL["nl"]
+    due = _d(inv["due_date"])
+    v = {"nr": inv["number"], "amount": _eur(inv["amount"] or 0) if inv["amount"] is not None else "het factuurbedrag",
+         "due": date.fromisoformat(due).strftime("%d-%m-%Y") if due else "de vervaldatum", "iban": IBAN,
+         "ref": INV_REF.get(lang, INV_REF["nl"]).format(o=inv["order_no"]) if inv["order_no"] else ""}
+    return to, subj.format(**v), body.format(**v)
+
+
+def _notify_many(conn, ids, title, body, url, skip=None):
+    from .notify import notify_user
+    for uid in ids:
+        if uid == skip:
+            continue
+        try:
+            notify_user(conn, uid, title, body, url=url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WorkPortal] Melding factuur verzenden: {exc}", flush=True)
+
+
+def start_sending(conn, sid, uid=None, notify=True):
+    """Factuur op 'klaarzetten' zetten (nieuw uit het DigiDossier, of met de hand) en de klaarzetters een melding sturen."""
+    inv = conn.execute("SELECT * FROM sales_invoices WHERE id = ?", (sid,)).fetchone()
+    if not inv or inv["send_state"]:
+        return False
+    to, subj, body = _send_defaults(conn, inv)
+    conn.execute("UPDATE sales_invoices SET send_state = 'klaarzetten', send_to = ?, send_subject = ?, send_body = ?, updated_at = ? WHERE id = ?",
+                 (to, subj, body, now_iso(), sid))
+    _send_log(conn, sid, "Klaar te zetten voor verzenden" + (" (met de hand)" if uid else " (nieuw uit het DigiDossier)"), uid)
+    conn.commit()
+    if notify:
+        cname = inv["customer_name"] or "klant onbekend"
+        _notify_many(conn, preparers(conn), f"Nieuwe factuur {inv['number']} klaarzetten",
+                     f"{cname}: leg de laatste hand aan de mail en bied hem ter goedkeuring aan.", f"/debiteuren/{sid}/verzenden", skip=uid)
+    return True
+
+
+def maybe_new(conn, inv):
+    """Na het opslaan van de PDF: is dit een nieuwe factuur (na de start van deze functie), dan klaarzetten."""
+    since = _setting("deb_send_since", conn)
+    if not since or inv["send_state"] or (inv["created_at"] or "") < since:
+        return
+    r = conn.execute("SELECT status, invoice_date FROM sales_invoices WHERE id = ?", (inv["id"],)).fetchone()
+    if r["status"] == "betaald" or (r["invoice_date"] and r["invoice_date"] < (_today() - timedelta(days=30)).isoformat()):
+        return   # oude factuur die nu pas is opgehaald
+    start_sending(conn, inv["id"])
+
+
+def send_count():
+    if "_deb_send" not in g:
+        if not can("debiteuren"):
+            g._deb_send = 0
+        else:
+            uid = g.user["id"]
+            n = 0
+            if uid in preparers() or can("debiteuren", BEHEER):
+                n += query("SELECT COUNT(*) c FROM sales_invoices WHERE send_state = 'klaarzetten'", one=True)["c"]
+            if uid in approvers():
+                n += query("SELECT COUNT(*) c FROM sales_invoices WHERE send_state = 'goedkeuren'", one=True)["c"]
+            g._deb_send = n
+    return g._deb_send
+
+
+def _addr_list(v):
+    return [a.strip() for a in re.split(r"[;,\s]+", v or "") if a.strip()]
+
+
+_EMAIL = re.compile(r"^[^@\s;,]+@[^@\s;,]+\.[^@\s;,]+$")
+
+
+@bp.route("/verzenden", methods=["GET", "POST"])
+@require("debiteuren")
+def sending():
+    conn = get_db()
+    if request.method == "POST" and request.form.get("action") == "instellingen":
+        if not can("debiteuren", BEHEER):
+            abort(403)
+        valid = {r["id"] for r in query("SELECT id FROM users WHERE active = 1")}
+        prep = sorted({int(x) for x in request.form.getlist("prep") if x.isdigit() and int(x) in valid})
+        appr = sorted({int(x) for x in request.form.getlist("appr") if x.isdigit() and int(x) in valid})
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_preparers', ?)", (json.dumps(prep),))
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_approvers', ?)", (json.dumps(appr),))
+        conn.commit()
+        names = lambda ids: ", ".join(r["name"] for r in query(f"SELECT name FROM users WHERE id IN ({','.join('?' * len(ids)) or 'NULL'})", ids)) or "–"  # noqa: E731
+        audit("instellingen", "debiteuren", None, f"facturen klaarzetten: {names(prep)}; goedkeuren: {names(appr)}")
+        flash("Instellingen opgeslagen.", "ok")
+        return redirect(url_for("debiteuren.sending"))
+    rows = query("SELECT s.*, c.name AS cname, up.name AS prep_name, ua.name AS appr_name FROM sales_invoices s"
+                 " LEFT JOIN customers c ON c.id = s.customer_id LEFT JOIN users up ON up.id = s.send_prepared_by"
+                 " LEFT JOIN users ua ON ua.id = s.send_approved_by"
+                 " WHERE s.send_state IN ('klaarzetten', 'goedkeuren') OR (s.send_state = 'verzonden' AND s.sent_at >= ?)"
+                 " ORDER BY CASE s.send_state WHEN 'goedkeuren' THEN 0 WHEN 'klaarzetten' THEN 1 ELSE 2 END, s.sent_at DESC, s.number DESC",
+                 ((now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),))
+    users = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
+    return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
+                           prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()))
+
+
+@bp.route("/<int:sid>/verzenden", methods=["GET", "POST"])
+@require("debiteuren")
+def send_one(sid):
+    conn = get_db()
+    s = query("SELECT s.*, c.name AS cname, c.invoice_email FROM sales_invoices s LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id = ?",
+              (sid,), one=True) or abort(404)
+    uid = g.user["id"]
+    appr = approvers()
+    is_appr = uid in appr
+    others = [a for a in appr if a != s["send_prepared_by"]]
+    may_approve = is_appr and (uid != s["send_prepared_by"] or not others)   # vier ogen, tenzij er geen andere controleur is
+    may_edit = can("debiteuren", BEWERKEN)
+    if request.method == "POST":
+        act = request.form.get("action")
+        if act == "start":
+            if not may_edit:
+                abort(403)
+            if start_sending(conn, sid, uid, notify=False):
+                flash("Klaargezet om te verzenden: vul de mail aan en bied hem ter goedkeuring aan.", "ok")
+            return redirect(url_for("debiteuren.send_one", sid=sid))
+        if s["send_state"] not in ("klaarzetten", "goedkeuren"):
+            abort(400)
+        if s["send_state"] == "goedkeuren" and not (may_approve or act == "terugtrekken"):
+            abort(403)
+        if not may_edit and not may_approve:
+            abort(403)
+        f = request.form
+        to, cc = _addr_list(f.get("to")), _addr_list(f.get("cc"))
+        vals = (", ".join(to), ", ".join(cc), (f.get("subject") or "").strip()[:300], (f.get("body") or "").strip()[:10000])
+        if act in ("opslaan", "aanbieden", "goedkeuren", "verzenden"):
+            conn.execute("UPDATE sales_invoices SET send_to = ?, send_cc = ?, send_subject = ?, send_body = ?, updated_at = ? WHERE id = ?",
+                         vals + (now_iso(), sid))
+            if f.get("save_to_customer") and len(to) == 1 and _EMAIL.match(to[0]) and s["customer_id"]:
+                conn.execute("UPDATE customers SET invoice_email = ?, updated_at = ? WHERE id = ? AND IFNULL(invoice_email, '') = ''",
+                             (to[0], now_iso(), s["customer_id"]))
+            for up in request.files.getlist("extra"):
+                if up and up.filename:
+                    data = up.read()
+                    if data:
+                        from .util import safe_filename
+                        save_bytes("sales_invoice", sid, data, safe_filename(up.filename) or "bijlage", kind="send_extra", mime=up.mimetype)
+            conn.commit()
+        if act in ("aanbieden", "goedkeuren", "verzenden"):
+            bad = [a for a in to + cc if not _EMAIL.match(a)]
+            if not to or bad or not vals[2] or not s["pdf_file_id"]:
+                flash(("Er is nog geen factuur-PDF. " if not s["pdf_file_id"] else "")
+                      + "Vul een geldig e-mailadres en onderwerp in." + (f" Ongeldig: {', '.join(bad)}" if bad else ""), "error")
+                return redirect(url_for("debiteuren.send_one", sid=sid))
+        if act == "opslaan":
+            flash("Opgeslagen.", "ok")
+        elif act == "bijlage_weg":
+            fid = f.get("fid", type=int)
+            row = query("SELECT * FROM files WHERE id = ? AND entity = 'sales_invoice' AND entity_id = ? AND kind = 'send_extra'", (fid, sid), one=True)
+            if row:
+                from .util import delete_file
+                delete_file(fid)
+                flash("Bijlage verwijderd.", "ok")
+        elif act == "aanbieden":
+            if s["send_state"] != "klaarzetten":
+                abort(400)
+            if not appr:
+                flash("Er zijn nog geen controleurs ingesteld (Verkoopfacturen › Nieuwe facturen › Instellingen); de factuur kan nu direct verzonden worden.", "error")
+                return redirect(url_for("debiteuren.send_one", sid=sid))
+            conn.execute("UPDATE sales_invoices SET send_state = 'goedkeuren', send_prepared_by = ?, send_prepared_at = ?, send_note = NULL WHERE id = ?",
+                         (uid, now_iso(), sid))
+            _send_log(conn, sid, "Ter goedkeuring aangeboden" + (f": {f.get('note').strip()}" if (f.get("note") or "").strip() else ""), uid)
+            conn.commit()
+            _notify_many(conn, appr, f"Factuur {s['number']} goedkeuren", f"{s['cname'] or s['customer_name'] or ''} · {g.user['name']} vraagt om goedkeuring.",
+                         f"/debiteuren/{sid}/verzenden", skip=uid if others else None)
+            flash("Ter goedkeuring aangeboden; de controleurs hebben een melding gekregen.", "ok")
+        elif act == "terugtrekken":
+            if s["send_state"] != "goedkeuren" or not (may_edit and (uid == s["send_prepared_by"] or may_approve)):
+                abort(403)
+            conn.execute("UPDATE sales_invoices SET send_state = 'klaarzetten' WHERE id = ?", (sid,))
+            _send_log(conn, sid, "Teruggetrokken (weer klaarzetten)", uid)
+            conn.commit()
+            flash("De factuur staat weer op klaarzetten.", "ok")
+        elif act == "afkeuren":
+            reason = (f.get("note") or "").strip()[:500]
+            if not reason:
+                flash("Geef aan wat er aangepast moet worden.", "error")
+                return redirect(url_for("debiteuren.send_one", sid=sid))
+            conn.execute("UPDATE sales_invoices SET send_state = 'klaarzetten', send_note = ? WHERE id = ?", (reason, sid))
+            _send_log(conn, sid, f"Teruggestuurd: {reason}", uid)
+            conn.commit()
+            if s["send_prepared_by"]:
+                _notify_many(conn, [s["send_prepared_by"]], f"Factuur {s['number']} teruggestuurd", f"{g.user['name']}: {reason}", f"/debiteuren/{sid}/verzenden")
+            flash("Teruggestuurd naar " + (query("SELECT name FROM users WHERE id = ?", (s["send_prepared_by"],), one=True) or {"name": "de opsteller"})["name"] + ".", "ok")
+        elif act in ("goedkeuren", "verzenden"):
+            if act == "verzenden" and (appr or s["send_state"] != "klaarzetten" or not may_edit):
+                abort(403)   # direct verzenden alleen als er (nog) geen controleurs zijn
+            if act == "goedkeuren" and not (s["send_state"] == "goedkeuren" and may_approve):
+                abort(403)
+            from .util import file_path, files_for
+            from .mail import send_mail_with_files
+            atts = []
+            pdf = query("SELECT * FROM files WHERE id = ?", (s["pdf_file_id"],), one=True)
+            with open(file_path(pdf), "rb") as fh:
+                atts.append((f"Factuur_{s['number']}.pdf", fh.read(), "application/pdf"))
+            for x in files_for("sales_invoice", sid, "send_extra"):
+                with open(file_path(x), "rb") as fh:
+                    atts.append((x["filename"], fh.read(), x["mime"] or "application/octet-stream"))
+            ok, err = send_mail_with_files(sender(conn), to, vals[2], vals[3], atts, cc=cc or None, signer="administratie")
+            if not ok:
+                _send_log(conn, sid, f"Verzenden mislukt: {err}", uid)
+                conn.commit()
+                flash(f"Verzenden mislukt: {err}", "error")
+                return redirect(url_for("debiteuren.send_one", sid=sid))
+            now = now_iso()
+            conn.execute("UPDATE sales_invoices SET send_state = 'verzonden', sent_at = ?, send_approved_by = ?, send_approved_at = ?,"
+                         " send_prepared_by = COALESCE(send_prepared_by, ?), send_note = NULL, updated_at = ? WHERE id = ?",
+                         (now, uid if act == "goedkeuren" else None, now if act == "goedkeuren" else None, uid, now, sid))
+            _send_log(conn, sid, ("Goedgekeurd en verzonden" if act == "goedkeuren" else "Verzonden") + f" aan {', '.join(to)}"
+                      + (f" (cc {', '.join(cc)})" if cc else "") + f" · bijlagen: {', '.join(a[0] for a in atts)}", uid)
+            conn.commit()
+            audit("factuur verzonden", "sales_invoice", sid, f"{s['number']} aan {', '.join(to)}")
+            if act == "goedkeuren" and s["send_prepared_by"] and s["send_prepared_by"] != uid:
+                _notify_many(conn, [s["send_prepared_by"]], f"Factuur {s['number']} verzonden", f"Goedgekeurd door {g.user['name']} en verzonden aan {', '.join(to)}.",
+                             f"/debiteuren/{sid}/verzenden")
+            flash(f"Factuur {s['number']} verzonden aan {', '.join(to)}.", "ok")
+            return redirect(url_for("debiteuren.sending"))
+        return redirect(url_for("debiteuren.send_one", sid=sid))
+    if not s["send_state"]:
+        return redirect(url_for("debiteuren.detail", sid=sid))
+    from .util import files_for
+    extras = files_for("sales_invoice", sid, "send_extra")
+    try:
+        log = json.loads(s["send_log"] or "[]")
+    except ValueError:
+        log = []
+    names = {r["id"]: r["name"] for r in query("SELECT id, name FROM users")}
+    return render_template("debiteuren/verzend.html", s=s, extras=extras, log=log, SEND_STATES=SEND_STATES, may_edit=may_edit,
+                           may_approve=may_approve, is_appr=is_appr, appr_names=[names.get(a, "?") for a in appr], appr=appr,
+                           prep_name=names.get(s["send_prepared_by"]), sender=sender())
