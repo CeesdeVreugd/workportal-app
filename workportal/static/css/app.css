@@ -1333,3 +1333,6 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .dunpost[open] { flex-basis: 100%; }
 .dunpost[open] > form { width: min(560px, 100%); }
 .hint.learned { color: var(--ok, #1E7A3C); }
+.mailprev .mp-head { margin-bottom: 12px; }
+.mailprev .mp-body { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: #fff; color: #000; font-family: Calibri, Carlito, 'Segoe UI', Arial, sans-serif; font-size: 15px; overflow-x: auto; }
+.mailprev .mp-body img { max-width: 100%; height: auto; }

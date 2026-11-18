@@ -1020,6 +1020,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V231 (2.23.5)
+- Nieuwe facturen › ter goedkeuring: geen invulscherm meer maar een **voorbeeld van de mail** zoals de klant hem krijgt (van, aan, CC incl. vaste CC, onderwerp, tekst met handtekening, bijlagen), de PDF ernaast en de knop **Goedkeuren** (plus Terugsturen). Ook na verzenden is de verstuurde mail zo terug te zien.
+- Meldingen in deze stroom (klaarzetten, goedkeuren, teruggestuurd, verzonden) alleen nog in de app (pushmelding + blauwe teller), geen e-mail.
+
 ## V230 (2.23.4)
 - Nieuwe facturen: verzenden gaat altijd via de ingestelde goedkeurders (geen direct verzenden meer). Knop "Versturen · ter goedkeuring aanbieden"; daarna ligt de mail vast (niet meer aan te passen) en zijn er alleen nog: *Goedkeuring intrekken en aanpassen* en *Opnieuw ter goedkeuring aanbieden* (nieuwe melding aan de goedkeurders, alleen zolang niet verzonden). Goedkeurders zien daarnaast *Goedkeuren en verzenden* en *Terugsturen met opmerking*. Verzonden wordt precies de mail zoals die is aangeboden.
 

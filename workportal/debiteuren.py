@@ -1913,7 +1913,7 @@ def _notify_many(conn, ids, title, body, url, skip=None):
         if uid == skip:
             continue
         try:
-            notify_user(conn, uid, title, body, url=url)
+            notify_user(conn, uid, title, body, url=url, email=False)   # alleen in de app (pushmelding), geen mail
         except Exception as exc:  # noqa: BLE001
             print(f"[WorkPortal] Melding factuur verzenden: {exc}", flush=True)
 
@@ -2003,6 +2003,16 @@ def sending():
     return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
                            prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()),
                            fixed_cc=", ".join(send_cc_fixed()))
+
+
+def _mail_preview(s):
+    """De mail zoals de klant hem krijgt (tekst + handtekening), voor de goedkeurder."""
+    from markupsafe import Markup
+    from .mail import text_to_html, signature_html
+    try:
+        return Markup(text_to_html(s["send_body"] or "") + signature_html("administratie"))
+    except Exception:  # noqa: BLE001
+        return Markup(text_to_html(s["send_body"] or ""))
 
 
 @bp.route("/<int:sid>/verzenden", methods=["GET", "POST"])
@@ -2180,5 +2190,5 @@ def send_one(sid):
     names = {r["id"]: r["name"] for r in query("SELECT id, name FROM users")}
     return render_template("debiteuren/verzend.html", s=s, extras=extras, log=log, SEND_STATES=SEND_STATES, may_edit=may_edit,
                            may_approve=may_approve, is_appr=is_appr, appr_names=[names.get(a, "?") for a in appr], appr=appr,
-                           prep_name=names.get(s["send_prepared_by"]), sender=sender(), fixed_cc=send_cc_fixed(),
+                           prep_name=names.get(s["send_prepared_by"]), sender=sender(), fixed_cc=send_cc_fixed(), preview=_mail_preview(s),
                            rel=invoice_relation(get_db(), s))
