@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V227 (2.23.1)
+- Nieuwe facturen verzenden: de ontvanger komt uit de relatie van de klantnaam bij het factuuradres op de factuur (factuur-e-mail, anders het algemene e-mailadres van die relatie). Op de verzendpagina staat welke relatie dat is, met "Opnieuw ophalen uit de relatie".
+- Vaste CC bij elke verzonden factuur (instelling *Altijd in CC* op het tabblad Nieuwe facturen; standaard boekhouding@, wim@ en cees@). Het veld CC op de verzendpagina heet nu *Extra CC*.
+- Facturen die bij de update (migratie 54) op Klaar te zetten kwamen, krijgen hun voorstel (adres, onderwerp, tekst) bij het openen.
+
 ## V226 (2.23.0)
 - Verkoopfacturen › nieuw tabblad **Nieuwe facturen**. Een nieuwe factuur uit het DigiDossier (factuurdatum niet ouder dan 30 dagen) komt op *Klaar te zetten*; de klaarzetters krijgen een melding. Zij vullen ontvanger (factuur-e-mail van de relatie, uit de factuur of de contactpersoon), CC, onderwerp en tekst aan (NL/EN/DE/FR), kunnen extra bijlagen toevoegen en bieden de factuur *ter goedkeuring* aan.
 - De controleurs krijgen een melding en kiezen **Goedkeuren en verzenden** (mail vanaf administratie@ met de factuur-PDF en bijlagen) of **Terugsturen** met een reden. Vier ogen: wie klaarzet keurt niet zelf goed, tenzij er geen andere controleur is. Zonder controleurs kan direct verzonden worden.

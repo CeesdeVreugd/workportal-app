@@ -1873,19 +1873,32 @@ def _send_log(conn, sid, text, uid=None):
     conn.execute("UPDATE sales_invoices SET send_log = ? WHERE id = ?", (json.dumps(log[-50:], ensure_ascii=False), sid))
 
 
+DEFAULT_SEND_CC = "boekhouding@devreugd-pt.nl, wim@devreugd-pt.nl, cees@devreugd-pt.nl"
+
+
+def send_cc_fixed(conn=None):
+    """Adressen die altijd in CC gaan bij het verzenden van een factuur (instelling deb_send_cc)."""
+    v = _setting("deb_send_cc", conn)
+    return _addr_list(DEFAULT_SEND_CC if v is None else v)
+
+
+def invoice_relation(conn, inv):
+    """De relatie van de klantnaam bij het factuuradres op de factuur (uit de PDF); anders de gekoppelde relatie."""
+    try:
+        info = json.loads(inv["pdf_json"] or "{}")
+    except (ValueError, TypeError):
+        info = {}
+    cid = _match_customer(conn, None, info.get("customer")) if info.get("customer") else None
+    cid = cid or inv["customer_id"]
+    return conn.execute("SELECT * FROM customers WHERE id = ?", (cid,)).fetchone() if cid else None
+
+
 def _send_defaults(conn, inv):
-    """Ontvanger, onderwerp en tekst voor een nieuwe factuur."""
-    c = conn.execute("SELECT * FROM customers WHERE id = ?", (inv["customer_id"],)).fetchone() if inv["customer_id"] else None
-    to = (c["invoice_email"] if c and c["invoice_email"] else None) or inv["mail_to"] or ""
-    if not to and inv["project_id"]:
-        p = conn.execute("SELECT * FROM projects WHERE id = ?", (inv["project_id"],)).fetchone()
-        if p:
-            try:
-                from .werk import _contact_email
-                to = _contact_email(p, inv["attn"]) or ""
-            except Exception:  # noqa: BLE001
-                to = ""
-    lang = _lang_of(conn, inv["customer_id"])
+    """Ontvanger, onderwerp en tekst voor een nieuwe factuur. Ontvanger: factuur-e-mail van de relatie op het factuuradres
+    (anders het algemene e-mailadres van die relatie)."""
+    c = invoice_relation(conn, inv)
+    to = (c["invoice_email"] or c["email"] or "") if c else ""
+    lang = _lang_of(conn, c["id"] if c else inv["customer_id"])
     subj, body = INV_MAIL.get(lang) or INV_MAIL["nl"]
     due = _d(inv["due_date"])
     v = {"nr": inv["number"], "amount": _eur(inv["amount"] or 0) if inv["amount"] is not None else "het factuurbedrag",
@@ -1967,6 +1980,14 @@ def sending():
         appr = sorted({int(x) for x in request.form.getlist("appr") if x.isdigit() and int(x) in valid})
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_preparers', ?)", (json.dumps(prep),))
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_approvers', ?)", (json.dumps(appr),))
+        if "fixed_cc" in request.form:
+            fixed = _addr_list(request.form.get("fixed_cc"))
+            bad = [a for a in fixed if not _EMAIL.match(a)]
+            if bad:
+                conn.commit()
+                flash("Ongeldig adres bij Altijd in CC: " + ", ".join(bad), "error")
+                return redirect(url_for("debiteuren.sending"))
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_cc', ?)", (", ".join(fixed),))
         conn.commit()
         names = lambda ids: ", ".join(r["name"] for r in query(f"SELECT name FROM users WHERE id IN ({','.join('?' * len(ids)) or 'NULL'})", ids)) or "–"  # noqa: E731
         audit("instellingen", "debiteuren", None, f"facturen klaarzetten: {names(prep)}; goedkeuren: {names(appr)}")
@@ -1980,7 +2001,8 @@ def sending():
                  ((now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),))
     users = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
     return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
-                           prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()))
+                           prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()),
+                           fixed_cc=", ".join(send_cc_fixed()))
 
 
 @bp.route("/<int:sid>/verzenden", methods=["GET", "POST"])
@@ -2015,9 +2037,10 @@ def send_one(sid):
         if act in ("opslaan", "aanbieden", "goedkeuren", "verzenden"):
             conn.execute("UPDATE sales_invoices SET send_to = ?, send_cc = ?, send_subject = ?, send_body = ?, updated_at = ? WHERE id = ?",
                          vals + (now_iso(), sid))
-            if f.get("save_to_customer") and len(to) == 1 and _EMAIL.match(to[0]) and s["customer_id"]:
+            rel = invoice_relation(conn, s)
+            if f.get("save_to_customer") and len(to) == 1 and _EMAIL.match(to[0]) and rel:
                 conn.execute("UPDATE customers SET invoice_email = ?, updated_at = ? WHERE id = ? AND IFNULL(invoice_email, '') = ''",
-                             (to[0], now_iso(), s["customer_id"]))
+                             (to[0], now_iso(), rel["id"]))
             for up in request.files.getlist("extra"):
                 if up and up.filename:
                     data = up.read()
@@ -2031,7 +2054,14 @@ def send_one(sid):
                 flash(("Er is nog geen factuur-PDF. " if not s["pdf_file_id"] else "")
                       + "Vul een geldig e-mailadres en onderwerp in." + (f" Ongeldig: {', '.join(bad)}" if bad else ""), "error")
                 return redirect(url_for("debiteuren.send_one", sid=sid))
-        if act == "opslaan":
+        if act == "adres":
+            c = invoice_relation(conn, s)
+            to2 = (c["invoice_email"] or c["email"] or "") if c else ""
+            conn.execute("UPDATE sales_invoices SET send_to = ? WHERE id = ?", (to2, sid))
+            conn.commit()
+            flash(f"Adres opgehaald uit de relatie {c['name']}: {to2 or 'geen e-mailadres bekend'}." if c else "Klant op het factuuradres niet gevonden in de relaties.",
+                  "ok" if to2 else "error")
+        elif act == "opslaan":
             flash("Opgeslagen.", "ok")
         elif act == "bijlage_weg":
             fid = f.get("fid", type=int)
@@ -2085,6 +2115,13 @@ def send_one(sid):
             for x in files_for("sales_invoice", sid, "send_extra"):
                 with open(file_path(x), "rb") as fh:
                     atts.append((x["filename"], fh.read(), x["mime"] or "application/octet-stream"))
+            seen = {a.lower() for a in to}
+            cc_all = []
+            for a in send_cc_fixed(conn) + cc:   # vaste CC (boekhouding e.d.) altijd mee
+                if a.lower() not in seen:
+                    seen.add(a.lower())
+                    cc_all.append(a)
+            cc = cc_all
             ok, err = send_mail_with_files(sender(conn), to, vals[2], vals[3], atts, cc=cc or None, signer="administratie")
             if not ok:
                 _send_log(conn, sid, f"Verzenden mislukt: {err}", uid)
@@ -2107,6 +2144,12 @@ def send_one(sid):
         return redirect(url_for("debiteuren.send_one", sid=sid))
     if not s["send_state"]:
         return redirect(url_for("debiteuren.detail", sid=sid))
+    if s["send_state"] == "klaarzetten" and not s["send_subject"]:   # klaargezet bij de update (migratie): voorstel nu invullen
+        to, subj, body = _send_defaults(conn, s)
+        conn.execute("UPDATE sales_invoices SET send_to = ?, send_subject = ?, send_body = ? WHERE id = ?", (to, subj, body, sid))
+        conn.commit()
+        s = query("SELECT s.*, c.name AS cname, c.invoice_email FROM sales_invoices s LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id = ?",
+                  (sid,), one=True)
     from .util import files_for
     extras = files_for("sales_invoice", sid, "send_extra")
     try:
@@ -2116,4 +2159,5 @@ def send_one(sid):
     names = {r["id"]: r["name"] for r in query("SELECT id, name FROM users")}
     return render_template("debiteuren/verzend.html", s=s, extras=extras, log=log, SEND_STATES=SEND_STATES, may_edit=may_edit,
                            may_approve=may_approve, is_appr=is_appr, appr_names=[names.get(a, "?") for a in appr], appr=appr,
-                           prep_name=names.get(s["send_prepared_by"]), sender=sender())
+                           prep_name=names.get(s["send_prepared_by"]), sender=sender(), fixed_cc=send_cc_fixed(),
+                           rel=invoice_relation(get_db(), s))
