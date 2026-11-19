@@ -990,6 +990,10 @@ MIGRATIONS = [
     UPDATE sales_invoices SET status = 'open', open_amount = COALESCE(open_amount, amount), status_source = 'verzonden', status_at = sent_at
      WHERE send_state = 'verzonden' AND status = 'onbekend';
     """,
+    # 56 - verkoopfacturen: goedkeuring per goedkeurder (pas verzenden als iedereen heeft goedgekeurd)
+    """
+    ALTER TABLE sales_invoices ADD COLUMN send_approvals TEXT;
+    """,
 ]
 
 

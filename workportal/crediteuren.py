@@ -1404,6 +1404,13 @@ FILTERS = [
 @bp.route("/")
 @require(MODULE)
 def index():
+    # zoekterm en filter onthouden (ook na een statuswijziging of terug van een factuur); leegmaken met het kruisje
+    from flask import session
+    args = {k: v for k, v in request.args.items() if (v or "").strip() and k not in ("partial",)}
+    if args or request.headers.get("X-Live-Search"):
+        session["cred_list"] = args
+    elif session.get("cred_list"):
+        return redirect(url_for("crediteuren.index", **session["cred_list"]))
     q = (request.args.get("q") or "").strip()
     # zoeken zonder gekozen filter: overal zoeken (ook afgerond en vorig jaar)
     flt = request.args.get("filter") or ("alle" if q else "open")

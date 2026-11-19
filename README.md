@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V233 (2.24.0)
+- Nieuwe facturen: **alle** ingestelde goedkeurders moeten goedkeuren; de knop heet *Goedkeuren*. Zodra de laatste goedkeurder akkoord geeft, wordt de factuur automatisch verzonden. Op de pagina staat per goedkeurder ✓ (met tijd) of "nog niet"; in de lijst "x/y". De blauwe teller telt alleen facturen die jij nog moet goedkeuren. Intrekken of terugsturen wist de goedkeuringen; *Opnieuw ter goedkeuring aanbieden* stuurt alleen een melding aan wie nog niet heeft goedgekeurd. Mislukt het verzenden, dan staat er *Opnieuw proberen te verzenden*.
+- Inkoopfacturen: zoekterm en filter worden onthouden (ook na een statuswijziging of terug van een factuur). Leegmaken met het kruisje in het zoekveld.
+- Database: migratie 56 (send_approvals).
+
 ## V232 (2.23.6)
 - Nieuwe facturen: een verzonden factuur verdwijnt van het tabblad Nieuwe facturen en staat als **open** in het overzicht Facturen (status uit "WorkPortal (verzonden)" tot SnelStart/Excel iets anders meldt). Na goedkeuren ga je naar de factuurkaart.
 - Overzicht Facturen: in de laatste kolom "verzonden dd-mm", of "ter goedkeuring" / "klaar te zetten".

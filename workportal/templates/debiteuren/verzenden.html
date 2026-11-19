@@ -14,7 +14,7 @@
       <td class="nowrap"><b>{{ r.number }}</b><div class="small muted">{{ r.invoice_date|date if r.invoice_date else '' }}</div></td>
       <td>{{ r.cname or r.customer_name or '–' }}{% if r.order_no %}<div class="small muted">ref. {{ r.order_no }}</div>{% endif %}</td>
       <td class="num nowrap hide-m">{{ r.amount|eur(2) if r.amount is not none else '–' }}</td>
-      <td>{% if r.send_state == 'goedkeuren' %}<span class="badge b-warn">Wacht op goedkeuring</span><div class="small muted">{{ r.prep_name or '' }}{% if r.send_prepared_at %} · {{ r.send_prepared_at|dt('%d-%m %H:%M') }}{% endif %}</div>
+      <td>{% if r.send_state == 'goedkeuren' %}<span class="badge b-warn">Wacht op goedkeuring</span> <span class="small muted">{{ (r.send_approvals|fromjson or {})|length if r.send_approvals else 0 }}/{{ appr|length }}</span><div class="small muted">{{ r.prep_name or '' }}{% if r.send_prepared_at %} · {{ r.send_prepared_at|dt('%d-%m %H:%M') }}{% endif %}</div>
         {% elif r.send_state == 'klaarzetten' %}<span class="badge b-blue">Klaar te zetten</span>{% if r.send_note %}<div class="small" style="color:var(--bad,#C62828)">Teruggestuurd: {{ r.send_note }}</div>{% endif %}
         {% else %}<span class="badge b-ok">Verzonden</span><div class="small muted">{{ r.sent_at|dt('%d-%m %H:%M') }}{% if r.appr_name %} · goedgekeurd door {{ r.appr_name }}{% endif %}</div>{% endif %}</td>
       <td class="hide-m small">{{ r.send_to or '–' }}</td>
@@ -32,7 +32,7 @@
         <p class="hint">{% if not prep_set %}Niets aangevinkt: iedereen met de rol administratie{% if prep %} ({{ users|selectattr('id', 'in', prep)|map(attribute='name')|join(', ') }}){% endif %}.{% endif %}</p></fieldset>
       <fieldset style="border:0;padding:0;margin:0"><legend class="small" style="font-weight:600;margin-bottom:6px">Goedkeuren (controle) · daarna wordt de factuur verzonden</legend>
         {% for u in users %}<label class="check"><input type="checkbox" name="appr" value="{{ u.id }}" {{ 'checked' if u.id in appr }}> {{ u.name }}</label>{% endfor %}
-        <p class="hint">{% if not appr %}<b>Nog niemand:</b> zonder controleurs kan wie klaarzet de factuur direct verzenden.{% else %}Alle aangevinkte controleurs krijgen een melding en kunnen goedkeuren.{% endif %}</p></fieldset>
+        <p class="hint">{% if not appr %}<b>Nog niemand:</b> zonder controleurs kan wie klaarzet de factuur direct verzenden.{% else %}Alle aangevinkte goedkeurders krijgen een melding; de factuur wordt automatisch verzonden als iedereen heeft goedgekeurd.{% endif %}</p></fieldset>
     </div>
     <label class="f" style="margin-top:12px">Altijd in CC<input type="text" name="fixed_cc" value="{{ fixed_cc }}"><span class="hint">Gaat bij elke verzonden factuur mee in CC. Meerdere adressen scheiden met een komma.</span></label>
     <div class="actions"><button class="btn primary">Opslaan</button></div>

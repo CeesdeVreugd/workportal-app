@@ -50,7 +50,7 @@
       <label class="f">Opmerking voor de goedkeurder<input type="text" name="note" placeholder="optioneel"></label>
       <div class="actions"><button class="btn" name="action" value="opslaan">Opslaan</button>
         <button class="btn primary" name="action" value="aanbieden">{{ icon('mail') }}Versturen · ter goedkeuring aanbieden</button></div>
-      <p class="hint">{% if appr %}De factuur gaat pas naar de klant als {{ appr_names|join(' of ') }} hem goedkeurt.{% else %}<b>Er zijn nog geen goedkeurders ingesteld</b> (Nieuwe facturen › Instellingen).{% endif %}</p>
+      <p class="hint">{% if appr %}De factuur gaat pas naar de klant als {{ appr_names|join(' én ') }} hem {{ 'hebben' if appr_names|length > 1 else 'heeft' }} goedgekeurd.{% else %}<b>Er zijn nog geen goedkeurders ingesteld</b> (Nieuwe facturen › Instellingen).{% endif %}</p>
     {% endif %}
   </form>
   {% else %}
@@ -68,13 +68,20 @@
   {% if st == 'goedkeuren' %}
   <form method="post" class="card" data-no-draft>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    {% if may_approve %}
-    <div class="actions" style="margin:0"><button class="btn primary" name="action" value="goedkeuren" data-confirm="Factuur {{ s.number }} goedkeuren en verzenden aan de klant?">{{ icon('check') }}Goedkeuren</button>
+    <div class="small apprlist" style="margin-bottom:10px"><b>Goedkeuringen</b>{% for a in appr %}<div>{% if a in got %}<span style="color:var(--ok,#1E7A3C)">{{ icon('check') }}</span> {{ names.get(a, '?') }} <span class="muted">{{ got[a]|dt('%d-%m %H:%M') }}</span>{% else %}<span class="muted">○</span> {{ names.get(a, '?') }} <span class="muted">nog niet</span>{% endif %}</div>{% endfor %}</div>
+    {% set all_ok = appr and (appr|reject('in', got)|list|length == 0) %}
+    {% if may_approve and all_ok %}
+    <div class="actions" style="margin:0"><button class="btn primary" name="action" value="goedkeuren">{{ icon('mail') }}Opnieuw proberen te verzenden</button></div>
+    <p class="hint">Iedereen heeft goedgekeurd, maar verzenden is mislukt (zie Verloop).</p>
+    {% elif may_approve and g.user.id in got %}
+    <p class="hint" style="margin-top:0">Je hebt goedgekeurd. De factuur wordt automatisch verzonden zodra alle goedkeurders hebben goedgekeurd.</p>
+    {% elif may_approve %}
+    <div class="actions" style="margin:0"><button class="btn primary" name="action" value="goedkeuren">{{ icon('check') }}Goedkeuren</button>
       <details class="cred-pop"><summary class="btn ghost">Terugsturen</summary>
         <label class="f">Wat moet er anders?<input type="text" name="note"></label>
         <div class="actions"><button class="btn sm" name="action" value="afkeuren">Terugsturen naar {{ prep_name or 'de opsteller' }}</button></div></details></div>
-    <p class="hint">Na goedkeuren wordt de mail meteen verstuurd.</p>
-    {% else %}<p class="hint" style="margin-top:0">Wacht op goedkeuring door {{ appr_names|join(' of ') }}. De mail wordt pas verstuurd na goedkeuring.</p>{% endif %}
+    <p class="hint">De mail wordt automatisch verstuurd als alle goedkeurders hebben goedgekeurd.</p>
+    {% else %}<p class="hint" style="margin-top:0">De mail wordt automatisch verstuurd als alle goedkeurders hebben goedgekeurd.</p>{% endif %}
     {% if may_edit %}<div class="actions"><button class="btn ghost sm" name="action" value="terugtrekken" formnovalidate>Goedkeuring intrekken en aanpassen</button>
       <button class="btn ghost sm" name="action" value="opnieuw" formnovalidate>Opnieuw ter goedkeuring aanbieden</button></div>{% endif %}
   </form>
