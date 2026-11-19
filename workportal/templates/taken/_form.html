@@ -1,5 +1,20 @@
 {% from "partials/macros.html" import opt %}
 {# Velden van een taak. t = bestaande taak (wijzigen) of None; who = toon 'Voor wie' #}
+{% macro repeatfields(s=None, WEEKDAY_NAMES=[], FREQS=[], wdays=[0], edit=False) %}
+  {% set rp = 'rp' ~ (s.id if s else 'new') %}
+  <div class="tkrepeat" id="{{ rp }}" {{ 'hidden' if not edit }}>
+    <div class="fgrid tkgrid">
+      <label class="f">Herhalen<select name="freq" onchange="var b=document.getElementById('{{ rp }}');b.querySelector('.rp-week').hidden=this.value!=='week';b.querySelector('.rp-month').hidden=this.value!=='maand';b.querySelector('.rp-every').hidden=this.value==='werkdag'">
+        {% for v, l in FREQS %}<option value="{{ v }}" {{ 'selected' if (s.freq if s else 'week') == v }}>{{ l }}</option>{% endfor %}</select></label>
+      <label class="f rp-every" {{ 'hidden' if s and s.freq == 'werkdag' }}>Om de<span style="display:flex;gap:6px;align-items:center"><input type="number" name="every" min="1" max="52" value="{{ s.every if s else 1 }}" style="width:80px"><span class="small muted">(1 = elke keer)</span></span></label>
+      <label class="f rp-month" {{ 'hidden' if not (s and s.freq == 'maand') }}>Dag van de maand<select name="monthday">{% for d in range(1, 29) %}<option value="{{ d }}" {{ 'selected' if s and s.monthday == d }}>{{ d }}</option>{% endfor %}<option value="-1" {{ 'selected' if s and s.monthday == -1 }}>laatste dag</option></select></label>
+    </div>
+    <div class="rp-week" {{ 'hidden' if s and s.freq != 'week' }}><span class="small">Op</span>
+      <span class="rp-days">{% for i in range(7) %}<label class="check"><input type="checkbox" name="weekdays" value="{{ i }}" {{ 'checked' if i in wdays }}> {{ WEEKDAY_NAMES[i][:2] }}</label>{% endfor %}</span></div>
+    <p class="hint" style="margin:6px 0 0">Op de dag zelf komt er een taak bij de uitvoerder (met herinnering als je die kiest). De datum hierboven is de startdatum.</p>
+  </div>
+{% endmacro %}
+
 {% macro taskfields(staff, REMIND_OPTS, t=None, prefill={}, who=True, remind_custom='') %}
   {% set rid = 'tk' ~ (t.id if t else 'new') %}
   <label class="f">Wat moet er gebeuren? *<input type="text" name="title" required maxlength="200" value="{{ t.title if t else (prefill.title or '') }}" placeholder="bijv. Lasapparaat meenemen naar NewCold"></label>
@@ -25,6 +40,7 @@
     <b>{{ t.title }}{% if not t.seen_at and t.assigned_to == g.user.id and t.created_by != g.user.id %} <span class="badge b-blue">Nieuw</span>{% endif %}</b>
     {%- set parts = [] -%}
     {%- if t.when %}{% set _ = parts.append((t.when, 'apred' if t.late else '')) %}{% endif -%}
+    {%- if t.series_id %}{% set _ = parts.append(('↻ vaste taak', '')) %}{% endif -%}
     {%- if t.remind_at and not t.reminded_at and not t.done_at %}{% set _ = parts.append(('🔔', 'bell')) %}{% endif -%}
     {%- if t.assigned_to != g.user.id %}{% set _ = parts.append(('voor ' ~ (t.assignee or 'niemand'), '')) %}{% elif t.created_by and t.created_by != g.user.id %}{% set _ = parts.append(('van ' ~ t.creator, '')) %}{% endif -%}
     {%- if t.link_label %}{% set _ = parts.append((t.link_label, '')) %}{% endif -%}

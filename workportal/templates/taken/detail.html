@@ -20,6 +20,7 @@
 <section class="card">
   {% if t.description %}<div class="prose" style="white-space:pre-line">{{ t.description }}</div>{% endif %}
   <dl class="dl" style="margin-top:10px">
+    {% if t.series_id %}<dt>Vaste taak</dt><dd><a href="{{ url_for('taken.series_edit', sid=t.series_id) }}">komt terug: bekijken of wijzigen</a></dd>{% endif %}
     {% if t.link_url %}<dt>Hoort bij</dt><dd><a href="{{ t.link_url }}">{{ t.link_label or t.link_url }}</a></dd>{% endif %}
     <dt>Herinnering</dt><dd>{% if t.remind_at %}{{ t.remind_at|dt }}{% if t.remind_mail %} (melding + mail){% else %} (melding){% endif %}{% if t.reminded_at %} · verstuurd{% endif %}{% else %}geen{% endif %}</dd>
   </dl>

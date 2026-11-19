@@ -1337,3 +1337,6 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .mailprev .mp-body { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: #fff; color: #000; font-family: Calibri, Carlito, 'Segoe UI', Arial, sans-serif; font-size: 15px; overflow-x: auto; }
 .mailprev .mp-body img { max-width: 100%; height: auto; }
 .apprlist svg { width: 14px; height: 14px; vertical-align: -2px; }
+.tkrepeat { border-left: 3px solid var(--line); padding: 4px 0 4px 12px; margin: 4px 0 8px; }
+.rp-week { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.rp-days { display: inline-flex; gap: 10px; flex-wrap: wrap; }

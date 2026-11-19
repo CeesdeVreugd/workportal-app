@@ -994,6 +994,32 @@ MIGRATIONS = [
     """
     ALTER TABLE sales_invoices ADD COLUMN send_approvals TEXT;
     """,
+    # 57 - taken: vaste terugkerende taken (bijv. elke maandag de SnelStart-Excel importeren)
+    """
+    CREATE TABLE task_series (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        freq TEXT NOT NULL DEFAULT 'week',
+        every INTEGER NOT NULL DEFAULT 1,
+        weekdays TEXT,
+        monthday INTEGER,
+        due_time TEXT,
+        remind TEXT,
+        remind_mail INTEGER NOT NULL DEFAULT 0,
+        link_url TEXT,
+        link_label TEXT,
+        start_date TEXT NOT NULL,
+        next_date TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+    ALTER TABLE tasks ADD COLUMN series_id INTEGER REFERENCES task_series(id) ON DELETE SET NULL;
+    CREATE INDEX idx_tasks_series ON tasks(series_id, due_date);
+    """,
 ]
 
 

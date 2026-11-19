@@ -108,6 +108,7 @@ def _loop(app):
         try:
             _check_pressure_tests(conn)
             _ticket_reminders(conn)
+            taken.generate_series(conn)
             taken.scheduled_reminders(conn)
             sharepoint.scheduled_sync(conn, state)
             komdex.notify_pending(conn)

@@ -215,7 +215,7 @@ def _back(default="taken.index", **kw):
 def index():
     me = g.user["id"]
     view = request.args.get("v", "open")
-    if view not in ("open", "uitgezet", "klaar"):
+    if view not in ("open", "uitgezet", "klaar", "vast"):
         view = "open"
     if view == "open":
         rows = _decorate(query(SELECT + " WHERE t.assigned_to = ? AND t.done_at IS NULL"
@@ -226,6 +226,8 @@ def index():
                                " (SELECT 1 FROM task_log l WHERE l.task_id = t.id AND l.user_id = :me AND l.action = 'doorgegeven'))"
                                " ORDER BY (t.due_date IS NULL), t.due_date, COALESCE(t.due_time, '99'), t.id", {"me": me}))
         groups = [("uitgezet", "", rows)] if rows else []
+    elif view == "vast":
+        groups = []
     else:
         rows = _decorate(query(SELECT + " WHERE t.done_at IS NOT NULL AND " + VISIBLE + " ORDER BY t.done_at DESC LIMIT 100", {"me": me}))
         groups = [("klaar", "", rows)] if rows else []
@@ -240,17 +242,32 @@ def index():
     link = _safe_link(request.args.get("link"))
     prefill = {"link_url": link, "link_label": (request.args.get("label") or "")[:120] if link else None,
                "title": (request.args.get("titel") or "")[:200]}
-    return render_template("taken/index.html", view=view, groups=groups, counts=counts, staff=_staff(),
+    series = my_series(me) if view == "vast" else []
+    counts["vast"] = query("SELECT COUNT(*) c FROM task_series WHERE active = 1 AND (assigned_to = ? OR created_by = ?)", (me, me), one=True)["c"]
+    return render_template("taken/index.html", view=view, groups=groups, counts=counts, staff=_staff(), series=series,
+                           FREQS=FREQS, WEEKDAY_NAMES=WEEKDAY_NAMES,
                            REMIND_OPTS=REMIND_OPTS, prefill=prefill, show_new=bool(link or request.args.get("nieuw")))
 
 
 @bp.route("/nieuw", methods=["POST"])
 def new():
     f = request.form
+    if f.get("repeat") and not _parse_date(f.get("due_date")):
+        f = f.copy()
+        f["due_date"] = _today().isoformat()   # herhalen zonder datum: vanaf vandaag
     vals, err = _form_values(f)
     if err:
         flash(err, "error")
         return _back()
+    if f.get("repeat"):
+        sv, err = _series_values(f)
+        if err:
+            flash(err, "error")
+            return _back()
+        s = create_series(f, vals, sv)
+        flash(f"Terugkerende taak gemaakt: {series_label(s).lower()}" + (f", voor {s['assignee']}" if s["assigned_to"] != g.user["id"] else "")
+              + (f". Volgende keer: {when_label(s['next_date'])}." if s["next_date"] else "."), "ok")
+        return redirect(url_for("taken.index", v="vast"))
     uid = _valid_user(to_int(f.get("assigned_to"))) or g.user["id"]
     link = _safe_link(f.get("link_url"))
     now = now_iso()
@@ -411,3 +428,225 @@ def scheduled_reminders(conn):
                         email=bool(t["remind_mail"]))
         except Exception as exc:  # pragma: no cover
             print(f"[WorkPortal] Herinnering taak {t['id']} mislukt: {exc}", flush=True)
+
+
+# ---------------------------------------------------------------- terugkerende taken
+# Een vaste taak (bijv. 'elke maandag de Excel uit SnelStart importeren') maakt op de dag zelf een gewone taak aan
+# voor de uitvoerder, met herinnering. Afvinken gaat per keer; de reeks loopt door tot hij gepauzeerd of verwijderd wordt.
+
+FREQS = [("dag", "Elke dag"), ("werkdag", "Elke werkdag (ma–vr)"), ("week", "Elke week"), ("maand", "Elke maand")]
+WEEKDAY_NAMES = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
+SERIES_REMIND = [o for o in REMIND_OPTS if o[0] != "eigen"]
+
+
+def _add_months(d, n, day):
+    import calendar
+    y, m = d.year + (d.month - 1 + n) // 12, (d.month - 1 + n) % 12 + 1
+    last = calendar.monthrange(y, m)[1]
+    return d.replace(year=y, month=m, day=last if day == -1 or day > last else day)
+
+
+def _wdays(s):
+    return sorted({int(x) for x in (s["weekdays"] or "").split(",") if x.strip().isdigit() and 0 <= int(x) <= 6}) or [0]
+
+
+def occurs_on(s, d):
+    start = _parse_date(s["start_date"])
+    if not start or d < start:
+        return False
+    every = max(1, int(s["every"] or 1))
+    if s["freq"] == "dag":
+        return (d - start).days % every == 0
+    if s["freq"] == "werkdag":
+        return d.weekday() < 5
+    if s["freq"] == "week":
+        if d.weekday() not in _wdays(s):
+            return False
+        w0 = start - timedelta(days=start.weekday())
+        return ((d - timedelta(days=d.weekday())) - w0).days // 7 % every == 0
+    if s["freq"] == "maand":
+        import calendar
+        md = int(s["monthday"] or start.day)
+        last = calendar.monthrange(d.year, d.month)[1]
+        want = last if md == -1 or md > last else md
+        return d.day == want and ((d.year - start.year) * 12 + d.month - start.month) % every == 0
+    return False
+
+
+def next_occurrence(s, after):
+    """Eerste datum ná 'after' (date) waarop de reeks een taak geeft."""
+    d = after + timedelta(days=1)
+    for _ in range(800):
+        if occurs_on(s, d):
+            return d
+        d += timedelta(days=1)
+    return None
+
+
+def series_label(s):
+    every = max(1, int(s["every"] or 1))
+    t = f" om {s['due_time']}" if s["due_time"] else ""
+    if s["freq"] == "dag":
+        base = "Elke dag" if every == 1 else f"Elke {every} dagen"
+    elif s["freq"] == "werkdag":
+        base = "Elke werkdag"
+    elif s["freq"] == "week":
+        days = " en ".join(", ".join(WEEKDAY_NAMES[i] for i in _wdays(s)).rsplit(", ", 1))
+        base = (f"Elke {days}" if every == 1 else f"Om de {every} weken op {days}")
+    else:
+        md = int(s["monthday"] or 1)
+        dag = "de laatste dag" if md == -1 else f"de {md}e"
+        base = (f"Elke maand op {dag}" if every == 1 else f"Om de {every} maanden op {dag}")
+    return base + t
+
+
+def _series_values(f):
+    freq = f.get("freq") if f.get("freq") in dict(FREQS) else "week"
+    every = max(1, min(52, to_int(f.get("every")) or 1))
+    wd = sorted({int(x) for x in f.getlist("weekdays") if x.isdigit() and 0 <= int(x) <= 6})
+    if freq == "week" and not wd:
+        return None, "Kies op welke dag(en) van de week."
+    md = to_int(f.get("monthday"))
+    if freq == "maand" and not (md == -1 or (md and 1 <= md <= 31)):
+        return None, "Kies de dag van de maand."
+    start = _parse_date(f.get("due_date")) or _today()
+    remind = f.get("remind") or ""
+    if remind not in dict(SERIES_REMIND):
+        remind = ""
+    return {"freq": freq, "every": every, "weekdays": ",".join(map(str, wd)) or None, "monthday": md if freq == "maand" else None,
+            "start_date": start.isoformat(), "due_time": _parse_time(f.get("due_time")), "remind": remind or None,
+            "remind_mail": 1 if f.get("remind_mail") and remind else 0}, None
+
+
+def _first_date(s):
+    """Eerste keer vanaf de startdatum, maar niet in het verleden (geen achterstallige taak bij het aanmaken)."""
+    start = max(_parse_date(s["start_date"]) or _today(), _today())
+    return start if occurs_on(s, start) else next_occurrence(s, start)
+
+
+def generate_series(conn, today=None):
+    """Planner: voor elke actieve reeks die aan de beurt is de taak van vandaag aanmaken (gemiste dagen: alleen de laatste)."""
+    today = today or _today()
+    made = 0
+    for s in conn.execute("SELECT * FROM task_series WHERE active = 1 AND next_date IS NOT NULL AND next_date <= ?", (today.isoformat(),)).fetchall():
+        d = _parse_date(s["next_date"])
+        last = d
+        while d and d <= today:   # bij een gemiste dag (server uit) alleen de meest recente aanmaken
+            last, d = d, next_occurrence(s, d)
+        due = last.isoformat()
+        if not conn.execute("SELECT 1 FROM tasks WHERE series_id = ? AND due_date = ?", (s["id"], due)).fetchone():
+            now = now_iso()
+            r_at = remind_at_for(due, s["due_time"], s["remind"] or "")
+            if r_at and r_at < now:
+                r_at = None if s["remind"] is None else now   # herinnering al voorbij: meteen
+            cur = conn.execute("INSERT INTO tasks (title, description, assigned_to, created_by, due_date, due_time, remind, remind_at, remind_mail,"
+                               " link_url, link_label, series_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                               (s["title"], s["description"], s["assigned_to"], s["created_by"], due, s["due_time"], s["remind"], r_at,
+                                s["remind_mail"], s["link_url"], s["link_label"], s["id"], now))
+            conn.execute("INSERT INTO task_log (task_id, user_id, to_user, action, note, created_at) VALUES (?,?,?,?,?,?)",
+                         (cur.lastrowid, None, s["assigned_to"], "aangemaakt", "Terugkerende taak: " + series_label(s), now))
+            made += 1
+        conn.execute("UPDATE task_series SET next_date = ? WHERE id = ?", (d.isoformat() if d else None, s["id"]))
+        conn.commit()
+    return made
+
+
+def _series(sid):
+    s = query("SELECT s.*, a.name AS assignee, c.name AS creator FROM task_series s LEFT JOIN users a ON a.id = s.assigned_to"
+              " LEFT JOIN users c ON c.id = s.created_by WHERE s.id = ?", (sid,), one=True) or abort(404)
+    if g.user["id"] not in (s["assigned_to"], s["created_by"]):
+        abort(404)
+    return s
+
+
+def my_series(uid):
+    rows = query("SELECT s.*, a.name AS assignee, c.name AS creator FROM task_series s LEFT JOIN users a ON a.id = s.assigned_to"
+                 " LEFT JOIN users c ON c.id = s.created_by WHERE s.assigned_to = ? OR s.created_by = ? ORDER BY s.active DESC, s.title", (uid, uid))
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["label"] = series_label(r)
+        d["next"] = when_label(r["next_date"]) if r["next_date"] and r["active"] else None
+        out.append(d)
+    return out
+
+
+def create_series(f, vals, sv):
+    uid = _valid_user(to_int(f.get("assigned_to"))) or g.user["id"]
+    link = _safe_link(f.get("link_url"))
+    now = now_iso()
+    sid = execute("INSERT INTO task_series (title, description, assigned_to, created_by, freq, every, weekdays, monthday, due_time, remind,"
+                  " remind_mail, link_url, link_label, start_date, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (vals["title"], vals["description"], uid, g.user["id"], sv["freq"], sv["every"], sv["weekdays"], sv["monthday"],
+                   sv["due_time"], sv["remind"], sv["remind_mail"], link, ((f.get("link_label") or "")[:120] or None) if link else None,
+                   sv["start_date"], now))
+    s = query("SELECT * FROM task_series WHERE id = ?", (sid,), one=True)
+    first = _first_date(s)
+    execute("UPDATE task_series SET next_date = ? WHERE id = ?", (first.isoformat() if first else None, sid))
+    generate_series(get_db())
+    s = query("SELECT s.*, a.name AS assignee FROM task_series s LEFT JOIN users a ON a.id = s.assigned_to WHERE s.id = ?", (sid,), one=True)
+    audit("terugkerende taak", "task_series", sid, f"{vals['title'][:80]} – {series_label(s)}")
+    if uid != g.user["id"]:
+        try:
+            from .notify import notify_user
+            notify_user(get_db(), uid, f"Vaste taak van {g.user['name']}: {vals['title']}"[:120],
+                        f"{g.user['name']} heeft een terugkerende taak voor je gemaakt: {vals['title']} ({series_label(s).lower()}).",
+                        url=url_for("taken.index", v="vast"), email=True)
+        except Exception as exc:  # pragma: no cover
+            print(f"[WorkPortal] Melding vaste taak mislukt: {exc}", flush=True)
+    return s
+
+
+@bp.route("/vast/<int:sid>", methods=["GET", "POST"])
+def series_edit(sid):
+    s = _series(sid)
+    if request.method == "POST":
+        f = request.form
+        act = f.get("action")
+        if act == "pauze":
+            execute("UPDATE task_series SET active = 0, updated_at = ? WHERE id = ?", (now_iso(), sid))
+            flash("Gepauzeerd: er worden geen nieuwe taken meer aangemaakt.", "ok")
+        elif act == "hervat":
+            nxt = next_occurrence(s, _today() - timedelta(days=1))
+            execute("UPDATE task_series SET active = 1, next_date = ?, updated_at = ? WHERE id = ?", (nxt.isoformat() if nxt else None, now_iso(), sid))
+            generate_series(get_db())
+            flash("Hervat.", "ok")
+        elif act == "verwijderen":
+            if s["created_by"] != g.user["id"] and s["created_by"] is not None:
+                abort(403)
+            execute("DELETE FROM task_series WHERE id = ?", (sid,))
+            audit("terugkerende taak verwijderd", "task_series", sid, s["title"][:120])
+            flash("Terugkerende taak verwijderd. Al aangemaakte taken blijven staan.", "ok")
+            return redirect(url_for("taken.index", v="vast"))
+        else:
+            vals, err = _form_values(f)
+            sv, err2 = _series_values(f) if not err else (None, None)
+            if err or err2:
+                flash(err or err2, "error")
+                return redirect(url_for("taken.series_edit", sid=sid))
+            uid = _valid_user(to_int(f.get("assigned_to"))) or s["assigned_to"]
+            execute("UPDATE task_series SET title = ?, description = ?, assigned_to = ?, freq = ?, every = ?, weekdays = ?, monthday = ?,"
+                    " due_time = ?, remind = ?, remind_mail = ?, start_date = ?, updated_at = ? WHERE id = ?",
+                    (vals["title"], vals["description"], uid, sv["freq"], sv["every"], sv["weekdays"], sv["monthday"], sv["due_time"],
+                     sv["remind"], sv["remind_mail"], sv["start_date"], now_iso(), sid))
+            s2 = query("SELECT * FROM task_series WHERE id = ?", (sid,), one=True)
+            # volgende keer opnieuw bepalen (vandaag telt mee als er vandaag nog geen taak is)
+            today = _today()
+            has_today = query("SELECT 1 FROM tasks WHERE series_id = ? AND due_date = ?", (sid, today.isoformat()), one=True)
+            nxt = next_occurrence(s2, today if has_today else today - timedelta(days=1))
+            st = _parse_date(s2["start_date"])
+            if st and st > today:
+                nxt = _first_date(s2)
+            elif not has_today and occurs_on(s2, today):
+                nxt = today
+            execute("UPDATE task_series SET next_date = ? WHERE id = ?", (nxt.isoformat() if nxt else None, sid))
+            if s2["active"]:
+                generate_series(get_db())
+            flash("Terugkerende taak opgeslagen. Wijzigingen gelden voor de volgende keren.", "ok")
+        return redirect(url_for("taken.series_edit", sid=sid))
+    recent = _decorate(query(SELECT + " WHERE t.series_id = ? ORDER BY t.due_date DESC LIMIT 10", (sid,)))
+    d = dict(s)
+    d["label"] = series_label(s)
+    d["next"] = when_label(s["next_date"]) if s["next_date"] and s["active"] else None
+    return render_template("taken/vast.html", s=d, recent=recent, staff=_staff(), REMIND_OPTS=SERIES_REMIND, FREQS=FREQS,
+                           WEEKDAY_NAMES=WEEKDAY_NAMES, wdays=_wdays(s), can_delete=s["created_by"] in (g.user["id"], None))

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% from "partials/macros.html" import opt %}
+{% from "taken/_form.html" import taskrow, repeatfields %}
+{% block title %}{{ s.title }} – Vaste taak{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><div class="eyebrow"><a href="{{ url_for('taken.index', v='vast') }}">Vaste taken</a>{% if not s.active %} · <span class="badge">Gepauzeerd</span>{% endif %}</div>
+    <h1>{{ s.title }}</h1>
+    <p>{{ s.label }} · voor {{ s.assignee or 'niemand' }}{% if s.next %} · volgende: {{ s.next }}{% endif %}</p></div>
+  <div class="actions">
+    <form method="post" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if s.active %}<button class="btn" name="action" value="pauze">{{ icon('timer') }}Pauzeren</button>{% else %}<button class="btn primary" name="action" value="hervat">{{ icon('refresh') }}Hervatten</button>{% endif %}</form>
+    {% if can_delete %}<form method="post" class="inline" data-confirm="Deze vaste taak verwijderen? Taken die al zijn aangemaakt blijven staan."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn ghost" name="action" value="verwijderen">{{ icon('trash') }}Verwijderen</button></form>{% endif %}
+  </div>
+</div>
+<form method="post" class="card form" data-no-draft>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card-head"><h2>Wijzigen</h2><span class="small muted">geldt voor de volgende keren</span></div>
+  <label class="f">Wat moet er gebeuren? *<input type="text" name="title" required maxlength="200" value="{{ s.title }}"></label>
+  <div class="fgrid tkgrid">
+    <label class="f">Voor wie<select name="assigned_to">{% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if u.id == s.assigned_to }}>{{ u.name }}{{ ' (ik)' if u.id == g.user.id }}</option>{% endfor %}</select></label>
+    <label class="f">Startdatum<input type="date" name="due_date" value="{{ s.start_date }}"></label>
+    <label class="f">Tijd<input type="time" name="due_time" value="{{ s.due_time or '' }}"></label>
+    <label class="f">Herinnering<select name="remind">{% for v, l in REMIND_OPTS %}{{ opt(v, l, s.remind or '') }}{% endfor %}</select></label>
+  </div>
+  {{ repeatfields(s, WEEKDAY_NAMES, FREQS, wdays, edit=True) }}
+  <label class="check"><input type="checkbox" name="remind_mail" value="1" {{ 'checked' if s.remind_mail }}> Herinnering ook per mail</label>
+  <label class="f">Notitie<textarea name="description" rows="2">{{ s.description or '' }}</textarea></label>
+  <div class="actions"><button class="btn primary" name="action" value="opslaan">Opslaan</button></div>
+</form>
+<section class="card">
+  <div class="card-head"><h2>Laatste keren</h2></div>
+  <div class="tklist">{% for t in recent %}{{ taskrow(t) }}{% else %}<div class="empty">Nog geen taak aangemaakt{% if s.next %}; de eerste komt {{ s.next }}{% endif %}.</div>{% endfor %}</div>
+</section>
+{% endblock %}

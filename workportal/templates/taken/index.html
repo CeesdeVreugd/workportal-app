@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
-{% from "taken/_form.html" import taskfields, taskrow %}
+{% from "taken/_form.html" import taskfields, taskrow, repeatfields %}
 {% block title %}Taken{% endblock %}
 {% block content %}
 <div class="pagehead">
@@ -12,19 +12,32 @@
   {% if prefill.link_url %}<input type="hidden" name="link_url" value="{{ prefill.link_url }}"><input type="hidden" name="link_label" value="{{ prefill.link_label or '' }}">
   <div class="small muted">Gekoppeld aan <a href="{{ prefill.link_url }}">{{ prefill.link_label or prefill.link_url }}</a></div>{% endif %}
   {{ taskfields(staff, REMIND_OPTS, prefill=prefill) }}
+  <label class="check"><input type="checkbox" name="repeat" value="1" {{ 'checked' if view == 'vast' }} onchange="document.getElementById('rpnew').hidden=!this.checked"> {{ icon('refresh') }} Vaste taak: herhalen</label>
+  {{ repeatfields(None, WEEKDAY_NAMES, FREQS, [0], edit=(view == 'vast')) }}
   <div class="actions"><button class="btn primary">{{ icon('check') }}Toevoegen</button><button class="btn ghost" type="button" data-toggle-form="tknew">Annuleren</button></div>
 </form>
 <nav class="seg" aria-label="Weergave">
   <a href="{{ url_for('taken.index') }}" class="{{ 'active' if view == 'open' }}">Mijn taken{% if counts.open %} ({{ counts.open }}){% endif %}</a>
   <a href="{{ url_for('taken.index', v='uitgezet') }}" class="{{ 'active' if view == 'uitgezet' }}">Uitgezet{% if counts.uitgezet %} ({{ counts.uitgezet }}){% endif %}</a>
+  <a href="{{ url_for('taken.index', v='vast') }}" class="{{ 'active' if view == 'vast' }}">Vaste taken{% if counts.vast %} ({{ counts.vast }}){% endif %}</a>
   <a href="{{ url_for('taken.index', v='klaar') }}" class="{{ 'active' if view == 'klaar' }}">Afgerond</a>
 </nav>
+{% if view == 'vast' %}
+<section class="card">
+  <div class="card-head"><h2>Vaste taken</h2><span class="small muted">komen vanzelf terug op de gekozen dagen</span></div>
+  <div class="tklist">{% for s in series %}
+    <div class="tkrow"><span class="tkcheck" aria-hidden="true" style="font-size:18px;color:var(--muted)">{{ icon('refresh') }}</span>
+      <a class="tktxt" href="{{ url_for('taken.series_edit', sid=s.id) }}"><b>{{ s.title }}</b>{% if not s.active %} <span class="badge">gepauzeerd</span>{% endif %}
+        <span class="small muted">{{ s.label }} · voor {{ s.assignee or 'niemand' }}{% if s.created_by != g.user.id and s.creator %} · van {{ s.creator }}{% endif %}{% if s.next %} · volgende: {{ s.next }}{% endif %}</span></a></div>
+  {% else %}<div class="empty">Nog geen vaste taken. Klik op <b>Nieuwe taak</b> en vink <b>Vaste taak: herhalen</b> aan.</div>{% endfor %}</div>
+</section>
+{% endif %}
 {% for key, label, rows in groups %}
 <section class="card tkgroup tk-{{ key }}">
   {% if label %}<div class="card-head"><h2>{{ label }} <span class="muted small">({{ rows|length }})</span></h2></div>{% endif %}
   <div class="tklist">{% for t in rows %}{{ taskrow(t) }}{% endfor %}</div>
 </section>
-{% else %}
+{% else %}{% if view != 'vast' %}
 <div class="card"><div class="empty">{% if view == 'open' %}Geen open taken. Maak er een met <b>Nieuwe taak</b>.{% elif view == 'uitgezet' %}Je hebt geen taken bij collega's open staan.{% else %}Nog niets afgerond.{% endif %}</div></div>
-{% endfor %}
+{% endif %}{% endfor %}
 {% endblock %}
