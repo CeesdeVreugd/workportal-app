@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V231: goedkeuren factuur met mailvoorbeeld, melding alleen in de app"
+set "OMSCHRIJVING=WorkPortal V232: verzonden facturen weg uit Nieuwe facturen, als open in het overzicht"
 
 echo.
 echo ============================================

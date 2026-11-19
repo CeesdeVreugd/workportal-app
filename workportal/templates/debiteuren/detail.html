@@ -53,7 +53,7 @@
     {% if s.order_no %}<dt>Onze ref.</dt><dd>{% if proj %}<a href="{{ werk_url('detail', proj.kind, pid=proj.id) }}">{{ 'Order' if proj.kind == 'order' else 'Project' }} {{ proj.number }} {{ proj.name or '' }}</a>{% else %}{{ s.order_no }}{% endif %}</dd>{% endif %}
     {% if s.attn %}<dt>T.a.v.</dt><dd>{{ s.attn }}</dd>{% endif %}
     {% if s.mail_to %}<dt>Factuur-e-mail</dt><dd>{{ s.mail_to }}</dd>{% endif %}
-    <dt>Status bijgewerkt</dt><dd>{% if s.status_at %}{{ s.status_at|dt }} uit {{ 'SnelStart' if s.status_source == 'snelstart' else 'Excel' }}{% else %}nog niet{% endif %}{% if s.paid_at %} · betaald gemeld {{ s.paid_at|dt }}{% endif %}</dd>
+    <dt>Status bijgewerkt</dt><dd>{% if s.status_at %}{{ s.status_at|dt }} uit {{ {'snelstart': 'SnelStart', 'verzonden': 'WorkPortal (verzonden)', 'handmatig': 'WorkPortal (met de hand)'}.get(s.status_source, 'Excel') }}{% else %}nog niet{% endif %}{% if s.paid_at %} · betaald gemeld {{ s.paid_at|dt }}{% endif %}</dd>
     <dt>DigiDossier</dt><dd class="small">{{ s.dossier_path or 'nog niet gevonden op DC01' }}</dd>
     {% if s.dossier_reminders %}{% set rems = s.dossier_reminders|fromjson %}<dt>Al herinnerd (DigiDossier)</dt><dd class="small">{% for r in rems %}{{ r.name }}{% if r.modified %} · {{ (r.modified[:19] ~ 'Z')|dt('%d-%m-%Y') }}{% endif %}<br>{% endfor %}</dd>{% endif %}
   </dl>

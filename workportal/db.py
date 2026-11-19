@@ -985,6 +985,11 @@ MIGRATIONS = [
      WHERE created_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 day') AND pdf_file_id IS NOT NULL
        AND IFNULL(status, 'onbekend') <> 'betaald' AND (invoice_date IS NULL OR invoice_date >= date('now', '-14 days'));
     """,
+    # 55 - verkoopfacturen: al verzonden facturen met nog onbekende status als open in het overzicht
+    """
+    UPDATE sales_invoices SET status = 'open', open_amount = COALESCE(open_amount, amount), status_source = 'verzonden', status_at = sent_at
+     WHERE send_state = 'verzonden' AND status = 'onbekend';
+    """,
 ]
 
 

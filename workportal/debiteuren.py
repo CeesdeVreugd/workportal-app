@@ -1996,9 +1996,8 @@ def sending():
     rows = query("SELECT s.*, c.name AS cname, up.name AS prep_name, ua.name AS appr_name FROM sales_invoices s"
                  " LEFT JOIN customers c ON c.id = s.customer_id LEFT JOIN users up ON up.id = s.send_prepared_by"
                  " LEFT JOIN users ua ON ua.id = s.send_approved_by"
-                 " WHERE s.send_state IN ('klaarzetten', 'goedkeuren') OR (s.send_state = 'verzonden' AND s.sent_at >= ?)"
-                 " ORDER BY CASE s.send_state WHEN 'goedkeuren' THEN 0 WHEN 'klaarzetten' THEN 1 ELSE 2 END, s.sent_at DESC, s.number DESC",
-                 ((now_utc() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),))
+                 " WHERE s.send_state IN ('klaarzetten', 'goedkeuren')"
+                 " ORDER BY CASE s.send_state WHEN 'goedkeuren' THEN 0 ELSE 1 END, s.number DESC")
     users = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
     return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
                            prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()),
@@ -2163,6 +2162,9 @@ def send_one(sid):
             conn.execute("UPDATE sales_invoices SET send_state = 'verzonden', sent_at = ?, send_approved_by = ?, send_approved_at = ?,"
                          " send_prepared_by = COALESCE(send_prepared_by, ?), send_note = NULL, updated_at = ? WHERE id = ?",
                          (now, uid if act == "goedkeuren" else None, now if act == "goedkeuren" else None, uid, now, sid))
+            # verzonden = openstaande factuur in het overzicht (tot SnelStart/Excel iets anders zegt)
+            conn.execute("UPDATE sales_invoices SET status = 'open', open_amount = COALESCE(open_amount, amount), status_source = 'verzonden',"
+                         " status_at = ? WHERE id = ? AND status = 'onbekend'", (now, sid))
             _send_log(conn, sid, ("Goedgekeurd en verzonden" if act == "goedkeuren" else "Verzonden") + f" aan {', '.join(to)}"
                       + (f" (cc {', '.join(cc)})" if cc else "") + f" · bijlagen: {', '.join(a[0] for a in atts)}", uid)
             conn.commit()
@@ -2171,7 +2173,7 @@ def send_one(sid):
                 _notify_many(conn, [s["send_prepared_by"]], f"Factuur {s['number']} verzonden", f"Goedgekeurd door {g.user['name']} en verzonden aan {', '.join(to)}.",
                              f"/debiteuren/{sid}/verzenden")
             flash(f"Factuur {s['number']} verzonden aan {', '.join(to)}.", "ok")
-            return redirect(url_for("debiteuren.sending"))
+            return redirect(url_for("debiteuren.detail", sid=sid))
         return redirect(url_for("debiteuren.send_one", sid=sid))
     if not s["send_state"]:
         return redirect(url_for("debiteuren.detail", sid=sid))

@@ -19,7 +19,7 @@
         {% else %}<span class="badge b-ok">Verzonden</span><div class="small muted">{{ r.sent_at|dt('%d-%m %H:%M') }}{% if r.appr_name %} · goedgekeurd door {{ r.appr_name }}{% endif %}</div>{% endif %}</td>
       <td class="hide-m small">{{ r.send_to or '–' }}</td>
     </tr>
-    {% else %}<tr><td colspan="5" class="empty">Geen nieuwe facturen. Zodra een nieuwe factuur in het DigiDossier staat, komt hij hier en krijgt de administratie een melding.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="5" class="empty">Geen nieuwe facturen om klaar te zetten of goed te keuren. Verzonden facturen staan bij Facturen. Zodra een nieuwe factuur in het DigiDossier staat, komt hij hier en krijgt de administratie een melding.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>
