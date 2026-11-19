@@ -1280,6 +1280,11 @@ def scheduled_poll(conn, app, state):
     state["cred_poll"] = t
     try:
         n, _ = poll_mailbox(conn, _upload_dir(app))
+        if _setting(conn, "cred_repair_v1", "") != "1":   # eenmalig: ten onrechte gearchiveerde mails terug
+            k = repair_archived(conn)
+            _set(conn, "cred_repair_v1", "1")
+            if k:
+                print(f"[WorkPortal] Inkoopfacturen: {k} mail(s) uit de Verwerkt-map terug naar Postvak IN", flush=True)
         _set(conn, "cred_last_poll", now_iso())
         _set(conn, "cred_last_error", "")
         if n:
@@ -1886,9 +1891,17 @@ def archive_mails(conn, iid, box, folder, back=False):
         skip = {fid} | {x for x in (graph_wellknown_id(box, "deleteditems"), graph_wellknown_id(box, "drafts")) if x}
         inbox = graph_wellknown_id(box, "inbox") if back else None
         msgs = {}
+        # Niet blind de hele mailwisseling: sommige leveranciers (facturatiesystemen) zetten al hun mails in één
+        # 'gesprek', en een betaalvraag in hetzelfde gesprek is nog niet afgehandeld. Daarom alleen: de factuurmail,
+        # de mails die aan deze kaart gekoppeld zijn, en onze eigen (verzonden) mails in het gesprek.
+        own = box.lower()
+        other_cards = {(x["mail_id"] or "").split(":")[0] for x in conn.execute(
+            "SELECT mail_id FROM invoices WHERE id <> ? AND source = 'mail' AND mail_id IS NOT NULL", (iid,))}
         for c in convs:
-            for m in graph_conversation(box, c):
-                msgs[m["id"]] = m.get("parentFolderId")
+            for m in graph_conversation(box, c, fields="id,parentFolderId,from"):
+                frm = (((m.get("from") or {}).get("emailAddress") or {}).get("address") or "").lower()
+                if (frm == own or m["id"] in ids) and m["id"] not in other_cards:
+                    msgs[m["id"]] = m.get("parentFolderId")
         for mid in ids:   # bijv. een reactie die alleen via [WP-F] in het onderwerp gekoppeld is
             msgs.setdefault(mid, None)
         moved, newid = 0, {}
@@ -1965,6 +1978,42 @@ def _owner_name(conn):
 
 def _archive_folder(conn):
     return (_setting(conn, "cred_done_folder", DONE_FOLDER) or DONE_FOLDER).strip() or DONE_FOLDER
+
+
+def repair_archived(conn, box=None):
+    """Eenmalig/op verzoek: factuurmails van kaarten die NIET zijn afgerond maar wel in de Verwerkt-map staan
+    (bijv. meegenomen omdat ze in hetzelfde mailgesprek zaten) terug naar Postvak IN. Geeft het aantal."""
+    from .mail import graph_configured, graph_message, graph_folder_id, graph_move, graph_wellknown_id, GraphError
+    if not graph_configured():
+        return 0
+    box = box or _setting(conn, "cred_mailbox", DEFAULT_MAILBOX)
+    folder = _archive_folder(conn)
+    try:
+        fid, inbox = graph_folder_id(box, folder), graph_wellknown_id(box, "inbox")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WorkPortal] Verwerkt-map controleren: {exc}", flush=True)
+        return 0
+    if not (fid and inbox):
+        return 0
+    n = 0
+    rows = conn.execute("SELECT id, mail_id FROM invoices WHERE source = 'mail' AND mail_id IS NOT NULL AND IFNULL(is_reminder, 0) = 0"
+                        " AND NOT (status IN ('snelstart', 'afgewezen') AND IFNULL(mail_archive, '') IN ('verplaatst', 'afgerond', 'bezig'))").fetchall()
+    for r in rows:
+        mid = r["mail_id"].split(":")[0]
+        gm = graph_message(box, mid, fields="id,parentFolderId")
+        if not gm or gm.get("parentFolderId") != fid:
+            continue
+        try:
+            nid = graph_move(box, mid, inbox)
+        except GraphError:
+            continue
+        if nid:
+            conn.execute("UPDATE invoices SET mail_id = ? WHERE id = ?", (nid + r["mail_id"][len(mid):], r["id"]))
+        conn.execute("UPDATE invoices SET mail_archive = NULL WHERE id = ? AND mail_archive = 'verplaatst'", (r["id"],))
+        log(conn, r["id"], f"Mail stond in '{folder}' terwijl de factuur nog niet is afgerond: teruggezet naar Postvak IN")
+        conn.commit()
+        n += 1
+    return n
 
 
 def _ask_archive(conn, iid, actor):

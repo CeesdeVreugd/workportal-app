@@ -1020,6 +1020,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V235 (2.25.1)
+- Inkoopfacturen › afronden: niet meer de hele mailwisseling naar 01-Verwerkt. Alleen de factuurmail zelf, de mails die aan de kaart gekoppeld zijn en onze eigen (verzonden) mails. Andere mails in hetzelfde 'gesprek' blijven staan: facturen met een eigen kaart (sommige facturatiesystemen zetten al hun mails in één gesprek) en vragen die nog niet aan de kaart hangen.
+- Eenmalig na de update: factuurmails van kaarten die nog níet zijn afgerond maar wel in 01-Verwerkt staan, gaan terug naar Postvak IN (met een regel in het logboek van de kaart).
+
 ## V234 (2.25.0)
 - Taken › **vaste (terugkerende) taken**. Bij Nieuwe taak "Vaste taak: herhalen" aanvinken: elke dag, elke werkdag, elke week (op gekozen dagen, eventueel om de x weken) of elke maand (op dag n of de laatste dag). Op de dag zelf maakt WorkPortal een gewone taak aan voor de uitvoerder (met tijd en herinnering), te herkennen aan "↻ vaste taak". Gemiste dagen (server uit): alleen de laatste keer.
 - Nieuw tabblad **Vaste taken** met per reeks: ritme, voor wie, volgende keer. Openen om te wijzigen (geldt voor de volgende keren), te pauzeren/hervatten of te verwijderen (al aangemaakte taken blijven staan); met de laatste keren.
