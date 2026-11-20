@@ -1344,7 +1344,7 @@ def _load(iid):
 def _notify(user_id, title, body, iid):
     try:
         from .notify import notify_user
-        notify_user(get_db(), user_id, title, body, url=url_for("crediteuren.detail", iid=iid))
+        notify_user(get_db(), user_id, title, body, url=url_for("crediteuren.detail", iid=iid) + "#gesprek", email="auto")
     except Exception:
         traceback.print_exc()
 
@@ -2490,6 +2490,8 @@ def note_done(iid, nid):
 def question_cancel(iid):
     """Open vraag aan een collega intrekken (de melding 'Vraag open bij …' verdwijnt)."""
     r = _load(iid)
+    if r["question_to"] and not (r["question_by"] == g.user["id"] or (can(MODULE, BEHEER) and r["question_to"] != g.user["id"])):
+        abort(403)   # alleen wie de vraag stelde (of de beheerder) trekt hem in
     if r["question_to"]:
         conn = get_db()
         conn.execute("UPDATE invoices SET question_to = NULL, question_by = NULL, question_at = NULL, updated_at = ? WHERE id = ?",

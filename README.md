@@ -1020,6 +1020,13 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V237 (2.25.3)
+- Inkoopfacturen: meldingen (vragen, antwoorden e.d.) alleen nog in de app (pushmelding). Alleen als iemand geen werkende meldingen heeft aanstaan, gaat er een mail. Nieuw in notify_user: email="auto".
+
+## V236 (2.25.2)
+- Inkoopfacturen › interne vragen: de melding opent de factuur bij het interne gesprek, maar het antwoordvak staat niet meer vanzelf open (knop *Antwoord geven…*). De formulieren voor antwoord/opmerking en vraag stellen bewaren geen concept meer (er bleef een concept staan na versturen).
+- *Vraag intrekken* alleen nog voor wie de vraag stelde (of de beheerder, als de vraag niet aan hemzelf is); wie de vraag krijgt ziet de knop niet.
+
 ## V235 (2.25.1)
 - Inkoopfacturen › afronden: niet meer de hele mailwisseling naar 01-Verwerkt. Alleen de factuurmail zelf, de mails die aan de kaart gekoppeld zijn en onze eigen (verzonden) mails. Andere mails in hetzelfde 'gesprek' blijven staan: facturen met een eigen kaart (sommige facturatiesystemen zetten al hun mails in één gesprek) en vragen die nog niet aan de kaart hangen.
 - Eenmalig na de update: factuurmails van kaarten die nog níet zijn afgerond maar wel in 01-Verwerkt staan, gaan terug naar Postvak IN (met een regel in het logboek van de kaart).

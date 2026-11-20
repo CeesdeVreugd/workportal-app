@@ -35,10 +35,17 @@ def push_user(conn, user_id, title, body, url="/"):
 
 
 def notify_user(conn, user_id, title, body, url="/", email=True):
+    """Melding in de app (push). email=True: ook een mail; email="auto": alleen een mail als de persoon geen
+    (werkende) meldingen in de app heeft aanstaan."""
     user = conn.execute("SELECT * FROM users WHERE id = ? AND active = 1", (user_id,)).fetchone()
     if not user:
         return
-    push_user(conn, user_id, title, body, url)
+    try:
+        sent = push_user(conn, user_id, title, body, url)
+    except Exception:  # noqa: BLE001
+        sent = 0
+    if email == "auto":
+        email = not sent
     if email:
         app_url = os.environ.get("APP_URL", "").rstrip("/")
         link = f"{app_url}{url}" if app_url else url

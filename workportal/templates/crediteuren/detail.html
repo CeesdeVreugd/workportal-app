@@ -64,8 +64,8 @@
 {% endif %}
 {% if r.question_to %}
 <div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
-  {% if r.question_to == g.user.id %}Je antwoord kun je hieronder bij het gesprek plaatsen.{% endif %}
-  {% if can('crediteuren', 2) %}<form method="post" action="{{ url_for('crediteuren.question_cancel', iid=r.id) }}" style="display:inline;margin-left:8px" onsubmit="return confirm({{ ('Vraag aan ' ~ (r.question_name or '') ~ ' intrekken?')|tojson|forceescape }})"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Vraag intrekken</button></form>{% endif %}</div>
+  {% if r.question_to == g.user.id %}Geef je antwoord hieronder bij het interne gesprek met <a href="#gesprek">Antwoord geven…</a>{% endif %}
+  {% if r.question_by == g.user.id or (can('crediteuren', 3) and r.question_to != g.user.id) %}<form method="post" action="{{ url_for('crediteuren.question_cancel', iid=r.id) }}" style="display:inline;margin-left:8px" onsubmit="return confirm({{ ('Vraag aan ' ~ (r.question_name or '') ~ ' intrekken?')|tojson|forceescape }})"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Vraag intrekken</button></form>{% endif %}</div>
 {% endif %}
 
 <div class="grid g2 stack cred-grid">
@@ -211,8 +211,8 @@
       <div class="cred-tools">
 
       {% if edit or r.question_to == g.user.id %}
-      <details class="cred-pop cred-note" {{ 'open' if r.question_to == g.user.id }}><summary class="btn">{{ 'Antwoord geven…' if r.question_to == g.user.id else 'Opmerking plaatsen…' }}</summary>
-      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:12px">
+      <details class="cred-pop cred-note"><summary class="btn">{{ 'Antwoord geven…' if r.question_to == g.user.id else 'Opmerking plaatsen…' }}</summary>
+      <form method="post" action="{{ url_for('crediteuren.comment', iid=r.id) }}" class="form" style="margin-top:12px" data-no-draft>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="f">{{ 'Je antwoord' if r.question_to == g.user.id else 'Interne opmerking of reactie' }}<textarea name="body" rows="3" required></textarea></label>
         <div class="cred-actions">
@@ -226,7 +226,7 @@
       {% endif %}
       {% if edit and r.status not in ('snelstart', 'afgewezen') %}
       <details class="cred-pop"><summary class="btn">Vraag stellen aan collega…</summary>
-        <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form method="post" action="{{ url_for('crediteuren.ask', iid=r.id) }}" class="form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="f">Aan<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
           <label class="f">Vraag<textarea name="body" rows="3" required placeholder="Bijv. klopt het aantal? In de inkoop staan er 10."></textarea></label>
           <div class="cred-actions"><button class="btn primary">Vraag versturen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
