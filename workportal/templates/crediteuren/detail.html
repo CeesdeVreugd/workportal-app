@@ -62,6 +62,14 @@
 <div class="result warn" style="margin-bottom:16px"><b>Vraag bij de leverancier staat open.</b> Zolang die openstaat kan er geen status gegeven of afgerond worden.
   {% if edit %}<span style="margin-left:8px">{{ extdone_btn() }}</span>{% endif %}</div>
 {% endif %}
+{% if r.parked_with %}
+<div class="result warn" style="margin-bottom:16px"><b>Ligt bij {{ r.parked_name }} om uit te zoeken</b>{% if r.parked_by_name %} (neergelegd door {{ r.parked_by_name }} op {{ r.parked_at|dt }}){% endif %}{% if r.parked_note %}: {{ r.parked_note }}{% endif %}
+  <div style="margin-top:8px">
+  {% if r.parked_with == g.user.id %}<form method="post" action="{{ url_for('crediteuren.unpark', iid=r.id) }}" class="inline-form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="text" name="note" placeholder="Wat heb je uitgezocht? (optioneel)" style="min-width:260px"><button class="btn sm primary">{{ icon('check') }}Uitgezocht, terug naar {{ r.parked_by_name or 'administratie' }}</button></form>
+  {% elif r.parked_by == g.user.id or can('crediteuren', 3) %}<form method="post" action="{{ url_for('crediteuren.unpark', iid=r.id) }}" style="display:inline" onsubmit="return confirm('Factuur terughalen van {{ r.parked_name }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm">Terughalen</button></form>{% endif %}
+  </div></div>
+{% endif %}
 {% if r.question_to %}
 <div class="result warn" style="margin-bottom:16px"><b>Vraag open bij {{ r.question_name }}</b>{% if r.question_by_name %} (gesteld door {{ r.question_by_name }} op {{ r.question_at|dt }}){% endif %}.
   {% if r.question_to == g.user.id %}Geef je antwoord hieronder bij het interne gesprek met <a href="#gesprek">Antwoord geven…</a>{% endif %}
@@ -223,6 +231,16 @@
         </div>
       </form>
       </details>
+      {% endif %}
+      {% if edit and r.status not in ('snelstart', 'afgewezen') and not r.parked_with %}
+      <details class="cred-pop"><summary class="btn">Neerleggen bij collega…</summary>
+        <form method="post" action="{{ url_for('crediteuren.park', iid=r.id) }}" class="form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="f">Bij<select name="to_user" required><option value="">Kies een collega</option>{% for u in users %}{% if u.id != g.user.id %}<option value="{{ u.id }}">{{ u.name }}</option>{% endif %}{% endfor %}</select></label>
+          <label class="f">Wat moet er uitgezocht worden?<textarea name="note" rows="3" required placeholder="Bijv. bij welk project hoort dit? Klopt de prijs?"></textarea></label>
+          <label class="check"><input type="checkbox" name="verder" value="1" checked> Daarna door naar de volgende factuur</label>
+          <div class="cred-actions"><button class="btn primary">Neerleggen</button><button type="button" class="btn ghost" data-cancel>Annuleren</button></div>
+          <p class="hint">De factuur gaat uit de verwerkstroom (komt niet meer bij 'Volgende') tot je collega hem teruggeeft. Je collega krijgt een melding.</p>
+        </form></details>
       {% endif %}
       {% if edit and r.status not in ('snelstart', 'afgewezen') %}
       <details class="cred-pop"><summary class="btn">Vraag stellen aan collega…</summary>

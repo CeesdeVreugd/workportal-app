@@ -29,6 +29,7 @@ STATUS = {"nieuw": "Nieuw", "erp": "Verwerkt in Komdex", "buiten": "Verwerkt bui
 STATUS_BADGE = {"nieuw": "b-blue", "erp": "b-purple", "buiten": "b-purple", "ss_eerst": "b-purple", "snelstart": "b-ok",
                 "afgewezen": "b-bad", "vraag": "b-warn", "afronden": "b-warn"}
 TODO_FINISH = ("", "gevraagd", "mislukt")   # mail_archive: Komdex + SnelStart klaar, boekhouder moet nog afronden
+FLOW_OK = " AND parked_with IS NULL AND IFNULL(ext_question, 0) = 0 AND IFNULL(is_reminder, 0) = 0"   # volgende in de stroom
 SQL_FINISH = "i.status = 'snelstart' AND IFNULL(i.mail_archive, '') IN ('', 'gevraagd', 'mislukt')"
 OPEN = ("nieuw", "erp", "buiten", "ss_eerst")   # nog niet afgerond
 TO_SNELSTART = ("erp", "buiten")         # klaar voor SnelStart
@@ -1302,7 +1303,7 @@ def _to_finish(r):
 
 
 def _status_key(r):
-    if r["status"] in OPEN and r["question_to"]:
+    if r["status"] in OPEN and (r["question_to"] or r["parked_with"]):
         return "vraag"
     if _to_finish(r):
         return "afronden"
@@ -1332,7 +1333,8 @@ def _users():
 
 
 def _load(iid):
-    r = query("SELECT i.*, q.name AS question_name, qb.name AS question_by_name, rb.name AS rejected_name FROM invoices i"
+    r = query("SELECT i.*, q.name AS question_name, qb.name AS question_by_name, rb.name AS rejected_name,"
+              " (SELECT name FROM users WHERE id = i.parked_with) AS parked_name, (SELECT name FROM users WHERE id = i.parked_by) AS parked_by_name FROM invoices i"
               " LEFT JOIN users q ON q.id = i.question_to LEFT JOIN users qb ON qb.id = i.question_by"
               " LEFT JOIN users rb ON rb.id = i.rejected_by"
               " WHERE i.id = ?", (iid,), one=True)
@@ -1355,14 +1357,14 @@ def open_counts():
     if not getattr(g, "user", None) or not can(MODULE):
         return {}
     uid = g.user["id"]
-    r = query("SELECT SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR ext_question = 1)) AS vraag,"
+    r = query("SELECT SUM(status='nieuw' AND question_to IS NULL AND parked_with IS NULL) AS nieuw,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR parked_with IS NOT NULL OR ext_question = 1)) AS vraag,"
               " SUM(status IN ('nieuw','erp','buiten')) AS erp,"
-              " SUM(status IN ('nieuw','ss_eerst') AND ext_question = 0 AND question_to IS NULL) AS komdex_todo,"
-              " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NULL) AS ss_todo,"
+              " SUM(status IN ('nieuw','ss_eerst') AND ext_question = 0 AND question_to IS NULL AND parked_with IS NULL) AS komdex_todo,"
+              " SUM(status IN ('nieuw','erp','buiten') AND question_to IS NULL AND parked_with IS NULL) AS ss_todo,"
               " SUM(" + SQL_FINISH.replace("i.", "") + " AND ext_question = 0 AND question_to IS NULL) AS fin_todo,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND question_to = ?) AS mij FROM invoices"
-              " WHERE IFNULL(is_reminder, 0) = 0", (uid,), one=True)
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to = ? OR parked_with = ?)) AS mij FROM invoices"
+              " WHERE IFNULL(is_reminder, 0) = 0", (uid, uid), one=True)
     rem = query("SELECT COUNT(*) AS n FROM invoices WHERE is_reminder = 1 AND reminder_done_at IS NULL", one=True)["n"] or 0
     out = {k: (r[k] or 0) for k in ("nieuw", "vraag", "erp", "mij")}
     out["herinneringen"] = 0
@@ -1424,11 +1426,11 @@ def index():
     cond = {
         "open": "(i.status IN ('nieuw','erp','buiten','ss_eerst') OR " + SQL_FINISH + ")",
         "afronden": SQL_FINISH,
-        "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL",
+        "nieuw": "i.status = 'nieuw' AND i.question_to IS NULL AND i.parked_with IS NULL",
         "erp": "i.status IN ('nieuw','erp','buiten')",       # nog te boeken in SnelStart (Komdex gedaan of nog niet)
         "komdex": "i.status IN ('nieuw','ss_eerst')",        # nog te verwerken in Komdex (SnelStart gedaan of nog niet)
-        "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (i.question_to IS NOT NULL OR i.ext_question = 1)",
-        "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND i.question_to = ?",
+        "vraag": "i.status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (i.question_to IS NOT NULL OR i.parked_with IS NOT NULL OR i.ext_question = 1)",
+        "mij": "i.status IN ('nieuw','erp','buiten','ss_eerst') AND (i.question_to = ? OR i.parked_with = ?)",
         "boekhouding": "i.status <> 'snelstart' AND EXISTS (SELECT 1 FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0)",
         "afgewezen": "i.status = 'afgewezen'",
         "klaar": "i.status = 'snelstart' AND NOT (" + SQL_FINISH + ")",
@@ -1441,7 +1443,7 @@ def index():
     where.append(cond[flt])
     where.append("IFNULL(i.is_reminder, 0) = 0")   # betalingsherinneringen staan op een eigen tabblad
     if flt == "mij":
-        params.append(uid)
+        params += [uid, uid]
     if q:
         terms = [t for t in q.split() if t][:6]
         for t in terms:   # elk woord moet ergens voorkomen (leverancier, nummer, inkoopnummer, omschrijving, onderwerp, afzender, bedrag)
@@ -1451,6 +1453,7 @@ def index():
             params += [f"%{t}%"] * 6 + [f"%{amt}%", f"%{t}%"]
     rows = query(
         "SELECT i.*, q.name AS question_name, (SELECT name FROM users WHERE id = i.rejected_by) AS rejected_name,"
+        " (SELECT name FROM users WHERE id = i.parked_with) AS parked_name,"
         " (SELECT COUNT(*) FROM invoice_notes n WHERE n.invoice_id = i.id AND n.for_accounting = 1 AND IFNULL(n.handled, 0) = 0) AS acc_notes,"
         " (SELECT n.kind FROM invoice_notes n WHERE n.invoice_id = i.id AND n.kind IN ('mail_uit', 'mail_in')"
         "   ORDER BY n.created_at DESC, n.id DESC LIMIT 1) AS last_mail,"
@@ -1459,14 +1462,14 @@ def index():
         " FROM invoices i LEFT JOIN users q ON q.id = i.question_to WHERE " + " AND ".join(where) +
         " ORDER BY CASE WHEN i.status IN ('nieuw','erp','buiten','ss_eerst') THEN 0 ELSE 1 END, i.received_at DESC, i.id DESC LIMIT 500", params)
     fin = SQL_FINISH.replace("i.", "")
-    c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst') OR (" + fin + ")) AS open, SUM(" + fin + ") AS afronden, SUM(status='nieuw' AND question_to IS NULL) AS nieuw,"
+    c = query("SELECT SUM(status IN ('nieuw','erp','buiten','ss_eerst') OR (" + fin + ")) AS open, SUM(" + fin + ") AS afronden, SUM(status='nieuw' AND question_to IS NULL AND parked_with IS NULL) AS nieuw,"
               " SUM(status IN ('nieuw','erp','buiten')) AS erp, SUM(status IN ('nieuw','ss_eerst')) AS komdex,"
-              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR ext_question = 1)) AS vraag,"
-              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND question_to = ?) AS mij, SUM(status='afgewezen') AS afgewezen,"
+              " SUM(status IN ('erp','buiten')) AS erp_klaar, SUM(status = 'ss_eerst') AS ss_klaar, SUM(status IN ('nieuw','erp','buiten','ss_eerst','snelstart') AND (question_to IS NOT NULL OR parked_with IS NOT NULL OR ext_question = 1)) AS vraag,"
+              " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND (question_to = ? OR parked_with = ?)) AS mij, SUM(status='afgewezen') AS afgewezen,"
               " SUM(status='snelstart' AND NOT (" + fin + ")) AS klaar, COUNT(*) AS alle,"
               " SUM(status IN ('nieuw','erp','buiten','ss_eerst') AND due_date IS NOT NULL AND due_date <= date('now','+7 day')) AS verval,"
               " SUM(status = 'afgewezen' AND rejected_at >= date('now','start of month')) AS af_maand"
-              " FROM invoices WHERE IFNULL(is_reminder, 0) = 0", (uid,), one=True)
+              " FROM invoices WHERE IFNULL(is_reminder, 0) = 0", (uid, uid), one=True)
     counts = {k: (c[k] or 0) for k in c.keys()}
     rc = query("SELECT SUM(reminder_done_at IS NULL) AS o, SUM(reminder_done_at IS NOT NULL) AS d, COUNT(*) AS a FROM invoices WHERE is_reminder = 1", one=True)
     counts["herinneringen"], counts["herinneringen_af"] = rc["o"] or 0, rc["d"] or 0
@@ -1567,9 +1570,9 @@ def detail(iid):
     if changed_msg:
         lane = request.args.get("baan")
         want = {"komdex": ("nieuw", "ss_eerst"), "snelstart": ("nieuw", "erp", "buiten")}.get(lane, OPEN)
-        next_inv = query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL"
+        next_inv = query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL{FLOW_OK}"
                          f" AND status IN ({','.join('?' * len(want))}) ORDER BY received_at, id LIMIT 1", [iid, *want], one=True) \
-            or query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL"
+            or query(f"SELECT id, supplier, invoice_no, status FROM invoices WHERE id <> ? AND question_to IS NULL{FLOW_OK}"
                      f" AND status IN ({','.join('?' * len(OPEN))}) ORDER BY received_at, id LIMIT 1", [iid, *OPEN], one=True)
     back = safe_path(request.args.get("terug"), url_for("crediteuren.index"))
     attachments = query("SELECT * FROM files WHERE entity = 'invoice' AND entity_id = ? AND kind = 'attachment' ORDER BY id", (iid,))
@@ -2075,6 +2078,8 @@ def status_chips(r, colors):
         out.append(("Nieuw", "#0059B3"))
     if r["question_to"]:
         out.append(("Vraag open bij " + ((r["question_name"] if "question_name" in keys else None) or "collega"), colors["vraag"]))
+    if r["parked_with"]:
+        out.append(("Ligt bij " + ((r["parked_name"] if "parked_name" in keys else None) or "collega"), colors["vraag"]))
     if r["ext_question"]:
         out.append(("Vraag bij leverancier", colors["vraag"]))
     if _to_finish(r):
@@ -2483,6 +2488,56 @@ def note_done(iid, nid):
         log(conn, iid, "Opmerking voor de boekhouding " + ("weer open gezet" if n["handled"] else "afgehandeld"), g.user["id"])
         conn.commit()
     return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
+
+
+@bp.route("/<int:iid>/neerleggen", methods=["POST"])
+@require(MODULE, BEWERKEN)
+def park(iid):
+    """Factuur neerleggen bij een collega om uit te zoeken: hij gaat uit de verwerkstroom tot de collega hem teruggeeft."""
+    r = _load(iid)
+    to = request.form.get("to_user", type=int)
+    note = (request.form.get("note") or "").strip()[:2000]
+    target = query("SELECT id, name FROM users WHERE id = ? AND active = 1", (to,), one=True) if to else None
+    if not target or not note:
+        flash("Kies een collega en schrijf wat er uitgezocht moet worden.", "error")
+        return redirect(url_for("crediteuren.detail", iid=iid) + "#gesprek")
+    conn, now, uid = get_db(), now_iso(), g.user["id"]
+    conn.execute("UPDATE invoices SET parked_with = ?, parked_by = ?, parked_at = ?, parked_note = ?, updated_at = ? WHERE id = ?",
+                 (target["id"], uid, now, note, now, iid))
+    conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, to_user, created_by, created_at) VALUES (?,?,?,?,?,?)",
+                 (iid, "opmerking", f"Neergelegd bij {target['name']} om uit te zoeken: {note}", target["id"], uid, now))
+    log(conn, iid, f"Neergelegd bij {target['name']}", uid)
+    conn.commit()
+    if target["id"] != uid:
+        _notify(target["id"], f"Factuur uitzoeken: {r['supplier'] or ''} {r['invoice_no'] or ''}".strip(),
+                f"{g.user['name']} heeft deze factuur bij je neergelegd: {note[:400]}", iid)
+    flash(f"Neergelegd bij {target['name']}. De factuur komt niet meer in de verwerkstroom tot {target['name']} hem teruggeeft.", "success")
+    nxt = query(f"SELECT id FROM invoices WHERE id <> ? AND question_to IS NULL{FLOW_OK}"
+                + f" AND status IN ({','.join('?' * len(OPEN))}) ORDER BY received_at, id LIMIT 1", [iid, *OPEN], one=True)
+    return redirect(url_for("crediteuren.detail", iid=nxt["id"]) if nxt and request.form.get("verder") else url_for("crediteuren.index"))
+
+
+@bp.route("/<int:iid>/teruggeven", methods=["POST"])
+@require(MODULE)
+def unpark(iid):
+    r = _load(iid)
+    uid = g.user["id"]
+    if not r["parked_with"]:
+        return redirect(url_for("crediteuren.detail", iid=iid))
+    if uid not in (r["parked_with"], r["parked_by"]) and not can(MODULE, BEHEER):
+        abort(403)
+    note = (request.form.get("note") or "").strip()[:2000]
+    conn, now = get_db(), now_iso()
+    conn.execute("UPDATE invoices SET parked_with = NULL, parked_at = NULL, parked_note = NULL, updated_at = ? WHERE id = ?", (now, iid))
+    by_me = uid == r["parked_with"]
+    txt = (f"Uitgezocht en teruggegeven door {g.user['name']}" if by_me else f"Teruggehaald van {r['parked_name'] or 'collega'}") + (f": {note}" if note else "")
+    conn.execute("INSERT INTO invoice_notes (invoice_id, kind, body, created_by, created_at) VALUES (?,?,?,?,?)", (iid, "antwoord" if by_me else "opmerking", txt, uid, now))
+    log(conn, iid, "Teruggegeven" if by_me else "Teruggehaald", uid)
+    conn.commit()
+    if by_me and r["parked_by"] and r["parked_by"] != uid:
+        _notify(r["parked_by"], f"Factuur terug: {r['supplier'] or ''} {r['invoice_no'] or ''}".strip(), txt[:400], iid)
+    flash("Teruggegeven: de factuur staat weer in de verwerkstroom." if by_me else "Teruggehaald.", "success")
+    return redirect(url_for("crediteuren.detail", iid=iid))
 
 
 @bp.route("/<int:iid>/vraag-intrekken", methods=["POST"])

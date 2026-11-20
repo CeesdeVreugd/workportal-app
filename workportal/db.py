@@ -1020,6 +1020,13 @@ MIGRATIONS = [
     ALTER TABLE tasks ADD COLUMN series_id INTEGER REFERENCES task_series(id) ON DELETE SET NULL;
     CREATE INDEX idx_tasks_series ON tasks(series_id, due_date);
     """,
+    # 58 - inkoopfacturen: factuur neerleggen bij een collega om uit te zoeken (uit de verwerkstroom tot hij terug is)
+    """
+    ALTER TABLE invoices ADD COLUMN parked_with INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE invoices ADD COLUMN parked_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE invoices ADD COLUMN parked_at TEXT;
+    ALTER TABLE invoices ADD COLUMN parked_note TEXT;
+    """,
 ]
 
 

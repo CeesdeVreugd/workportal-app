@@ -1020,6 +1020,11 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V238 (2.26.0)
+- Inkoopfacturen › **Neerleggen bij collega…** (bij het interne gesprek): kies een collega en schrijf wat er uitgezocht moet worden; standaard daarna door naar de volgende factuur. De factuur gaat uit de verwerkstroom: komt niet meer bij 'Volgende' na een status, telt niet mee bij 'Nog in Komdex/SnelStart' en staat bij het filter Vraag open (en bij 'Wacht op mij' voor de collega). Gele balk "Ligt bij … om uit te zoeken"; de collega klikt *Uitgezocht, terug naar …* (met toelichting), wie neerlegde kan *Terughalen*. Meldingen in de app.
+- 'Volgende' slaat ook facturen met een open vraag bij de leverancier en betalingsherinneringen over.
+- Database: migratie 58 (parked_with/by/at/note).
+
 ## V237 (2.25.3)
 - Inkoopfacturen: meldingen (vragen, antwoorden e.d.) alleen nog in de app (pushmelding). Alleen als iemand geen werkende meldingen heeft aanstaan, gaat er een mail. Nieuw in notify_user: email="auto".
 
