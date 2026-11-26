@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V238: inkoopfactuur neerleggen bij collega, uit de verwerkstroom"
+set "OMSCHRIJVING=WorkPortal V239: aantekening afronden vraagt naar single export CADdossier"
 
 echo.
 echo ============================================

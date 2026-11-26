@@ -1064,3 +1064,37 @@ document.addEventListener("click", function (e) {
     form.addEventListener("submit", function (e) { e.preventDefault(); clearTimeout(timer); last = null; run(); });
   });
 })();
+
+/* Aantekening afronden: eerst vragen of de single export met CADdossier gedraaid is (data-cadcheck op het formulier). */
+(function () {
+  var pending = null, dlg = null;
+  function getDlg() {
+    if (dlg) return dlg;
+    dlg = document.getElementById("caddlg");
+    if (dlg) dlg.addEventListener("click", onClick);
+    return dlg;
+  }
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!getDlg() || !dlg.showModal) return;
+    if (!f.hasAttribute || !f.hasAttribute("data-cadcheck")) return;
+    var inp = f.querySelector('input[name="cad_export"]');
+    if (!inp || inp.value) return;
+    var mode = f.getAttribute("data-cadcheck"), done;
+    if (mode === "button") done = e.submitter && e.submitter.value === "afgerond";
+    else { var sel = f.querySelector('select[name="status"]'); done = sel && sel.value === "afgerond" && f.getAttribute("data-was") !== "afgerond"; }
+    if (!done) return;
+    if (mode === "button") { var ta = f.querySelector("textarea[required]"); if (ta && !ta.value.trim()) return; }   // eerst de browsercontrole
+    e.preventDefault(); e.stopImmediatePropagation();
+    pending = { form: f, submitter: e.submitter, inp: inp };
+    dlg.showModal();
+  }, true);
+  function onClick(e) {
+    var b = e.target.closest("[data-cad]"); if (!b || !pending) return;
+    var k = b.getAttribute("data-cad"); dlg.close();
+    if (k === "nee") { pending = null; return; }
+    pending.inp.value = k === "ja" ? "1" : "nvt";
+    var p = pending; pending = null;
+    if (p.form.requestSubmit) p.form.requestSubmit(p.submitter && p.submitter.form === p.form ? p.submitter : undefined); else p.form.submit();
+  }
+})();

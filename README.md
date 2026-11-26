@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V239 (2.26.1)
+- Aantekeningen › afronden (ook via Bewerken met status Afgerond): eerst een venster "Single export CADdossier gedraaid?" met *Ja, gedraaid – afronden*, *Nee, eerst draaien* (niet afronden) of *Niet nodig (geen tekenwijziging)*. Het antwoord komt onder "Wat is er gedaan" (dus ook in de PDF) en in het logboek. Zonder antwoord weigert de server het afronden.
+
 ## V238 (2.26.0)
 - Inkoopfacturen › **Neerleggen bij collega…** (bij het interne gesprek): kies een collega en schrijf wat er uitgezocht moet worden; standaard daarna door naar de volgende factuur. De factuur gaat uit de verwerkstroom: komt niet meer bij 'Volgende' na een status, telt niet mee bij 'Nog in Komdex/SnelStart' en staat bij het filter Vraag open (en bij 'Wacht op mij' voor de collega). Gele balk "Ligt bij … om uit te zoeken"; de collega klikt *Uitgezocht, terug naar …* (met toelichting), wie neerlegde kan *Terughalen*. Meldingen in de app.
 - 'Volgende' slaat ook facturen met een open vraag bij de leverancier en betalingsherinneringen over.

@@ -31,8 +31,8 @@
     <section class="card" id="afronden">
       {% if a.status != 'afgerond' %}
         <h2>Afronden</h2>
-        <form method="post" class="annform-done" action="{{ url_for(B ~ '.annot_status', pid=p.id, aid=a.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form method="post" class="annform-done" action="{{ url_for(B ~ '.annot_status', pid=p.id, aid=a.id) }}" data-cadcheck="button">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="cad_export" value="">
           <label class="f">Wat is er gedaan? *<textarea name="done_note" rows="4" required placeholder="bijv. Steun 20 mm verplaatst, opnieuw gelast en gecontroleerd"></textarea></label>
           <div class="annbtns">
             <button class="btn primary" name="status" value="afgerond">{{ icon('check') }}Afronden</button>

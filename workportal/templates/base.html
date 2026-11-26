@@ -116,5 +116,10 @@
 <script src="{{ url_for('static', filename='js/print.js') }}?v={{ VERSION }}"></script>
 <script src="{{ url_for('static', filename='js/draft.js') }}?v={{ VERSION }}"></script>
 {% block scripts %}{% endblock %}
+<dialog class="alertdlg" id="caddlg">
+  <h2 style="margin:0 0 8px">Single export CADdossier gedraaid?</h2>
+  <p style="margin:0 0 14px">Is voor deze wijziging de <b>single export met CADdossier</b> gedraaid? Zo niet, doe dat eerst: anders missen bij de volgende stuklijst en het verzamelen van de mapjes de bijbehorende PDF's en STEP-files.</p>
+  <div class="actions" style="margin:0"><button type="button" class="btn primary" data-cad="ja">{{ icon('check') }}Ja, gedraaid – afronden</button><button type="button" class="btn" data-cad="nee">Nee, eerst draaien</button><button type="button" class="btn ghost" data-cad="nvt">Niet nodig (geen tekenwijziging)</button></div>
+</dialog>
 </body>
 </html>

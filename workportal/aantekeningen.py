@@ -201,6 +201,11 @@ def annot_edit(pid, aid=None):
         if v["status"] == "afgerond" and not v["done_note"]:
             flash("Schrijf bij het afronden kort wat er gedaan is.", "error")
             return render_template("werk/aantekening_form.html", seed=request.form.get("image") or "", form=v, **ctx)
+        if v["status"] == "afgerond" and (not a or a["status"] != "afgerond") and not request.form.get("cad_export"):
+            flash("Bevestig bij het afronden of de single export met CADdossier gedraaid is.", "error")
+            return render_template("werk/aantekening_form.html", seed=request.form.get("image") or "", form=v, **ctx)
+        if v["status"] == "afgerond" and (not a or a["status"] != "afgerond"):
+            v["done_note"] = (v["done_note"] + "\n\n" + {"1": "Single export CADdossier gedraaid.", "nvt": "Single export CADdossier niet nodig (geen tekenwijziging)."}.get(request.form.get("cad_export"), "")).strip()
         data = _image_from_dataurl(request.form.get("image"))
         now = now_iso()
         if a:
@@ -277,8 +282,12 @@ def annot_status(pid, aid):
         if not note:
             flash("Schrijf bij het afronden kort wat er gedaan is.", "error")
             return redirect(back + "#afronden")
+        if not request.form.get("cad_export"):
+            flash("Bevestig bij het afronden of de single export met CADdossier gedraaid is.", "error")
+            return redirect(back + "#afronden")
+        note = note + "\n\n" + {"1": "Single export CADdossier gedraaid.", "nvt": "Single export CADdossier niet nodig (geen tekenwijziging)."}.get(request.form.get("cad_export"), "")
         execute("UPDATE project_annotations SET status='afgerond', done_note=?, done_by=?, done_at=?, updated_at=? WHERE id=?",
-                (note, g.user["id"], now, now, aid))
+                (note.strip(), g.user["id"], now, now, aid))
         _notify(a["created_by"], p, a, f"Afgerond: {p['number']} – aantekening {a['number']}",
                 f"{g.user['name']} heeft aantekening {a['number']} ‘{a['title']}’ afgerond.\n\n{note}")
         flash(f"Aantekening {a['number']} afgerond.", "ok")
@@ -286,7 +295,8 @@ def annot_status(pid, aid):
         execute("UPDATE project_annotations SET status=?, updated_at=?, done_at=CASE WHEN ?='afgerond' THEN done_at END WHERE id=?",
                 (st, now, st, aid))
         flash(f"Status: {STATUS_LABEL[st]}.", "ok")
-    audit("aantekening status", "project", pid, f"{a['number']}: {STATUS_LABEL[st]}")
+    cad = {"1": " · single export CADdossier gedraaid", "nvt": " · single export niet nodig"}.get(request.form.get("cad_export") or "", "") if st == "afgerond" else ""
+    audit("aantekening status", "project", pid, f"{a['number']}: {STATUS_LABEL[st]}{cad}")
     _after_change(p)
     return redirect(back)
 
