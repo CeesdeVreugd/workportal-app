@@ -15,8 +15,8 @@
 </div>
 <div class="card cred-flow lin" aria-label="Voortgang">
   <span class="cf-node done"><b>{{ icon('check') }}</b>Uit DigiDossier</span><i class="cf-line {{ 'on' if st != 'klaarzetten' }}"></i>
-  <span class="cf-node {{ 'done' if st != 'klaarzetten' else 'todo' }}"><b>{% if st != 'klaarzetten' %}{{ icon('check') }}{% else %}2{% endif %}</b>Klaarzetten{% if prep_name and st != 'klaarzetten' %} · {{ prep_name }}{% endif %}</span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
-  <span class="cf-node {{ 'done' if st == 'verzonden' else ('todo' if st == 'goedkeuren' else 'off') }}"><b>{% if st == 'verzonden' %}{{ icon('check') }}{% else %}3{% endif %}</b>Goedkeuren{% if appr_names %} ({{ appr_names|join(', ') }}){% endif %}</span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
+  <span class="cf-node {{ 'done' if st != 'klaarzetten' else 'todo' }}"><b>{% if st != 'klaarzetten' %}{{ icon('check') }}{% else %}2{% endif %}</b><span class="cf-txt">{{ 'Klaargezet' if st != 'klaarzetten' else 'Klaarzetten' }}{% if prep_name and st != 'klaarzetten' %}<small>{{ prep_name }}</small>{% endif %}</span></span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
+  <span class="cf-node {{ 'done' if st == 'verzonden' else ('todo' if st == 'goedkeuren' else 'off') }}"><b>{% if st == 'verzonden' %}{{ icon('check') }}{% else %}3{% endif %}</b><span class="cf-txt">Goedkeuren{% if appr %} {{ (appr|select('in', got)|list|length) }}/{{ appr|length }}{% endif %}{% if appr_names %}<small>{{ appr_names|join(', ') }}</small>{% endif %}</span></span><i class="cf-line {{ 'on' if st == 'verzonden' }}"></i>
   <span class="cf-node {{ 'done' if st == 'verzonden' else 'off' }}"><b>{% if st == 'verzonden' %}{{ icon('check') }}{% else %}4{% endif %}</b>{% if st == 'verzonden' %}Verzonden {{ s.sent_at|dt('%d-%m %H:%M') }}{% else %}Verzenden{% endif %}</span>
 </div>
 {% if s.send_note and st == 'klaarzetten' %}<div class="alertbox" style="margin-bottom:12px;display:block"><b>Teruggestuurd:</b> {{ s.send_note }}</div>{% endif %}
@@ -59,7 +59,7 @@
     <dl class="dl mp-head">
       <dt>Van</dt><dd>{{ sender }}</dd>
       <dt>Aan</dt><dd><b>{{ s.send_to or '–' }}</b></dd>
-      <dt>CC</dt><dd>{{ (fixed_cc + (s.send_cc.split(', ') if s.send_cc else []))|join(', ') or '–' }}</dd>
+      <dt>CC</dt><dd>{% for a in fixed_cc + (s.send_cc.split(', ') if s.send_cc else []) %}<span class="mp-addr">{{ a }}</span>{% else %}–{% endfor %}</dd>
       <dt>Onderwerp</dt><dd><b>{{ s.send_subject }}</b></dd>
       <dt>Bijlagen</dt><dd>{% if s.pdf_file_id %}<a href="{{ url_for('main.pdfview', src=url_for('main.file', fid=s.pdf_file_id), terug=request.path, titel='Factuur ' ~ s.number) }}">{{ icon('pdf') }} Factuur_{{ s.number }}.pdf</a>{% endif %}{% for x in extras %}<br><a href="{{ url_for('main.file', fid=x.id) }}" target="_blank" rel="noopener">{{ icon('file') }} {{ x.filename }}</a>{% endfor %}</dd>
     </dl>

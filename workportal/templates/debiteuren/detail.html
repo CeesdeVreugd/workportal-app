@@ -61,8 +61,10 @@
     </section>
 <section class="card" id="verzenden">
   <div class="card-head"><h2>Verzenden aan de klant</h2></div>
-  {% if s.send_state %}<p class="small" style="margin:0 0 8px">{% if s.send_state == 'verzonden' %}Verzonden op {{ s.sent_at|dt }} aan {{ s.send_to }}.{% elif s.send_state == 'goedkeuren' %}Wacht op goedkeuring.{% else %}Klaar te zetten.{% endif %}</p>
+  {% if s.send_state %}<p class="small" style="margin:0 0 8px">{% if s.send_state == 'verzonden' %}Verzonden op {{ s.sent_at|dt }} aan {{ s.send_to }}.
+    {% if s.sp_saved_at %}<br>{{ icon('check') }} In SharePoint{% if s.sp_web_url %}: <a href="{{ s.sp_web_url }}" target="_blank" rel="noopener">Factuur_{{ s.number }}.pdf</a>{% endif %}{% elif s.sp_error %}<br><span style="color:var(--bad,#C62828)">SharePoint: {{ s.sp_error }}</span>{% endif %}{% elif s.send_state == 'goedkeuren' %}Wacht op goedkeuring.{% else %}Klaar te zetten.{% endif %}</p>
     <a class="btn sm" href="{{ url_for('debiteuren.send_one', sid=s.id) }}">{{ icon('mail') }}{{ 'Bekijken' if s.send_state == 'verzonden' else 'Openen' }}</a>
+    {% if s.send_state == 'verzonden' and not s.sp_saved_at and can('debiteuren', 2) %}<form method="post" action="{{ url_for('debiteuren.sp_save_one', sid=s.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm ghost">{{ icon('upload') }}Opslaan in SharePoint</button></form>{% endif %}
   {% elif can('debiteuren', 2) %}<p class="small muted" style="margin:0 0 8px">Deze factuur is niet via WorkPortal verzonden.</p>
     <form method="post" action="{{ url_for('debiteuren.send_one', sid=s.id) }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn sm" name="action" value="start">{{ icon('mail') }}Klaarzetten om te verzenden</button></form>
   {% else %}<p class="small muted" style="margin:0">Niet via WorkPortal verzonden.</p>{% endif %}

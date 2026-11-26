@@ -1348,3 +1348,8 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .itemmenu-body .btn { align-self: flex-start; }
 .card:has(.itemmenu[open]), .rows:has(.itemmenu[open]), #droplist:has(.itemmenu[open]) { overflow: visible; }
 .rowitem:has(.itemmenu[open]) { position: relative; z-index: 5; }
+.cf-node .cf-txt { display: inline-flex; flex-direction: column; line-height: 1.2; white-space: normal; }
+.cf-node .cf-txt small { font-size: 12px; font-weight: 400; font-style: normal; color: var(--muted); }
+.mailprev .dl { grid-template-columns: 100px minmax(0, 1fr); }
+.mailprev .dl dd { overflow-wrap: anywhere; }
+.mp-addr { display: block; }

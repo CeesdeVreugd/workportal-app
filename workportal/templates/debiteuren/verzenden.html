@@ -34,6 +34,8 @@
         {% for u in users %}<label class="check"><input type="checkbox" name="appr" value="{{ u.id }}" {{ 'checked' if u.id in appr }}> {{ u.name }}</label>{% endfor %}
         <p class="hint">{% if not appr %}<b>Nog niemand:</b> zonder controleurs kan wie klaarzet de factuur direct verzenden.{% else %}Alle aangevinkte goedkeurders krijgen een melding; de factuur wordt automatisch verzonden als iedereen heeft goedgekeurd.{% endif %}</p></fieldset>
     </div>
+    <label class="f" style="margin-top:12px">SharePoint-map voor verzonden facturen<input type="url" name="sp_link" value="{{ sp_link }}" placeholder="Plak de link van de map 01-Uitgaande facturen">
+      <span class="hint">{% if sp_name %}Gekoppeld: {% if sp_web %}<a href="{{ sp_web }}" target="_blank" rel="noopener">{{ sp_name }}</a>{% else %}{{ sp_name }}{% endif %}. {% endif %}Elke verzonden factuur komt hierin, in een map per jaar (wordt aangemaakt als hij er nog niet is). Open de map in SharePoint en kopieer de link uit de adresbalk.</span></label>
     <label class="f" style="margin-top:12px">Altijd in CC<input type="text" name="fixed_cc" value="{{ fixed_cc }}"><span class="hint">Gaat bij elke verzonden factuur mee in CC. Meerdere adressen scheiden met een komma.</span></label>
     <div class="actions"><button class="btn primary">Opslaan</button></div>
   </form></details></section>

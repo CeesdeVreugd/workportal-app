@@ -1020,6 +1020,15 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V243 (2.27.2)
+- Verkoopfacturen › bedrag uit de PDF: het **eindtotaal** (de laatste regel 'Totaal …', niet 'excl./netto') in plaats van de eerste totaalregel. Eenmalig worden alle factuur-PDF's opnieuw uitgelezen (PARSE_VERSION 7); een bedrag dat eerder uit de PDF kwam wordt gecorrigeerd (bedragen uit SnelStart/Excel blijven staan).
+- Verzendscherm: voortgangsbalk met korte stappen en namen op een tweede regel (geen overlappende tekst), "Goedkeuren x/y"; mailvoorbeeld met smallere labelkolom en CC-adressen onder elkaar.
+
+## V242 (2.27.1)
+- Verkoopfacturen: na verzenden wordt de factuur-PDF opgeslagen in SharePoint, in de map die is ingesteld bij Nieuwe facturen › Instellingen (*SharePoint-map voor verzonden facturen*, bijv. Administratie › Documents › 20-Debiteuren › 01-Uitgaande facturen), in een submap per jaar (factuurdatum; wordt aangemaakt) als Factuur_<nummer>.pdf. Mislukt het, dan probeert de planner het elk kwartier opnieuw; ook al verzonden facturen worden zo alsnog opgeslagen. Op de factuurkaart: link naar het bestand, of de fout met knop *Opslaan in SharePoint*.
+- Let op: de app-registratie (Sites.Selected) heeft per site schrijfrecht nodig, dus ook op de site Administratie.
+- Database: migratie 59 (sp_saved_at, sp_web_url, sp_error).
+
 ## V241 (2.27.0)
 - Project-/ordermap: bij elke map en elk bestand een menu **⋯** met *Naam wijzigen* (bij een bestand blijft de extensie staan als je hem weglaat), *Verplaatsen naar* (lijst van alle mappen in de projectmap) en *Verwijderen* (map met inhoud of bestand; gaat naar de prullenbak van SharePoint, met bevestiging). Hoofdmappen (zoals 3 Documenten) kan alleen een beheerder verwijderen. Alles wordt gelogd.
 

@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V241: projectmap - hernoemen, verplaatsen en verwijderen van mappen en bestanden"
+set "OMSCHRIJVING=WorkPortal V243: juist factuurbedrag (eindtotaal) en uitlijning verzendscherm"
 
 echo.
 echo ============================================

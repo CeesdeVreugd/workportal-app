@@ -1027,6 +1027,12 @@ MIGRATIONS = [
     ALTER TABLE invoices ADD COLUMN parked_at TEXT;
     ALTER TABLE invoices ADD COLUMN parked_note TEXT;
     """,
+    # 59 - verkoopfacturen: verzonden factuur ook in SharePoint (Administratie > 20-Debiteuren > 01-Uitgaande facturen > jaar)
+    """
+    ALTER TABLE sales_invoices ADD COLUMN sp_saved_at TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN sp_web_url TEXT;
+    ALTER TABLE sales_invoices ADD COLUMN sp_error TEXT;
+    """,
 ]
 
 

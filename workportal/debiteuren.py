@@ -362,9 +362,11 @@ def parse_pdf(data):
         from datetime import timedelta
         out["due_date"] = (date.fromisoformat(out["invoice_date"]) + timedelta(days=days)).isoformat()
         out["due_from_terms"] = days if m else "standaard 30"
-    m = re.search(r"^\s*(?:totaal|total|gesamt(?:betrag)?|te betalen)\b[^\n\d€-]*€?\s*(-?\s*[\d.]+,\d{2})", text, re.I | re.M)
-    if m:
-        out["amount"] = _amount(m.group(1).replace(" ", ""))
+    # het eindtotaal: de LAATSTE regel 'Totaal …' (er kunnen totaalregels per onderdeel boven staan), niet 'excl./netto/subtotaal'
+    tots = [m for m in re.finditer(r"^\s*(?:totaal|total|gesamt(?:betrag)?|te betalen)\b([^\n\d€-]*)€?\s*(-?\s*[\d.]+,\d{2})", text, re.I | re.M)
+            if not re.search(r"excl|exkl|netto|net\b|zonder|ohne|hors", m.group(1), re.I)]
+    if tots:
+        out["amount"] = _amount(tots[-1].group(2).replace(" ", ""))
     m = re.search(r"(?:onze\s*ref|our\s*ref|unsere\s*ref|notre\s*r[ée]f)[^:\n]*:\s*(\d{8})\b", text, re.I)
     if m:
         out["order_no"] = m.group(1)
@@ -532,6 +534,15 @@ def apply_info(conn, inv, info):
     if not cid and pid:
         pr = conn.execute("SELECT customer_id FROM projects WHERE id = ?", (pid,)).fetchone()
         cid = pr["customer_id"] if pr else None
+    # bedrag eerder uit de PDF gehaald (en sindsdien niet door SnelStart/Excel gezet): mag door een betere uitlezing vervangen worden
+    try:
+        old_pdf_amt = json.loads(inv["pdf_json"] or "{}").get("amount") if "pdf_json" in inv.keys() else None
+    except (ValueError, TypeError):
+        old_pdf_amt = None
+    if old_pdf_amt is not None and info.get("amount") is not None and info["amount"] != old_pdf_amt:
+        conn.execute("UPDATE sales_invoices SET amount = ?, open_amount = CASE WHEN status_source IN ('verzonden') OR status_source IS NULL"
+                     " THEN CASE WHEN open_amount = ? THEN ? ELSE open_amount END ELSE open_amount END WHERE id = ? AND amount = ?",
+                     (info["amount"], old_pdf_amt, info["amount"], inv["id"], old_pdf_amt))
     conn.execute("UPDATE sales_invoices SET customer_id = ?, customer_name = COALESCE(customer_name, ?), project_id = ?, order_no = COALESCE(order_no, ?),"
                  " attn = COALESCE(attn, ?), pdf_json = ?, invoice_date = COALESCE(invoice_date, ?), due_date = COALESCE(due_date, ?),"
                  " amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
@@ -541,7 +552,7 @@ def apply_info(conn, inv, info):
     conn.execute("UPDATE sales_invoices SET paid = amount WHERE id = ? AND status = 'betaald' AND paid IS NULL AND amount IS NOT NULL", (inv["id"],))
 
 
-PARSE_VERSION = "6"
+PARSE_VERSION = "7"
 
 
 def reparse(conn, ids=None, upload_dir=None):
@@ -1980,6 +1991,26 @@ def sending():
         appr = sorted({int(x) for x in request.form.getlist("appr") if x.isdigit() and int(x) in valid})
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_preparers', ?)", (json.dumps(prep),))
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('deb_send_approvers', ?)", (json.dumps(appr),))
+        if "sp_link" in request.form:
+            link = (request.form.get("sp_link") or "").strip()
+            if not link:
+                for k in ("deb_sp_link", "deb_sp_drive", "deb_sp_root", "deb_sp_web", "deb_sp_name"):
+                    conn.execute("DELETE FROM settings WHERE key = ?", (k,))
+            elif link != (_setting("deb_sp_link", conn) or ""):
+                from . import sharepoint as sp
+                try:
+                    info = sp.resolve_url(link)
+                except ValueError as exc:
+                    conn.commit()
+                    flash("SharePoint-map: " + str(exc).replace("Projecten-map", "map voor uitgaande facturen"), "error")
+                    return redirect(url_for("debiteuren.sending"))
+                except Exception as exc:  # noqa: BLE001
+                    conn.commit()
+                    flash(f"SharePoint-map kon niet gecontroleerd worden: {exc}", "error")
+                    return redirect(url_for("debiteuren.sending"))
+                for k, v in (("deb_sp_link", link), ("deb_sp_drive", info["drive_id"]), ("deb_sp_root", info["root_id"]),
+                             ("deb_sp_web", info["web_url"]), ("deb_sp_name", f"{info.get('site_name') or ''} › {info['name']}")):
+                    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
         if "fixed_cc" in request.form:
             fixed = _addr_list(request.form.get("fixed_cc"))
             bad = [a for a in fixed if not _EMAIL.match(a)]
@@ -2001,7 +2032,8 @@ def sending():
     users = query("SELECT id, name FROM users WHERE active = 1 ORDER BY name")
     return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
                            prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()),
-                           fixed_cc=", ".join(send_cc_fixed()))
+                           fixed_cc=", ".join(send_cc_fixed()), sp_link=_setting("deb_sp_link") or "", sp_name=_setting("deb_sp_name") or "",
+                           sp_web=_setting("deb_sp_web") or "")
 
 
 def approvals_of(s):
@@ -2190,6 +2222,10 @@ def send_one(sid):
                       + (f" (cc {', '.join(cc)})" if cc else "") + f" · bijlagen: {', '.join(a[0] for a in atts)}", uid)
             conn.commit()
             audit("factuur verzonden", "sales_invoice", sid, f"{s['number']} aan {', '.join(to)}")
+            spr = save_to_sharepoint(conn, sid)
+            if spr:
+                _send_log(conn, sid, spr[1], uid)
+                conn.commit()
             if s["send_prepared_by"] and s["send_prepared_by"] != uid:
                 _notify_many(conn, [s["send_prepared_by"]], f"Factuur {s['number']} verzonden", f"Door alle goedkeurders goedgekeurd en verzonden aan {', '.join(to)}.",
                              f"/debiteuren/{sid}/verzenden")
@@ -2215,3 +2251,82 @@ def send_one(sid):
                            may_approve=may_approve, is_appr=is_appr, appr_names=[names.get(a, "?") for a in appr], appr=appr,
                            prep_name=names.get(s["send_prepared_by"]), sender=sender(), fixed_cc=send_cc_fixed(), preview=_mail_preview(s), got=approvals_of(s), names=names,
                            rel=invoice_relation(get_db(), s))
+
+
+
+# ---------------------------------------------------------------- verzonden facturen in SharePoint
+# Map (instelling): bijv. Administratie > Documents > 20-Debiteuren > 01-Uitgaande facturen; daaronder per jaar een map
+# (wordt aangemaakt als hij er nog niet is). Bestandsnaam Factuur_<nummer>.pdf.
+
+def sp_target(conn=None):
+    d, r = _setting("deb_sp_drive", conn), _setting("deb_sp_root", conn)
+    return (d, r) if d and r else None
+
+
+def save_to_sharepoint(conn, sid):
+    """Factuur-PDF in <map>/<jaar>/Factuur_<nr>.pdf zetten. Geeft (ok, melding) of None als er geen map is ingesteld."""
+    from . import sharepoint as sp
+    tgt = sp_target(conn)
+    if not tgt or not sp.configured():
+        return None
+    inv = conn.execute("SELECT * FROM sales_invoices WHERE id = ?", (sid,)).fetchone()
+    if not inv or not inv["pdf_file_id"]:
+        return False, "geen factuur-PDF"
+    f = conn.execute("SELECT * FROM files WHERE id = ?", (inv["pdf_file_id"],)).fetchone()
+    from .util import upload_dir
+    import os
+    try:
+        with open(os.path.join(upload_dir(), f["stored_name"]), "rb") as fh:
+            data = fh.read()
+    except OSError as exc:
+        return False, f"PDF niet gevonden ({exc})"
+    year = ((inv["invoice_date"] or "")[:4] if (inv["invoice_date"] or "")[:4].isdigit() else
+            (inv["number"][:4] if (inv["number"] or "")[:4].isdigit() else str(_today().year)))
+    drive, root = tgt
+    try:
+        g = sp.client()
+        ydir = next((c for c in g.children(drive, root) if "folder" in c and c.get("name") == year), None)
+        if not ydir:
+            try:
+                ydir = g.create_folder(drive, root, year)
+            except sp.GraphError as exc:
+                if exc.status != 409:
+                    raise
+                ydir = g.item_by_path(drive, year, root)
+        res = g.upload(drive, ydir["id"], f"Factuur_{inv['number']}.pdf", data, conflict="replace") or {}
+    except sp.GraphError as exc:
+        msg = f"SharePoint gaf een fout: {exc.message}"
+    except Exception as exc:  # noqa: BLE001 - netwerk e.d.
+        msg = f"SharePoint niet bereikbaar ({type(exc).__name__})"
+    else:
+        conn.execute("UPDATE sales_invoices SET sp_saved_at = ?, sp_web_url = ?, sp_error = NULL WHERE id = ?", (now_iso(), res.get("webUrl"), sid))
+        conn.commit()
+        return True, f"Opgeslagen in SharePoint: {year}/Factuur_{inv['number']}.pdf"
+    conn.execute("UPDATE sales_invoices SET sp_error = ? WHERE id = ?", (msg[:300], sid))
+    conn.commit()
+    return False, msg
+
+
+def scheduled_sp_save(conn, app, state):
+    """Elk kwartier: verzonden facturen die nog niet in SharePoint staan (mislukt, of van vóór de instelling) alsnog opslaan."""
+    import time
+    if not sp_target(conn) or time.time() - state.get("deb_sp", 0) < 900:
+        return
+    state["deb_sp"] = time.time()
+    with app.app_context():
+        for r in conn.execute("SELECT id FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL AND pdf_file_id IS NOT NULL"
+                              " ORDER BY sent_at DESC LIMIT 25").fetchall():
+            res = save_to_sharepoint(conn, r["id"])
+            if res and not res[0] and "niet bereikbaar" in res[1]:
+                break
+
+
+@bp.route("/<int:sid>/sharepoint", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def sp_save_one(sid):
+    res = save_to_sharepoint(get_db(), sid)
+    if res is None:
+        flash("Er is nog geen SharePoint-map voor uitgaande facturen ingesteld (Nieuwe facturen › Instellingen).", "error")
+    else:
+        flash(res[1] + ".", "ok" if res[0] else "error")
+    return redirect(url_for("debiteuren.detail", sid=sid))

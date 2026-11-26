@@ -120,6 +120,7 @@ def _loop(app):
             debiteuren.scheduled_reparse(conn, app)
             debiteuren.scheduled_rematch(conn, state)
             debiteuren.scheduled_replies(conn, app, state)
+            debiteuren.scheduled_sp_save(conn, app, state)
             if not state.get("oplev_moved"):
                 state["oplev_moved"] = True
                 try:
