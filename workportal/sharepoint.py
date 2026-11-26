@@ -810,6 +810,28 @@ def upload_to_folder(conn, pid, relpath, filename, data, g=None):
     return (res or {}).get("name") or name
 
 
+FOLDER_BAD = re.compile(r'[\x00-\x1f"*:<>?/\\|#%]')
+
+
+def clean_folder_name(name):
+    """Geldige SharePoint-mapnaam of None."""
+    name = re.sub(r"\s+", " ", (name or "").strip()).strip(". ")
+    if not name or len(name) > 120 or FOLDER_BAD.search(name) or name.startswith("~") or name.lower() in ("con", "prn", "aux", "nul"):
+        return None
+    return name
+
+
+def make_folder(conn, pid, relpath, name, g=None):
+    """Nieuwe map in <projectmap>/<relpath>. Geeft de naam; bestaat hij al, dan GraphError 409."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    p = conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()
+    rel = safe_rel(relpath)
+    parent = g.item_by_path(drive, rel, p["sp_item_id"])["id"] if rel else p["sp_item_id"]
+    res = g.create_folder(drive, parent, name)
+    return (res or {}).get("name") or name
+
+
 def list_files_deep(conn, pid, relpath, depth=2, g=None, limit=300):
     """Alle bestanden in een map en (tot depth niveaus) de submappen, met hun pad t.o.v. de projectmap."""
     g = g or client()

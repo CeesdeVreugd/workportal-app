@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V240 (2.26.2)
+- Project-/ordermap (SharePoint): knop **Nieuwe map** naast "Bestanden toevoegen" (voor wie bestanden mag toevoegen). De map komt in de map waar je staat; optioneel meteen openen. Ongeldige tekens worden geweigerd; bestaat de naam al, dan een melding. Wordt gelogd.
+
 ## V239 (2.26.1)
 - Aantekeningen › afronden (ook via Bewerken met status Afgerond): eerst een venster "Single export CADdossier gedraaid?" met *Ja, gedraaid – afronden*, *Nee, eerst draaien* (niet afronden) of *Niet nodig (geen tekenwijziging)*. Het antwoord komt onder "Wat is er gedaan" (dus ook in de PDF) en in het logboek. Zonder antwoord weigert de server het afronden.
 

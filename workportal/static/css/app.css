@@ -1340,3 +1340,5 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .tkrepeat { border-left: 3px solid var(--line); padding: 4px 0 4px 12px; margin: 4px 0 8px; }
 .rp-week { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .rp-days { display: inline-flex; gap: 10px; flex-wrap: wrap; }
+.mkdir-pop[open] > form { position: absolute; right: 0; top: 100%; z-index: 30; box-shadow: 0 12px 32px rgba(10,10,60,.18); }
+@media (max-width: 600px) { .mkdir-pop[open] > form { position: static; } }

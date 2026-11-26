@@ -799,6 +799,35 @@ def project_folder_upload(pid):
     return jsonify({"ok": True, "saved": saved})
 
 
+@bp.route("/<int:pid>/map/nieuwe-map", methods=["POST"])
+def project_folder_mkdir(pid):
+    """Nieuwe (sub)map in de projectmap in SharePoint."""
+    p = _project_sp(pid)
+    B = BP_OF_KIND[p["kind"]]
+    try:
+        rel = sp.safe_rel(request.form.get("pad", ""))
+    except ValueError:
+        abort(400)
+    back = url_for(B + ".project_folder", pid=pid, pad=rel or None)
+    if not _can_upload(p):
+        abort(403)
+    name = sp.clean_folder_name(request.form.get("naam"))
+    if not name:
+        flash("Geef een geldige mapnaam (zonder tekens als / \\ : * ? \" < > | # %).", "error")
+        return redirect(back)
+    try:
+        made = sp.make_folder(get_db(), pid, rel, name)
+    except sp.GraphError as exc:
+        flash(f"Er bestaat hier al een map of bestand ‘{name}’." if exc.status == 409 else f"SharePoint gaf een fout: {exc.message}", "error")
+        return redirect(back)
+    except (requests.RequestException, RuntimeError):
+        flash("SharePoint is op dit moment niet bereikbaar.", "error")
+        return redirect(back)
+    audit("map aangemaakt", "project", pid, f"{rel + '/' if rel else ''}{made}"[:300])
+    flash(f"Map ‘{made}’ aangemaakt.", "ok")
+    return redirect(url_for(B + ".project_folder", pid=pid, pad=f"{rel}/{made}" if rel else made) if request.form.get("openen") else back)
+
+
 CERT_RE = re.compile(r"certifica|machine[\s_-]*veilighe", re.I)
 # Mappen in de projectmap waaruit je bestanden kunt mailen (aanvinken, tekst, naar de contactpersoon)
 MAIL_KINDS = [
