@@ -1020,6 +1020,10 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V244 (2.27.3)
+- Nieuwe facturen › ontvanger: WorkPortal leest nu ook het **werk-/afleveradres** van de factuur. Volgorde: factuur-e-mail van de relatie op het factuuradres → factuur-e-mail van de relatie op het werk-/afleveradres → algemeen e-mailadres van die relaties. Op de verzendpagina staat welke relatie en waarom. "Opslaan als factuur-e-mail" staat alleen standaard aan als het adres bij de relatie van het factuuradres hoort.
+- Eenmalig opnieuw uitlezen van de factuur-PDF's (PARSE_VERSION 8).
+
 ## V243 (2.27.2)
 - Verkoopfacturen › bedrag uit de PDF: het **eindtotaal** (de laatste regel 'Totaal …', niet 'excl./netto') in plaats van de eerste totaalregel. Eenmalig worden alle factuur-PDF's opnieuw uitgelezen (PARSE_VERSION 7); een bedrag dat eerder uit de PDF kwam wordt gecorrigeerd (bedragen uit SnelStart/Excel blijven staan).
 - Verzendscherm: voortgangsbalk met korte stappen en namen op een tweede regel (geen overlappende tekst), "Goedkeuren x/y"; mailvoorbeeld met smallere labelkolom en CC-adressen onder elkaar.

@@ -332,6 +332,26 @@ def _address_block(page):
     return out
 
 
+def _delivery_block(page):
+    """Rechterkolom onder 'Werk-/afleveradres:' (of Delivery/Lieferadresse/Livraison)."""
+    words = page.extract_words()
+    head = next((w for w in words if re.match(r"(werk|aflever|delivery|lieferadresse|liefer|livraison|site|job)", w["text"], re.I)
+                 and w["x0"] > page.width * 0.3), None)
+    if not head:
+        return []
+    lines = {}
+    for w in words:
+        if head["top"] + 5 < w["top"] < head["top"] + 120 and w["x0"] >= head["x0"] - 5:
+            lines.setdefault(round(w["top"] / 3), []).append(w)
+    out = []
+    for k in sorted(lines):
+        txt = " ".join(w["text"] for w in sorted(lines[k], key=lambda w: w["x0"]))
+        if re.match(r"(factuurnummer|invoice|rechnung|facture|factuurdatum)", txt, re.I):
+            break
+        out.append(txt)
+    return out
+
+
 def parse_pdf(data):
     """Gegevens van de factuur zelf: nummer, datums, bedrag, klant (factuuradres), T.a.v., onze referentie (order),
     factuur-e-mailadres als dat op de factuur staat."""
@@ -339,6 +359,10 @@ def parse_pdf(data):
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         text = "\n".join((p.extract_text() or "") for p in pdf.pages[:40])
         block = _address_block(pdf.pages[0]) if pdf.pages else []
+        try:
+            dblock = _delivery_block(pdf.pages[0]) if pdf.pages else []
+        except Exception:  # noqa: BLE001
+            dblock = []
     out = {}
     head = "\n".join(text.splitlines()[:25])
     if re.search(r"^\s*(herinnering|aanmaning|betalingsherinnering|sommatie|payment reminder|reminder|zahlungserinnerung|mahnung|rappel)\b", head, re.I | re.M):
@@ -373,6 +397,8 @@ def parse_pdf(data):
     m = re.search(r"factuur[\s-]*e-?mail(?:adres)?\s*[:.]?\s*([^\s@]+@[^\s@]+\.[a-z]{2,})", text, re.I)
     if m:
         out["mail_to"] = m.group(1).strip(".,;")
+    if dblock and not re.match(r"(contactpersoon|t\.?a\.?v)", dblock[0], re.I):
+        out["delivery"] = dblock[0].strip()
     if block:
         out["customer"] = block[0].strip()
         attn = next((l for l in block[1:] if re.match(r"(t\.?a\.?v\.?|attn\.?|z\.?\s*hd\.?|[àa]\s*l'attention)", l, re.I)), None)
@@ -552,7 +578,7 @@ def apply_info(conn, inv, info):
     conn.execute("UPDATE sales_invoices SET paid = amount WHERE id = ? AND status = 'betaald' AND paid IS NULL AND amount IS NOT NULL", (inv["id"],))
 
 
-PARSE_VERSION = "7"
+PARSE_VERSION = "8"
 
 
 def reparse(conn, ids=None, upload_dir=None):
@@ -1904,11 +1930,30 @@ def invoice_relation(conn, inv):
     return conn.execute("SELECT * FROM customers WHERE id = ?", (cid,)).fetchone() if cid else None
 
 
+def invoice_recipient(conn, inv):
+    """(adres, relatie, uitleg): eerst de factuur-e-mail van de relatie op het factuuradres, dan die van de relatie op het
+    werk-/afleveradres, dan het algemene e-mailadres van die relaties."""
+    fact = invoice_relation(conn, inv)
+    try:
+        info = json.loads(inv["pdf_json"] or "{}")
+    except (ValueError, TypeError):
+        info = {}
+    dcid = _match_customer(conn, None, info.get("delivery")) if info.get("delivery") else None
+    delv = conn.execute("SELECT * FROM customers WHERE id = ?", (dcid,)).fetchone() if dcid and (not fact or dcid != fact["id"]) else None
+    for rel, field, why in ((fact, "invoice_email", "factuur-e-mail van de relatie op het factuuradres"),
+                            (delv, "invoice_email", "factuur-e-mail van de relatie op het werk-/afleveradres"),
+                            (fact, "email", "geen factuur-e-mail bekend: algemeen e-mailadres van de relatie op het factuuradres"),
+                            (delv, "email", "geen factuur-e-mail bekend: algemeen e-mailadres van de relatie op het werk-/afleveradres")):
+        if rel and rel[field]:
+            return rel[field], rel, why
+    return "", fact or delv, "geen e-mailadres bekend bij de relatie(s) op de factuur"
+
+
 def _send_defaults(conn, inv):
     """Ontvanger, onderwerp en tekst voor een nieuwe factuur. Ontvanger: factuur-e-mail van de relatie op het factuuradres
     (anders het algemene e-mailadres van die relatie)."""
-    c = invoice_relation(conn, inv)
-    to = (c["invoice_email"] or c["email"] or "") if c else ""
+    to, c, _ = invoice_recipient(conn, inv)
+    c = invoice_relation(conn, inv) or c
     lang = _lang_of(conn, c["id"] if c else inv["customer_id"])
     subj, body = INV_MAIL.get(lang) or INV_MAIL["nl"]
     due = _d(inv["due_date"])
@@ -2121,11 +2166,10 @@ def send_one(sid):
             conn.commit()
             flash("Standaard onderwerp en tekst teruggezet.", "ok")
         elif act == "adres":
-            c = invoice_relation(conn, s)
-            to2 = (c["invoice_email"] or c["email"] or "") if c else ""
+            to2, c, why = invoice_recipient(conn, s)
             conn.execute("UPDATE sales_invoices SET send_to = ? WHERE id = ?", (to2, sid))
             conn.commit()
-            flash(f"Adres opgehaald uit de relatie {c['name']}: {to2 or 'geen e-mailadres bekend'}." if c else "Klant op het factuuradres niet gevonden in de relaties.",
+            flash(f"Adres opgehaald ({why}): {to2}." if to2 else ("Klant op de factuur niet gevonden in de relaties." if not c else f"{c['name']}: {why}."),
                   "ok" if to2 else "error")
         elif act == "opslaan":
             flash("Opgeslagen.", "ok")
@@ -2250,7 +2294,7 @@ def send_one(sid):
     return render_template("debiteuren/verzend.html", s=s, extras=extras, log=log, SEND_STATES=SEND_STATES, may_edit=may_edit,
                            may_approve=may_approve, is_appr=is_appr, appr_names=[names.get(a, "?") for a in appr], appr=appr,
                            prep_name=names.get(s["send_prepared_by"]), sender=sender(), fixed_cc=send_cc_fixed(), preview=_mail_preview(s), got=approvals_of(s), names=names,
-                           rel=invoice_relation(get_db(), s))
+                           rel=invoice_relation(get_db(), s), rcpt=invoice_recipient(get_db(), s))
 
 
 
