@@ -9,7 +9,7 @@
   <div>
     <div class="crumbs"><a href="{{ url_for('debiteuren.sending') }}">{{ icon('back') }}Nieuwe facturen</a> · <a href="{{ url_for('debiteuren.detail', sid=s.id) }}">factuurkaart</a></div>
     <h1>{{ s.cname or s.customer_name or 'Klant onbekend' }} · {{ s.number }}</h1>
-    <p>{% set bits = [] %}{% if s.invoice_date %}{% set _ = bits.append('factuurdatum ' ~ s.invoice_date|date) %}{% endif %}{% if s.amount is not none %}{% set _ = bits.append(s.amount|eur(2)) %}{% endif %}{% if s.order_no %}{% set _ = bits.append('ref. ' ~ s.order_no) %}{% endif %}{{ bits|join(' · ') }}</p>
+    <p>{% set bits = [] %}{% if s.invoice_date %}{% set _ = bits.append('factuurdatum ' ~ s.invoice_date|date) %}{% endif %}{% if s.amount is not none %}{% set ex = (s.pdf_json|fromjson or {}).get('amount_excl') if s.pdf_json else none %}{% set _ = bits.append(s.amount|eur(2) ~ (' incl. btw (excl. ' ~ ex|eur(2) ~ ')' if ex is not none and ex != s.amount else '')) %}{% endif %}{% if s.order_no %}{% set _ = bits.append('ref. ' ~ s.order_no) %}{% endif %}{{ bits|join(' · ') }}</p>
   </div>
   <div class="actions"><span class="stchips row"><span class="stchip lg" style="--c:{{ '#1E7A3C' if st == 'verzonden' else ('#E0A800' if st == 'goedkeuren' else '#0080FF') }}">{{ SEND_STATES[st] }}</span></span></div>
 </div>

@@ -47,7 +47,7 @@
   <dl class="dl">
     <dt>Factuurdatum</dt><dd>{{ s.invoice_date|date if s.invoice_date else '–' }}</dd>
     <dt>Vervaldatum</dt><dd>{{ s.due_date|date if s.due_date else '–' }}{% if info.due_from_terms and s.status_source != 'snelstart' %} <span class="small muted">(berekend: {{ info.due_from_terms }}{{ ' dagen' if info.due_from_terms is number }} na factuurdatum)</span>{% endif %}</dd>
-    <dt>Bedrag</dt><dd>{{ s.amount|eur(2) if s.amount is not none else '–' }}</dd>
+    <dt>Bedrag</dt><dd>{{ s.amount|eur(2) if s.amount is not none else '–' }}{% if info.get('amount_excl') is not none and info.get('amount_excl') != s.amount %} <span class="small muted">incl. btw · excl. {{ info.amount_excl|eur(2) }}</span>{% endif %}</dd>
     <dt>Betaald</dt><dd>{{ s.paid|eur(2) if s.paid is not none else '–' }}</dd>
     <dt>Openstaand</dt><dd><b>{{ s.open_amount|eur(2) if s.open_amount is not none else '–' }}</b></dd>
     {% if s.order_no %}<dt>Onze ref.</dt><dd>{% if proj %}<a href="{{ werk_url('detail', proj.kind, pid=proj.id) }}">{{ 'Order' if proj.kind == 'order' else 'Project' }} {{ proj.number }} {{ proj.name or '' }}</a>{% else %}{{ s.order_no }}{% endif %}</dd>{% endif %}

@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V245 (2.27.4)
+- Verkoopfacturen: zolang SnelStart/Excel nog niets over een factuur heeft gemeld, is de **nieuwste PDF leidend** voor bedrag, factuurdatum en vervaldatum (een opnieuw geëxporteerde, gecorrigeerde factuur overschrijft dus het oude bedrag; ook het openstaande bedrag). Daarnaast wordt het bedrag excl. btw uitgelezen en getoond ("€ 806,33 incl. btw · excl. € 666,39"). Eenmalig opnieuw uitlezen (PARSE_VERSION 9).
+
 ## V244 (2.27.3)
 - Nieuwe facturen › ontvanger: WorkPortal leest nu ook het **werk-/afleveradres** van de factuur. Volgorde: factuur-e-mail van de relatie op het factuuradres → factuur-e-mail van de relatie op het werk-/afleveradres → algemeen e-mailadres van die relaties. Op de verzendpagina staat welke relatie en waarom. "Opslaan als factuur-e-mail" staat alleen standaard aan als het adres bij de relatie van het factuuradres hoort.
 - Eenmalig opnieuw uitlezen van de factuur-PDF's (PARSE_VERSION 8).

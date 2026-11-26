@@ -391,6 +391,11 @@ def parse_pdf(data):
             if not re.search(r"excl|exkl|netto|net\b|zonder|ohne|hors", m.group(1), re.I)]
     if tots:
         out["amount"] = _amount(tots[-1].group(2).replace(" ", ""))
+    # bedrag excl. btw: het bedrag vlak boven de btw-regel (of 'Totaal excl.'/'Subtotaal')
+    m = re.search(r"(?:excl\.?\s*(?:btw|vat)|subtotaal|netto)[^\n\d€-]*€?\s*(-?[\d.]+,\d{2})\s*$", text, re.I | re.M) \
+        or re.search(r"€\s*(-?[\d.]+,\d{2})\s*\n\s*(?:btw|vat|mwst|tva)\s*\d", text, re.I)
+    if m:
+        out["amount_excl"] = _amount(m.group(1))
     m = re.search(r"(?:onze\s*ref|our\s*ref|unsere\s*ref|notre\s*r[ée]f)[^:\n]*:\s*(\d{8})\b", text, re.I)
     if m:
         out["order_no"] = m.group(1)
@@ -570,15 +575,23 @@ def apply_info(conn, inv, info):
                      " THEN CASE WHEN open_amount = ? THEN ? ELSE open_amount END ELSE open_amount END WHERE id = ? AND amount = ?",
                      (info["amount"], old_pdf_amt, info["amount"], inv["id"], old_pdf_amt))
     conn.execute("UPDATE sales_invoices SET customer_id = ?, customer_name = COALESCE(customer_name, ?), project_id = ?, order_no = COALESCE(order_no, ?),"
-                 " attn = COALESCE(attn, ?), pdf_json = ?, invoice_date = COALESCE(invoice_date, ?), due_date = COALESCE(due_date, ?),"
-                 " amount = COALESCE(amount, ?), mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
+                 " attn = COALESCE(attn, ?), pdf_json = ?,"
+                 " invoice_date = CASE WHEN status_source IN ('snelstart', 'excel') THEN COALESCE(invoice_date, ?) ELSE COALESCE(?, invoice_date) END,"
+                 " due_date = CASE WHEN status_source IN ('snelstart', 'excel') THEN COALESCE(due_date, ?) ELSE COALESCE(?, due_date) END,"
+                 " amount = CASE WHEN status_source IN ('snelstart', 'excel') THEN COALESCE(amount, ?) ELSE COALESCE(?, amount) END,"
+                 " mail_to = COALESCE(?, mail_to), updated_at = ? WHERE id = ?",
                  (cid, info.get("customer"), pid, info.get("order_no"), info.get("attn"), json.dumps(info, ensure_ascii=False),
-                  info.get("invoice_date"), info.get("due_date"), info.get("amount"), info.get("mail_to"), now_iso(), inv["id"]))
+                  info.get("invoice_date"), info.get("invoice_date"), info.get("due_date"), info.get("due_date"),
+                  info.get("amount"), info.get("amount"), info.get("mail_to"), now_iso(), inv["id"]))
+    # nog niet uit SnelStart/Excel: openstaand = factuurbedrag (de factuur kan na een correctie opnieuw zijn geëxporteerd)
+    if info.get("amount") is not None:
+        conn.execute("UPDATE sales_invoices SET open_amount = amount - IFNULL(paid, 0) WHERE id = ? AND status = 'open'"
+                     " AND IFNULL(status_source, 'verzonden') = 'verzonden'", (inv["id"],))
     # betaald gemeld voordat het bedrag bekend was: betaald = factuurbedrag
     conn.execute("UPDATE sales_invoices SET paid = amount WHERE id = ? AND status = 'betaald' AND paid IS NULL AND amount IS NOT NULL", (inv["id"],))
 
 
-PARSE_VERSION = "8"
+PARSE_VERSION = "9"
 
 
 def reparse(conn, ids=None, upload_dir=None):
