@@ -1,4 +1,17 @@
 {% from "partials/icons.html" import icon %}
+{% macro itemmenu(path, name, is_dir) %}{% if can_upload %}
+<details class="cred-pop itemmenu"><summary class="iconbtn" title="Meer: hernoemen, verplaatsen, verwijderen" aria-label="Meer acties voor {{ name }}">⋯</summary>
+  <div class="itemmenu-body">
+    <form method="post" action="{{ url_for(B ~ '.project_folder_item', pid=p.id) }}" class="form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="pad" value="{{ path }}"><input type="hidden" name="hier" value="{{ rel }}">
+      <label class="f">Naam wijzigen<input type="text" name="naam" value="{{ name }}" required maxlength="200"></label>
+      <button class="btn sm" name="action" value="hernoemen">Hernoemen</button></form>
+    <form method="post" action="{{ url_for(B ~ '.project_folder_item', pid=p.id) }}" class="form" data-no-draft><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="pad" value="{{ path }}"><input type="hidden" name="hier" value="{{ rel }}">
+      <label class="f">Verplaatsen naar<select name="naar" data-dirs="{{ url_for(B ~ '.project_folder_dirs', pid=p.id) }}" data-self="{{ path if is_dir else '' }}" data-cur="{{ rel }}"><option value="{{ rel }}">laden…</option></select></label>
+      <button class="btn sm" name="action" value="verplaatsen">Verplaatsen</button></form>
+    <form method="post" action="{{ url_for(B ~ '.project_folder_item', pid=p.id) }}" data-no-draft data-confirm="{{ ('Map ‘' ~ name ~ '’ met alle inhoud verwijderen?' if is_dir else 'Bestand ‘' ~ name ~ '’ verwijderen?') ~ ' Het gaat naar de prullenbak van SharePoint.' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="pad" value="{{ path }}"><input type="hidden" name="hier" value="{{ rel }}">
+      <button class="btn sm ghost danger" name="action" value="verwijderen">{{ icon('trash') }}Verwijderen</button></form>
+  </div>
+</details>{% endif %}{% endmacro %}
 {% if error %}<div class="empty">{{ error }}</div>
 {% else %}
 {% set photos = items|selectattr('is_image')|list if photo_mode else [] %}
@@ -15,12 +28,12 @@
   {% set path = (rel ~ '/' ~ i.name) if rel else i.name %}
   {% if i.folder %}
   <div class="rowitem rowlink" data-droppath="{{ path }}" data-dropname="{{ i.name }}"><a class="grow rowmain" href="{{ url_for(B ~ '.project_folder', pid=p.id, pad=path) }}"><span class="ficon dir">{{ icon('folder') }}</span><div class="grow"><div class="t">{{ i.name }}</div><div class="s">{{ i.count if i.count is not none else '' }}{{ ' items' if i.count is not none }}</div></div></a>
-    {% if can_upload and mail_kind and mail_kind(i.name) %}<a class="btn sm" href="{{ url_for(B ~ '.certificates_mail', pid=p.id, pad=path) }}">{{ icon('mail') }}Mailen</a>{% endif %}</div>
+    {% if can_upload and mail_kind and mail_kind(i.name) %}<a class="btn sm" href="{{ url_for(B ~ '.certificates_mail', pid=p.id, pad=path) }}">{{ icon('mail') }}Mailen</a>{% endif %}{{ itemmenu(path, i.name, True) }}</div>
   {% else %}
   <div class="rowitem"><span class="ficon">{{ icon('pdf' if i.mime == 'application/pdf' else 'image' if (i.mime or '').startswith('image/') else 'file') }}</span>
     {% set xls = i.name.lower().endswith(('.xlsx', '.xlsm', '.xltx', '.xltm', '.csv')) %}{% set docx = i.name.lower().endswith(('.docx', '.docm', '.dotx', '.dotm')) %}<a class="grow" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path) }}"{% if i.name.lower().endswith('.pdf') %} data-pdf="{{ i.name }}"{% endif %}{% if xls %} data-xls="{{ i.name }}"{% elif docx %} data-doc="{{ i.name }}"{% else %} target="_blank" rel="noopener"{% endif %}><div class="t">{{ i.name }}</div><div class="s">{{ (i.size / 1024 / 1024)|num(1) ~ ' MB' if i.size >= 1048576 else ((i.size / 1024)|round|int ~ ' kB') }} · {{ i.modified|date }}</div></a>
     {% if can_print and i.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')) %}<button type="button" class="iconbtn" title="Afdrukken via Printix" aria-label="Afdrukken" data-print="{{ url_for(B ~ '.project_folder_print', pid=p.id) }}" data-print-pad="{{ path }}" data-print-name="{{ i.name }}" data-print-opts="{{ print_opts|tojson|forceescape }}">{{ icon('printer') }}</button>{% endif %}
-    <a class="iconbtn" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" title="Downloaden">{{ icon('download') }}</a></div>
+    <a class="iconbtn" href="{{ url_for(B ~ '.project_file', pid=p.id, pad=path, download=1) }}" title="Downloaden">{{ icon('download') }}</a>{{ itemmenu(path, i.name, False) }}</div>
   {% endif %}
 {% else %}{% if not photos %}<div class="empty">Deze map is leeg.{% if photo_mode and can_upload %} Maak een foto of kies er een uit de galerij.{% endif %}</div>{% endif %}{% endfor %}
 </div>

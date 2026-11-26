@@ -1098,3 +1098,30 @@ document.addEventListener("click", function (e) {
     if (p.form.requestSubmit) p.form.requestSubmit(p.submitter && p.submitter.form === p.form ? p.submitter : undefined); else p.form.submit();
   }
 })();
+
+/* Projectmap: 'Verplaatsen naar' vullen met alle mappen zodra het menu opengaat. */
+(function () {
+  var cache = {};
+  document.addEventListener("toggle", function (e) {
+    var d = e.target;
+    if (!d.classList || !d.classList.contains("itemmenu") || !d.open) return;
+    document.querySelectorAll("details.itemmenu[open]").forEach(function (o) { if (o !== d) o.open = false; });
+    var sel = d.querySelector("select[data-dirs]");
+    if (!sel || sel.getAttribute("data-loaded")) return;
+    var url = sel.getAttribute("data-dirs");
+    (cache[url] = cache[url] || fetch(url, { credentials: "same-origin" }).then(function (r) { return r.json(); }))
+      .then(function (js) {
+        if (js.error) { sel.innerHTML = ""; sel.add(new Option(js.error, sel.getAttribute("data-cur"))); return; }
+        var self = sel.getAttribute("data-self"), cur = sel.getAttribute("data-cur");
+        sel.innerHTML = "";
+        sel.add(new Option(js.number + " (projectmap)", ""));
+        js.folders.forEach(function (f) {
+          if (self && (f === self || f.indexOf(self + "/") === 0)) return;
+          var depth = f.split("/").length - 1, o = new Option("  ".repeat(depth) + f.split("/").pop(), f);
+          sel.add(o);
+        });
+        sel.value = cur || "";
+        sel.setAttribute("data-loaded", "1");
+      }).catch(function () { delete cache[url]; });
+  }, true);
+})();

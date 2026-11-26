@@ -1342,3 +1342,9 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .rp-days { display: inline-flex; gap: 10px; flex-wrap: wrap; }
 .mkdir-pop[open] > form { position: absolute; right: 0; top: 100%; z-index: 30; box-shadow: 0 12px 32px rgba(10,10,60,.18); }
 @media (max-width: 600px) { .mkdir-pop[open] > form { position: static; } }
+.itemmenu > summary { width: 36px; height: 36px; display: inline-grid; place-items: center; font-size: 18px; line-height: 1; }
+.itemmenu[open] > .itemmenu-body { position: absolute; right: 0; top: 100%; z-index: 40; width: min(340px, 86vw); padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(10,10,60,.18); display: flex; flex-direction: column; gap: 12px; }
+.itemmenu-body .form { display: flex; flex-direction: column; gap: 6px; }
+.itemmenu-body .btn { align-self: flex-start; }
+.card:has(.itemmenu[open]), .rows:has(.itemmenu[open]), #droplist:has(.itemmenu[open]) { overflow: visible; }
+.rowitem:has(.itemmenu[open]) { position: relative; z-index: 5; }

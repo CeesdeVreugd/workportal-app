@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V240: mappen aanmaken in de projectmap"
+set "OMSCHRIJVING=WorkPortal V241: projectmap - hernoemen, verplaatsen en verwijderen van mappen en bestanden"
 
 echo.
 echo ============================================

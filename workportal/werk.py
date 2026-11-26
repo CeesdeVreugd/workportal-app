@@ -828,6 +828,61 @@ def project_folder_mkdir(pid):
     return redirect(url_for(B + ".project_folder", pid=pid, pad=f"{rel}/{made}" if rel else made) if request.form.get("openen") else back)
 
 
+@bp.route("/<int:pid>/map/item", methods=["POST"])
+def project_folder_item(pid):
+    """Bestand of map in de projectmap: hernoemen, verplaatsen of verwijderen (prullenbak van SharePoint)."""
+    p = _project_sp(pid)
+    B = BP_OF_KIND[p["kind"]]
+    f = request.form
+    try:
+        rel = sp.safe_rel(f.get("pad", ""))
+        here = sp.safe_rel(f.get("hier", ""))
+    except ValueError:
+        abort(400)
+    back = url_for(B + ".project_folder", pid=pid, pad=here or None)
+    if not _can_upload(p):
+        abort(403)
+    act = f.get("action")
+    conn = get_db()
+    try:
+        if act == "verwijderen":
+            if "/" not in rel and not can(KINDS[B]["module"], BEHEER):
+                flash("Hoofdmappen van de projectmap (zoals 3 Documenten) kan alleen een beheerder verwijderen.", "error")
+                return redirect(back)
+            name, is_dir = sp.delete_item(conn, pid, rel)
+            audit("map verwijderd" if is_dir else "bestand verwijderd uit map", "project", pid, rel[:300])
+            flash(f"{'Map' if is_dir else 'Bestand'} ‘{name}’ verwijderd (staat nog in de prullenbak van SharePoint).", "ok")
+        elif act == "hernoemen":
+            new = sp.rename_item(conn, pid, rel, f.get("naam"))
+            audit("hernoemd in map", "project", pid, f"{rel} → {new}"[:300])
+            flash(f"Hernoemd naar ‘{new}’.", "ok")
+        elif act == "verplaatsen":
+            dest = sp.safe_rel(f.get("naar", ""))
+            name = sp.move_item(conn, pid, rel, dest)
+            audit("verplaatst in map", "project", pid, f"{rel} → {dest or '(projectmap)'}"[:300])
+            flash(f"‘{name}’ verplaatst naar {dest or p['number']}.", "ok")
+        else:
+            abort(400)
+    except ValueError as exc:
+        flash(str(exc), "error")
+    except sp.GraphError as exc:
+        flash("Er bestaat daar al een map of bestand met die naam." if exc.status == 409 else
+              ("Dit bestand of deze map bestaat niet meer." if exc.status == 404 else f"SharePoint gaf een fout: {exc.message}"), "error")
+    except (requests.RequestException, RuntimeError):
+        flash("SharePoint is op dit moment niet bereikbaar.", "error")
+    return redirect(back)
+
+
+@bp.route("/<int:pid>/map/mappen")
+def project_folder_dirs(pid):
+    """Alle mappen in de projectmap (voor 'Verplaatsen naar')."""
+    p = _project_sp(pid)
+    try:
+        return jsonify({"number": p["number"], "folders": sp.all_folders(get_db(), pid)})
+    except (sp.GraphError, requests.RequestException, RuntimeError):
+        return jsonify({"error": "SharePoint is op dit moment niet bereikbaar."}), 502
+
+
 CERT_RE = re.compile(r"certifica|machine[\s_-]*veilighe", re.I)
 # Mappen in de projectmap waaruit je bestanden kunt mailen (aanvinken, tekst, naar de contactpersoon)
 MAIL_KINDS = [

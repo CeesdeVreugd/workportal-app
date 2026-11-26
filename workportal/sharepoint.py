@@ -887,6 +887,76 @@ def delete_file(conn, pid, relpath, g=None):
     return meta.get("name") or rel.rpartition("/")[2]
 
 
+def _proj_item(conn, pid):
+    return conn.execute("SELECT sp_item_id FROM projects WHERE id = ?", (pid,)).fetchone()["sp_item_id"]
+
+
+def delete_item(conn, pid, relpath, g=None):
+    """Bestand of map (met inhoud) uit de projectmap verwijderen; gaat in SharePoint naar de prullenbak. Geeft (naam, is_map)."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    rel = safe_rel(relpath)
+    if not rel:
+        raise ValueError("De projectmap zelf kan hier niet verwijderd worden.")
+    meta = g.item_by_path(drive, rel, _proj_item(conn, pid))
+    g.delete_path(drive, _proj_item(conn, pid), rel)
+    return meta.get("name") or rel.rpartition("/")[2], "folder" in meta
+
+
+def rename_item(conn, pid, relpath, new_name, g=None):
+    """Bestand of map hernoemen. Bij een bestand zonder extensie in de nieuwe naam blijft de oude extensie. Geeft de nieuwe naam."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    rel = safe_rel(relpath)
+    if not rel:
+        raise ValueError("De projectmap zelf hernoem je via de omschrijving van de order.")
+    meta = g.item_by_path(drive, rel, _proj_item(conn, pid))
+    name = clean_folder_name(new_name)
+    if not name:
+        raise ValueError("Ongeldige naam (zonder tekens als / \\ : * ? \" < > | # %).")
+    if "folder" not in meta:
+        old_ext = os.path.splitext(meta.get("name") or "")[1]
+        if old_ext and not os.path.splitext(name)[1]:
+            name += old_ext
+    if name == meta.get("name"):
+        return name
+    res = g.rename(drive, meta["id"], name)
+    return (res or {}).get("name") or name
+
+
+def move_item(conn, pid, relpath, dest_rel, g=None):
+    """Bestand of map naar een andere map binnen de projectmap. Geeft de naam."""
+    g = g or client()
+    drive, _ = _ctx(conn)
+    rel, dest = safe_rel(relpath), safe_rel(dest_rel)
+    if not rel:
+        raise ValueError("De projectmap zelf kan niet verplaatst worden.")
+    if dest == rel or dest.startswith(rel + "/"):
+        raise ValueError("Een map kan niet in zichzelf verplaatst worden.")
+    base = _proj_item(conn, pid)
+    meta = g.item_by_path(drive, rel, base)
+    target = g.item_by_path(drive, dest, base)["id"] if dest else base
+    g.move(drive, meta["id"], target)
+    return meta.get("name") or rel.rpartition("/")[2]
+
+
+def all_folders(conn, pid, depth=4, limit=400, g=None):
+    """Alle mappen in de projectmap (pad t.o.v. de projectmap), voor 'Verplaatsen naar'."""
+    g = g or client()
+    out = []
+
+    def walk(rel, d):
+        for i in list_folder(conn, pid, rel, g):
+            if not i["folder"] or len(out) >= limit:
+                continue
+            path = f"{rel}/{i['name']}" if rel else i["name"]
+            out.append(path)
+            if d > 1:
+                walk(path, d - 1)
+    walk("", depth)
+    return out
+
+
 def item_version(item):
     """Versie-kenmerk van een bestand; verandert als de inhoud verandert."""
     return item.get("cTag") or item.get("eTag") or item.get("lastModifiedDateTime") or ""

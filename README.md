@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V241 (2.27.0)
+- Project-/ordermap: bij elke map en elk bestand een menu **⋯** met *Naam wijzigen* (bij een bestand blijft de extensie staan als je hem weglaat), *Verplaatsen naar* (lijst van alle mappen in de projectmap) en *Verwijderen* (map met inhoud of bestand; gaat naar de prullenbak van SharePoint, met bevestiging). Hoofdmappen (zoals 3 Documenten) kan alleen een beheerder verwijderen. Alles wordt gelogd.
+
 ## V240 (2.26.2)
 - Project-/ordermap (SharePoint): knop **Nieuwe map** naast "Bestanden toevoegen" (voor wie bestanden mag toevoegen). De map komt in de map waar je staat; optioneel meteen openen. Ongeldige tekens worden geweigerd; bestaat de naam al, dan een melding. Wordt gelogd.
 
