@@ -2069,6 +2069,12 @@ def sending():
                 for k, v in (("deb_sp_link", link), ("deb_sp_drive", info["drive_id"]), ("deb_sp_root", info["root_id"]),
                              ("deb_sp_web", info["web_url"]), ("deb_sp_name", f"{info.get('site_name') or ''} › {info['name']}")):
                     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
+                conn.commit()
+                n_ok = sum(1 for r in conn.execute("SELECT id FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL"
+                                                     " AND pdf_file_id IS NOT NULL ORDER BY sent_at LIMIT 200").fetchall()
+                           if (save_to_sharepoint(conn, r["id"]) or (False,))[0])
+                if n_ok:
+                    flash(f"{n_ok} eerder verzonden factu{'ren' if n_ok != 1 else 'ur'} in SharePoint gezet.", "ok")
         if "fixed_cc" in request.form:
             fixed = _addr_list(request.form.get("fixed_cc"))
             bad = [a for a in fixed if not _EMAIL.match(a)]
@@ -2091,7 +2097,7 @@ def sending():
     return render_template("debiteuren/verzenden.html", rows=rows, SEND_STATES=SEND_STATES, users=users,
                            prep=set(preparers()), prep_set=bool(_user_list("deb_send_preparers")), appr=set(approvers()),
                            fixed_cc=", ".join(send_cc_fixed()), sp_link=_setting("deb_sp_link") or "", sp_name=_setting("deb_sp_name") or "",
-                           sp_web=_setting("deb_sp_web") or "")
+                           sp_web=_setting("deb_sp_web") or "", sp_todo=sp_backlog() if _setting("deb_sp_root") else 0)
 
 
 def approvals_of(s):
@@ -2376,6 +2382,35 @@ def scheduled_sp_save(conn, app, state):
             res = save_to_sharepoint(conn, r["id"])
             if res and not res[0] and "niet bereikbaar" in res[1]:
                 break
+
+
+def sp_backlog(conn=None):
+    q = "SELECT COUNT(*) c FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL AND pdf_file_id IS NOT NULL"
+    return (conn.execute(q).fetchone() if conn is not None else query(q, one=True))["c"]
+
+
+@bp.route("/sharepoint-alles", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def sp_save_all():
+    """Alle met WorkPortal verzonden facturen die nog niet in SharePoint staan nu opslaan (terugwerkend)."""
+    conn = get_db()
+    if not sp_target(conn):
+        flash("Stel eerst de SharePoint-map voor verzonden facturen in.", "error")
+        return redirect(url_for("debiteuren.sending"))
+    ok = bad = 0
+    last = ""
+    for r in conn.execute("SELECT id FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL AND pdf_file_id IS NOT NULL"
+                          " ORDER BY sent_at LIMIT 200").fetchall():
+        res = save_to_sharepoint(conn, r["id"])
+        if res and res[0]:
+            ok += 1
+        else:
+            bad += 1
+            last = res[1] if res else ""
+            if "niet bereikbaar" in last or "geen toegang" in last.lower() or "403" in last:
+                break
+    flash(f"{ok} factu{'ren' if ok != 1 else 'ur'} opgeslagen in SharePoint." + (f" {bad} mislukt: {last}" if bad else ""), "ok" if not bad else "error")
+    return redirect(url_for("debiteuren.sending"))
 
 
 @bp.route("/<int:sid>/sharepoint", methods=["POST"])

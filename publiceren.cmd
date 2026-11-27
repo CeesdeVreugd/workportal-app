@@ -12,7 +12,7 @@ setlocal
 
 set "DOEL=C:\1 Automatiserings projecten\DeVreugdProductietechniek\WorkPortal-App\WorkPortal"
 set "REPO=https://github.com/CeesdeVreugd/workportal-app.git"
-set "OMSCHRIJVING=WorkPortal V245: factuurbedrag uit de nieuwste PDF, ook excl. btw"
+set "OMSCHRIJVING=WorkPortal V246: eerder verzonden facturen terugwerkend in SharePoint"
 
 echo.
 echo ============================================

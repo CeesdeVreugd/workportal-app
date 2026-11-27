@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V246 (2.27.5)
+- Verkoopfacturen › SharePoint terugwerkend: na het instellen van de map worden alle eerder met WorkPortal verzonden facturen meteen in de juiste jaarmap gezet. Bij Nieuwe facturen › Instellingen staat hoeveel er nog niet in SharePoint staan, met knop *Nu opslaan*; de planner doet het daarnaast elk kwartier vanzelf.
+
 ## V245 (2.27.4)
 - Verkoopfacturen: zolang SnelStart/Excel nog niets over een factuur heeft gemeld, is de **nieuwste PDF leidend** voor bedrag, factuurdatum en vervaldatum (een opnieuw geëxporteerde, gecorrigeerde factuur overschrijft dus het oude bedrag; ook het openstaande bedrag). Daarnaast wordt het bedrag excl. btw uitgelezen en getoond ("€ 806,33 incl. btw · excl. € 666,39"). Eenmalig opnieuw uitlezen (PARSE_VERSION 9).
 
