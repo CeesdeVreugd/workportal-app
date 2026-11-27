@@ -1353,3 +1353,10 @@ section.card, form.card, .card.form { container-type: inline-size; }
 .mailprev .dl { grid-template-columns: 100px minmax(0, 1fr); }
 .mailprev .dl dd { overflow-wrap: anywhere; }
 .mp-addr { display: block; }
+@media (max-width: 900px) {
+  #deb-table td.debnr { white-space: normal; min-width: 0; }
+  #deb-table .table { table-layout: auto; width: 100%; }
+  #deb-table td.num { white-space: nowrap; vertical-align: top; }
+  .debsearch input[type=search] { flex: 1 1 100% !important; order: 3; min-width: 0; }
+  .debsearch select { flex: 1 1 auto; }
+}

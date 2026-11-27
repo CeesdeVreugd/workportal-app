@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V249 (2.27.8)
+- Verkoopfacturen op de telefoon: de lijst past weer op het scherm (lange klantnamen lopen door op een volgende regel; bedrag en "x dg te laat" staan rechts in beeld, met "ter goedkeuring"/"klaar te zetten"). Zoekveld op een eigen regel onder jaar en Zoeken.
+
 ## V248 (2.27.7)
 - Verkoopfacturen › Instellingen: knop **Controleren en opslaan** (altijd zichtbaar als de map gekoppeld is) en ook bij elke klik op *Opslaan*: ruimt een kale jaarmap ('2026') op naar 'Facturen 2026' en zet alle met WorkPortal verzonden facturen (terugwerkend) in de juiste jaarmap, met bijgewerkte links.
 
