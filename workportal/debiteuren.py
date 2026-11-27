@@ -2326,6 +2326,47 @@ def sp_target(conn=None):
     return (d, r) if d and r else None
 
 
+def _year_dir(g, drive, root, year):
+    """Jaarmap zoals de bestaande indeling ('Facturen 2026'); aanmaken als hij er niet is. Een kale map '2026' (eerder
+    door WorkPortal gemaakt) wordt in 'Facturen 2026' opgeruimd."""
+    from . import sharepoint as sp
+    kids = [c for c in g.children(drive, root) if "folder" in c]
+    yre = re.compile(r"(?<!\d)" + year + r"(?!\d)")
+    named = [c for c in kids if yre.search(c.get("name") or "") and (c.get("name") or "").strip() != year]
+    bare = next((c for c in kids if (c.get("name") or "").strip() == year), None)
+    if named:
+        ydir = sorted(named, key=lambda c: (not (c.get("name") or "").lower().startswith("facturen"), c.get("name")))[0]
+    else:
+        # zelfde opmaak als de andere jaarmappen (bijv. 'Facturen 2025'), anders 'Facturen <jaar>'
+        yr_any = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+        pat = next((yr_any.sub(year, c["name"]) for c in kids
+                    if yr_any.search(c.get("name") or "") and (c.get("name") or "").strip() != yr_any.search(c["name"]).group(0)), None)
+        name = pat or f"Facturen {year}"
+        try:
+            ydir = g.create_folder(drive, root, name)
+        except sp.GraphError as exc:
+            if exc.status != 409:
+                raise
+            ydir = g.item_by_path(drive, name, root)
+    ydir = dict(ydir, _cleaned=bool(bare and bare["id"] != ydir["id"]))
+    if bare and bare["id"] != ydir["id"]:   # opruimen: inhoud van '2026' naar 'Facturen 2026', lege map weg
+        for c in g.children(drive, bare["id"]):
+            try:
+                g.move(drive, c["id"], ydir["id"])
+            except sp.GraphError as exc:
+                if exc.status == 409:   # staat al in de goede map: dubbele weg
+                    try:
+                        g.delete_path(drive, bare["id"], c["name"])
+                    except sp.GraphError:
+                        pass
+        try:
+            if not g.children(drive, bare["id"]):
+                g.delete_path(drive, root, bare["name"])
+        except sp.GraphError:
+            pass
+    return ydir
+
+
 def save_to_sharepoint(conn, sid):
     """Factuur-PDF in <map>/<jaar>/Factuur_<nr>.pdf zetten. Geeft (ok, melding) of None als er geen map is ingesteld."""
     from . import sharepoint as sp
@@ -2348,14 +2389,7 @@ def save_to_sharepoint(conn, sid):
     drive, root = tgt
     try:
         g = sp.client()
-        ydir = next((c for c in g.children(drive, root) if "folder" in c and c.get("name") == year), None)
-        if not ydir:
-            try:
-                ydir = g.create_folder(drive, root, year)
-            except sp.GraphError as exc:
-                if exc.status != 409:
-                    raise
-                ydir = g.item_by_path(drive, year, root)
+        ydir = _year_dir(g, drive, root, year)
         res = g.upload(drive, ydir["id"], f"Factuur_{inv['number']}.pdf", data, conflict="replace") or {}
     except sp.GraphError as exc:
         msg = f"SharePoint gaf een fout: {exc.message}"
@@ -2363,8 +2397,10 @@ def save_to_sharepoint(conn, sid):
         msg = f"SharePoint niet bereikbaar ({type(exc).__name__})"
     else:
         conn.execute("UPDATE sales_invoices SET sp_saved_at = ?, sp_web_url = ?, sp_error = NULL WHERE id = ?", (now_iso(), res.get("webUrl"), sid))
+        if ydir.get("_cleaned"):   # verplaatste facturen hebben een nieuwe link: opnieuw laten opslaan (overschrijft in de goede map)
+            conn.execute("UPDATE sales_invoices SET sp_saved_at = NULL WHERE id <> ? AND sp_web_url LIKE ?", (sid, f"%/{year}/Factuur_%"))
         conn.commit()
-        return True, f"Opgeslagen in SharePoint: {year}/Factuur_{inv['number']}.pdf"
+        return True, f"Opgeslagen in SharePoint: {ydir.get('name') or year}/Factuur_{inv['number']}.pdf"
     conn.execute("UPDATE sales_invoices SET sp_error = ? WHERE id = ?", (msg[:300], sid))
     conn.commit()
     return False, msg
