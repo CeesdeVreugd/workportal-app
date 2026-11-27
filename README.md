@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V250 (2.27.9)
+- Inkoopfacturen › mail naar 01-Verwerkt: elk half uur controle. Staat de mail van een factuur die nog níet door de boekhouder is afgerond in 01-Verwerkt (bijv. door een Outlook-regel of met de hand), dan gaat hij terug naar Postvak IN, met een regel in het logboek van de kaart. Bij het afronden gaan van onze eigen verzonden mails alleen die van déze factuur mee ([WP-F…]).
+
 ## V249 (2.27.8)
 - Verkoopfacturen op de telefoon: de lijst past weer op het scherm (lange klantnamen lopen door op een volgende regel; bedrag en "x dg te laat" staan rechts in beeld, met "ter goedkeuring"/"klaar te zetten"). Zoekveld op een eigen regel onder jaar en Zoeken.
 

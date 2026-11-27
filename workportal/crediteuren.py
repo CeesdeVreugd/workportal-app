@@ -1281,9 +1281,10 @@ def scheduled_poll(conn, app, state):
     state["cred_poll"] = t
     try:
         n, _ = poll_mailbox(conn, _upload_dir(app))
-        if _setting(conn, "cred_repair_v1", "") != "1":   # eenmalig: ten onrechte gearchiveerde mails terug
+        # elk half uur: mails van facturen die nog níet door de boekhouder zijn afgerond horen niet in de Verwerkt-map
+        if t - state.get("cred_repair", 0) > 1800:
+            state["cred_repair"] = t
             k = repair_archived(conn)
-            _set(conn, "cred_repair_v1", "1")
             if k:
                 print(f"[WorkPortal] Inkoopfacturen: {k} mail(s) uit de Verwerkt-map terug naar Postvak IN", flush=True)
         _set(conn, "cred_last_poll", now_iso())
@@ -1901,9 +1902,11 @@ def archive_mails(conn, iid, box, folder, back=False):
         other_cards = {(x["mail_id"] or "").split(":")[0] for x in conn.execute(
             "SELECT mail_id FROM invoices WHERE id <> ? AND source = 'mail' AND mail_id IS NOT NULL", (iid,))}
         for c in convs:
-            for m in graph_conversation(box, c, fields="id,parentFolderId,from"):
+            for m in graph_conversation(box, c, fields="id,parentFolderId,from,subject"):
                 frm = (((m.get("from") or {}).get("emailAddress") or {}).get("address") or "").lower()
-                if (frm == own or m["id"] in ids) and m["id"] not in other_cards:
+                subj = m.get("subject") or ""
+                mine = frm == own and (f"[WP-F{iid}]" in subj or not re.search(r"\[WP-F\d+\]", subj))
+                if (mine or m["id"] in ids) and m["id"] not in other_cards:
                     msgs[m["id"]] = m.get("parentFolderId")
         for mid in ids:   # bijv. een reactie die alleen via [WP-F] in het onderwerp gekoppeld is
             msgs.setdefault(mid, None)
@@ -2013,7 +2016,8 @@ def repair_archived(conn, box=None):
         if nid:
             conn.execute("UPDATE invoices SET mail_id = ? WHERE id = ?", (nid + r["mail_id"][len(mid):], r["id"]))
         conn.execute("UPDATE invoices SET mail_archive = NULL WHERE id = ? AND mail_archive = 'verplaatst'", (r["id"],))
-        log(conn, r["id"], f"Mail stond in '{folder}' terwijl de factuur nog niet is afgerond: teruggezet naar Postvak IN")
+        log(conn, r["id"], f"Mail stond in '{folder}' terwijl de factuur nog niet door de boekhouder is afgerond (niet door WorkPortal verplaatst;"
+                           f" mogelijk een regel in Outlook of met de hand): teruggezet naar Postvak IN")
         conn.commit()
         n += 1
     return n
