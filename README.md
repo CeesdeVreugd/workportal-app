@@ -1020,6 +1020,9 @@ Op een tablet of pc die door meerdere mensen wordt gebruikt: knop **Andere gebru
 ## V189 (2.13.5)
 - Projecten en orders: blok **Logboek** onderaan (wie wanneer wat): aanmaken, wijzigen (met welke velden), afronden/heropenen, omzetten, gespreksnotities (ook verwijderen), afvinkpunten, actiepunten, aantekeningen, 3D-modellen, opleverdocumenten, bestanden in de map, afdrukken en certificaten mailen. De laatste 15 zichtbaar, de rest via "Alles tonen".
 
+## V248 (2.27.7)
+- Verkoopfacturen › Instellingen: knop **Controleren en opslaan** (altijd zichtbaar als de map gekoppeld is) en ook bij elke klik op *Opslaan*: ruimt een kale jaarmap ('2026') op naar 'Facturen 2026' en zet alle met WorkPortal verzonden facturen (terugwerkend) in de juiste jaarmap, met bijgewerkte links.
+
 ## V247 (2.27.6)
 - Verkoopfacturen › SharePoint: de bestaande jaarmappen worden gebruikt (**Facturen 2026**, herkend op het jaartal); bestaat er geen, dan wordt hij in dezelfde opmaak aangemaakt. Herstel: de eerder aangemaakte map **2026** wordt opgeruimd: de facturen erin gaan naar Facturen 2026 (dubbele worden weggegooid), de lege map gaat naar de prullenbak en de links bij de facturen worden bijgewerkt.
 

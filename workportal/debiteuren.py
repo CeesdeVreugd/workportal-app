@@ -2070,11 +2070,16 @@ def sending():
                              ("deb_sp_web", info["web_url"]), ("deb_sp_name", f"{info.get('site_name') or ''} › {info['name']}")):
                     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
                 conn.commit()
-                n_ok = sum(1 for r in conn.execute("SELECT id FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL"
-                                                     " AND pdf_file_id IS NOT NULL ORDER BY sent_at LIMIT 200").fetchall()
-                           if (save_to_sharepoint(conn, r["id"]) or (False,))[0])
-                if n_ok:
-                    flash(f"{n_ok} eerder verzonden factu{'ren' if n_ok != 1 else 'ur'} in SharePoint gezet.", "ok")
+            if link and sp_target(conn):   # bij elke keer opslaan: jaarmappen controleren en verzonden facturen (terugwerkend) opslaan
+                conn.commit()
+                try:
+                    sp_repair(conn)
+                    n_ok, n_bad, last = _save_backlog(conn)
+                    if n_ok or n_bad:
+                        flash(f"{n_ok} verzonden factu{'ren' if n_ok != 1 else 'ur'} in de juiste jaarmap gezet." + (f" {n_bad} mislukt: {last}" if n_bad else ""),
+                              "ok" if not n_bad else "error")
+                except Exception as exc:  # noqa: BLE001
+                    flash(f"SharePoint controleren mislukt: {exc}", "error")
         if "fixed_cc" in request.form:
             fixed = _addr_list(request.form.get("fixed_cc"))
             bad = [a for a in fixed if not _EMAIL.match(a)]
@@ -2425,27 +2430,59 @@ def sp_backlog(conn=None):
     return (conn.execute(q).fetchone() if conn is not None else query(q, one=True))["c"]
 
 
-@bp.route("/sharepoint-alles", methods=["POST"])
-@require("debiteuren", BEWERKEN)
-def sp_save_all():
-    """Alle met WorkPortal verzonden facturen die nog niet in SharePoint staan nu opslaan (terugwerkend)."""
-    conn = get_db()
-    if not sp_target(conn):
-        flash("Stel eerst de SharePoint-map voor verzonden facturen in.", "error")
-        return redirect(url_for("debiteuren.sending"))
+def sp_repair(conn):
+    """Jaarmappen controleren (kale map '2026' opruimen naar 'Facturen 2026') en facturen die niet in de goede jaarmap
+    staan opnieuw laten opslaan. Geeft het aantal facturen dat opnieuw moet."""
+    from . import sharepoint as sp
+    tgt = sp_target(conn)
+    if not tgt:
+        return 0
+    drive, root = tgt
+    g = sp.client()
+    years = sorted({(r["y"] or "") for r in conn.execute(
+        "SELECT COALESCE(substr(invoice_date, 1, 4), substr(number, 1, 4)) AS y FROM sales_invoices WHERE send_state = 'verzonden'")} - {""})
+    for y in years:
+        if not y.isdigit():
+            continue
+        if any((c.get("name") or "").strip() == y for c in g.children(drive, root) if "folder" in c):
+            _year_dir(g, drive, root, y)
+        conn.execute("UPDATE sales_invoices SET sp_saved_at = NULL WHERE send_state = 'verzonden' AND sp_web_url LIKE ?", (f"%/{y}/Factuur_%",))
+    conn.commit()
+    return sp_backlog(conn)
+
+
+def _save_backlog(conn, limit=200):
     ok = bad = 0
     last = ""
     for r in conn.execute("SELECT id FROM sales_invoices WHERE send_state = 'verzonden' AND sp_saved_at IS NULL AND pdf_file_id IS NOT NULL"
-                          " ORDER BY sent_at LIMIT 200").fetchall():
+                          " ORDER BY sent_at LIMIT ?", (limit,)).fetchall():
         res = save_to_sharepoint(conn, r["id"])
         if res and res[0]:
             ok += 1
         else:
             bad += 1
             last = res[1] if res else ""
-            if "niet bereikbaar" in last or "geen toegang" in last.lower() or "403" in last:
+            if "niet bereikbaar" in last or "403" in last:
                 break
-    flash(f"{ok} factu{'ren' if ok != 1 else 'ur'} opgeslagen in SharePoint." + (f" {bad} mislukt: {last}" if bad else ""), "ok" if not bad else "error")
+    return ok, bad, last
+
+
+@bp.route("/sharepoint-alles", methods=["POST"])
+@require("debiteuren", BEWERKEN)
+def sp_save_all():
+    """Controleren en herstellen: jaarmappen goed, alle met WorkPortal verzonden facturen in de juiste map (terugwerkend)."""
+    conn = get_db()
+    if not sp_target(conn):
+        flash("Stel eerst de SharePoint-map voor verzonden facturen in.", "error")
+        return redirect(url_for("debiteuren.sending"))
+    try:
+        sp_repair(conn)
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Controleren van de jaarmappen mislukt: {exc}", "error")
+        return redirect(url_for("debiteuren.sending"))
+    ok, bad, last = _save_backlog(conn)
+    flash((f"{ok} factu{'ren' if ok != 1 else 'ur'} (opnieuw) opgeslagen in de juiste jaarmap." if ok else "Alle verzonden facturen staan in de juiste jaarmap.")
+          + (f" {bad} mislukt: {last}" if bad else ""), "ok" if not bad else "error")
     return redirect(url_for("debiteuren.sending"))
 
 

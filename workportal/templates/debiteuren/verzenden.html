@@ -37,8 +37,8 @@
     </div>
     <label class="f" style="margin-top:12px">SharePoint-map voor verzonden facturen<input type="url" name="sp_link" value="{{ sp_link }}" placeholder="Plak de link van de map 01-Uitgaande facturen">
       <span class="hint">{% if sp_name %}Gekoppeld: {% if sp_web %}<a href="{{ sp_web }}" target="_blank" rel="noopener">{{ sp_name }}</a>{% else %}{{ sp_name }}{% endif %}. {% endif %}Elke verzonden factuur komt hierin, in een map per jaar (wordt aangemaakt als hij er nog niet is). Open de map in SharePoint en kopieer de link uit de adresbalk.</span></label>
-    {% if sp_todo %}<p class="small" style="margin:4px 0 0">{{ sp_todo }} verzonden factu{{ 'ren staan' if sp_todo != 1 else 'ur staat' }} nog niet in SharePoint (dit gebeurt ook vanzelf elk kwartier).
-      <button class="btn sm" form="spall">{{ icon('upload') }}Nu opslaan</button></p>{% endif %}
+    {% if sp_name %}<p class="small" style="margin:4px 0 0">{% if sp_todo %}{{ sp_todo }} verzonden factu{{ 'ren staan' if sp_todo != 1 else 'ur staat' }} nog niet in SharePoint (gebeurt ook vanzelf elk kwartier). {% endif %}
+      <button class="btn sm" form="spall">{{ icon('upload') }}Controleren en opslaan</button> <span class="muted">zet alle verzonden facturen in de juiste jaarmap</span></p>{% endif %}
     <label class="f" style="margin-top:12px">Altijd in CC<input type="text" name="fixed_cc" value="{{ fixed_cc }}"><span class="hint">Gaat bij elke verzonden factuur mee in CC. Meerdere adressen scheiden met een komma.</span></label>
     <div class="actions"><button class="btn primary">Opslaan</button></div>
   </form></details></section>
